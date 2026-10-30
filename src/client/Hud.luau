@@ -96,7 +96,7 @@ moneyLabel.Size = UDim2.fromScale(1, 1)
 local popups = Instance.new("Frame")
 popups.BackgroundTransparency = 1
 popups.AnchorPoint = Vector2.new(0.5, 0)
-popups.Position = UDim2.new(0.5, 0, 0, 60)
+popups.Position = UDim2.new(0.5, 0, 0, 140)
 popups.Size = UDim2.fromOffset(400, 200)
 popups.Parent = gui
 
@@ -196,6 +196,7 @@ side.Position = UDim2.new(0, 12, 0.5, 0)
 side.Size = UDim2.fromOffset(120, 120)
 side.Parent = gui
 local garageButton = button(side, "GARAGE", ACCENT)
+garageButton.Name = "GarageButton"
 garageButton.Size = UDim2.fromOffset(120, 50)
 local storeButton = button(side, "STORE", Color3.fromRGB(60, 120, 220))
 storeButton.Position = UDim2.fromOffset(0, 60)
@@ -237,6 +238,7 @@ local function panel(title: string): (Frame, ScrollingFrame)
 end
 
 local garage, garageList = panel("GARAGE")
+garage.Name = "Garage"
 local grid = Instance.new("UIGridLayout")
 grid.CellSize = UDim2.fromOffset(240, 300)
 grid.CellPadding = UDim2.fromOffset(12, 12)
@@ -294,6 +296,7 @@ for _, stats in Vehicles.List do
 	local card = Instance.new("Frame")
 	card.BackgroundColor3 = INK
 	card.LayoutOrder = stats.order
+	card.Name = stats.id
 	card.Parent = garageList
 	corner(card, 14)
 	preview(card, stats.id)
@@ -327,6 +330,7 @@ for _, stats in Vehicles.List do
 	price.Size = UDim2.fromOffset(100, 28)
 	price.TextXAlignment = Enum.TextXAlignment.Left
 	local action = button(card, "SPAWN", GOOD)
+	action.Name = "Action"
 	action.AnchorPoint = Vector2.new(1, 0)
 	action.Position = UDim2.new(1, -10, 0, 258)
 	action.Size = UDim2.fromOffset(110, 34)
@@ -648,7 +652,10 @@ function Hud.start()
 	refreshStore()
 	-- first visit: open the garage so the starter car is one click away
 	task.delay(2, function()
-		if not Drive.state.driving then
+		while not player:GetAttribute("DataReady") do
+			task.wait(0.2)
+		end
+		if not Drive.state.driving and player:GetAttribute("Tutorial") == 1 then
 			garage.Visible = true
 			refreshCards()
 		end

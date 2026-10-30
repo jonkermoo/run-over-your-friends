@@ -14,6 +14,7 @@ export type Result = {
 	buildings: Folder,
 	walkPoints: { Vector3 },
 	spawnPoints: { Vector3 },
+	crowdPoints: { Vector3 },
 }
 
 local COLORS = {
@@ -191,10 +192,13 @@ function MapBuilder.build(): Result
 	buildings.Parent = map
 	local walkPoints: { Vector3 } = {}
 	local spawnPoints: { Vector3 } = {}
+	local crowdPoints: { Vector3 } = {}
 
-	local old = workspace:FindFirstChild("Baseplate")
-	if old then
-		old:Destroy()
+	-- a template place's Baseplate and SpawnLocation would fight the map (players must appear at the plaza)
+	for _, old in workspace:GetChildren() do
+		if old.Name == "Baseplate" or old:IsA("SpawnLocation") then
+			old:Destroy()
+		end
 	end
 
 	local G = M.GroundSize
@@ -350,16 +354,17 @@ function MapBuilder.build(): Result
 				local f = Instance.new("Part")
 				f.Shape = Enum.PartType.Cylinder
 				f.Anchored = true
-				f.Size = Vector3.new(4, 40, 40)
-				f.CFrame = CFrame.new(cx, 1.5, cz) * CFrame.Angles(0, 0, math.pi / 2)
+				f.Size = Vector3.new(0.6, 40, 40) -- flat, so new drivers don't beach on it
+				f.CFrame = CFrame.new(cx, 0.05, cz) * CFrame.Angles(0, 0, math.pi / 2)
 				f.Color = COLORS.concrete
 				f.Parent = static
-				for k = 1, 16 do
-					local a = k / 16 * math.pi * 2
-					table.insert(
-						walkPoints,
-						centre + Vector3.new(math.cos(a) * 60, 0.5, math.sin(a) * 60)
-					)
+				-- the first crowd: right in front of where new players appear
+				for k = 1, 24 do
+					local a = k / 24 * math.pi * 2
+					local r = if k % 2 == 0 then 50 else 80
+					local p = centre + Vector3.new(math.cos(a) * r, 0.5, math.sin(a) * r)
+					table.insert(walkPoints, p)
+					table.insert(crowdPoints, p)
 				end
 			elseif distFromCentre < 2.5 and roll < 0.8 or roll < 0.35 then
 				-- downtown towers
@@ -622,7 +627,12 @@ function MapBuilder.build(): Result
 	end
 
 	map.Parent = workspace
-	return { buildings = buildings, walkPoints = walkPoints, spawnPoints = spawnPoints }
+	return {
+		buildings = buildings,
+		walkPoints = walkPoints,
+		spawnPoints = spawnPoints,
+		crowdPoints = crowdPoints,
+	}
 end
 
 return MapBuilder

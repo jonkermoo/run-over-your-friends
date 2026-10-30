@@ -30,10 +30,11 @@ local NpcService = require(script.NpcService)
 local BuildingService = require(script.BuildingService)
 local WreckerService = require(script.WreckerService)
 local MapBuilder = require(script.MapBuilder)
+local OnboardingService = require(script.Onboarding)
 
 local world = MapBuilder.build()
 BuildingService.register(world.buildings)
-NpcService.setWalkPoints(world.walkPoints)
+NpcService.setWalkPoints(world.walkPoints, world.crowdPoints)
 VehicleService.setSpawnPoints(world.spawnPoints)
 
 Data.start()
@@ -42,6 +43,7 @@ VehicleService.start()
 NpcService.start()
 BuildingService.start()
 WreckerService.start()
+OnboardingService.start()
 
 -- shop: buy a vehicle with in-game money (the Roadster can also come from its pass)
 Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
@@ -57,7 +59,7 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 	profile.money -= stats.price
 	profile.owned[stats.id] = true
 	Data.changed(player)
-	Net.remote("Popup"):FireClient(player, stats.name .. " unlocked!", "big")
+	OnboardingService.purchased(player, stats)
 end)
 
 -- like reward: honour system, once per account (Roblox can't tell a game whether you liked it)

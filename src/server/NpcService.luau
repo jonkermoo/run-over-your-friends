@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
@@ -28,8 +29,15 @@ local pool: { Friend } = {}
 local poolIds: { [number]: boolean } = {}
 local descriptions: { [number]: HumanoidDescription } = {}
 local walkPoints: { Vector3 } = {}
-local npcs: { [Model]: { target: Vector3?, busyUntil: number, lastPaid: { [Player]: number } } } =
-	{}
+type NpcState = {
+	target: Vector3?,
+	busyUntil: number,
+	lastPaid: { [Player]: number },
+	crowd: boolean,
+}
+local npcs: { [Model]: NpcState } = {}
+local crowdPoints: { Vector3 } = {} -- the spawn plaza: a crowd always waits here, so a first hit comes fast
+local knockListeners: { (Player) -> () } = {}
 local combos: { [Player]: { count: number, last: number } } = {}
 local lastCall: { [Player]: { [string]: number } } = {}
 local random = Random.new()
@@ -101,7 +109,10 @@ local function fallbackDescription(): HumanoidDescription
 	return d
 end
 
-local function pickWalkPoint(near: Vector3?): Vector3
+local function pickWalkPoint(near: Vector3?, crowd: boolean?): Vector3
+	if crowd and #crowdPoints > 0 then
+		return crowdPoints[random:NextInteger(1, #crowdPoints)]
+	end
 	if #walkPoints == 0 then
 		return Vector3.new(0, 3, 0)
 	end
@@ -116,7 +127,7 @@ local function pickWalkPoint(near: Vector3?): Vector3
 	return walkPoints[random:NextInteger(1, #walkPoints)]
 end
 
-local function spawnNpc()
+local function spawnNpc(crowd: boolean?)
 	local friend: Friend? = if #pool > 0 then pool[random:NextInteger(1, #pool)] else nil
 	local desc: HumanoidDescription? = nil
 	if friend then
@@ -155,7 +166,7 @@ local function spawnNpc()
 			d.CollisionGroup = "Npcs"
 		end
 	end
-	local at = pickWalkPoint(nil)
+	local at = pickWalkPoint(nil, crowd)
 	npc:PivotTo(
 		CFrame.new(at + Vector3.new(0, 3, 0))
 			* CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0)
@@ -165,7 +176,7 @@ local function spawnNpc()
 	pcall(function()
 		root:SetNetworkOwner(nil)
 	end)
-	npcs[npc] = { target = nil, busyUntil = 0, lastPaid = {} }
+	npcs[npc] = { target = nil, busyUntil = 0, lastPaid = {}, crowd = crowd == true }
 end
 
 -- knock an NPC down and send it flying; pays `share` of the hit to `player` (if any)
@@ -217,11 +228,14 @@ function NpcService.knock(
 			)} COMBO`
 		end
 		Net.remote("Popup"):FireClient(player, text, "money")
+		for _, listener in knockListeners do
+			task.spawn(listener, player)
+		end
 	end
 	task.delay(World.Npc.RespawnSeconds, function()
 		npcs[npc] = nil
 		npc:Destroy()
-		spawnNpc()
+		spawnNpc(state.crowd)
 	end)
 end
 
@@ -383,8 +397,14 @@ local function onFeature(player: Player, feature: unknown)
 	end
 end
 
-function NpcService.setWalkPoints(points: { Vector3 })
+function NpcService.setWalkPoints(points: { Vector3 }, crowd: { Vector3 })
 	walkPoints = points
+	crowdPoints = crowd
+end
+
+-- called with the player whenever they knock an NPC down for money
+function NpcService.onKnock(listener: (Player) -> ())
+	table.insert(knockListeners, listener)
 end
 
 function NpcService.start()
@@ -403,11 +423,17 @@ function NpcService.start()
 	task.spawn(function()
 		task.wait(2)
 		while true do
-			local count = 0
-			for _ in npcs do
+			local count, crowd = 0, 0
+			for _, state in npcs do
 				count += 1
+				if state.crowd then
+					crowd += 1
+				end
 			end
-			if count < CFG.Count then
+			if crowd < Onboarding.SpawnCrowd then
+				spawnNpc(true)
+				task.wait(0.15)
+			elseif count < CFG.Count then
 				spawnNpc()
 				task.wait(0.15)
 			else
@@ -426,7 +452,7 @@ function NpcService.start()
 					local humanoid = npc:FindFirstChildOfClass("Humanoid")
 					if humanoid then
 						humanoid.WalkSpeed = CFG.WalkSpeed
-						local target = pickWalkPoint(npc:GetPivot().Position)
+						local target = pickWalkPoint(npc:GetPivot().Position, state.crowd)
 						walkTo(npc, target, random:NextNumber(6, 14), false)
 					end
 				end

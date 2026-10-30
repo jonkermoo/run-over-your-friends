@@ -15,6 +15,7 @@ export type Profile = {
 	owned: { [string]: boolean },
 	likeClaimed: boolean,
 	roadsterPassPaid: boolean,
+	tutorial: number, -- Config/Onboarding Steps
 }
 
 local Data = {}
@@ -35,6 +36,7 @@ local function default(): Profile
 		owned = { [Vehicles.Starter] = true },
 		likeClaimed = false,
 		roadsterPassPaid = false,
+		tutorial = 1,
 	}
 end
 
@@ -56,6 +58,7 @@ local function publish(player: Player, profile: Profile)
 	end
 	player:SetAttribute("Owned", table.concat(owned, ","))
 	player:SetAttribute("LikeClaimed", profile.likeClaimed)
+	player:SetAttribute("Tutorial", profile.tutorial)
 end
 
 function Data.get(player: Player): Profile?
@@ -110,6 +113,7 @@ local function load(player: Player)
 				profile.money = tonumber(decoded.money) or profile.money
 				profile.likeClaimed = decoded.likeClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
+				profile.tutorial = tonumber(decoded.tutorial) or 99 -- saves from before the tutorial skip it
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do
 						if yes == true and Vehicles.ById[id] then

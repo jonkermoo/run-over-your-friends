@@ -1,0 +1,457 @@
+--!strict
+-- First-session guidance and goals: the goal card under the money (spawn → run over 3 → next ride),
+-- a bouncing arrow over the nearest pedestrian, glowing GARAGE button, timed hints for stuck players,
+-- one-time tips when you first drive a vehicle with a feature, and the confetti moment.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local Net = require(ReplicatedStorage.Shared.Net)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Drive = require(script.Parent.Drive)
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
+local Steps = Onboarding.Steps
+
+local Guide = {}
+
+local INK = Color3.fromRGB(16, 16, 22)
+local MONEY = Color3.fromRGB(120, 230, 120)
+local GOLD = Color3.fromRGB(255, 200, 70)
+local WHITE = Color3.new(1, 1, 1)
+local BOLD = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+local CONFETTI = {
+	Color3.fromRGB(255, 80, 80),
+	Color3.fromRGB(255, 200, 60),
+	Color3.fromRGB(80, 200, 120),
+	Color3.fromRGB(80, 160, 255),
+	Color3.fromRGB(200, 110, 255),
+}
+
+local function corner(parent: Instance, r: number)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, r)
+	c.Parent = parent
+end
+
+local function label(
+	parent: Instance,
+	text: string,
+	size: number,
+	font: Font,
+	color: Color3
+): TextLabel
+	local l = Instance.new("TextLabel")
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.TextSize = size
+	l.FontFace = font
+	l.TextColor3 = color
+	l.Parent = parent
+	return l
+end
+
+local function money(n: number): string
+	local s = tostring(math.floor(n))
+	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if string.sub(out, 1, 1) == "," then
+		out = string.sub(out, 2)
+	end
+	return "$" .. out
+end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "Guide"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 5
+gui.Parent = playerGui
+
+---------------------------------------------------------------- goal card
+
+local card = Instance.new("Frame")
+card.AnchorPoint = Vector2.new(0.5, 0)
+card.Position = UDim2.new(0.5, 0, 0, 58)
+card.Size = UDim2.fromOffset(420, 58)
+card.BackgroundColor3 = INK
+card.BackgroundTransparency = 0.2
+card.Visible = false
+card.Parent = gui
+corner(card, 14)
+local stroke = Instance.new("UIStroke")
+stroke.Color = GOLD
+stroke.Thickness = 2
+stroke.Transparency = 1
+stroke.Parent = card
+local tag = label(card, "GOAL", 11, BOLD, GOLD)
+tag.Position = UDim2.fromOffset(14, 6)
+tag.Size = UDim2.fromOffset(60, 12)
+tag.TextXAlignment = Enum.TextXAlignment.Left
+local goalText = label(card, "", 16, BOLD, WHITE)
+goalText.Position = UDim2.fromOffset(14, 18)
+goalText.Size = UDim2.new(1, -28, 0, 20)
+goalText.TextXAlignment = Enum.TextXAlignment.Left
+goalText.TextTruncate = Enum.TextTruncate.AtEnd
+local barBack = Instance.new("Frame")
+barBack.Position = UDim2.fromOffset(14, 42)
+barBack.Size = UDim2.new(1, -28, 0, 6)
+barBack.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+barBack.Parent = card
+corner(barBack, 3)
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.fromScale(0, 1)
+barFill.BackgroundColor3 = MONEY
+barFill.Parent = barBack
+corner(barFill, 3)
+local hintText = label(gui, "", 15, BOLD, GOLD)
+hintText.AnchorPoint = Vector2.new(0.5, 0)
+hintText.Position = UDim2.new(0.5, 0, 0, 120)
+hintText.Size = UDim2.fromOffset(500, 20)
+hintText.TextStrokeTransparency = 0.4
+hintText.Visible = false
+
+---------------------------------------------------------------- arrow over the nearest pedestrian
+
+local arrow = Instance.new("BillboardGui")
+arrow.Name = "GuideArrow"
+arrow.Size = UDim2.fromOffset(60, 60)
+arrow.StudsOffset = Vector3.new(0, 5, 0)
+arrow.AlwaysOnTop = true
+arrow.Enabled = false
+arrow.ResetOnSpawn = false
+arrow.Parent = playerGui -- a BillboardGui inside a ScreenGui never draws
+-- a chevron from two bars (font glyphs like ▼ don't draw)
+for _, side in { -1, 1 } do
+	local bar = Instance.new("Frame")
+	bar.AnchorPoint = Vector2.new(0.5, 0.5)
+	bar.Position = UDim2.new(0.5, side * 11, 0.45, 0)
+	bar.Size = UDim2.fromOffset(34, 10)
+	bar.Rotation = side * -45
+	bar.BackgroundColor3 = GOLD
+	bar.BorderSizePixel = 0
+	bar.Parent = arrow
+	corner(bar, 5)
+	local edge = Instance.new("UIStroke")
+	edge.Color = INK
+	edge.Thickness = 2
+	edge.Parent = bar
+end
+
+---------------------------------------------------------------- tips and celebrations
+
+local tip = Instance.new("TextLabel")
+tip.AnchorPoint = Vector2.new(0.5, 1)
+tip.Position = UDim2.new(0.5, 0, 1, -150)
+tip.Size = UDim2.fromOffset(520, 44)
+tip.BackgroundColor3 = INK
+tip.BackgroundTransparency = 0.15
+tip.TextColor3 = WHITE
+tip.FontFace = BOLD
+tip.TextSize = 16
+tip.TextWrapped = true
+tip.Visible = false
+tip.Parent = gui
+corner(tip, 12)
+local tipPad = Instance.new("UIPadding")
+tipPad.PaddingLeft = UDim.new(0, 12)
+tipPad.PaddingRight = UDim.new(0, 12)
+tipPad.Parent = tip
+local tipToken = 0
+
+local function showTip(text: string)
+	tipToken += 1
+	local mine = tipToken
+	tip.Text = text
+	tip.Visible = true
+	task.delay(7, function()
+		if tipToken == mine then
+			tip.Visible = false
+		end
+	end)
+end
+
+local cheer = Instance.new("Sound")
+cheer.SoundId = "rbxasset://sounds/electronicpingshort.wav"
+cheer.Volume = 0.8
+cheer.Parent = gui
+
+local function celebrate(title: string, subtitle: string)
+	cheer:Play()
+	local t = label(gui, title, 54, BOLD, GOLD)
+	t.AnchorPoint = Vector2.new(0.5, 0.5)
+	t.Position = UDim2.fromScale(0.5, 0.36)
+	t.Size = UDim2.fromOffset(700, 64)
+	t.TextStrokeTransparency = 0
+	t.TextStrokeColor3 = INK
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.3
+	scale.Parent = t
+	local s = label(gui, subtitle, 20, BOLD, WHITE)
+	s.AnchorPoint = Vector2.new(0.5, 0.5)
+	s.Position = UDim2.fromScale(0.5, 0.36)
+	s.Size = UDim2.fromOffset(700, 24)
+	s.Position = UDim2.new(0.5, 0, 0.36, 48)
+	s.TextStrokeTransparency = 0.3
+	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	-- confetti from the top of the screen
+	for _ = 1, 70 do
+		local c = Instance.new("Frame")
+		c.BorderSizePixel = 0
+		c.BackgroundColor3 = CONFETTI[math.random(1, #CONFETTI)]
+		c.Size = UDim2.fromOffset(math.random(6, 12), math.random(10, 18))
+		c.Position = UDim2.new(math.random(), 0, 0, -20)
+		c.Rotation = math.random(0, 360)
+		c.Parent = gui
+		local fall = TweenService:Create(
+			c,
+			TweenInfo.new(math.random(18, 32) / 10, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{
+				Position = UDim2.fromScale(c.Position.X.Scale + (math.random() - 0.5) * 0.3, 1.1),
+				Rotation = c.Rotation + math.random(-540, 540),
+			}
+		)
+		fall:Play()
+		fall.Completed:Once(function()
+			c:Destroy()
+		end)
+	end
+	task.delay(3.2, function()
+		for _, l in { t, s } do
+			TweenService
+				:Create(l, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 })
+				:Play()
+		end
+		task.delay(0.6, function()
+			t:Destroy()
+			s:Destroy()
+		end)
+	end)
+end
+
+---------------------------------------------------------------- state
+
+local function owns(id: string): boolean
+	return string.find(
+		"," .. ((player:GetAttribute("Owned") or "") :: string) .. ",",
+		"," .. id .. ",",
+		1,
+		true
+	) ~= nil
+end
+
+-- the cheapest vehicle you don't have yet
+local function nextRide(): Vehicles.Vehicle?
+	local best: Vehicles.Vehicle? = nil
+	for _, v in Vehicles.List do
+		if not owns(v.id) and (best == nil or v.price < best.price) then
+			best = v
+		end
+	end
+	return best
+end
+
+local function nearestPedestrian(from: Vector3): BasePart?
+	local npcs = workspace:FindFirstChild("Npcs")
+	if not npcs then
+		return nil
+	end
+	local best, bestD = nil, 500
+	for _, npc in npcs:GetChildren() do
+		local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root and not npc:GetAttribute("Down") then
+			local d = (root.Position - from).Magnitude
+			if d < bestD then
+				best, bestD = root, d
+			end
+		end
+	end
+	return best
+end
+
+local stepStarted = os.clock()
+local lastStep = -1
+local lastHits = 0
+local tipsShown: { [string]: boolean } = {}
+local lastVehicle = ""
+
+local function glow(target: GuiObject?, on: boolean)
+	if not target then
+		return
+	end
+	local s = target:FindFirstChild("GuideGlow") :: UIStroke?
+	if on and not s then
+		s = Instance.new("UIStroke")
+		s.Name = "GuideGlow"
+		s.Color = GOLD
+		s.Thickness = 3
+		s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		s.Parent = target
+	end
+	if s then
+		s.Enabled = on
+		s.Transparency = 0.5 + 0.5 * math.sin(os.clock() * 6)
+	end
+end
+
+local function vehicleTips(id: string)
+	local v = Vehicles.ById[id]
+	if not v or tipsShown[id] then
+		return
+	end
+	tipsShown[id] = true
+	local touch = UserInputService.TouchEnabled
+	local text: string? = nil
+	if Vehicles.has(v, "Jet") then
+		text = if touch
+			then "Hold JET to fly. In the air, steer to pitch and yaw and use ROLL L/R."
+			else "Hold SHIFT for the jet. In the air: W/S pitch, A/D turn, Q/E roll. R fires the thruster."
+	elseif Vehicles.has(v, "Thruster") then
+		text = if touch then "Tap BOOST for a thruster burst." else "Press R for a thruster burst."
+	elseif Vehicles.has(v, "Taxi") then
+		text = if touch
+			then "Tap HORN to yell TAXI! Someone will come running..."
+			else "Press G to yell TAXI! Someone will come running..."
+	elseif Vehicles.has(v, "Jingle") then
+		text = if touch
+			then "Tap HORN to play the jingle. Everyone wants ice cream."
+			else "Press G to play the jingle. Everyone wants ice cream."
+	elseif Vehicles.has(v, "Cannon") then
+		text = if touch
+			then "Hold WATER to blast people off their feet."
+			else "Hold G to blast people off their feet with the water cannon."
+	end
+	if v.breaksBuildings then
+		text = (if text then text .. "  " else "") .. "This one smashes through buildings!"
+	end
+	if text then
+		showTip(text)
+	end
+end
+
+local function update()
+	local hud = playerGui:FindFirstChild("Hud")
+	local garageButton = hud and hud:FindFirstChild("GarageButton", true) :: GuiObject?
+	local garage = hud and hud:FindFirstChild("Garage") :: GuiObject?
+	local stepValue = (player:GetAttribute("Tutorial") or Steps.Done) :: number
+	if not player:GetAttribute("DataReady") then
+		card.Visible = false
+		return
+	end
+	if stepValue ~= lastStep then
+		lastStep = stepValue
+		stepStarted = os.clock()
+	end
+	local hits = (player:GetAttribute("TutorialHits") or 0) :: number
+	if hits ~= lastHits then
+		lastHits = hits
+		stepStarted = os.clock()
+	end
+	local stuck = os.clock() - stepStarted > Onboarding.HintAfter
+	local cash = (player:GetAttribute("Money") or 0) :: number
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local touch = UserInputService.TouchEnabled
+
+	card.Visible = true
+	hintText.Visible = false
+	arrow.Enabled = false
+	local glowGarage = false
+	local glowCard: string? = nil
+	stroke.Transparency = 1
+
+	if stepValue == Steps.Spawn then
+		goalText.Text = "Open the GARAGE and spawn your Hatchback"
+		barFill.Size = UDim2.fromScale(0, 1)
+		glowGarage = true
+		glowCard = Vehicles.Starter
+		stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
+		if stuck then
+			hintText.Text = "Tap GARAGE on the left, then SPAWN"
+			hintText.Visible = true
+		end
+	elseif stepValue == Steps.Hits then
+		goalText.Text = `Run over {Onboarding.HitsGoal} people!   {hits}/{Onboarding.HitsGoal}`
+		barFill.Size = UDim2.fromScale(math.clamp(hits / Onboarding.HitsGoal, 0, 1), 1)
+		stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
+		if root then
+			local target = nearestPedestrian(root.Position)
+			if target then
+				arrow.Adornee = target
+				arrow.StudsOffset = Vector3.new(0, 5 + math.sin(os.clock() * 6) * 0.8, 0)
+				arrow.Enabled = true
+			end
+		end
+		if not Drive.state.driving then
+			glowGarage = true
+			hintText.Text = "Spawn your car from the GARAGE"
+			hintText.Visible = stuck
+		elseif stuck then
+			hintText.Text = if touch
+				then "Use the thumbstick to drive at the arrow"
+				else "Hold W to drive, A/D to steer. Aim for the arrow!"
+			hintText.Visible = true
+		end
+	else
+		local v = nextRide()
+		if v then
+			local ready = cash >= v.price
+			goalText.Text = if ready
+				then `Buy the {v.name} in the GARAGE!`
+				else `Next ride: {v.name}   {money(cash)} / {money(v.price)}`
+			barFill.Size = UDim2.fromScale(math.clamp(cash / math.max(v.price, 1), 0, 1), 1)
+			if ready then
+				glowGarage = true
+				glowCard = v.id
+				stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
+			end
+		else
+			card.Visible = false
+		end
+	end
+
+	glow(garageButton, glowGarage and not (garage and garage.Visible))
+	if garage then
+		for _, c in garage:GetDescendants() do
+			if c:IsA("TextButton") and c.Name == "Action" then
+				local cardFrame = c.Parent
+				glow(
+					c,
+					garage.Visible
+						and glowCard ~= nil
+						and cardFrame ~= nil
+						and cardFrame.Name == glowCard
+				)
+			end
+		end
+	end
+
+	local id = Drive.state.vehicleId
+	if Drive.state.driving and id ~= lastVehicle then
+		lastVehicle = id
+		vehicleTips(id)
+	elseif not Drive.state.driving then
+		lastVehicle = ""
+	end
+end
+
+function Guide.start()
+	Net.waitFor("Celebrate").OnClientEvent:Connect(celebrate)
+	local wreckerTipped = false
+	player:GetAttributeChangedSignal("PassWrecker"):Connect(function()
+		if player:GetAttribute("PassWrecker") == true and not wreckerTipped then
+			wreckerTipped = true
+			showTip(
+				if UserInputService.TouchEnabled
+					then "Wrecker: drive into players to launch them. Hold BOMB to self-destruct."
+					else "Wrecker: drive into players to launch them. Hold X to self-destruct."
+			)
+		end
+	end)
+	RunService.RenderStepped:Connect(update)
+end
+
+return Guide

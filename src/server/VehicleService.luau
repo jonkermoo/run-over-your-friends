@@ -21,6 +21,12 @@ folder.Parent = workspace
 local owned: { [Player]: Model } = {}
 local cooldownUntil: { [Player]: number } = {}
 local spawnPoints: { Vector3 } = {}
+local spawnListeners: { (Player, string) -> () } = {}
+
+-- called with the player and vehicle id after every spawn
+function VehicleService.onSpawn(listener: (Player, string) -> ())
+	table.insert(spawnListeners, listener)
+end
 
 function VehicleService.of(player: Player): Model?
 	local m = owned[player]
@@ -159,6 +165,9 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	model.Parent = folder
 	owned[player] = model
 	player:SetAttribute("VehicleId", id)
+	for _, listener in spawnListeners do
+		task.spawn(listener, player, id)
+	end
 
 	local chassis = model.PrimaryPart :: BasePart
 	local seat = model:FindFirstChild("DriverSeat") :: VehicleSeat
