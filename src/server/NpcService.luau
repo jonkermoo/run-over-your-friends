@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
@@ -128,7 +129,7 @@ local function pickWalkPoint(near: Vector3?, crowd: boolean?): Vector3
 	return walkPoints[random:NextInteger(1, #walkPoints)]
 end
 
-local function spawnNpc(crowd: boolean?)
+local function spawnNpc(crowd: boolean?): Model?
 	local friend: Friend? = if #pool > 0 then pool[random:NextInteger(1, #pool)] else nil
 	local desc: HumanoidDescription? = nil
 	if friend then
@@ -178,6 +179,65 @@ local function spawnNpc(crowd: boolean?)
 		root:SetNetworkOwner(nil)
 	end)
 	npcs[npc] = { target = nil, busyUntil = 0, lastPaid = {}, crowd = crowd == true }
+	if
+		workspace:GetAttribute("Event") == "GoldenRush"
+		and random:NextNumber() < EventConfig.GoldenRespawnChance
+	then
+		NpcService.makeGolden(npc)
+	end
+	return npc
+end
+
+-- a golden pedestrian (Golden Rush) pays several times over
+function NpcService.makeGolden(npc: Model)
+	if npc:GetAttribute("Golden") or npc:GetAttribute("GiantHp") then
+		return
+	end
+	npc:SetAttribute("Golden", true)
+	local h = Instance.new("Highlight")
+	h.Name = "GoldenGlow"
+	h.FillColor = Color3.fromRGB(255, 205, 60)
+	h.FillTransparency = 0.35
+	h.OutlineColor = Color3.fromRGB(255, 240, 160)
+	h.Parent = npc
+end
+
+function NpcService.clearGolden()
+	for npc in npcs do
+		npc:SetAttribute("Golden", nil)
+		local h = npc:FindFirstChild("GoldenGlow")
+		if h then
+			h:Destroy()
+		end
+	end
+end
+
+function NpcService.all(): { Model }
+	local out = {}
+	for npc in npcs do
+		if not npc:GetAttribute("Down") then
+			table.insert(out, npc)
+		end
+	end
+	return out
+end
+
+-- a giant (Giant in Town): a normal pedestrian scaled up that takes several hits to topple
+function NpcService.spawnGiant(at: Vector3): Model?
+	local npc = spawnNpc(false)
+	if not npc then
+		return nil
+	end
+	npc:ScaleTo(EventConfig.GiantScale)
+	npc:PivotTo(CFrame.new(at + Vector3.new(0, 4 * EventConfig.GiantScale, 0)))
+	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
+	local humanoid = npc:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 14
+		humanoid.DisplayName = `GIANT {humanoid.DisplayName}   ({EventConfig.GiantHits} hits)`
+		humanoid.NameDisplayDistance = 400
+	end
+	return npc
 end
 
 -- knock an NPC down and send it flying; pays `share` of the hit to `player` (if any)
@@ -219,6 +279,12 @@ function NpcService.knock(
 			pay *= 0.5
 		end
 		state.lastPaid[player] = now
+		if npc:GetAttribute("Golden") then
+			pay *= EventConfig.GoldenMultiplier
+		end
+		if workspace:GetAttribute("Event") == "Stampede" then
+			pay *= EventConfig.StampedeMultiplier
+		end
 		if Passes.has(player, "DoubleMoney") then
 			pay *= Economy.DoubleMoney
 		end
@@ -312,7 +378,11 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
 		+ 10
 	local speed = math.min(velocity.Magnitude, maxStuds)
-	local reach = chassis.Size.Magnitude / 2 + 14 + speed * 0.3
+	local giantHp = npc:GetAttribute("GiantHp")
+	local reach = chassis.Size.Magnitude / 2
+		+ 14
+		+ speed * 0.3
+		+ (if typeof(giantHp) == "number" then 6 * EventConfig.GiantScale else 0)
 	if (root.Position - chassis.Position).Magnitude > reach then
 		return
 	end
@@ -329,6 +399,31 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 			side = -side
 		end
 		dir = (side * 0.8 + dir * 0.4).Unit
+	end
+	if typeof(giantHp) == "number" and giantHp > 1 then
+		if not rateOk(player, "giant", 0.8) then
+			return
+		end
+		npc:SetAttribute("GiantHp", giantHp - 1)
+		local humanoid = npc:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.DisplayName =
+				string.gsub(humanoid.DisplayName, "%(%d+ hits%)", `({giantHp - 1} hits)`)
+		end
+		root.AssemblyLinearVelocity += (dir * Vector3.new(1, 0, 1)) * 40
+		local pay = EventConfig.GiantHitPay
+			* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+		Data.addMoney(player, pay)
+		Net.remote("Popup"):FireClient(player, `+${pay}  GIANT HIT!`, "big")
+		Net.remote("Fx"):FireAllClients("Hit", root.Position, 1, 0, player.UserId)
+		return
+	end
+	if typeof(giantHp) == "number" then
+		Data.addMoney(player, EventConfig.GiantToppleBonus)
+		for _, everyone in Players:GetPlayers() do
+			Net.remote("Celebrate")
+				:FireClient(everyone, "GIANT TOPPLED!", `{player.DisplayName} brought it down.`)
+		end
 	end
 	local launch = Impact.launchSpeed(energy)
 	NpcService.knock(
@@ -472,7 +567,13 @@ function NpcService.start()
 			if crowd < Onboarding.SpawnCrowd then
 				spawnNpc(true)
 				task.wait(0.15)
-			elseif count < CFG.Count then
+			elseif
+				count
+				< CFG.Count
+					+ (if workspace:GetAttribute("Event") == "Stampede"
+						then EventConfig.StampedeExtraNpcs
+						else 0)
+			then
 				spawnNpc()
 				task.wait(0.15)
 			else

@@ -3,6 +3,8 @@
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Impact = require("../src/shared/Rules/Impact")
+local EventConfig = require("../src/shared/Config/Events")
+local EventRules = require("../src/shared/Rules/Events")
 local Products = require("../src/shared/Config/Products")
 local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
@@ -252,6 +254,30 @@ check("bigger packs give more money per Robux", ascending)
 check(
 	"starter pack is once and its vehicle exists",
 	Products.Starter.once and Vehicles.ById[Products.Starter.vehicle or ""] ~= nil
+)
+
+-- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
+local function ph(t: number, offset: number?)
+	return EventRules.phase(t, 4, 90, 360, 120, 20, offset or 0)
+end
+check("quiet at the start", ph(0).phase == "quiet" and ph(0).index == 1)
+check("warning before the first", ph(75).phase == "warn" and math.abs(ph(75).endsIn - 15) < 1e-9)
+check("first event live", ph(90).phase == "live" and ph(90).index == 1 and ph(209).phase == "live")
+check("quiet after it", ph(210).phase == "quiet" and ph(210).index == 2)
+check(
+	"second event warns then runs",
+	ph(560).phase == "warn" and ph(570).phase == "live" and ph(570).index == 2
+)
+check("events cycle through the list", ph(90 + 4 * 480).index == 1 and ph(90 + 3 * 480).index == 4)
+check("offset rotates the order", ph(90, 2).index == 3)
+check("no events, always quiet", EventRules.phase(100, 0, 90, 360, 120, 20, 0).phase == "quiet")
+local evKeys = {}
+for _, e in EventConfig.List do
+	evKeys[e.key] = true
+end
+check(
+	"event list has the four events",
+	evKeys.LowGravity and evKeys.GoldenRush and evKeys.Giant and evKeys.Stampede
 )
 
 if failures > 0 then

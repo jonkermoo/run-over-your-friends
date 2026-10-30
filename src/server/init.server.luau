@@ -34,11 +34,19 @@ local OnboardingService = require(script.Onboarding)
 local QuestService = require(script.QuestService)
 local LeaderboardService = require(script.LeaderboardService)
 local ProductService = require(script.ProductService)
+local EventService = require(script.EventService)
 
 local world = MapBuilder.build()
 BuildingService.register(world.buildings)
 NpcService.setWalkPoints(world.walkPoints, world.crowdPoints)
 VehicleService.setSpawnPoints(world.spawnPoints)
+-- the giant appears at a downtown crossing
+local downtown = {}
+for _, p in world.spawnPoints do
+	if p.Magnitude < 700 then
+		table.insert(downtown, p)
+	end
+end
 
 Data.start()
 Passes.start()
@@ -50,6 +58,8 @@ OnboardingService.start()
 QuestService.start()
 LeaderboardService.start()
 ProductService.start()
+EventService.setGiantSpots(downtown)
+EventService.start()
 
 -- shop: buy a vehicle with in-game money (the Roadster can also come from its pass)
 Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
