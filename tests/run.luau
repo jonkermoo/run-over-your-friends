@@ -3,6 +3,7 @@
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Impact = require("../src/shared/Rules/Impact")
+local Products = require("../src/shared/Config/Products")
 local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
@@ -229,6 +230,28 @@ local ranked = Lb.rank({
 check(
 	"rank: highest first, ties by id, top N, zeros dropped",
 	#ranked == 2 and ranked[1].userId == 1 and ranked[2].userId == 2
+)
+
+-- products
+local keys, packsOk = {}, true
+for _, pack in Products.MoneyPacks do
+	if keys[pack.key] or pack.money <= 0 or pack.robux <= 0 or pack.once then
+		packsOk = false
+	end
+	keys[pack.key] = true
+end
+check("money packs: unique keys, positive, repeatable", packsOk and not keys[Products.Starter.key])
+local ascending = true
+for i = 2, #Products.MoneyPacks do
+	local lo, hi = Products.MoneyPacks[i - 1], Products.MoneyPacks[i]
+	if hi.money <= lo.money or hi.money / hi.robux < lo.money / lo.robux then
+		ascending = false
+	end
+end
+check("bigger packs give more money per Robux", ascending)
+check(
+	"starter pack is once and its vehicle exists",
+	Products.Starter.once and Vehicles.ById[Products.Starter.vehicle or ""] ~= nil
 )
 
 if failures > 0 then

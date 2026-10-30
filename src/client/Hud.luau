@@ -3,6 +3,7 @@
 -- stats, buy and spawn), the store (passes, like reward, credits) and the phone driving buttons.
 -- Every visual comes from Style.
 
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -11,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -263,6 +265,7 @@ grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = garageList
 
 type Card = { stats: Vehicles.Vehicle, action: TextButton, price: TextLabel, frame: Frame }
+local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
 local cards: { Card } = {}
 
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
@@ -359,6 +362,8 @@ for _, stats in Vehicles.List do
 			and ((player:GetAttribute("Money") or 0) :: number) < stats.price
 		then
 			Net.waitFor("BuyPass"):FireServer("Roadster")
+		elseif ((player:GetAttribute("Money") or 0) :: number) < stats.price and offerFor then
+			offerFor(stats) -- not enough yet: offer the pack that covers it
 		else
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
@@ -398,6 +403,30 @@ local storeLayout = Instance.new("UIListLayout")
 storeLayout.Padding = UDim.new(0, 12)
 storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 storeLayout.Parent = storeList
+
+local function header(order: number, text: string)
+	local h = Style.label(storeList, text, 22, F.display, C.dim)
+	h.Size = UDim2.new(1, -12, 0, 26)
+	h.TextXAlignment = Enum.TextXAlignment.Left
+	h.LayoutOrder = order
+end
+
+-- "R$ 99": the configured label until the product exists, then Roblox's real price
+local function robuxText(product: Products.Product, label: TextButton)
+	label.Text = "R$ " .. product.robux
+	if product.id ~= 0 then
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(product.id, Enum.InfoType.Product)
+			end)
+			if ok and info and info.PriceInRobux then
+				label.Text = "R$ " .. info.PriceInRobux
+			end
+		end)
+	elseif RunService:IsStudio() then
+		label.Text ..= " (test)"
+	end
+end
 
 local passButtons: { [string]: TextButton } = {}
 local function storeRow(
@@ -458,11 +487,65 @@ local PASSES = {
 		text = "Double money from every hit.",
 	},
 }
+header(1, "SPECIAL OFFER")
+local starter = Products.Starter
+local starterButton = storeRow(
+	2,
+	string.upper(starter.title),
+	`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}. Once per account.`,
+	"",
+	C.gold,
+	"gold",
+	function()
+		Net.waitFor("BuyProduct"):FireServer(starter.key)
+	end
+)
+robuxText(starter, starterButton)
+
+header(3, "MONEY")
+local packs = Instance.new("Frame")
+packs.BackgroundTransparency = 1
+packs.Size = UDim2.new(1, -12, 0, 176)
+packs.LayoutOrder = 4
+packs.Parent = storeList
+local packGrid = Instance.new("UIGridLayout")
+packGrid.CellSize = UDim2.new(0.25, -10, 1, 0)
+packGrid.CellPadding = UDim2.fromOffset(12, 0)
+packGrid.SortOrder = Enum.SortOrder.LayoutOrder
+packGrid.Parent = packs
+for i, pack in Products.MoneyPacks do
+	local card = Style.card(packs, 16)
+	card.LayoutOrder = i
+	if pack.tag then
+		local tag =
+			Style.pill(card, pack.tag, if i == #Products.MoneyPacks then C.gold else C.orange)
+		tag.AnchorPoint = Vector2.new(0.5, 0)
+		tag.Position = UDim2.new(0.5, 0, 0, 10)
+	end
+	local amount = Style.label(card, money(pack.money), 30, F.display, C.money)
+	amount.Position = UDim2.fromOffset(0, 36)
+	amount.Size = UDim2.new(1, 0, 0, 40)
+	Style.outline(amount, 2)
+	local name = Style.label(card, pack.title, 15, F.heavy, C.dim)
+	name.Position = UDim2.fromOffset(0, 78)
+	name.Size = UDim2.new(1, 0, 0, 18)
+	local buy = Style.button(card, "", "green", 18)
+	buy.AnchorPoint = Vector2.new(0.5, 1)
+	buy.Position = UDim2.new(0.5, 0, 1, -12)
+	buy.Size = UDim2.new(1, -24, 0, 46)
+	robuxText(pack, buy)
+	buy.Activated:Connect(function()
+		Net.waitFor("BuyProduct"):FireServer(pack.key)
+	end)
+end
+
+header(5, "GAME PASSES")
 for i, p in PASSES do
-	passButtons[p.name] = storeRow(i, p.title, p.text, "GET", p.accent, "blue", function()
+	passButtons[p.name] = storeRow(5 + i, p.title, p.text, "GET", p.accent, "blue", function()
 		Net.waitFor("BuyPass"):FireServer(p.name)
 	end)
 end
+header(9, "FREE")
 local likeButton = storeRow(
 	10,
 	"LIKE REWARD",
@@ -495,6 +578,19 @@ local function refreshStore()
 			Style.setKind(b, "blue")
 		end
 	end
+	local bought = string.find(
+		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
+		",Starter,",
+		1,
+		true
+	) ~= nil
+	local starterRow = starterButton.Parent :: GuiObject
+	starterRow.Visible = not bought
+	for _, h in storeList:GetChildren() do
+		if h:IsA("TextLabel") and h.LayoutOrder == 1 then
+			h.Visible = not bought
+		end
+	end
 	local claimed = player:GetAttribute("LikeClaimed") == true
 	likeButton.Text = if claimed then "CLAIMED" else "CLAIM"
 	Style.setKind(likeButton, if claimed then "dark" else "green")
@@ -506,6 +602,109 @@ local function open(p: Frame)
 	scale.Scale = 0.85
 	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	p.Visible = true
+end
+
+---------------------------------------------------------------- offers
+
+local offer = Style.panel(gui, 20, 0.02)
+offer.AnchorPoint = Vector2.new(0.5, 0.5)
+offer.Position = UDim2.fromScale(0.5, 0.5)
+offer.Size = UDim2.fromOffset(420, 250)
+offer.ZIndex = 10
+offer.Visible = false
+Style.stroke(offer, C.gold, 3, 0)
+local offerTitle = Style.label(offer, "", 30, F.display, C.gold)
+offerTitle.Position = UDim2.fromOffset(0, 16)
+offerTitle.Size = UDim2.new(1, 0, 0, 36)
+offerTitle.ZIndex = 11
+Style.outline(offerTitle, 2)
+local offerText = Style.label(offer, "", 17, F.bold, C.text)
+offerText.Position = UDim2.fromOffset(24, 58)
+offerText.Size = UDim2.new(1, -48, 0, 70)
+offerText.TextWrapped = true
+offerText.ZIndex = 11
+local offerBuy = Style.button(offer, "", "green", 20)
+offerBuy.AnchorPoint = Vector2.new(0.5, 0)
+offerBuy.Position = UDim2.new(0.5, 0, 0, 136)
+offerBuy.Size = UDim2.fromOffset(260, 50)
+offerBuy.ZIndex = 11
+local offerNo = Style.button(offer, "KEEP DRIVING", "dark", 16)
+offerNo.AnchorPoint = Vector2.new(0.5, 0)
+offerNo.Position = UDim2.new(0.5, 0, 0, 194)
+offerNo.Size = UDim2.fromOffset(200, 38)
+offerNo.ZIndex = 11
+local offerKey = ""
+offerBuy.Activated:Connect(function()
+	offer.Visible = false
+	Net.waitFor("BuyProduct"):FireServer(offerKey)
+end)
+offerNo.Activated:Connect(function()
+	offer.Visible = false
+end)
+
+local function showOffer(
+	title: string,
+	text: string,
+	product: Products.Product,
+	buyLabel: string,
+	noLabel: string
+)
+	offerTitle.Text = title
+	offerText.Text = text
+	offerKey = product.key
+	robuxText(product, offerBuy)
+	offerBuy.Text = buyLabel .. "  ·  " .. offerBuy.Text
+	offerNo.Text = noLabel
+	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = offer
+	scale.Scale = 0.8
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	offer.Visible = true
+end
+
+-- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
+offerFor = function(stats: Vehicles.Vehicle)
+	local cash = (player:GetAttribute("Money") or 0) :: number
+	local gap = stats.price - cash
+	local pick = Products.MoneyPacks[#Products.MoneyPacks]
+	for _, pack in Products.MoneyPacks do
+		if pack.money >= gap then
+			pick = pack
+			break
+		end
+	end
+	showOffer(
+		`NEED {money(gap)} MORE`,
+		`Keep running people over to earn it, or grab {pick.title} ({money(pick.money)}) for the {stats.name} right now.`,
+		pick,
+		"GET " .. money(pick.money),
+		"KEEP DRIVING"
+	)
+end
+
+local starterOffered = false
+local function maybeOfferStarter()
+	local bought = string.find(
+		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
+		",Starter,",
+		1,
+		true
+	) ~= nil
+	if starterOffered or bought then
+		return
+	end
+	starterOffered = true
+	task.delay(8, function()
+		if not offer.Visible then
+			showOffer(
+				"STARTER PACK",
+				`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
+				starter,
+				"GET IT",
+				"NO THANKS"
+			)
+		end
+	end)
 end
 
 garageButton.Activated:Connect(function()
@@ -664,6 +863,12 @@ function Hud.start()
 	end)
 	player:GetAttributeChangedSignal("Owned"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("LikeClaimed"):Connect(refreshStore)
+	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
+	player:GetAttributeChangedSignal("Tutorial"):Connect(function()
+		if player:GetAttribute("Tutorial") == 3 then
+			maybeOfferStarter()
+		end
+	end)
 	for _, p in PASSES do
 		player:GetAttributeChangedSignal("Pass" .. p.name):Connect(refreshStore)
 	end

@@ -18,6 +18,8 @@ export type Profile = {
 	tutorial: number, -- Config/Onboarding Steps
 	quests: { [string]: any }, -- Hourly/Daily goal sets, checked by QuestService
 	stats: { [string]: any }, -- leaderboard numbers, checked by LeaderboardService
+	receipts: { [string]: boolean }, -- Robux purchase ids already granted
+	bought: { [string]: boolean }, -- one-time products already bought
 }
 
 local Data = {}
@@ -41,6 +43,8 @@ local function default(): Profile
 		tutorial = 1,
 		quests = {},
 		stats = {},
+		receipts = {},
+		bought = {},
 	}
 end
 
@@ -63,6 +67,13 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute("Owned", table.concat(owned, ","))
 	player:SetAttribute("LikeClaimed", profile.likeClaimed)
 	player:SetAttribute("Tutorial", profile.tutorial)
+	local bought = {}
+	for key, yes in profile.bought do
+		if yes then
+			table.insert(bought, key)
+		end
+	end
+	player:SetAttribute("Bought", table.concat(bought, ","))
 end
 
 function Data.get(player: Player): Profile?
@@ -96,10 +107,10 @@ function Data.addMoney(player: Player, amount: number)
 	end
 end
 
-local function save(player: Player)
+local function save(player: Player): boolean
 	local p = profiles[player]
 	if not (store and p) or loadFailed[player] or saving[player] then
-		return
+		return false
 	end
 	saving[player] = true
 	inFlight += 1
@@ -112,6 +123,22 @@ local function save(player: Player)
 	end
 	inFlight -= 1
 	saving[player] = nil
+	return ok
+end
+
+-- save right away (after a Robux purchase); true when the profile is safely stored, or when this
+-- server has no DataStore at all (Studio, unpublished), where everything is session-only anyway
+function Data.saveNow(player: Player): boolean
+	if not store or not profiles[player] then
+		return store == nil and profiles[player] ~= nil
+	end
+	if loadFailed[player] then
+		return false
+	end
+	while saving[player] do
+		task.wait(0.1)
+	end
+	return save(player)
 end
 
 local function load(player: Player)
@@ -135,6 +162,12 @@ local function load(player: Player)
 				end
 				if typeof(decoded.stats) == "table" then
 					profile.stats = decoded.stats
+				end
+				if typeof(decoded.receipts) == "table" then
+					profile.receipts = decoded.receipts
+				end
+				if typeof(decoded.bought) == "table" then
+					profile.bought = decoded.bought
 				end
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do

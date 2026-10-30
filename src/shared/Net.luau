@@ -10,6 +10,7 @@ Net.Messages = table.freeze({
 	DespawnVehicle = "DespawnVehicle", -- ()
 	BuyVehicle = "BuyVehicle", -- (vehicleId)
 	BuyPass = "BuyPass", -- (passName): real purchase prompt, or a test toggle in Studio
+	BuyProduct = "BuyProduct", -- (productKey): Robux money pack or starter pack
 	ClaimLike = "ClaimLike", -- ()
 	HitNpc = "HitNpc", -- (npc: Model, velocity: Vector3)
 	BreakAt = "BreakAt", -- (position: Vector3, velocity: Vector3)
@@ -30,6 +31,7 @@ export type MessageName =
 	| "DespawnVehicle"
 	| "BuyVehicle"
 	| "BuyPass"
+	| "BuyProduct"
 	| "ClaimLike"
 	| "HitNpc"
 	| "BreakAt"
