@@ -1,0 +1,288 @@
+--!strict
+-- One vehicle per player: spawn from the garage, sit the owner in it, hand the driver network ownership,
+-- hide closed-cab drivers, step them out beside the vehicle, despawn on leave.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Net = require(ReplicatedStorage.Shared.Net)
+local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Data = require(script.Parent.Data)
+local VehicleBuilder = require(script.Parent.VehicleBuilder)
+
+local VehicleService = {}
+
+local LEVEL_RATE = 6
+local folder = Instance.new("Folder")
+folder.Name = "Vehicles"
+folder.Parent = workspace
+
+local owned: { [Player]: Model } = {}
+local cooldownUntil: { [Player]: number } = {}
+local spawnPoints: { Vector3 } = {}
+
+function VehicleService.of(player: Player): Model?
+	local m = owned[player]
+	if m and m.Parent then
+		return m
+	end
+	return nil
+end
+
+function VehicleService.ownerOf(model: Model): Player?
+	for p, m in owned do
+		if m == model then
+			return p
+		end
+	end
+	return nil
+end
+
+function VehicleService.stats(model: Model): Vehicles.Vehicle?
+	local id = model:GetAttribute("VehicleId")
+	return if typeof(id) == "string" then Vehicles.ById[id] else nil
+end
+
+function VehicleService.setSpawnPoints(points: { Vector3 })
+	spawnPoints = points
+end
+
+function VehicleService.setCooldown(player: Player, seconds: number)
+	cooldownUntil[player] = os.clock() + seconds
+	player:SetAttribute("SpawnCooldownUntil", workspace:GetServerTimeNow() + seconds)
+end
+
+local function setHidden(character: Model, hidden: boolean)
+	for _, d in character:GetDescendants() do
+		if d:IsA("BasePart") or d:IsA("Decal") then
+			if hidden then
+				if d:GetAttribute("ShownT") == nil then
+					d:SetAttribute("ShownT", d.Transparency)
+				end
+				d.Transparency = 1
+			else
+				local t = d:GetAttribute("ShownT")
+				if typeof(t) == "number" then
+					d.Transparency = t
+					d:SetAttribute("ShownT", nil)
+				end
+			end
+		end
+	end
+end
+
+function VehicleService.despawn(player: Player)
+	local m = owned[player]
+	owned[player] = nil
+	player:SetAttribute("VehicleId", nil)
+	if m then
+		local seat = m:FindFirstChild("DriverSeat") :: VehicleSeat?
+		local occupant = seat and seat.Occupant
+		if occupant then
+			occupant.Sit = false
+			occupant.Jump = true
+		end
+		m:Destroy()
+	end
+end
+
+local function blocked(cf: CFrame, size: Vector3, ignore: { Instance }): boolean
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = ignore
+	params.CollisionGroup = "Vehicles"
+	local parts = workspace:GetPartBoundsInBox(
+		cf * CFrame.new(0, size.Y / 2 + 1, 0),
+		size * Vector3.new(1.1, 0.9, 1.1),
+		params
+	)
+	for _, p in parts do
+		if p.CanCollide then
+			return true
+		end
+	end
+	return false
+end
+
+local function ground(pos: Vector3, ignore: { Instance }): Vector3
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = ignore
+	local hit = workspace:Raycast(pos + Vector3.new(0, 10, 0), Vector3.new(0, -200, 0), params)
+	return if hit then hit.Position else pos - Vector3.new(0, 3, 0)
+end
+
+function VehicleService.spawn(player: Player, id: string): boolean
+	local stats = Vehicles.ById[id]
+	local profile = Data.get(player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if
+		not (stats and profile and profile.owned[id] and humanoid and root and humanoid.Health > 0)
+	then
+		return false
+	end
+	if (cooldownUntil[player] or 0) > os.clock() then
+		Net.remote("Popup"):FireClient(player, "Your last ride is still smoking...", "info")
+		return false
+	end
+	if humanoid.SeatPart then
+		humanoid.Sit = false
+		task.wait()
+	end
+	VehicleService.despawn(player)
+
+	local model = VehicleBuilder.build(id)
+	local _, size = model:GetBoundingBox()
+	local ignore = { character, folder }
+	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+	look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, -1)
+	local at = ground(root.Position, ignore)
+	local cf = CFrame.lookAt(at, at + look)
+	if blocked(cf, size, ignore) then
+		local best, bestD = nil, math.huge
+		for _, p in spawnPoints do
+			local d = (p - root.Position).Magnitude
+			if d < bestD and not blocked(CFrame.new(p), size, ignore) then
+				best, bestD = p, d
+			end
+		end
+		if best then
+			cf = CFrame.lookAt(best, best + look)
+		end
+	end
+	model:PivotTo(cf + Vector3.new(0, 0.4, 0))
+	model:SetAttribute("OwnerId", player.UserId)
+	model:SetAttribute("SpawnedAt", workspace:GetServerTimeNow())
+	model.Parent = folder
+	owned[player] = model
+	player:SetAttribute("VehicleId", id)
+
+	local chassis = model.PrimaryPart :: BasePart
+	local seat = model:FindFirstChild("DriverSeat") :: VehicleSeat
+	local turn = chassis:FindFirstChild("Turn") :: AngularVelocity
+	local drive = chassis:FindFirstChild("Drive") :: LinearVelocity
+
+	-- the owner gets back in with a prompt
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Drive"
+	prompt.ObjectText = stats.name
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = math.max(12, size.Z * 0.6)
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = chassis
+	prompt.Triggered:Connect(function(who)
+		local h = who.Character and who.Character:FindFirstChildOfClass("Humanoid")
+		if who == player and h and not h.SeatPart and seat.Occupant == nil then
+			seat:Sit(h)
+		end
+	end)
+
+	local driver: Humanoid? = nil
+	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+		local now = seat.Occupant
+		if now then
+			local who = Players:GetPlayerFromCharacter(now.Parent)
+			if who ~= player then
+				now.Sit = false -- only the owner drives
+				return
+			end
+			driver = now
+			prompt.Enabled = false
+			pcall(function()
+				chassis:SetNetworkOwner(player)
+			end)
+			if not stats.showDriver then
+				setHidden(now.Parent :: Model, true)
+			end
+		else
+			local left = driver
+			driver = nil
+			prompt.Enabled = true
+			drive.Enabled = true
+			turn.Enabled = true
+			drive.VectorVelocity = Vector3.zero
+			pcall(function()
+				chassis:SetNetworkOwner(nil)
+			end)
+			local ch = left and left.Parent :: Model?
+			if ch then
+				setHidden(ch, false)
+				local r = ch:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if r and left and left.Health > 0 then
+					local exit = chassis.CFrame * CFrame.new(-(size.X / 2 + 3), 2, 0)
+					task.defer(function()
+						r.AssemblyLinearVelocity = Vector3.zero
+						r.CFrame = CFrame.lookAt(
+							exit.Position,
+							exit.Position + chassis.CFrame.LookVector * Vector3.new(1, 0, 1)
+						)
+					end)
+				end
+			end
+		end
+	end)
+
+	-- parked: hold still and stay level (the driver's client does this while driving)
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		if not model.Parent then
+			conn:Disconnect()
+			return
+		end
+		if seat.Occupant == nil and turn.Enabled then
+			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * LEVEL_RATE
+			turn.AngularVelocity = Vector3.new(level.X, 0, level.Z)
+		end
+	end)
+
+	task.defer(function()
+		if humanoid.Health > 0 and model.Parent then
+			seat:Sit(humanoid)
+		end
+	end)
+	return true
+end
+
+function VehicleService.start()
+	Net.remote("SpawnVehicle").OnServerEvent:Connect(function(player, id)
+		if typeof(id) == "string" then
+			VehicleService.spawn(player, id)
+		end
+	end)
+	Net.remote("DespawnVehicle").OnServerEvent:Connect(function(player)
+		VehicleService.despawn(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		VehicleService.despawn(player)
+		cooldownUntil[player] = nil
+	end)
+	local function onCharacter(character: Model)
+		-- vehicles pass through players
+		for _, d in character:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CollisionGroup = "Characters"
+			end
+		end
+		character.DescendantAdded:Connect(function(d)
+			if d:IsA("BasePart") then
+				d.CollisionGroup = "Characters"
+			end
+		end)
+	end
+	local function onPlayer(player: Player)
+		player.CharacterAdded:Connect(onCharacter)
+		if player.Character then
+			onCharacter(player.Character)
+		end
+	end
+	Players.PlayerAdded:Connect(onPlayer)
+	for _, p in Players:GetPlayers() do
+		onPlayer(p)
+	end
+end
+
+return VehicleService

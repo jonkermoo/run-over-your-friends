@@ -5,10 +5,35 @@
 local Net = {}
 
 Net.Messages = table.freeze({
-	Ping = "Ping",
+	-- client -> server
+	SpawnVehicle = "SpawnVehicle", -- (vehicleId)
+	DespawnVehicle = "DespawnVehicle", -- ()
+	BuyVehicle = "BuyVehicle", -- (vehicleId)
+	BuyPass = "BuyPass", -- (passName): real purchase prompt, or a test toggle in Studio
+	ClaimLike = "ClaimLike", -- ()
+	HitNpc = "HitNpc", -- (npc: Model, velocity: Vector3)
+	BreakAt = "BreakAt", -- (position: Vector3, velocity: Vector3)
+	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
+	SelfDestruct = "SelfDestruct", -- ()
+	Feature = "Feature", -- (feature: string)
+	-- server -> client
+	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
+	Popup = "Popup", -- (text: string, kind: string)
 })
 
-export type MessageName = "Ping"
+export type MessageName =
+	"SpawnVehicle"
+	| "DespawnVehicle"
+	| "BuyVehicle"
+	| "BuyPass"
+	| "ClaimLike"
+	| "HitNpc"
+	| "BreakAt"
+	| "WreckerHit"
+	| "SelfDestruct"
+	| "Feature"
+	| "Fling"
+	| "Popup"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent
@@ -31,6 +56,13 @@ function Net.remote(name: MessageName): RemoteEvent
 		remote = created
 	end
 	return remote :: RemoteEvent
+end
+
+-- client side: wait for the server to make it
+function Net.waitFor(name: MessageName): RemoteEvent
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local folder = ReplicatedStorage:WaitForChild("Remotes")
+	return folder:WaitForChild(name) :: RemoteEvent
 end
 
 return Net

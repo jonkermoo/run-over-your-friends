@@ -1,6 +1,7 @@
 --!strict
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- Client entry.
+local Drive = require(script.Drive)
+local Hud = require(script.Hud)
 
-local Net = require(ReplicatedStorage.Shared.Net)
-
-Net.remote("Ping")
+Drive.start()
+Hud.start()
