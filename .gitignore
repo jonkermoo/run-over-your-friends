@@ -1,0 +1,9 @@
+/build/
+/*.rbxl
+/*.rbxlx
+/Packages/
+/ServerPackages/
+/roblox.yml
+/.env
+*.log
+.DS_Store
