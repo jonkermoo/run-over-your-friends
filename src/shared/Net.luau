@@ -21,6 +21,7 @@ Net.Messages = table.freeze({
 	Popup = "Popup", -- (text: string, kind: string)
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
+	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom", position: Vector3, a: number, b: number, userId: number)
 })
 
 export type MessageName =
@@ -38,6 +39,7 @@ export type MessageName =
 	| "Popup"
 	| "Celebrate"
 	| "Goals"
+	| "Fx"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

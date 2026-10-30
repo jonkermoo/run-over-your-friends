@@ -203,6 +203,7 @@ function NpcService.knock(
 			random:NextNumber(-8, 8)
 		)
 	end
+	local comboCount = 0
 	if player and share > 0 then
 		local now = os.clock()
 		local combo = combos[player]
@@ -212,6 +213,7 @@ function NpcService.knock(
 		end
 		combo.count += 1
 		combo.last = now
+		comboCount = combo.count
 		local pay = Impact.npcPayout(energy, combo.count, Economy) * share
 		if (state.lastPaid[player] or -math.huge) + Economy.RepeatWindow > now then
 			pay *= 0.5
@@ -247,8 +249,22 @@ function NpcService.knock(
 				for _, listener in launchListeners do
 					task.spawn(listener, player, far)
 				end
+				if root.Parent and far > 15 then
+					Net.remote("Fx")
+						:FireClient(player, "Land", root.Position, far, 0, player.UserId)
+				end
 			end)
 		end
+	end
+	if root then
+		-- everyone nearby hears and sees it; the hitter's screen shakes
+		Net.remote("Fx"):FireAllClients(
+			"Hit",
+			root.Position,
+			Impact.strength(energy, 3000, 20000000),
+			comboCount,
+			if player then player.UserId else 0
+		)
 	end
 	task.delay(World.Npc.RespawnSeconds, function()
 		npcs[npc] = nil

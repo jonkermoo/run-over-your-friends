@@ -160,6 +160,8 @@ function BuildingService.breakAt(
 			dropped += 1
 		end
 	end
+	Net.remote("Fx")
+		:FireAllClients("Break", pos, count + dropped, radius, if player then player.UserId else 0)
 	if player then
 		for _, listener in breakListeners do
 			task.spawn(listener, player, count + dropped)

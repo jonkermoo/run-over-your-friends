@@ -208,6 +208,7 @@ local function onSelfDestruct(player: Player)
 	boom.DestroyJointRadiusPercent = 0
 	boom.BlastRadius = radius
 	boom.Parent = workspace
+	Net.remote("Fx"):FireAllClients("Boom", pos, radius, 0, player.UserId)
 
 	BuildingService.breakAt(pos, radius * 0.75, Vector3.zero, player)
 	local function outward(at: Vector3, power: number): Vector3
