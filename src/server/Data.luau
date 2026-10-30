@@ -16,6 +16,7 @@ export type Profile = {
 	likeClaimed: boolean,
 	roadsterPassPaid: boolean,
 	tutorial: number, -- Config/Onboarding Steps
+	quests: { [string]: any }, -- Hourly/Daily goal sets, checked by QuestService
 }
 
 local Data = {}
@@ -37,6 +38,7 @@ local function default(): Profile
 		likeClaimed = false,
 		roadsterPassPaid = false,
 		tutorial = 1,
+		quests = {},
 	}
 end
 
@@ -72,11 +74,23 @@ function Data.changed(player: Player)
 	end
 end
 
+local earnListeners: { (Player, number) -> () } = {}
+
+-- called whenever money is earned by playing (not goal rewards or purchases)
+function Data.onEarn(listener: (Player, number) -> ())
+	table.insert(earnListeners, listener)
+end
+
 function Data.addMoney(player: Player, amount: number)
 	local p = profiles[player]
 	if p and amount == amount then
 		p.money = math.max(0, p.money + amount)
 		publish(player, p)
+		if amount > 0 then
+			for _, listener in earnListeners do
+				task.spawn(listener, player, amount)
+			end
+		end
 	end
 end
 
@@ -114,6 +128,9 @@ local function load(player: Player)
 				profile.likeClaimed = decoded.likeClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
 				profile.tutorial = tonumber(decoded.tutorial) or 99 -- saves from before the tutorial skip it
+				if typeof(decoded.quests) == "table" then
+					profile.quests = decoded.quests
+				end
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do
 						if yes == true and Vehicles.ById[id] then

@@ -209,7 +209,7 @@ local function onSelfDestruct(player: Player)
 	boom.BlastRadius = radius
 	boom.Parent = workspace
 
-	BuildingService.breakAt(pos, radius * 0.75, Vector3.zero)
+	BuildingService.breakAt(pos, radius * 0.75, Vector3.zero, player)
 	local function outward(at: Vector3, power: number): Vector3
 		local away = (at - pos) * Vector3.new(1, 0, 1)
 		away = if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)

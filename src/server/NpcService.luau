@@ -37,7 +37,8 @@ type NpcState = {
 }
 local npcs: { [Model]: NpcState } = {}
 local crowdPoints: { Vector3 } = {} -- the spawn plaza: a crowd always waits here, so a first hit comes fast
-local knockListeners: { (Player) -> () } = {}
+local knockListeners: { (Player, number) -> () } = {}
+local launchListeners: { (Player, number) -> () } = {}
 local combos: { [Player]: { count: number, last: number } } = {}
 local lastCall: { [Player]: { [string]: number } } = {}
 local random = Random.new()
@@ -229,7 +230,24 @@ function NpcService.knock(
 		end
 		Net.remote("Popup"):FireClient(player, text, "money")
 		for _, listener in knockListeners do
-			task.spawn(listener, player)
+			task.spawn(listener, player, combo.count)
+		end
+		-- how far they flew, for the launch goals
+		if root then
+			task.spawn(function()
+				local start = root.Position * Vector3.new(1, 0, 1)
+				local far = 0
+				for _ = 1, 20 do
+					task.wait(0.15)
+					if not root.Parent then
+						break
+					end
+					far = math.max(far, (root.Position * Vector3.new(1, 0, 1) - start).Magnitude)
+				end
+				for _, listener in launchListeners do
+					task.spawn(listener, player, far)
+				end
+			end)
 		end
 	end
 	task.delay(World.Npc.RespawnSeconds, function()
@@ -402,9 +420,14 @@ function NpcService.setWalkPoints(points: { Vector3 }, crowd: { Vector3 })
 	crowdPoints = crowd
 end
 
--- called with the player whenever they knock an NPC down for money
-function NpcService.onKnock(listener: (Player) -> ())
+-- called with the player and their combo count whenever they knock an NPC down for money
+function NpcService.onKnock(listener: (Player, number) -> ())
 	table.insert(knockListeners, listener)
+end
+
+-- called with the player and how far (studs, flat) the NPC flew, ~3 s after the hit
+function NpcService.onLaunch(listener: (Player, number) -> ())
+	table.insert(launchListeners, listener)
 end
 
 function NpcService.start()

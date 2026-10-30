@@ -13,6 +13,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
+local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
@@ -20,50 +21,13 @@ local Steps = Onboarding.Steps
 
 local Guide = {}
 
-local INK = Color3.fromRGB(16, 16, 22)
-local MONEY = Color3.fromRGB(120, 230, 120)
-local GOLD = Color3.fromRGB(255, 200, 70)
-local WHITE = Color3.new(1, 1, 1)
-local BOLD = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
-local CONFETTI = {
-	Color3.fromRGB(255, 80, 80),
-	Color3.fromRGB(255, 200, 60),
-	Color3.fromRGB(80, 200, 120),
-	Color3.fromRGB(80, 160, 255),
-	Color3.fromRGB(200, 110, 255),
-}
-
-local function corner(parent: Instance, r: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r)
-	c.Parent = parent
-end
-
-local function label(
-	parent: Instance,
-	text: string,
-	size: number,
-	font: Font,
-	color: Color3
-): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Text = text
-	l.TextSize = size
-	l.FontFace = font
-	l.TextColor3 = color
-	l.Parent = parent
-	return l
-end
-
-local function money(n: number): string
-	local s = tostring(math.floor(n))
-	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
-	if string.sub(out, 1, 1) == "," then
-		out = string.sub(out, 2)
-	end
-	return "$" .. out
-end
+local C, F = Style.colors, Style.fonts
+local INK, MONEY, GOLD, WHITE = C.ink, C.money, C.gold, C.text
+local BOLD = F.display
+local CONFETTI = { C.red, C.gold, C.green, C.blue, C.purple, C.orange }
+local corner = Style.corner
+local label = Style.label
+local money = Style.money
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Guide"
@@ -73,45 +37,28 @@ gui.Parent = playerGui
 
 ---------------------------------------------------------------- goal card
 
-local card = Instance.new("Frame")
+local card = Style.panel(gui, 16)
 card.AnchorPoint = Vector2.new(0.5, 0)
-card.Position = UDim2.new(0.5, 0, 0, 58)
-card.Size = UDim2.fromOffset(420, 58)
-card.BackgroundColor3 = INK
-card.BackgroundTransparency = 0.2
+card.Position = UDim2.new(0.5, 0, 0, 64)
+card.Size = UDim2.fromOffset(440, 64)
 card.Visible = false
-card.Parent = gui
-corner(card, 14)
-local stroke = Instance.new("UIStroke")
-stroke.Color = GOLD
-stroke.Thickness = 2
-stroke.Transparency = 1
-stroke.Parent = card
-local tag = label(card, "GOAL", 11, BOLD, GOLD)
-tag.Position = UDim2.fromOffset(14, 6)
-tag.Size = UDim2.fromOffset(60, 12)
-tag.TextXAlignment = Enum.TextXAlignment.Left
-local goalText = label(card, "", 16, BOLD, WHITE)
-goalText.Position = UDim2.fromOffset(14, 18)
-goalText.Size = UDim2.new(1, -28, 0, 20)
+local stroke = Style.stroke(card, GOLD, 2.5, 1)
+local tag = Style.pill(card, "TUTORIAL", GOLD)
+tag.Position = UDim2.fromOffset(14, 9)
+local goalText = label(card, "", 19, F.display, WHITE)
+goalText.Position = UDim2.fromOffset(14, 28)
+goalText.Size = UDim2.new(1, -28, 0, 22)
 goalText.TextXAlignment = Enum.TextXAlignment.Left
 goalText.TextTruncate = Enum.TextTruncate.AtEnd
-local barBack = Instance.new("Frame")
-barBack.Position = UDim2.fromOffset(14, 42)
+Style.outline(goalText, 1.5)
+local barBack, barFill = Style.bar(card, MONEY)
+barBack.Position = UDim2.fromOffset(14, 52)
 barBack.Size = UDim2.new(1, -28, 0, 6)
-barBack.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-barBack.Parent = card
-corner(barBack, 3)
-local barFill = Instance.new("Frame")
-barFill.Size = UDim2.fromScale(0, 1)
-barFill.BackgroundColor3 = MONEY
-barFill.Parent = barBack
-corner(barFill, 3)
-local hintText = label(gui, "", 15, BOLD, GOLD)
+local hintText = label(gui, "", 18, F.display, GOLD)
 hintText.AnchorPoint = Vector2.new(0.5, 0)
-hintText.Position = UDim2.new(0.5, 0, 0, 120)
-hintText.Size = UDim2.fromOffset(500, 20)
-hintText.TextStrokeTransparency = 0.4
+hintText.Position = UDim2.new(0.5, 0, 0, 134)
+hintText.Size = UDim2.fromOffset(600, 24)
+Style.outline(hintText, 2)
 hintText.Visible = false
 
 ---------------------------------------------------------------- arrow over the nearest pedestrian
@@ -143,33 +90,30 @@ end
 
 ---------------------------------------------------------------- tips and celebrations
 
-local tip = Instance.new("TextLabel")
-tip.AnchorPoint = Vector2.new(0.5, 1)
-tip.Position = UDim2.new(0.5, 0, 1, -150)
-tip.Size = UDim2.fromOffset(520, 44)
-tip.BackgroundColor3 = INK
-tip.BackgroundTransparency = 0.15
-tip.TextColor3 = WHITE
-tip.FontFace = BOLD
-tip.TextSize = 16
+local tipBox = Style.panel(gui, 14)
+tipBox.AnchorPoint = Vector2.new(0.5, 1)
+tipBox.Position = UDim2.new(0.5, 0, 1, -170)
+tipBox.Size = UDim2.fromOffset(560, 52)
+tipBox.Visible = false
+Style.stroke(tipBox, C.blue, 2, 0.2)
+local tipPill = Style.pill(tipBox, "TIP", C.blue)
+tipPill.AnchorPoint = Vector2.new(0, 0.5)
+tipPill.Position = UDim2.new(0, 12, 0.5, 0)
+local tip = label(tipBox, "", 16, F.bold, WHITE)
+tip.Position = UDim2.fromOffset(58, 0)
+tip.Size = UDim2.new(1, -70, 1, 0)
 tip.TextWrapped = true
-tip.Visible = false
-tip.Parent = gui
-corner(tip, 12)
-local tipPad = Instance.new("UIPadding")
-tipPad.PaddingLeft = UDim.new(0, 12)
-tipPad.PaddingRight = UDim.new(0, 12)
-tipPad.Parent = tip
+tip.TextXAlignment = Enum.TextXAlignment.Left
 local tipToken = 0
 
 local function showTip(text: string)
 	tipToken += 1
 	local mine = tipToken
 	tip.Text = text
-	tip.Visible = true
+	tipBox.Visible = true
 	task.delay(7, function()
 		if tipToken == mine then
-			tip.Visible = false
+			tipBox.Visible = false
 		end
 	end)
 end
@@ -185,8 +129,7 @@ local function celebrate(title: string, subtitle: string)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.fromScale(0.5, 0.36)
 	t.Size = UDim2.fromOffset(700, 64)
-	t.TextStrokeTransparency = 0
-	t.TextStrokeColor3 = INK
+	Style.outline(t, 4)
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
 	scale.Parent = t
@@ -195,7 +138,7 @@ local function celebrate(title: string, subtitle: string)
 	s.Position = UDim2.fromScale(0.5, 0.36)
 	s.Size = UDim2.fromOffset(700, 24)
 	s.Position = UDim2.new(0.5, 0, 0.36, 48)
-	s.TextStrokeTransparency = 0.3
+	Style.outline(s, 2)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	-- confetti from the top of the screen
 	for _ = 1, 70 do
@@ -363,8 +306,11 @@ local function update()
 	local glowCard: string? = nil
 	stroke.Transparency = 1
 
+	local tutorial = stepValue == Steps.Spawn or stepValue == Steps.Hits
+	tag.Text = if tutorial then "TUTORIAL" else "NEXT RIDE"
+	tag.BackgroundColor3 = if tutorial then GOLD else MONEY
 	if stepValue == Steps.Spawn then
-		goalText.Text = "Open the GARAGE and spawn your Hatchback"
+		goalText.Text = "Spawn your Hatchback from the GARAGE"
 		barFill.Size = UDim2.fromScale(0, 1)
 		glowGarage = true
 		glowCard = Vehicles.Starter
@@ -374,7 +320,7 @@ local function update()
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Hits then
-		goalText.Text = `Run over {Onboarding.HitsGoal} people!   {hits}/{Onboarding.HitsGoal}`
+		goalText.Text = `Run over {Onboarding.HitsGoal} people!   {hits} / {Onboarding.HitsGoal}`
 		barFill.Size = UDim2.fromScale(math.clamp(hits / Onboarding.HitsGoal, 0, 1), 1)
 		stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
 		if root then
@@ -401,7 +347,7 @@ local function update()
 			local ready = cash >= v.price
 			goalText.Text = if ready
 				then `Buy the {v.name} in the GARAGE!`
-				else `Next ride: {v.name}   {money(cash)} / {money(v.price)}`
+				else `{v.name}   {money(cash)} / {money(v.price)}`
 			barFill.Size = UDim2.fromScale(math.clamp(cash / math.max(v.price, 1), 0, 1), 1)
 			if ready then
 				glowGarage = true

@@ -3,6 +3,8 @@
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Impact = require("../src/shared/Rules/Impact")
+local QuestConfig = require("../src/shared/Config/Quests")
+local Quests = require("../src/shared/Rules/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
 local World = require("../src/shared/Config/World")
 
@@ -104,6 +106,89 @@ check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)
 -- world
 check("roads fit the semi", World.Map.RoadWidth >= 40)
 check("debris budget positive", World.Debris.MaxLoose > 0)
+
+-- goals
+local function rngFrom(seed: number): () -> number
+	math.randomseed(seed)
+	return function()
+		return math.random()
+	end
+end
+local function always(_: string): boolean
+	return true
+end
+local function never(_: string): boolean
+	return false
+end
+check(
+	"hourly period changes on the hour",
+	Quests.period(3599, 3600) == 0 and Quests.period(3600, 3600) == 1
+)
+check("seconds left counts down", Quests.secondsLeft(3590, 3600) == 10)
+local a = Quests.roll(QuestConfig.Hourly.Templates, 3, rngFrom(42), always)
+local b = Quests.roll(QuestConfig.Hourly.Templates, 3, rngFrom(42), always)
+check("roll gives 3 goals", #a == 3)
+local same = true
+for i = 1, 3 do
+	if a[i].kind ~= b[i].kind or a[i].target ~= b[i].target then
+		same = false
+	end
+end
+check("same seed, same goals", same)
+local kinds = {}
+local distinct = true
+for _, g in a do
+	if kinds[g.kind] then
+		distinct = false
+	end
+	kinds[g.kind] = true
+end
+check("goals in a set are different kinds", distinct)
+local breaksOffered = false
+for seed = 1, 40 do
+	for _, g in Quests.roll(QuestConfig.Daily.Templates, 3, rngFrom(seed), never) do
+		if g.kind == "Breaks" then
+			breaksOffered = true
+		end
+	end
+end
+check("no building goal without a breaker vehicle", not breaksOffered)
+local inRange = true
+for seed = 1, 40 do
+	for _, set in { QuestConfig.Hourly, QuestConfig.Daily } do
+		for _, g in Quests.roll(set.Templates, set.Count, rngFrom(seed), always) do
+			if
+				g.target <= 0
+				or g.reward < 10
+				or g.reward % 10 ~= 0
+				or string.find(g.text, "{n}", 1, true)
+			then
+				inRange = false
+			end
+		end
+	end
+end
+check("targets positive, rewards rounded, text filled", inRange)
+local goals = {
+	{ kind = "Hits", mode = "add", text = "", target = 3, reward = 10, progress = 0, done = false },
+	{
+		kind = "Combo",
+		mode = "max",
+		text = "",
+		target = 5,
+		reward = 10,
+		progress = 0,
+		done = false,
+	},
+} :: { Quests.Goal }
+check("add goal progresses", #Quests.advance(goals, "Hits", 2) == 0 and goals[1].progress == 2)
+check("add goal completes once", #Quests.advance(goals, "Hits", 5) == 1 and goals[1].progress == 3)
+check("done goal stays done", #Quests.advance(goals, "Hits", 1) == 0)
+check("max goal keeps the best", #Quests.advance(goals, "Combo", 3) == 0 and goals[2].progress == 3)
+Quests.advance(goals, "Combo", 2)
+check("max goal doesn't drop", goals[2].progress == 3)
+check("max goal completes", #Quests.advance(goals, "Combo", 6) == 1)
+check("bad amounts ignored", #Quests.advance(goals, "Hits", 0 / 0) == 0)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

@@ -1,6 +1,7 @@
 --!strict
 -- Screen UI: money and pop-ups, the speedometer with jet and thruster meters, the garage (3D previews,
 -- stats, buy and spawn), the store (passes, like reward, credits) and the phone driving buttons.
+-- Every visual comes from Style.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,113 +13,117 @@ local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
+local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 
 local Hud = {}
-
-local INK = Color3.fromRGB(16, 16, 22)
-local PANEL = Color3.fromRGB(28, 28, 36)
-local ACCENT = Color3.fromRGB(232, 52, 44)
-local GOOD = Color3.fromRGB(70, 200, 110)
-local MONEY = Color3.fromRGB(120, 230, 120)
-local WHITE = Color3.new(1, 1, 1)
-local DIM = Color3.fromRGB(160, 162, 172)
-local FONT = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Medium)
-local BOLD = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
-
-local function corner(parent: Instance, r: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r)
-	c.Parent = parent
-end
-
-local function label(
-	parent: Instance,
-	text: string,
-	size: number,
-	font: Font?,
-	color: Color3?
-): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Text = text
-	l.TextSize = size
-	l.FontFace = font or FONT
-	l.TextColor3 = color or WHITE
-	l.Parent = parent
-	return l
-end
-
-local function button(parent: Instance, text: string, color: Color3): TextButton
-	local b = Instance.new("TextButton")
-	b.AutoButtonColor = true
-	b.BackgroundColor3 = color
-	b.Text = text
-	b.TextSize = 16
-	b.FontFace = BOLD
-	b.TextColor3 = WHITE
-	b.Parent = parent
-	corner(b, 10)
-	return b
-end
-
-local function money(n: number): string
-	local s = tostring(math.floor(n))
-	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
-	if string.sub(out, 1, 1) == "," then
-		out = string.sub(out, 2)
-	end
-	return "$" .. out
-end
+local C, F = Style.colors, Style.fonts
+local money = Style.money
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Hud"
 gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
 ---------------------------------------------------------------- money and pop-ups
 
-local moneyBox = Instance.new("Frame")
+local moneyBox = Style.panel(gui, 24)
 moneyBox.AnchorPoint = Vector2.new(0.5, 0)
 moneyBox.Position = UDim2.new(0.5, 0, 0, 8)
-moneyBox.Size = UDim2.fromOffset(220, 44)
-moneyBox.BackgroundColor3 = INK
-moneyBox.BackgroundTransparency = 0.2
-moneyBox.Parent = gui
-corner(moneyBox, 22)
-local moneyLabel = label(moneyBox, "$0", 26, BOLD, MONEY)
-moneyLabel.Size = UDim2.fromScale(1, 1)
+moneyBox.Size = UDim2.fromOffset(240, 48)
+local moneyScale = Instance.new("UIScale")
+moneyScale.Parent = moneyBox
+local coin = Style.label(moneyBox, "$", 22, F.display, C.ink)
+coin.BackgroundColor3 = Color3.new(1, 1, 1)
+coin.BackgroundTransparency = 0
+coin.AnchorPoint = Vector2.new(0, 0.5)
+coin.Position = UDim2.new(0, 8, 0.5, 0)
+coin.Size = UDim2.fromOffset(34, 34)
+Style.corner(coin, 17)
+Style.gradient(coin, Color3.fromRGB(255, 230, 120), Color3.fromRGB(240, 160, 30))
+Style.stroke(coin, Color3.fromRGB(150, 90, 10), 2, 0)
+local moneyLabel = Style.label(moneyBox, "0", 30, F.display, C.money)
+moneyLabel.Position = UDim2.fromOffset(48, 0)
+moneyLabel.Size = UDim2.new(1, -60, 1, 0)
+moneyLabel.TextXAlignment = Enum.TextXAlignment.Left
+Style.outline(moneyLabel)
 
 local popups = Instance.new("Frame")
 popups.BackgroundTransparency = 1
 popups.AnchorPoint = Vector2.new(0.5, 0)
 popups.Position = UDim2.new(0.5, 0, 0, 140)
-popups.Size = UDim2.fromOffset(400, 200)
+popups.Size = UDim2.fromOffset(520, 220)
 popups.Parent = gui
 
-local function popup(text: string, kind: string)
-	local big = kind == "big"
-	local l =
-		label(popups, text, if big then 30 else 24, BOLD, if kind == "info" then WHITE else MONEY)
-	l.TextStrokeTransparency = 0.3
-	l.TextStrokeColor3 = INK
-	l.AnchorPoint = Vector2.new(0.5, 0)
-	l.Position = UDim2.new(0.5, 0, 0, 10)
-	l.Size = UDim2.new(1, 0, 0, 34)
-	local up =
-		TweenService:Create(l, TweenInfo.new(if big then 2.4 else 1.3, Enum.EasingStyle.Quad), {
-			Position = UDim2.new(0.5, 0, 0, if big then 60 else 90),
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-		})
-	up:Play()
-	up.Completed:Once(function()
-		l:Destroy()
+local function rise(obj: GuiObject, seconds: number, distance: number)
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.4
+	scale.Parent = obj
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	local start = obj.Position
+	task.delay(0.3, function()
+		local fade = TweenService:Create(
+			obj,
+			TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+			{
+				Position = start + UDim2.fromOffset(0, distance),
+			}
+		)
+		fade:Play()
+		for _, d in obj:GetDescendants() do
+			if d:IsA("TextLabel") then
+				TweenService:Create(d, TweenInfo.new(seconds), { TextTransparency = 1 }):Play()
+			elseif d:IsA("UIStroke") then
+				TweenService:Create(d, TweenInfo.new(seconds), { Transparency = 1 }):Play()
+			end
+		end
+		if obj:IsA("TextLabel") then
+			TweenService:Create(obj, TweenInfo.new(seconds), { TextTransparency = 1 }):Play()
+		end
+		if obj:IsA("Frame") then
+			TweenService:Create(obj, TweenInfo.new(seconds), { BackgroundTransparency = 1 }):Play()
+		end
+		fade.Completed:Once(function()
+			obj:Destroy()
+		end)
 	end)
+end
+
+local function popup(text: string, kind: string)
+	if kind == "goal" then
+		-- a gold toast: pill + the goal text
+		local toast = Style.panel(popups, 14)
+		toast.AnchorPoint = Vector2.new(0.5, 0)
+		toast.Position = UDim2.new(0.5, 0, 0, 40)
+		toast.Size = UDim2.fromOffset(480, 46)
+		Style.stroke(toast, C.gold, 2, 0.1)
+		local pill = Style.pill(toast, "GOAL COMPLETE", C.gold)
+		pill.AnchorPoint = Vector2.new(0, 0.5)
+		pill.Position = UDim2.new(0, 12, 0.5, 0)
+		local l = Style.label(toast, text, 17, F.heavy, C.text)
+		l.Position = UDim2.fromOffset(140, 0)
+		l.Size = UDim2.new(1, -150, 1, 0)
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.TextTruncate = Enum.TextTruncate.AtEnd
+		rise(toast, 2.6, -30)
+		return
+	end
+	local big = kind == "big"
+	local l = Style.label(
+		popups,
+		text,
+		if big then 36 elseif kind == "info" then 24 else 32,
+		F.display,
+		if kind == "info" then C.text elseif big then C.gold else C.money
+	)
+	Style.outline(l, 3)
+	l.AnchorPoint = Vector2.new(0.5, 0)
+	l.Position = UDim2.new(0.5, (math.random() - 0.5) * 60, 0, 0)
+	l.Size = UDim2.new(1, 0, 0, 40)
+	rise(l, if big then 2 else 1, if big then 40 else 70)
 end
 
 local shownMoney = 0
@@ -126,11 +131,16 @@ local function refreshMoney()
 	local target = (player:GetAttribute("Money") or 0) :: number
 	local from = shownMoney
 	shownMoney = target
+	if target > from then
+		moneyScale.Scale = 1.12
+		TweenService:Create(moneyScale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 })
+			:Play()
+	end
 	local t0 = os.clock()
 	local conn
 	conn = RunService.RenderStepped:Connect(function()
 		local k = math.clamp((os.clock() - t0) / 0.4, 0, 1)
-		moneyLabel.Text = money(from + (target - from) * k)
+		moneyLabel.Text = string.sub(money(from + (target - from) * k), 2)
 		if k >= 1 then
 			conn:Disconnect()
 		end
@@ -139,52 +149,49 @@ end
 
 ---------------------------------------------------------------- speedometer
 
-local dash = Instance.new("Frame")
+local dash = Style.panel(gui, 20)
 dash.AnchorPoint = Vector2.new(0.5, 1)
-dash.Position = UDim2.new(0.5, 0, 1, -18)
-dash.Size = UDim2.fromOffset(190, 96)
-dash.BackgroundColor3 = INK
-dash.BackgroundTransparency = 0.15
+dash.Position = UDim2.new(0.5, 0, 1, -16)
+dash.Size = UDim2.fromOffset(210, 104)
 dash.Visible = false
-dash.Parent = gui
-corner(dash, 18)
-local speedLabel = label(dash, "0", 44, BOLD)
-speedLabel.Position = UDim2.fromOffset(0, 4)
-speedLabel.Size = UDim2.new(1, 0, 0, 48)
-local unitLabel = label(dash, "MPH", 12, FONT, DIM)
-unitLabel.Position = UDim2.fromOffset(0, 50)
+local speedLabel = Style.label(dash, "0", 54, F.display, C.text)
+speedLabel.Position = UDim2.fromOffset(0, 2)
+speedLabel.Size = UDim2.new(1, 0, 0, 56)
+Style.outline(speedLabel)
+local unitLabel = Style.label(dash, "MPH", 13, F.heavy, C.dim)
+unitLabel.Position = UDim2.fromOffset(0, 56)
 unitLabel.Size = UDim2.new(1, 0, 0, 14)
-local gearLabel = label(dash, "D", 16, BOLD, ACCENT)
-gearLabel.Position = UDim2.fromOffset(14, 10)
-gearLabel.Size = UDim2.fromOffset(20, 20)
-local function bar(y: number, color: Color3): Frame
-	local back = Instance.new("Frame")
-	back.Position = UDim2.fromOffset(18, y)
-	back.Size = UDim2.new(1, -36, 0, 6)
-	back.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+local gearLabel = Style.pill(dash, "D", C.money)
+gearLabel.Position = UDim2.fromOffset(12, 12)
+local function meter(y: number, color: Color3): (Frame, Frame)
+	local back, fill = Style.bar(dash, color)
+	back.Position = UDim2.fromOffset(20, y)
+	back.Size = UDim2.new(1, -40, 0, 7)
 	back.Visible = false
-	back.Parent = dash
-	corner(back, 3)
-	local fill = Instance.new("Frame")
-	fill.Size = UDim2.fromScale(1, 1)
-	fill.BackgroundColor3 = color
-	fill.Parent = back
-	corner(fill, 3)
-	return back
+	return back, fill
 end
-local jetBar = bar(70, Color3.fromRGB(110, 180, 255))
-local thrustBar = bar(82, Color3.fromRGB(255, 190, 80))
-local hint = label(gui, "", 13, FONT, WHITE)
-hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -120)
-hint.Size = UDim2.fromOffset(600, 18)
-hint.TextStrokeTransparency = 0.5
-hint.Visible = false
-local bombLabel = label(gui, "SELF-DESTRUCT", 34, BOLD, ACCENT)
+local jetBar, jetFill = meter(76, C.blue)
+local thrustBar, thrustFill = meter(88, C.orange)
+
+local hintBox = Style.panel(gui, 12, 0.25)
+hintBox.AnchorPoint = Vector2.new(0.5, 1)
+hintBox.Position = UDim2.new(0.5, 0, 1, -128)
+hintBox.Size = UDim2.fromOffset(0, 28)
+hintBox.AutomaticSize = Enum.AutomaticSize.X
+hintBox.Visible = false
+local hintPad = Instance.new("UIPadding")
+hintPad.PaddingLeft = UDim.new(0, 14)
+hintPad.PaddingRight = UDim.new(0, 14)
+hintPad.Parent = hintBox
+local hint = Style.label(hintBox, "", 14, F.bold, C.text)
+hint.AutomaticSize = Enum.AutomaticSize.X
+hint.Size = UDim2.fromScale(0, 1)
+
+local bombLabel = Style.label(gui, "SELF-DESTRUCT", 52, F.display, C.red)
 bombLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 bombLabel.Position = UDim2.fromScale(0.5, 0.4)
-bombLabel.Size = UDim2.fromOffset(500, 50)
-bombLabel.TextStrokeTransparency = 0
+bombLabel.Size = UDim2.fromOffset(600, 60)
+Style.outline(bombLabel, 4)
 bombLabel.Visible = false
 
 ---------------------------------------------------------------- side buttons and panels
@@ -192,89 +199,93 @@ bombLabel.Visible = false
 local side = Instance.new("Frame")
 side.BackgroundTransparency = 1
 side.AnchorPoint = Vector2.new(0, 0.5)
-side.Position = UDim2.new(0, 12, 0.5, 0)
-side.Size = UDim2.fromOffset(120, 120)
+side.Position = UDim2.new(0, 14, 0.5, 0)
+side.Size = UDim2.fromOffset(140, 130)
 side.Parent = gui
-local garageButton = button(side, "GARAGE", ACCENT)
+local garageButton = Style.button(side, "GARAGE", "red", 20)
 garageButton.Name = "GarageButton"
-garageButton.Size = UDim2.fromOffset(120, 50)
-local storeButton = button(side, "STORE", Color3.fromRGB(60, 120, 220))
-storeButton.Position = UDim2.fromOffset(0, 60)
-storeButton.Size = UDim2.fromOffset(120, 50)
+garageButton.Size = UDim2.fromOffset(140, 56)
+local storeButton = Style.button(side, "STORE", "blue", 20)
+storeButton.Position = UDim2.fromOffset(0, 68)
+storeButton.Size = UDim2.fromOffset(140, 56)
 
-local function panel(title: string): (Frame, ScrollingFrame)
-	local p = Instance.new("Frame")
+local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
+	local p = Style.panel(gui, 22, 0.04)
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
-	p.Position = UDim2.fromScale(0.5, 0.52)
+	p.Position = UDim2.fromScale(0.5, 0.53)
 	p.Size = UDim2.fromScale(0.86, 0.78)
-	p.BackgroundColor3 = PANEL
 	p.Visible = false
-	p.Parent = gui
-	corner(p, 18)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = Vector2.new(1100, 700)
 	limit.Parent = p
-	local t = label(p, title, 26, BOLD)
-	t.Position = UDim2.fromOffset(20, 10)
-	t.Size = UDim2.new(1, -80, 0, 36)
+	local stripe = Instance.new("Frame")
+	stripe.BackgroundColor3 = accent
+	stripe.BorderSizePixel = 0
+	stripe.Position = UDim2.fromOffset(22, 16)
+	stripe.Size = UDim2.fromOffset(6, 32)
+	stripe.Parent = p
+	Style.corner(stripe, 3)
+	local t = Style.label(p, title, 34, F.display, C.text)
+	t.Position = UDim2.fromOffset(38, 10)
+	t.Size = UDim2.new(1, -100, 0, 44)
 	t.TextXAlignment = Enum.TextXAlignment.Left
-	local close = button(p, "X", Color3.fromRGB(70, 70, 80))
+	Style.outline(t)
+	local close = Style.button(p, "X", "dark", 20)
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -12, 0, 10)
-	close.Size = UDim2.fromOffset(40, 40)
+	close.Position = UDim2.new(1, -14, 0, 12)
+	close.Size = UDim2.fromOffset(42, 42)
 	close.Activated:Connect(function()
 		p.Visible = false
 	end)
 	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.fromOffset(14, 58)
-	list.Size = UDim2.new(1, -28, 1, -70)
+	list.Position = UDim2.fromOffset(16, 66)
+	list.Size = UDim2.new(1, -32, 1, -80)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
+	list.ScrollBarThickness = 5
+	list.ScrollBarImageColor3 = C.dim
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
 	list.Parent = p
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.PaddingLeft = UDim.new(0, 4)
+	pad.Parent = list
 	return p, list
 end
 
-local garage, garageList = panel("GARAGE")
+local garage, garageList = panel("GARAGE", C.red)
 garage.Name = "Garage"
 local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.fromOffset(240, 300)
-grid.CellPadding = UDim2.fromOffset(12, 12)
+grid.CellSize = UDim2.fromOffset(244, 316)
+grid.CellPadding = UDim2.fromOffset(14, 14)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = garageList
 
-type Card = { stats: Vehicles.Vehicle, action: TextButton, price: TextLabel }
+type Card = { stats: Vehicles.Vehicle, action: TextButton, price: TextLabel, frame: Frame }
 local cards: { Card } = {}
 
-local function statBar(parent: Instance, y: number, name: string, value: number)
-	local l = label(parent, name, 11, FONT, DIM)
-	l.Position = UDim2.fromOffset(12, y)
-	l.Size = UDim2.fromOffset(70, 12)
+local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
+	local l = Style.label(parent, name, 11, F.heavy, C.dim)
+	l.Position = UDim2.fromOffset(14, y)
+	l.Size = UDim2.fromOffset(72, 12)
 	l.TextXAlignment = Enum.TextXAlignment.Left
-	local back = Instance.new("Frame")
-	back.Position = UDim2.fromOffset(84, y + 3)
-	back.Size = UDim2.new(1, -96, 0, 6)
-	back.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
-	back.Parent = parent
-	corner(back, 3)
-	local fill = Instance.new("Frame")
-	fill.Size = UDim2.fromScale(math.clamp(value, 0.04, 1), 1)
-	fill.BackgroundColor3 = ACCENT
-	fill.Parent = back
-	corner(fill, 3)
+	local back, fill = Style.bar(parent, color)
+	back.Position = UDim2.fromOffset(88, y + 3)
+	back.Size = UDim2.new(1, -102, 0, 7)
+	fill.Size = UDim2.fromScale(math.clamp(value, 0.05, 1), 1)
 end
 
 local function preview(parent: Instance, id: string)
 	local vf = Instance.new("ViewportFrame")
-	vf.Size = UDim2.new(1, 0, 0, 120)
-	vf.BackgroundColor3 = Color3.fromRGB(42, 42, 52)
-	vf.Ambient = Color3.fromRGB(170, 170, 180)
+	vf.Position = UDim2.fromOffset(6, 6)
+	vf.Size = UDim2.new(1, -12, 0, 122)
+	vf.BackgroundColor3 = Color3.fromRGB(52, 54, 84) -- no UIGradient here: it would tint the 3D model
+	vf.Ambient = Color3.fromRGB(175, 175, 190)
 	vf.LightColor = Color3.new(1, 1, 1)
 	vf.LightDirection = Vector3.new(-1, -2, -1)
 	vf.Parent = parent
-	corner(vf, 12)
+	Style.corner(vf, 12)
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(id) :: Model?
 	if not template then
@@ -285,7 +296,7 @@ local function preview(parent: Instance, id: string)
 	local cf, size = m:GetBoundingBox()
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 30
-	local dist = size.Magnitude * 1.9
+	local dist = size.Magnitude * 1.85
 	cam.CFrame =
 		CFrame.lookAt(cf.Position + Vector3.new(-0.75, 0.45, -0.75).Unit * dist, cf.Position)
 	cam.Parent = vf
@@ -293,47 +304,46 @@ local function preview(parent: Instance, id: string)
 end
 
 for _, stats in Vehicles.List do
-	local card = Instance.new("Frame")
-	card.BackgroundColor3 = INK
+	local card = Style.card(garageList, 16)
 	card.LayoutOrder = stats.order
 	card.Name = stats.id
-	card.Parent = garageList
-	corner(card, 14)
 	preview(card, stats.id)
-	local name = label(card, stats.name, 18, BOLD)
-	name.Position = UDim2.fromOffset(12, 124)
-	name.Size = UDim2.new(1, -24, 0, 22)
+	local name = Style.label(card, stats.name, 21, F.display, C.text)
+	name.Position = UDim2.fromOffset(14, 132)
+	name.Size = UDim2.new(1, -28, 0, 26)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = label(card, stats.blurb, 11, FONT, DIM)
-	blurb.Position = UDim2.fromOffset(12, 146)
-	blurb.Size = UDim2.new(1, -24, 0, 28)
+	local blurb = Style.label(card, stats.blurb, 12, F.medium, C.dim)
+	blurb.Position = UDim2.fromOffset(14, 158)
+	blurb.Size = UDim2.new(1, -28, 0, 30)
 	blurb.TextWrapped = true
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(card, 178, "TOP SPEED", stats.topSpeed / 250)
-	statBar(card, 194, "ACCEL", stats.launch / 15)
-	statBar(card, 210, "HANDLING", stats.grip / 22)
-	statBar(card, 226, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50))
-	local tag = label(
+	statBar(card, 192, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(card, 208, "ACCEL", stats.launch / 15, C.blue)
+	statBar(card, 224, "HANDLING", stats.grip / 22, C.green)
+	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.purple)
+	if stats.breaksBuildings then
+		local tag = Style.pill(card, "BREAKS BUILDINGS", C.orange)
+		tag.AnchorPoint = Vector2.new(1, 0)
+		tag.Position = UDim2.new(1, -12, 0, 12)
+		tag.ZIndex = 3
+	end
+	local price = Style.label(
 		card,
-		if stats.breaksBuildings then "BREAKS BUILDINGS" else "",
-		11,
-		BOLD,
-		Color3.fromRGB(255, 190, 80)
+		if stats.price == 0 then "FREE" else money(stats.price),
+		20,
+		F.display,
+		C.money
 	)
-	tag.Position = UDim2.fromOffset(12, 242)
-	tag.Size = UDim2.new(1, -24, 0, 12)
-	tag.TextXAlignment = Enum.TextXAlignment.Left
-	local price =
-		label(card, if stats.price == 0 then "FREE" else money(stats.price), 16, BOLD, MONEY)
-	price.Position = UDim2.fromOffset(12, 262)
-	price.Size = UDim2.fromOffset(100, 28)
+	price.Position = UDim2.fromOffset(14, 272)
+	price.Size = UDim2.fromOffset(110, 32)
 	price.TextXAlignment = Enum.TextXAlignment.Left
-	local action = button(card, "SPAWN", GOOD)
+	Style.outline(price, 1.5)
+	local action = Style.button(card, "SPAWN", "green", 18)
 	action.Name = "Action"
 	action.AnchorPoint = Vector2.new(1, 0)
-	action.Position = UDim2.new(1, -10, 0, 258)
-	action.Size = UDim2.fromOffset(110, 34)
+	action.Position = UDim2.new(1, -12, 0, 268)
+	action.Size = UDim2.fromOffset(112, 38)
 	action.Activated:Connect(function()
 		local owned = string.find(
 			"," .. ((player:GetAttribute("Owned") or "") :: string) .. ",",
@@ -353,7 +363,7 @@ for _, stats in Vehicles.List do
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
-	table.insert(cards, { stats = stats, action = action, price = price })
+	table.insert(cards, { stats = stats, action = action, price = price, frame = card })
 end
 
 local function refreshCards()
@@ -362,29 +372,30 @@ local function refreshCards()
 	for _, c in cards do
 		if string.find(owned, "," .. c.stats.id .. ",", 1, true) then
 			c.action.Text = "SPAWN"
-			c.action.BackgroundColor3 = GOOD
+			Style.setKind(c.action, "green")
 			c.price.Text = "OWNED"
-			c.price.TextColor3 = DIM
+			c.price.TextColor3 = C.dim
 		else
 			c.price.Text = if c.stats.price == 0 then "FREE" else money(c.stats.price)
-			c.price.TextColor3 = MONEY
+			c.price.TextColor3 = C.money
 			if cash >= c.stats.price then
 				c.action.Text = "BUY"
-				c.action.BackgroundColor3 = ACCENT
+				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
 				c.action.Text = "GET PASS"
-				c.action.BackgroundColor3 = Color3.fromRGB(60, 120, 220)
+				Style.setKind(c.action, "blue")
 			else
 				c.action.Text = "BUY"
-				c.action.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+				Style.setKind(c.action, "dark")
 			end
 		end
 	end
 end
 
-local store, storeList = panel("STORE")
+local store, storeList = panel("STORE", C.blue)
+store.Name = "Store"
 local storeLayout = Instance.new("UIListLayout")
-storeLayout.Padding = UDim.new(0, 10)
+storeLayout.Padding = UDim.new(0, 12)
 storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 storeLayout.Parent = storeList
 
@@ -394,29 +405,35 @@ local function storeRow(
 	title: string,
 	text: string,
 	buttonText: string,
-	color: Color3,
+	accent: Color3,
+	kind: string,
 	onClick: () -> ()
 ): TextButton
-	local row = Instance.new("Frame")
-	row.Size = UDim2.new(1, -10, 0, 78)
-	row.BackgroundColor3 = INK
+	local row = Style.card(storeList, 16)
+	row.Size = UDim2.new(1, -12, 0, 88)
 	row.LayoutOrder = order
-	row.Parent = storeList
-	corner(row, 12)
-	local t = label(row, title, 20, BOLD)
-	t.Position = UDim2.fromOffset(16, 10)
-	t.Size = UDim2.new(1, -200, 0, 24)
+	local stripe = Instance.new("Frame")
+	stripe.BackgroundColor3 = accent
+	stripe.BorderSizePixel = 0
+	stripe.Position = UDim2.fromOffset(0, 0)
+	stripe.Size = UDim2.new(0, 8, 1, 0)
+	stripe.Parent = row
+	Style.corner(stripe, 4)
+	local t = Style.label(row, title, 24, F.display, C.text)
+	t.Position = UDim2.fromOffset(24, 10)
+	t.Size = UDim2.new(1, -220, 0, 30)
 	t.TextXAlignment = Enum.TextXAlignment.Left
-	local d = label(row, text, 13, FONT, DIM)
-	d.Position = UDim2.fromOffset(16, 38)
-	d.Size = UDim2.new(1, -200, 0, 32)
+	Style.outline(t, 1.5)
+	local d = Style.label(row, text, 14, F.medium, C.dim)
+	d.Position = UDim2.fromOffset(24, 42)
+	d.Size = UDim2.new(1, -220, 0, 36)
 	d.TextWrapped = true
 	d.TextXAlignment = Enum.TextXAlignment.Left
 	d.TextYAlignment = Enum.TextYAlignment.Top
-	local b = button(row, buttonText, color)
+	local b = Style.button(row, buttonText, kind, 18)
 	b.AnchorPoint = Vector2.new(1, 0.5)
-	b.Position = UDim2.new(1, -14, 0.5, 0)
-	b.Size = UDim2.fromOffset(160, 44)
+	b.Position = UDim2.new(1, -16, 0.5, 0)
+	b.Size = UDim2.fromOffset(170, 48)
 	b.Activated:Connect(onClick)
 	return b
 end
@@ -425,75 +442,89 @@ local PASSES = {
 	{
 		name = "Roadster",
 		title = "ROADSTER",
+		accent = C.red,
 		text = "The dream car: rear jet, air control and a thruster. Plus $1,000,000 in game.",
 	},
 	{
 		name = "Wrecker",
 		title = "WRECKER",
-		text = "Run over other players and fling their cars. Includes self-destruct (hold X).",
+		accent = C.orange,
+		text = "Run over other players and fling their cars. Includes self-destruct.",
 	},
-	{ name = "DoubleMoney", title = "2x MONEY", text = "Double money from every hit." },
+	{
+		name = "DoubleMoney",
+		title = "2x MONEY",
+		accent = C.money,
+		text = "Double money from every hit.",
+	},
 }
 for i, p in PASSES do
-	passButtons[p.name] = storeRow(
-		i,
-		p.title,
-		p.text,
-		"GET",
-		Color3.fromRGB(60, 120, 220),
-		function()
-			Net.waitFor("BuyPass"):FireServer(p.name)
-		end
-	)
+	passButtons[p.name] = storeRow(i, p.title, p.text, "GET", p.accent, "blue", function()
+		Net.waitFor("BuyPass"):FireServer(p.name)
+	end)
 end
 local likeButton = storeRow(
 	10,
 	"LIKE REWARD",
 	`Liked the game? Thanks! Here's {money(Economy.LikeReward)}, once.`,
 	"CLAIM",
-	GOOD,
+	C.gold,
+	"green",
 	function()
 		Net.waitFor("ClaimLike"):FireServer()
 	end
 )
-local credits = label(
+local credits = Style.label(
 	storeList,
 	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0)",
 	12,
-	FONT,
-	DIM
+	F.medium,
+	C.dim
 )
-credits.Size = UDim2.new(1, -10, 0, 30)
+credits.Size = UDim2.new(1, -12, 0, 30)
 credits.LayoutOrder = 20
 
 local function refreshStore()
 	for name, b in passButtons do
+		local test = RunService:IsStudio() and Economy.Passes[name] == 0
 		if player:GetAttribute("Pass" .. name) == true then
-			b.Text = if RunService:IsStudio() and Economy.Passes[name] == 0
-				then "OWNED (test)"
-				else "OWNED"
-			b.BackgroundColor3 = Color3.fromRGB(70, 70, 80)
+			b.Text = if test then "OWNED (test)" else "OWNED"
+			Style.setKind(b, "dark")
 		else
-			b.Text = if RunService:IsStudio() and Economy.Passes[name] == 0
-				then "TEST TOGGLE"
-				else "GET"
-			b.BackgroundColor3 = Color3.fromRGB(60, 120, 220)
+			b.Text = if test then "TEST TOGGLE" else "GET"
+			Style.setKind(b, "blue")
 		end
 	end
 	local claimed = player:GetAttribute("LikeClaimed") == true
 	likeButton.Text = if claimed then "CLAIMED" else "CLAIM"
-	likeButton.BackgroundColor3 = if claimed then Color3.fromRGB(70, 70, 80) else GOOD
+	Style.setKind(likeButton, if claimed then "dark" else "green")
+end
+
+local function open(p: Frame)
+	local scale = p:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = p
+	scale.Scale = 0.85
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	p.Visible = true
 end
 
 garageButton.Activated:Connect(function()
 	store.Visible = false
-	garage.Visible = not garage.Visible
-	refreshCards()
+	if garage.Visible then
+		garage.Visible = false
+	else
+		refreshCards()
+		open(garage)
+	end
 end)
 storeButton.Activated:Connect(function()
 	garage.Visible = false
-	store.Visible = not store.Visible
-	refreshStore()
+	if store.Visible then
+		store.Visible = false
+	else
+		refreshStore()
+		open(store)
+	end
 end)
 
 ---------------------------------------------------------------- phone driving buttons
@@ -509,15 +540,15 @@ touch.Parent = gui
 local function holdButton(
 	text: string,
 	pos: UDim2,
-	color: Color3,
+	kind: string,
 	down: () -> (),
 	up: () -> ()
 ): TextButton
-	local b = button(touch, text, color)
-	b.Size = UDim2.fromOffset(72, 72)
+	local b = Style.button(touch, text, kind, 15)
+	b.Size = UDim2.fromOffset(74, 74)
 	b.Position = pos
-	b.TextSize = 13
-	corner(b, 36)
+	local round = b:FindFirstChildOfClass("UICorner") :: UICorner
+	round.CornerRadius = UDim.new(1, 0)
 	b.InputBegan:Connect(function(input)
 		if
 			input.UserInputType == Enum.UserInputType.Touch
@@ -536,42 +567,30 @@ local function holdButton(
 	end)
 	return b
 end
-local boostB = holdButton("JET", UDim2.fromOffset(160, 0), Color3.fromRGB(60, 120, 220), function()
+local boostB = holdButton("JET", UDim2.fromOffset(160, 0), "blue", function()
 	Drive.input.boost = true
 end, function()
 	Drive.input.boost = false
 end)
-local featureB = holdButton(
-	"HORN",
-	UDim2.fromOffset(80, 0),
-	Color3.fromRGB(230, 160, 40),
-	function()
-		Drive.input.feature = true
-	end,
-	function()
-		Drive.input.feature = false
-	end
-)
-local thrustB = holdButton(
-	"BOOST",
-	UDim2.fromOffset(160, 80),
-	Color3.fromRGB(240, 120, 40),
-	function()
-		Drive.thruster()
-	end,
-	function() end
-)
-local bombB = holdButton("BOMB", UDim2.fromOffset(0, 0), ACCENT, function()
+local featureB = holdButton("HORN", UDim2.fromOffset(80, 0), "gold", function()
+	Drive.input.feature = true
+end, function()
+	Drive.input.feature = false
+end)
+local thrustB = holdButton("BOOST", UDim2.fromOffset(160, 80), "orange", function()
+	Drive.thruster()
+end, function() end)
+local bombB = holdButton("BOMB", UDim2.fromOffset(0, 0), "red", function()
 	Drive.input.bomb = true
 end, function()
 	Drive.input.bomb = false
 end)
-local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), Color3.fromRGB(70, 70, 80), function()
+local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), "dark", function()
 	Drive.input.roll = -1
 end, function()
 	Drive.input.roll = 0
 end)
-local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), Color3.fromRGB(70, 70, 80), function()
+local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
 	Drive.input.roll = 1
 end, function()
 	Drive.input.roll = 0
@@ -584,7 +603,7 @@ local FEATURE_NAMES = { Taxi = "TAXI!", Jingle = "JINGLE", Cannon = "WATER" }
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
 	dash.Visible = s.driving
-	hint.Visible = s.driving and not UserInputService.TouchEnabled
+	hintBox.Visible = s.driving and not UserInputService.TouchEnabled
 	touch.Visible = s.driving and UserInputService.TouchEnabled
 	if not s.driving then
 		bombLabel.Visible = false
@@ -593,6 +612,7 @@ RunService.RenderStepped:Connect(function()
 	local stats = Vehicles.ById[s.vehicleId]
 	speedLabel.Text = tostring(s.speedMph)
 	gearLabel.Text = if s.reverse then "R" else "D"
+	gearLabel.BackgroundColor3 = if s.reverse then C.red else C.money
 	local hasJet = stats ~= nil and Vehicles.has(stats, "Jet")
 	local hasThruster = stats ~= nil and Vehicles.has(stats, "Thruster")
 	local wrecker = player:GetAttribute("PassWrecker") == true
@@ -604,10 +624,10 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 	end
-	jetBar.Visible = hasJet;
-	(jetBar:FindFirstChildOfClass("Frame") :: Frame).Size = UDim2.fromScale(s.boost / 100, 1)
-	thrustBar.Visible = hasThruster;
-	(thrustBar:FindFirstChildOfClass("Frame") :: Frame).Size = UDim2.fromScale(s.thruster, 1)
+	jetBar.Visible = hasJet
+	jetFill.Size = UDim2.fromScale(s.boost / 100, 1)
+	thrustBar.Visible = hasThruster
+	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
 	local keys = { "WASD drive", "SPACE get out" }
 	if feature then
 		table.insert(keys, "G " .. string.lower(feature))
@@ -622,7 +642,7 @@ RunService.RenderStepped:Connect(function()
 	if wrecker then
 		table.insert(keys, "hold X self-destruct")
 	end
-	hint.Text = table.concat(keys, "  ·  ")
+	hint.Text = table.concat(keys, "   ·   ")
 	boostB.Visible = hasJet
 	featureB.Visible = feature ~= nil
 	featureB.Text = feature or ""
@@ -656,8 +676,8 @@ function Hud.start()
 			task.wait(0.2)
 		end
 		if not Drive.state.driving and player:GetAttribute("Tutorial") == 1 then
-			garage.Visible = true
 			refreshCards()
+			open(garage)
 		end
 	end)
 end

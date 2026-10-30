@@ -100,10 +100,22 @@ local function loosen(part: BasePart, push: Vector3)
 	task.delay(CFG.RebuildSeconds + random:NextNumber(0, 8), restore, part)
 end
 
--- break everything within radius of pos; push is the hitter's velocity (studs/s)
-function BuildingService.breakAt(pos: Vector3, radius: number, push: Vector3)
+local breakListeners: { (Player, number) -> () } = {}
+
+-- called with the player and how many pieces they broke
+function BuildingService.onBreak(listener: (Player, number) -> ())
+	table.insert(breakListeners, listener)
+end
+
+-- break everything within radius of pos; push is the hitter's velocity (studs/s); returns the pieces broken
+function BuildingService.breakAt(
+	pos: Vector3,
+	radius: number,
+	push: Vector3,
+	player: Player?
+): number
 	if not buildingsFolder or radius <= 0 then
-		return
+		return 0
 	end
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
@@ -124,7 +136,7 @@ function BuildingService.breakAt(pos: Vector3, radius: number, push: Vector3)
 		end
 	end
 	if count == 0 then
-		return
+		return 0
 	end
 	-- whatever stood on the broken part falls too
 	local reach = radius * CFG.ChunkFallReach
@@ -148,6 +160,12 @@ function BuildingService.breakAt(pos: Vector3, radius: number, push: Vector3)
 			dropped += 1
 		end
 	end
+	if player then
+		for _, listener in breakListeners do
+			task.spawn(listener, player, count + dropped)
+		end
+	end
+	return count + dropped
 end
 
 local function onBreak(player: Player, pos: unknown, velocity: unknown)
@@ -181,7 +199,7 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 		return
 	end
 	local energy = Impact.energy(stats.weight, speed / spm)
-	BuildingService.breakAt(pos, Impact.breakRadius(energy), velocity.Unit * speed)
+	BuildingService.breakAt(pos, Impact.breakRadius(energy), velocity.Unit * speed, player)
 end
 
 function BuildingService.start()
