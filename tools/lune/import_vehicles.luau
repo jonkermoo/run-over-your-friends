@@ -13,7 +13,7 @@ local Vector3 = roblox.Vector3
 
 local raw, out = process.args[1], process.args[2]
 local factor = 1 / assert(tonumber(process.args[3]), "importer scale")
-local texture = "rbxassetid://" .. assert(process.args[4], "palette image id")
+local texture = roblox.Content.fromUri("rbxassetid://" .. assert(process.args[4], "palette image id"))
 
 local source = roblox.deserializeModel(fs.readFile(raw))[1]
 local groups: { [string]: { any } } = {}
@@ -42,7 +42,7 @@ for id, parts in groups do
 	for _, p in parts do
 		p.Size = p.Size * factor
 		p.CFrame = CFrame.new(p.CFrame.Position * factor - origin)
-		p.TextureID = texture
+		p.TextureContent = texture
 		p.Anchored = true
 		p.CanCollide = false
 		p.CanTouch = false

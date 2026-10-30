@@ -79,9 +79,9 @@ function VehicleService.despawn(player: Player)
 	if m then
 		local seat = m:FindFirstChild("DriverSeat") :: VehicleSeat?
 		local occupant = seat and seat.Occupant
+		m:SetAttribute("Despawning", true)
 		if occupant then
 			occupant.Sit = false
-			occupant.Jump = true
 		end
 		m:Destroy()
 	end
@@ -212,7 +212,8 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			if ch then
 				setHidden(ch, false)
 				local r = ch:FindFirstChild("HumanoidRootPart") :: BasePart?
-				if r and left and left.Health > 0 then
+				-- a replaced or exploded vehicle doesn't step its driver out beside it
+				if r and left and left.Health > 0 and not model:GetAttribute("Despawning") then
 					local exit = chassis.CFrame * CFrame.new(-(size.X / 2 + 3), 2, 0)
 					task.defer(function()
 						r.AssemblyLinearVelocity = Vector3.zero
@@ -233,14 +234,43 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			conn:Disconnect()
 			return
 		end
+		-- fell out of the world: put it back on the nearest road
+		if chassis.Position.Y < -40 then
+			local best, bestD = chassis.Position, math.huge
+			for _, p in spawnPoints do
+				local d = (p - chassis.Position * Vector3.new(1, 0, 1)).Magnitude
+				if d < bestD then
+					best, bestD = p, d
+				end
+			end
+			pcall(function()
+				chassis:SetNetworkOwner(nil)
+			end)
+			model:PivotTo(
+				CFrame.lookAt(
+					best + Vector3.new(0, 3, 0),
+					best + Vector3.new(0, 3, 0) + chassis.CFrame.LookVector * Vector3.new(1, 0, 1)
+				)
+			)
+			chassis.AssemblyLinearVelocity = Vector3.zero
+			task.delay(0.3, function()
+				if driver and model.Parent then
+					pcall(function()
+						chassis:SetNetworkOwner(player)
+					end)
+				end
+			end)
+		end
 		if seat.Occupant == nil and turn.Enabled then
 			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * LEVEL_RATE
 			turn.AngularVelocity = Vector3.new(level.X, 0, level.Z)
 		end
 	end)
 
-	task.defer(function()
-		if humanoid.Health > 0 and model.Parent then
+	-- a moment after spawning, once any old seat has let go
+	task.delay(0.15, function()
+		if humanoid.Health > 0 and model.Parent and not humanoid.SeatPart then
+			humanoid.Jump = false
 			seat:Sit(humanoid)
 		end
 	end)

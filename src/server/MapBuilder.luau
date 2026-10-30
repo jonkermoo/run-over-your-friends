@@ -337,8 +337,11 @@ function MapBuilder.build(): Result
 					local sp = Instance.new("SpawnLocation")
 					sp.Anchored = true
 					sp.Size = Vector3.new(10, 1, 10)
-					sp.CFrame =
-						CFrame.new(cx + (s % 2 - 0.5) * 60, 0, cz + (math.floor(s / 2) - 0.5) * 60)
+					sp.CFrame = CFrame.new(
+						cx + (s % 2 - 0.5) * 60,
+						-0.36,
+						cz + (math.floor(s / 2) - 0.5) * 60
+					)
 					sp.Color = COLORS.ramp
 					sp.Material = Enum.Material.SmoothPlastic
 					sp.Duration = 0

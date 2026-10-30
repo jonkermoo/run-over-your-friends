@@ -288,6 +288,7 @@ local thrustLeft = 0
 local thrustReadyAt = 0
 local boostUsedAt = 0
 local flingUntil = 0
+local stuckFor = 0
 local airSpin = Vector3.zero
 local bombHeld = 0
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
@@ -426,7 +427,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 	params.FilterDescendantsInstances = include
 	local chassis = s.chassis
 	-- the vehicle's outline plus a little look-ahead along the way it's going
-	local ahead = math.clamp(velocity.Magnitude * 0.08, 1, 14)
+	local ahead = math.clamp(velocity.Magnitude * 0.12, 1, 40)
 	local size = Vector3.new(chassis.Size.X + 2, s.height + 2, chassis.Size.Z + ahead)
 	local localVel = chassis.CFrame:VectorToObjectSpace(velocity)
 	local shift = if localVel.Z < 0 then -ahead / 2 else ahead / 2
@@ -790,6 +791,20 @@ local function step(dt: number)
 			math.clamp(math.abs(alphaR) / PEAK_SLIP - 0.8, 0, 1),
 			math.clamp((longSlide - 0.95) * 4, 0, 1)
 		)
+
+		-- on its roof (or side) and stopped: put it back on its wheels
+		if chassis.CFrame.UpVector.Y < 0.3 and chassis.AssemblyLinearVelocity.Magnitude < 10 then
+			stuckFor += dt
+			if stuckFor > 1.2 then
+				stuckFor = 0
+				local at = chassis.Position + Vector3.new(0, s.height + 2, 0)
+				s.car:PivotTo(CFrame.lookAt(at, at + look) * CFrame.new(0, -chassis.Size.Y / 2, 0))
+				chassis.AssemblyLinearVelocity = Vector3.zero
+				chassis.AssemblyAngularVelocity = Vector3.zero
+			end
+		else
+			stuckFor = 0
+		end
 
 		detectHits(s, chassis.AssemblyLinearVelocity)
 		features(s, dt)

@@ -245,7 +245,8 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 	then
 		return
 	end
-	if velocity ~= velocity or not rateOk(player, "hit" .. npc:GetDebugId(), 0.5) then
+	-- a knocked-down NPC can't be hit again, so a plain rate limit is enough here
+	if velocity ~= velocity or not rateOk(player, "hit", 0.04) then
 		return
 	end
 	local vehicle = VehicleService.of(player)

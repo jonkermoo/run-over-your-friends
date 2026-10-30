@@ -48,17 +48,39 @@ function VehicleBuilder.build(id: string): Model
 		end
 	end
 
-	-- the chassis: a box from the ground up to about the bumpers, a little inside the body's outline
+	-- the chassis: a box up to about the bumpers, a little inside the body's outline, riding on four
+	-- invisible balls at its corners so kerbs and ramp lips roll under instead of stopping it dead
+	local skid = math.clamp(wheelRadius * 0.8, 0.8, 2)
+	local lift = skid * 0.7
 	local chassisHeight = math.clamp(body.Size.Y * 0.35, 1.6, 5)
 	local chassis = Instance.new("Part")
 	chassis.Name = "Chassis"
 	chassis.Size = Vector3.new(math.max(width * 0.82, 3), chassisHeight, math.max(length * 0.86, 4))
-	chassis.CFrame = CFrame.new(0, chassisHeight / 2, cf.Position.Z)
+	chassis.CFrame = CFrame.new(0, lift + chassisHeight / 2, cf.Position.Z)
 	chassis.Transparency = 1
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
 	chassis.CollisionGroup = "Vehicles"
 	chassis.Parent = model
 	model.PrimaryPart = chassis
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local ball = Instance.new("Part")
+			ball.Name = "Skid"
+			ball.Shape = Enum.PartType.Ball
+			ball.Size = Vector3.one * skid * 2
+			ball.CFrame = CFrame.new(
+				sx * (chassis.Size.X / 2 - skid),
+				skid,
+				cf.Position.Z + sz * (chassis.Size.Z / 2 - skid)
+			)
+			ball.Transparency = 1
+			ball.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
+			ball.CanQuery = false
+			ball.CanTouch = false
+			ball.Parent = model
+			weld("SkidWeld", chassis, ball)
+		end
+	end
 
 	local sprung = Instance.new("Part")
 	sprung.Name = "Sprung"
@@ -129,9 +151,9 @@ function VehicleBuilder.build(id: string): Model
 	for _, p in model:GetDescendants() do
 		if p:IsA("BasePart") then
 			p.Anchored = false
-			if p ~= chassis then
+			p.CollisionGroup = "Vehicles"
+			if p ~= chassis and p.Name ~= "Skid" then
 				p.CanCollide = false
-				p.CollisionGroup = "Vehicles"
 			end
 		end
 	end
