@@ -12,6 +12,7 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
 local NpcService = require(script.Parent.NpcService)
 local Passes = require(script.Parent.Passes)
@@ -196,6 +197,7 @@ local function onSelfDestruct(player: Player)
 		return
 	end
 	lastBlast[player] = t
+	Analytics.custom(player, "SelfDestruct")
 	local spm = Vehicles.StudsPerMetre
 	local pos = chassis.Position
 	local speed = chassis.AssemblyLinearVelocity.Magnitude / spm

@@ -9,7 +9,9 @@ local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
+local RateLimit = require(script.Parent.RateLimit)
 
 local Passes = {}
 
@@ -27,6 +29,12 @@ local function grant(player: Player, name: string)
 			if not profile.roadsterPassPaid then
 				profile.roadsterPassPaid = true
 				profile.money += Economy.RoadsterPassMoney
+				Analytics.source(
+					player,
+					Economy.RoadsterPassMoney,
+					Enum.AnalyticsEconomyTransactionType.IAP,
+					"RoadsterPass"
+				)
 				Net.remote("Popup"):FireClient(player, "+$1,000,000  Roadster unlocked!", "big")
 			end
 			Data.changed(player)
@@ -70,7 +78,11 @@ function Passes.start()
 		end
 	end)
 	Net.remote("BuyPass").OnServerEvent:Connect(function(player, name)
-		if typeof(name) ~= "string" or Economy.Passes[name] == nil then
+		if
+			typeof(name) ~= "string"
+			or Economy.Passes[name] == nil
+			or not RateLimit.allow(player, "pass", 1)
+		then
 			return
 		end
 		local id = Economy.Passes[name]

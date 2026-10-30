@@ -107,14 +107,24 @@ function Data.addMoney(player: Player, amount: number)
 	end
 end
 
-local function save(player: Player): boolean
+-- Session lock: a saved profile carries { job, at } for the server using it. Another server waits for it
+-- (or for it to go stale) before loading, so two servers never write over each other's progress.
+local LOCK_STALE = 150 -- seconds without a save before a lock counts as abandoned (autosave refreshes it)
+
+local function withLock(p: Profile, release: boolean): string
+	local copy = table.clone(p) :: any
+	copy.lock = if release then nil else { job = game.JobId, at = os.time() }
+	return HttpService:JSONEncode(copy)
+end
+
+local function save(player: Player, release: boolean?): boolean
 	local p = profiles[player]
 	if not (store and p) or loadFailed[player] or saving[player] then
 		return false
 	end
 	saving[player] = true
 	inFlight += 1
-	local blob = HttpService:JSONEncode(p)
+	local blob = withLock(p, release == true)
 	local ok, err = pcall(function()
 		(store :: DataStore):SetAsync("u" .. player.UserId, blob)
 	end)
@@ -144,15 +154,46 @@ end
 local function load(player: Player)
 	local profile = default()
 	if store then
-		local ok, result = pcall(function()
-			return (store :: DataStore):GetAsync("u" .. player.UserId)
-		end)
+		-- take the session lock; wait for another server to let go (up to ~20 s), then take it anyway
+		local ok, decoded = false, nil
+		for attempt = 1, 5 do
+			local locked = false
+			local loaded: any = nil
+			ok = pcall(function()
+				(store :: DataStore):UpdateAsync("u" .. player.UserId, function(old)
+					local data = if typeof(old) == "string"
+						then HttpService:JSONDecode(old)
+						else nil
+					if typeof(data) ~= "table" then
+						data = {}
+					end
+					local lock = data.lock
+					local fresh = typeof(lock) == "table"
+						and lock.job ~= game.JobId
+						and os.time() - (tonumber(lock.at) or 0) < LOCK_STALE
+					if fresh and attempt < 5 then
+						locked = true
+						return nil -- leave it alone and try again shortly
+					end
+					data.lock = { job = game.JobId, at = os.time() }
+					loaded = data
+					return HttpService:JSONEncode(data)
+				end)
+			end)
+			if not ok or not locked then
+				decoded = loaded
+				break
+			end
+			task.wait(5)
+			if not player.Parent then
+				return
+			end
+		end
 		if not ok then
 			loadFailed[player] = true
-			warn("load failed, session-only data for", player.UserId, result)
-		elseif typeof(result) == "string" then
-			local decoded = HttpService:JSONDecode(result)
-			if typeof(decoded) == "table" then
+			warn("load failed, session-only data for", player.UserId)
+		else
+			if typeof(decoded) == "table" and decoded.money ~= nil then
 				profile.money = tonumber(decoded.money) or profile.money
 				profile.likeClaimed = decoded.likeClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
@@ -194,7 +235,7 @@ function Data.start()
 		task.spawn(load, p)
 	end
 	Players.PlayerRemoving:Connect(function(player)
-		save(player)
+		save(player, true)
 		profiles[player] = nil
 		loadFailed[player] = nil
 	end)
@@ -209,7 +250,7 @@ function Data.start()
 	game:BindToClose(function()
 		-- PlayerRemoving may already have taken the profiles; wait for every save in flight
 		for player in profiles do
-			task.spawn(save, player)
+			task.spawn(save, player, true)
 		end
 		local deadline = os.clock() + 25
 		task.wait(0.1)

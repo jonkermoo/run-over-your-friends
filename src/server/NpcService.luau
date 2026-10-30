@@ -14,6 +14,7 @@ local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
 local Passes = require(script.Parent.Passes)
 local VehicleService = require(script.Parent.VehicleService)
@@ -420,6 +421,7 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 	end
 	if typeof(giantHp) == "number" then
 		Data.addMoney(player, EventConfig.GiantToppleBonus)
+		Analytics.custom(player, "GiantToppled")
 		for _, everyone in Players:GetPlayers() do
 			Net.remote("Celebrate")
 				:FireClient(everyone, "GIANT TOPPLED!", `{player.DisplayName} brought it down.`)

@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Data = require(script.Parent.Data)
+local RateLimit = require(script.Parent.RateLimit)
 local VehicleBuilder = require(script.Parent.VehicleBuilder)
 
 local VehicleService = {}
@@ -288,11 +289,14 @@ end
 
 function VehicleService.start()
 	Net.remote("SpawnVehicle").OnServerEvent:Connect(function(player, id)
-		if typeof(id) == "string" then
+		if typeof(id) == "string" and RateLimit.allow(player, "spawn", 1) then
 			VehicleService.spawn(player, id)
 		end
 	end)
 	Net.remote("DespawnVehicle").OnServerEvent:Connect(function(player)
+		if not RateLimit.allow(player, "despawn", 1) then
+			return
+		end
 		VehicleService.despawn(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)

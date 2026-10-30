@@ -11,7 +11,9 @@ local RunService = game:GetService("RunService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
+local RateLimit = require(script.Parent.RateLimit)
 
 local ProductService = {}
 
@@ -53,6 +55,7 @@ local function grant(player: Player, product: Products.Product): boolean
 		profile.bought[product.key] = true
 	end
 	Data.changed(player)
+	Analytics.source(player, product.money, Enum.AnalyticsEconomyTransactionType.IAP, product.key)
 	local extra = if product.vehicle then ` + the {Vehicles.ById[product.vehicle].name}` else ""
 	Net.remote("Celebrate"):FireClient(
 		player,
@@ -83,6 +86,9 @@ function ProductService.start()
 	end
 
 	Net.remote("BuyProduct").OnServerEvent:Connect(function(player, key)
+		if not RateLimit.allow(player, "product", 1) then
+			return
+		end
 		local product = if typeof(key) == "string" then byKey[key] else nil
 		local profile = Data.get(player)
 		if not (product and profile) or (product.once and profile.bought[product.key]) then

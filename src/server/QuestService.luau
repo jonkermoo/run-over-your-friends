@@ -10,6 +10,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local Quests = require(ReplicatedStorage.Shared.Rules.Quests)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
@@ -98,6 +99,12 @@ function QuestService.event(player: Player, kind: string, amount: number)
 		if set then
 			for _, goal in Quests.advance(set.goals, kind, amount) do
 				paid += goal.reward
+				Analytics.source(
+					player,
+					goal.reward,
+					Enum.AnalyticsEconomyTransactionType.TimedReward,
+					name .. "Goal"
+				)
 				Net.remote("Popup"):FireClient(
 					player,
 					`{string.upper(name)} GOAL!  {goal.text}  +${goal.reward}`,

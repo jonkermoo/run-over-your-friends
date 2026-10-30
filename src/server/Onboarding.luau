@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
 local VehicleService = require(script.Parent.VehicleService)
@@ -57,6 +58,7 @@ function OnboardingService.start()
 		if n >= Onboarding.HitsGoal then
 			Data.addMoney(player, Onboarding.HitsReward)
 			setStep(player, Steps.Save)
+			Analytics.step(player, Analytics.Steps.TutorialDone)
 			Net.remote("Celebrate"):FireClient(
 				player,
 				"FIRST RAMPAGE!",
