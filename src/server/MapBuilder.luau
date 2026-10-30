@@ -5,6 +5,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local World = require(ReplicatedStorage.Shared.Config.World)
 
 local MapBuilder = {}
@@ -358,6 +359,29 @@ function MapBuilder.build(): Result
 				f.CFrame = CFrame.new(cx, 0.05, cz) * CFrame.Angles(0, 0, math.pi / 2)
 				f.Color = COLORS.concrete
 				f.Parent = static
+				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
+				local boards = Instance.new("Folder")
+				boards.Name = "Boards"
+				boards.Parent = static
+				for k, board in Leaderboards.Boards do
+					local bx = cx + (k - 2) * 62
+					local bz = cz - B / 2 + 6
+					local face = part(
+						boards,
+						Vector3.new(52, 46, 1.2),
+						CFrame.lookAt(Vector3.new(bx, 30, bz), Vector3.new(bx, 30, bz + 10)),
+						Color3.fromRGB(24, 24, 38)
+					)
+					face.Name = "Board_" .. board.key
+					for _, side in { -1, 1 } do
+						part(
+							boards,
+							Vector3.new(2, 8, 2),
+							CFrame.new(bx + side * 20, 3, bz - 0.5),
+							COLORS.concrete
+						)
+					end
+				end
 				-- the first crowd: right in front of where new players appear
 				for k = 1, 24 do
 					local a = k / 24 * math.pi * 2

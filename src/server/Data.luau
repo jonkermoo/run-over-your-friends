@@ -17,6 +17,7 @@ export type Profile = {
 	roadsterPassPaid: boolean,
 	tutorial: number, -- Config/Onboarding Steps
 	quests: { [string]: any }, -- Hourly/Daily goal sets, checked by QuestService
+	stats: { [string]: any }, -- leaderboard numbers, checked by LeaderboardService
 }
 
 local Data = {}
@@ -39,6 +40,7 @@ local function default(): Profile
 		roadsterPassPaid = false,
 		tutorial = 1,
 		quests = {},
+		stats = {},
 	}
 end
 
@@ -130,6 +132,9 @@ local function load(player: Player)
 				profile.tutorial = tonumber(decoded.tutorial) or 99 -- saves from before the tutorial skip it
 				if typeof(decoded.quests) == "table" then
 					profile.quests = decoded.quests
+				end
+				if typeof(decoded.stats) == "table" then
+					profile.stats = decoded.stats
 				end
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do

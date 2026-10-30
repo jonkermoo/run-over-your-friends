@@ -3,6 +3,8 @@
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Impact = require("../src/shared/Rules/Impact")
+local LbConfig = require("../src/shared/Config/Leaderboards")
+local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
 local Quests = require("../src/shared/Rules/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
@@ -189,6 +191,45 @@ Quests.advance(goals, "Combo", 2)
 check("max goal doesn't drop", goals[2].progress == 3)
 check("max goal completes", #Quests.advance(goals, "Combo", 6) == 1)
 check("bad amounts ignored", #Quests.advance(goals, "Hits", 0 / 0) == 0)
+
+-- leaderboards
+local W, OFF = LbConfig.WeekSeconds, LbConfig.WeekStartOffset
+-- 2026-10-26 00:00 UTC was a Monday: 1792972800
+check("week starts on Monday", Lb.week(1792972800, W, OFF) == Lb.week(1792972800 + W - 1, W, OFF))
+check(
+	"next Monday is a new week",
+	Lb.week(1792972800 - 1, W, OFF) + 1 == Lb.week(1792972800, W, OFF)
+)
+check("seconds left is a full week at the start", Lb.secondsLeft(1792972800, W, OFF) == W)
+local st = Lb.fresh(5)
+check(
+	"hits add up",
+	Lb.record(st, "Hits", 1) and Lb.record(st, "Hits", 2) and st.hits == 3 and st.allHits == 3
+)
+check(
+	"launch keeps the best",
+	Lb.record(st, "Launch", 120) and not Lb.record(st, "Launch", 80) and st.launch == 120
+)
+check("combo keeps the best", Lb.record(st, "Combo", 4) and st.combo == 4)
+check(
+	"bad values ignored",
+	not Lb.record(st, "Hits", 0 / 0) and not Lb.record(st, "Hits", -3) and st.hits == 3
+)
+check("same week doesn't reset", not Lb.roll(st, 5) and st.hits == 3)
+check(
+	"new week resets weekly only",
+	Lb.roll(st, 6) and st.hits == 0 and st.launch == 0 and st.allHits == 3 and st.allLaunch == 120
+)
+local ranked = Lb.rank({
+	{ userId = 3, name = "c", value = 5 },
+	{ userId = 1, name = "a", value = 9 },
+	{ userId = 2, name = "b", value = 5 },
+	{ userId = 4, name = "d", value = 0 },
+}, 2)
+check(
+	"rank: highest first, ties by id, top N, zeros dropped",
+	#ranked == 2 and ranked[1].userId == 1 and ranked[2].userId == 2
+)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)
