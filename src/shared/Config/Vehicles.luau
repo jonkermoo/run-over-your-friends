@@ -2,6 +2,7 @@
 -- Every vehicle is one row: shop price, hit weight, driving numbers, features. The model is
 -- ReplicatedStorage.VehicleModels[id] (Body + Wheel_<Corner><n> meshes, front facing -Z).
 -- Driving numbers are metres and seconds; topSpeed in mph.
+-- Engine sounds: Roblox audio library loops (Pro Sound Effects) except Electric (own synth); see ASSETS_LICENSES.md.
 
 export type Feature =
 	"Taxi"
@@ -13,6 +14,35 @@ export type Feature =
 	| "Scooter"
 	| "Cart"
 	| "Monster"
+
+export type EngineKind =
+	"Electric"
+	| "Petrol"
+	| "V8"
+	| "Race"
+	| "Kart"
+	| "Cart"
+	| "Jalopy"
+	| "Diesel"
+	| "BigRig"
+
+export type Engine = {
+	sound: string,
+	loop: { number }?, -- seconds {from, to}: the steadiest stretch of the recording; nil = the whole file
+	idlePitch: number, -- PlaybackSpeed at a standstill
+	topPitch: number, -- PlaybackSpeed at top speed
+	volume: number, -- evens out the recordings' levels
+	idle: number, -- share of full volume while sitting still with a driver in; 0 = silent (electric)
+}
+
+export type Trailer = {
+	model: string, -- ReplicatedStorage.VehicleModels[model], built like a vehicle (Body + Wheel_R<n>)
+	hitch: { number }, -- coupling point on the tractor, studs from its centre-bottom (x, y, z)
+	kingpin: { number }, -- the matching point on the trailer, studs from its centre-bottom
+	swing: number, -- degrees the trailer may turn either way on the hitch
+	twist: number, -- degrees the trailer may roll either way against the tractor
+	sideGrip: number, -- lateral m/s^2 the trailer's tyres hold before its tail slides out
+}
 
 export type Vehicle = {
 	id: string,
@@ -30,6 +60,9 @@ export type Vehicle = {
 	features: { Feature },
 	showDriver: boolean, -- open vehicles show the rider; closed ones hide them inside
 	seat: { number }, -- seat position from the model's centre-bottom, studs (x, y, z)
+	engine: EngineKind,
+	engineTone: number?, -- pitch multiplier on the engine (bigger vehicle = lower), default 1
+	trailer: Trailer?,
 	blurb: string,
 }
 
@@ -54,6 +87,8 @@ local list: { Vehicle } = {
 		features = {},
 		showDriver = false,
 		seat = { 0, 1.6, 1 },
+		engine = "Petrol",
+		engineTone = 1.15,
 		blurb = "Nippy little starter. Light hits.",
 	}),
 	v({
@@ -72,6 +107,7 @@ local list: { Vehicle } = {
 		features = { "Scooter" },
 		showDriver = true,
 		seat = { 0, 3.9, 1.9 },
+		engine = "Kart",
 		blurb = "Tiny and silly. Barely tips people over.",
 	}),
 	v({
@@ -90,6 +126,7 @@ local list: { Vehicle } = {
 		features = {},
 		showDriver = false,
 		seat = { 0, 1.8, 1 },
+		engine = "Petrol",
 		blurb = "The all-rounder.",
 	}),
 	v({
@@ -108,6 +145,7 @@ local list: { Vehicle } = {
 		features = { "Cart" },
 		showDriver = true,
 		seat = { 0, 2.2, 0.3 },
+		engine = "Cart",
 		blurb = "One wobbly wheel. The speedometer swears it does 400.",
 	}),
 	v({
@@ -126,6 +164,7 @@ local list: { Vehicle } = {
 		features = { "Taxi" },
 		showDriver = false,
 		seat = { 0, 1.8, 1 },
+		engine = "Petrol",
 		blurb = "Yell TAXI! and someone comes running.",
 	}),
 	v({
@@ -144,6 +183,7 @@ local list: { Vehicle } = {
 		features = {},
 		showDriver = false,
 		seat = { 0, 1.8, 1.5 },
+		engine = "V8",
 		blurb = "Huge launch, loose tail.",
 	}),
 	v({
@@ -162,6 +202,7 @@ local list: { Vehicle } = {
 		features = { "Jingle" },
 		showDriver = false,
 		seat = { 0, 3, -3 },
+		engine = "Jalopy",
 		blurb = "Play the jingle and they all come to you.",
 	}),
 	v({
@@ -180,6 +221,7 @@ local list: { Vehicle } = {
 		features = { "Cannon" },
 		showDriver = false,
 		seat = { 0, 4, -12 },
+		engine = "Diesel",
 		blurb = "Water cannon knocks people flat. Breaks buildings.",
 	}),
 	v({
@@ -197,8 +239,17 @@ local list: { Vehicle } = {
 		maxSteer = 26,
 		features = {},
 		showDriver = false,
-		seat = { 0, 4, -12 },
-		blurb = "Enormous hits. Turns like a ship.",
+		seat = { 0, 4, -4.2 },
+		engine = "BigRig",
+		trailer = {
+			model = "SemiTrailer",
+			hitch = { 0, 5.7, 7.6 },
+			kingpin = { 0, 5.7, -9.05 },
+			swing = 75,
+			twist = 15,
+			sideGrip = 12,
+		},
+		blurb = "Enormous hits. The trailer swings wide and flattens the lot.",
 	}),
 	v({
 		id = "Bulldozer",
@@ -216,6 +267,8 @@ local list: { Vehicle } = {
 		features = { "Plow" },
 		showDriver = false,
 		seat = { 0, 5, 3 },
+		engine = "Diesel",
+		engineTone = 0.85,
 		blurb = "Slow. The blade throws everything aside.",
 	}),
 	v({
@@ -234,6 +287,8 @@ local list: { Vehicle } = {
 		features = { "Monster" },
 		showDriver = false,
 		seat = { 0, 7, 0 },
+		engine = "V8",
+		engineTone = 0.8,
 		blurb = "Giant wheels, giant bounces. Breaks buildings.",
 	}),
 	v({
@@ -252,6 +307,7 @@ local list: { Vehicle } = {
 		features = { "Thruster" },
 		showDriver = false,
 		seat = { 0, 1.5, 1 },
+		engine = "Race",
 		blurb = "Near-Roadster speed, plus a forward thruster.",
 	}),
 	v({
@@ -270,8 +326,83 @@ local list: { Vehicle } = {
 		features = { "Jet", "Thruster" },
 		showDriver = false,
 		seat = { 0, 1.5, 1 },
+		engine = "Electric",
 		blurb = "The dream car: rear jet, air control, thruster.",
 	}),
+}
+
+local engines: { [EngineKind]: Engine } = {
+	Electric = {
+		sound = "rbxassetid://73461257901277",
+		idlePitch = 0.3,
+		topPitch = 2.5,
+		volume = 1,
+		idle = 0,
+	},
+	Petrol = { -- 1969 convertible, cruising
+		sound = "rbxassetid://9112735119",
+		loop = { 9.25, 15.25 },
+		idlePitch = 0.85,
+		topPitch = 1.7,
+		volume = 2.5,
+		idle = 0.3,
+	},
+	V8 = { -- 1969 convertible, deep rumble
+		sound = "rbxassetid://9112734366",
+		loop = { 39.75, 45.75 },
+		idlePitch = 0.8,
+		topPitch = 1.6,
+		volume = 3,
+		idle = 0.4,
+	},
+	Race = { -- race car, constant
+		sound = "rbxassetid://9112782186",
+		loop = { 4.75, 10.75 },
+		idlePitch = 0.6,
+		topPitch = 1.35,
+		volume = 2,
+		idle = 0.3,
+	},
+	Kart = { -- go-kart engine, constant
+		sound = "rbxassetid://9112787518",
+		loop = { 11.5, 17.5 },
+		idlePitch = 0.8,
+		topPitch = 1.6,
+		volume = 3,
+		idle = 0.3,
+	},
+	Cart = { -- shopping cart rolling: no engine, just rattle
+		sound = "rbxassetid://9119092604",
+		loop = { 2, 8 },
+		idlePitch = 0.6,
+		topPitch = 1.4,
+		volume = 5,
+		idle = 0,
+	},
+	Jalopy = { -- cartoon jalopy chugging
+		sound = "rbxassetid://9125425383",
+		loop = { 1.5, 7.5 },
+		idlePitch = 0.8,
+		topPitch = 1.4,
+		volume = 2.5,
+		idle = 0.4,
+	},
+	Diesel = { -- diesel dump truck
+		sound = "rbxassetid://9112735582",
+		loop = { 26.75, 32.75 },
+		idlePitch = 0.75,
+		topPitch = 1.3,
+		volume = 1,
+		idle = 0.4,
+	},
+	BigRig = { -- semi truck, driving
+		sound = "rbxassetid://9112736261",
+		loop = { 15, 21 },
+		idlePitch = 0.75,
+		topPitch = 1.3,
+		volume = 1.5,
+		idle = 0.4,
+	},
 }
 
 local byId: { [string]: Vehicle } = {}
@@ -286,6 +417,7 @@ end
 return table.freeze({
 	List = table.freeze(list),
 	ById = table.freeze(byId),
+	Engines = table.freeze(engines),
 	Starter = "Hatchback",
 	StudsPerMetre = 4.32, -- every model is built to this scale
 	has = has,

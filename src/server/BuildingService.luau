@@ -197,7 +197,8 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
 		+ 10
 	local speed = math.min(velocity.Magnitude, maxStuds)
-	if (pos - chassis.Position).Magnitude > chassis.Size.Magnitude / 2 + 16 + speed * 0.3 then
+	local body = VehicleService.bodyNear(vehicle :: Model, pos) or chassis
+	if (pos - body.Position).Magnitude > body.Size.Magnitude / 2 + 16 + speed * 0.3 then
 		return
 	end
 	local energy = Impact.energy(stats.weight, speed / spm)

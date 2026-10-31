@@ -380,11 +380,12 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 		+ 10
 	local speed = math.min(velocity.Magnitude, maxStuds)
 	local giantHp = npc:GetAttribute("GiantHp")
-	local reach = chassis.Size.Magnitude / 2
+	local body = VehicleService.bodyNear(vehicle, root.Position) or chassis
+	local reach = body.Size.Magnitude / 2
 		+ 14
 		+ speed * 0.3
 		+ (if typeof(giantHp) == "number" then 6 * EventConfig.GiantScale else 0)
-	if (root.Position - chassis.Position).Magnitude > reach then
+	if (root.Position - body.Position).Magnitude > reach then
 		return
 	end
 	local metres = speed / spm

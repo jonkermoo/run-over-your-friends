@@ -559,12 +559,14 @@ local likeButton = storeRow(
 )
 local credits = Style.label(
 	storeList,
-	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0)",
+	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0). "
+		.. "Roadster: simplified from a model by metarex.4d on Sketchfab (CC BY 4.0).",
 	12,
 	F.medium,
 	C.dim
 )
-credits.Size = UDim2.new(1, -12, 0, 30)
+credits.TextWrapped = true
+credits.Size = UDim2.new(1, -12, 0, 44)
 credits.LayoutOrder = 20
 
 local function refreshStore()

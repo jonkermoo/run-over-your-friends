@@ -53,6 +53,63 @@ for _, v in Vehicles.List do
 	end
 end
 check("vehicle ids and orders unique, stats positive", allGood)
+local enginesOk, engineKinds = true, {}
+for _, v in Vehicles.List do
+	local e = Vehicles.Engines[v.engine]
+	engineKinds[v.engine] = true
+	local tone = v.engineTone or 1
+	if
+		not e
+		or not string.match(e.sound, "^rbxassetid://%d+$")
+		or e.idlePitch <= 0
+		or e.topPitch <= e.idlePitch
+		or e.topPitch * tone * 1.3 > 4
+		or e.volume <= 0
+		or e.idle < 0
+		or e.idle > 1
+		or (e.loop and (#e.loop ~= 2 or e.loop[1] < 0 or e.loop[2] - e.loop[1] < 2))
+	then
+		enginesOk = false
+	end
+end
+check("every vehicle has a sane engine sound", enginesOk)
+local kindCount = 0
+for _ in engineKinds do
+	kindCount += 1
+end
+check("at least 8 different engine sounds in use", kindCount >= 8)
+local electric = 0
+for _, v in Vehicles.List do
+	if v.engine == "Electric" then
+		electric += 1
+	end
+end
+check(
+	"electric only on the Roadster",
+	Vehicles.ById.Roadster.engine == "Electric" and electric == 1
+)
+local trailers = 0
+local trailersOk = true
+for _, v in Vehicles.List do
+	local t = v.trailer
+	if t then
+		trailers += 1
+		if
+			Vehicles.ById[t.model]
+			or #t.hitch ~= 3
+			or #t.kingpin ~= 3
+			or t.swing <= 20
+			or t.swing >= 90
+			or t.sideGrip <= 0
+			or t.hitch[3] <= 0 -- hitch sits behind the tractor's centre
+			or t.kingpin[3] >= 0 -- kingpin sits ahead of the trailer's centre
+		then
+			trailersOk = false
+		end
+	end
+end
+check("the semi pulls a trailer", Vehicles.ById.Semi.trailer ~= nil and trailers == 1)
+check("trailer settings sane", trailersOk)
 check(
 	"early cars don't break buildings",
 	not (

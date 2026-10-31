@@ -139,6 +139,10 @@ type CarState = {
 	rearSlide: number,
 	marks: { { trail: Trail, front: boolean } },
 	jet: ParticleEmitter?,
+	engine: Vehicles.Engine,
+	tone: number,
+	seat: VehicleSeat?,
+	trailer: BasePart?,
 }
 
 local cars: { [Model]: CarState } = {}
@@ -167,17 +171,28 @@ local function track(car: Instance)
 	local radius = (car:GetAttribute("WheelRadius") or 1) :: number
 	local spm = Vehicles.StudsPerMetre
 	local marks = {}
-	for _, w in chassis:GetChildren() do
+	-- the trailer's wheels spin and leave marks too, but don't count towards the tractor's wheelbase
+	local trailerModel = car:FindFirstChild("Trailer")
+	local trailer = if trailerModel and trailerModel:IsA("Model")
+		then trailerModel.PrimaryPart
+		else nil
+	local welds = chassis:GetChildren()
+	if trailer then
+		local more = trailer:GetChildren()
+		table.move(more, 1, #more, #welds + 1, welds)
+	end
+	for _, w in welds do
 		local c = w:GetAttribute("Corner")
-		if w:IsA("Weld") and typeof(c) == "string" then
+		if w:IsA("Weld") and typeof(c) == "string" and w.Part0 then
 			local front = string.sub(c, 1, 1) == "F"
+			local onTrailer = w.Part0 ~= chassis
 			table.insert(
 				wheels,
 				{ weld = w, base = w.C0, front = front, spin = w:GetAttribute("Spin") == true }
 			)
 			if front then
 				frontZ = math.min(frontZ, w.C0.Position.Z)
-			else
+			elseif not onTrailer then
 				rearZ = math.max(rearZ, w.C0.Position.Z)
 			end
 			local tyre = w.Part1
@@ -186,10 +201,10 @@ local function track(car: Instance)
 				local half = Vector3.new(math.min(tyre.Size.X, 2) * 0.4, 0, 0)
 				local a0 = Instance.new("Attachment")
 				a0.Position = contact - half
-				a0.Parent = chassis
+				a0.Parent = w.Part0
 				local a1 = Instance.new("Attachment")
 				a1.Position = contact + half
-				a1.Parent = chassis
+				a1.Parent = w.Part0
 				local trail = Instance.new("Trail")
 				trail.Attachment0 = a0
 				trail.Attachment1 = a1
@@ -275,6 +290,10 @@ local function track(car: Instance)
 		rearSlide = 0,
 		marks = marks,
 		jet = jet,
+		engine = Vehicles.Engines[stats.engine],
+		tone = stats.engineTone or 1,
+		seat = car:FindFirstChild("DriverSeat") :: VehicleSeat?,
+		trailer = trailer,
 	}
 end
 
@@ -433,6 +452,14 @@ local function detectHits(s: CarState, velocity: Vector3)
 	local shift = if localVel.Z < 0 then -ahead / 2 else ahead / 2
 	local box = chassis.CFrame * CFrame.new(0, s.height / 2 - chassis.Size.Y / 2, shift)
 	local parts = workspace:GetPartBoundsInBox(box, size, params)
+	local trailer = s.trailer
+	if trailer and trailer.Parent then
+		local tSize = Vector3.new(trailer.Size.X + 2, s.height + 2, trailer.Size.Z + 2)
+		local tBox = trailer.CFrame * CFrame.new(0, s.height / 2 - trailer.Size.Y / 2, 0)
+		for _, p in workspace:GetPartBoundsInBox(tBox, tSize, params) do
+			table.insert(parts, p)
+		end
+	end
 	local now = os.clock()
 	local breakSum, breakCount = Vector3.zero, 0
 	for _, p in parts do
@@ -959,8 +986,13 @@ local function step(dt: number)
 		s.load += (math.clamp(math.abs(accel) / 12, 0, 1) - s.load) * math.min(1, dt * 6)
 		local frac = math.clamp(mag / (s.stats.topSpeed / MPH), 0, 1.3)
 		if s.motor then
-			s.motor.PlaybackSpeed = 0.3 + 2.2 * frac
-			s.motor.Volume = math.clamp(mag / 1.5, 0, 1) * (0.08 + 0.6 * s.load)
+			-- pitch follows speed; volume rises with load, and engines that idle keep a low rumble while occupied
+			local e = s.engine
+			s.motor.PlaybackSpeed = (e.idlePitch + (e.topPitch - e.idlePitch) * frac) * s.tone
+			local running = if s.seat and s.seat.Occupant then e.idle else 0
+			local moving = math.clamp(mag / 1.5, 0, 1)
+				* (0.12 + 0.6 * s.load + 0.28 * math.min(frac, 1))
+			s.motor.Volume = e.volume * math.max(running, moving)
 		end
 		if s.road then
 			s.road.PlaybackSpeed = 0.75 + 0.5 * math.clamp(mag / 60, 0, 1)

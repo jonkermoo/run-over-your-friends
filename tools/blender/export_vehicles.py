@@ -6,6 +6,7 @@
 # Front is Blender -Y, left is Blender +X. Units: studs (Blender units = studs after STUDS scaling).
 import bpy, bmesh, sys, os, math
 from mathutils import Vector, Matrix
+from mathutils.bvhtree import BVHTree
 
 args = sys.argv[sys.argv.index("--") + 1:]
 pack, roadster_path, out = args[0], args[1], args[2]
@@ -78,11 +79,13 @@ def bake(o):
     o.matrix_world = Matrix.Identity(4)
 
 
-def box(name, size, loc, rgb, bevel=0.0):
+def box(name, size, loc, rgb, bevel=0.0, yaw=0.0):
     me = bpy.data.meshes.new(name)
     bm = bmesh.new()
     bmesh.ops.create_cube(bm, size=1.0)
     bmesh.ops.scale(bm, vec=Vector(size), verts=bm.verts)
+    if yaw:
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(yaw, 3, "Z"))
     bmesh.ops.translate(bm, vec=Vector(loc), verts=bm.verts)
     if bevel > 0:
         bmesh.ops.bevel(bm, geom=list(bm.edges), offset=bevel, segments=1, affect="EDGES")
@@ -195,6 +198,83 @@ def place(vid, body, wheels, scale):
     lo, hi = bounds(objs)
     size = hi - lo
     print(f"VEHICLE {vid:12s} size {size.x:6.2f} x {size.y:6.2f} x {size.z:6.2f} studs  wheels {len(wheels)}")
+    return shift
+
+
+def roblox_point(p, scale, shift):
+    """A pack-unit point on a placed vehicle, in its Roblox model frame (studs, base centre, front -Z)."""
+    b = p * scale + shift
+    return (round(-b.x, 2), round(b.z, 2), round(b.y, 2))
+
+
+def face_colour(me, poly):
+    """The palette colour a face points at (sRGB 0-1, rounded)."""
+    uv = me.uv_layers.active.data[poly.loop_start].uv
+    x, y = min(PW - 1, int(uv.x * PW)), min(PH - 1, int(uv.y * PH))
+    k = (y * PW + x) * 4
+    return tuple(round(c, 2) for c in pix[k:k + 3])
+
+
+def recolour(obj, test, rgb):
+    """Point every face where test(centre, colour) holds at a new palette colour."""
+    me = obj.data
+    uv = uv_for(rgb)
+    layer = me.uv_layers.active.data
+    for p in me.polygons:
+        if test(p.center, face_colour(me, p)):
+            for li in p.loop_indices:
+                layer[li].uv = uv
+
+
+def drop_faces(obj, test):
+    """Delete every face where test(centre, colour) holds."""
+    me = obj.data
+    gone = [p.index for p in me.polygons if test(p.center, face_colour(me, p))]
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in gone], context="FACES")
+    bm.to_mesh(me)
+    bm.free()
+
+
+def top_z(obj, x, y):
+    """Height of obj's top surface over (x, y) in plan."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    hit = BVHTree.FromBMesh(bm).ray_cast(Vector((x, y, 50)), Vector((0, 0, -1)))
+    bm.free()
+    return hit[0].z if hit[0] else 0.0
+
+
+def split_shells(obj, keep):
+    """Copy obj keeping only the loose shells where keep(lo, hi) holds."""
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    seen, gone = set(), []
+    for f in bm.faces:
+        if f in seen:
+            continue
+        shell, stack = [], [f]
+        while stack:
+            g = stack.pop()
+            if g in seen:
+                continue
+            seen.add(g)
+            shell.append(g)
+            stack.extend(h for e in g.edges for h in e.link_faces if h not in seen)
+        vs = {v for g in shell for v in g.verts}
+        lo = Vector([min(v.co[i] for v in vs) for i in range(3)])
+        hi = Vector([max(v.co[i] for v in vs) for i in range(3)])
+        if not keep(lo, hi):
+            gone.extend(shell)
+    bmesh.ops.delete(bm, geom=gone, context="FACES")
+    me = bpy.data.meshes.new(obj.name)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(obj.name, me)
+    scene.collection.objects.link(o)
+    return o
 
 
 # ---- pack vehicles
@@ -206,11 +286,105 @@ PACK = [
     ("Supercar", "Sports cars/Veh_Sports_Car_03_Yellow.blend"),
     ("IceCream", "Special/Veh_IceCream_Van.blend"),
     ("FireTruck", "Emergency/Veh_Firetruck_01.blend"),
-    ("Semi", "Trucks/Veh_Truck_03_Tank_White.blend"),
 ]
+LAMP, GRILLE = (0.81, 0.92, 0.95), (0.14, 0.14, 0.12)
+BRIGHT, BLACKP, GREYP = (0.95, 0.95, 0.9), (0.1, 0.1, 0.11), (0.32, 0.32, 0.32)
+
+
+def near(c, ref):
+    return max(abs(a - b) for a, b in zip(c, ref)) < 0.02
+
+
+def restyle_muscle(body):
+    """Our own nose: a light bar over a slatted grille, plus a hood scoop (the pack's twin round lamps and split
+    grille read too much like one real 70s car)."""
+    red = (0.76, 0.27, 0.19)
+    recolour(body, lambda c, col: c.y < -1.3 and near(col, LAMP), red)
+    recolour(body, lambda c, col: c.y < -1.3 and 0.28 < c.z < 0.5 and near(col, GRILLE), red)
+    hood = top_z(body, 0, -0.85)
+    parts = [
+        box("nose", (0.9, 0.12, 0.17), (0, -1.4, 0.375), red),
+        box("grille", (0.8, 0.03, 0.09), (0, -1.47, 0.355), BLACKP),
+        box("slat", (0.76, 0.03, 0.014), (0, -1.48, 0.34), GREYP),
+        box("slat", (0.76, 0.03, 0.014), (0, -1.48, 0.37), GREYP),
+        box("lightBar", (0.88, 0.03, 0.025), (0, -1.475, 0.43), BRIGHT),
+        box("scoop", (0.3, 0.42, 0.06), (0, -0.85, hood + 0.02), BLACKP, 0.02),
+    ]
+    return join([body] + parts, "body")
+
+
+def restyle_supercar(body):
+    """Our own nose and tail: slim angled light strips, a front splitter and a ducktail in place of the pack's
+    flush lamps and tall wing (too close to one real 80s wedge supercar)."""
+    yellow = (0.91, 0.64, 0.22)
+    recolour(body, lambda c, col: c.y < -1.0 and near(col, LAMP), yellow)
+    drop_faces(body, lambda c, col: c.y > 0.95 and c.z > 0.4 and near(col, (0.2, 0.2, 0.2)))
+    tail = top_z(body, 0, 1.1)
+    parts = [box("splitter", (1.06, 0.14, 0.03), (0, -1.33, 0.07), BLACKP)]
+    for side in (1, -1):
+        x = side * 0.34
+        parts.append(box("lamp", (0.32, 0.05, 0.02), (x, -1.12, top_z(body, x, -1.12) + 0.002), BRIGHT, 0, side * 0.3))
+    parts.append(box("duck", (1.04, 0.14, 0.05), (0, 1.12, tail + 0.03), yellow, 0.01))
+    parts.append(box("gurney", (1.04, 0.03, 0.04), (0, 1.18, tail + 0.06), BLACKP))
+    return join([body] + parts, "body")
+
+
+RESTYLE = {"Muscle": restyle_muscle, "Supercar": restyle_supercar}
 for vid, rel in PACK:
     body, wheels = load_pack(rel)
+    if vid in RESTYLE:
+        body = RESTYLE[vid](body)
     place(vid, body, wheels, STUDS)
+
+# ---- semi: the pack's rigid tank truck cut into a tractor and a tank trailer that hitches over its drive axle
+body, wheels = load_pack("Trucks/Veh_Truck_03_Tank_White.blend")
+KINGPIN, BACK = -0.1, 0.5  # pack units along the truck: hitch on the tractor; how far the trailer moves back
+FRAME = (0.2, 0.2, 0.2)
+
+
+def is_rail(lo, hi):
+    return lo.y < -1.2 and hi.y > 2 and hi.x - lo.x < 0.15
+
+
+def is_tractor(lo, hi):
+    return hi.y < -1.27 or (hi.y < -0.4 and hi.z < 0.62 and max(abs(lo.x), abs(hi.x)) > 0.6)
+
+
+cab = split_shells(body, is_tractor)
+tank = split_shells(body, lambda lo, hi: not is_tractor(lo, hi) and not is_rail(lo, hi))
+bpy.data.objects.remove(body)
+drive = [w for w in wheels if w.name.endswith("1") and w.name.startswith("Wheel_R")]
+rear = [w for w in wheels if w.name.endswith("2")]
+front = [w for w in wheels if w.name.startswith("Wheel_F")]
+for w in drive:
+    w.data.transform(Matrix.Translation((0, KINGPIN - (bounds([w])[0].y + bounds([w])[1].y) / 2, 0)))
+tractor = [cab]
+for side in (1, -1):
+    tractor.append(box("rail", (0.09, 1.65, 0.13), (side * 0.2, -0.47, 0.585), FRAME))
+    tractor.append(box("guard", (0.42, 0.78, 0.05), (side * 0.47, KINGPIN, 0.7), FRAME, 0.01))
+tractor.append(box("fifthWheel", (0.6, 0.5, 0.06), (0, KINGPIN, 0.68), (0.15, 0.15, 0.16), 0.02))
+tractor_body = join(tractor, "body")
+shift = place("Semi", tractor_body, front + drive, STUDS)
+print("HITCH Semi", roblox_point(Vector((0, KINGPIN, 0.71)), STUDS, shift))
+
+extra = []
+for w in rear:
+    c = w.copy()
+    c.data = w.data.copy()
+    scene.collection.objects.link(c)
+    c.data.transform(Matrix.Translation((0, -0.77, 0)))
+    extra.append(c)
+trailer_wheels = rear + extra
+trailer = [tank]
+for side in (1, -1):
+    trailer.append(box("rail", (0.09, 2.45, 0.13), (side * 0.2, 1.5 - BACK, 0.585), FRAME))
+    trailer.append(box("leg", (0.06, 0.06, 0.52), (side * 0.45, 0.45 - BACK, 0.45), FRAME))
+    trailer.append(box("foot", (0.14, 0.14, 0.04), (side * 0.45, 0.45 - BACK, 0.19), FRAME))
+trailer_body = join(trailer, "body")
+for o in [trailer_body] + trailer_wheels:
+    o.data.transform(Matrix.Translation((0, BACK, 0)))
+shift = place("SemiTrailer", trailer_body, trailer_wheels, STUDS)
+print("HITCH SemiTrailer", roblox_point(Vector((0, KINGPIN, 0.71)), STUDS, shift))
 
 # ---- monster truck: the pickup on giant wheels with a lift kit
 body, wheels = load_pack("Pickups/Veh_Pickup_02_Green.blend")

@@ -24,6 +24,17 @@ local cooldownUntil: { [Player]: number } = {}
 local spawnPoints: { Vector3 } = {}
 local spawnListeners: { (Player, string) -> () } = {}
 
+-- the vehicle's collider nearest a point: the chassis, or its trailer's (for hit range checks)
+function VehicleService.bodyNear(vehicle: Model, pos: Vector3): BasePart?
+	local best = vehicle.PrimaryPart
+	local trailer = vehicle:FindFirstChild("Trailer") :: Model?
+	local other = trailer and trailer.PrimaryPart
+	if best and other and (other.Position - pos).Magnitude < (best.Position - pos).Magnitude then
+		best = other
+	end
+	return best
+end
+
 -- called with the player and vehicle id after every spawn
 function VehicleService.onSpawn(listener: (Player, string) -> ())
 	table.insert(spawnListeners, listener)
@@ -58,6 +69,16 @@ end
 function VehicleService.setCooldown(player: Player, seconds: number)
 	cooldownUntil[player] = os.clock() + seconds
 	player:SetAttribute("SpawnCooldownUntil", workspace:GetServerTimeNow() + seconds)
+end
+
+-- the driver's client simulates the vehicle and its trailer together
+local function own(model: Model, who: Player?)
+	local trailer = model:FindFirstChild("Trailer") :: Model?
+	for _, part in { model.PrimaryPart, trailer and trailer.PrimaryPart } do
+		if part then
+			part:SetNetworkOwner(who)
+		end
+	end
 end
 
 local function setHidden(character: Model, hidden: boolean)
@@ -203,7 +224,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			driver = now
 			prompt.Enabled = false
 			pcall(function()
-				chassis:SetNetworkOwner(player)
+				own(model, player)
 			end)
 			if not stats.showDriver then
 				setHidden(now.Parent :: Model, true)
@@ -216,7 +237,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			turn.Enabled = true
 			drive.VectorVelocity = Vector3.zero
 			pcall(function()
-				chassis:SetNetworkOwner(nil)
+				own(model, nil)
 			end)
 			local ch = left and left.Parent :: Model?
 			if ch then
@@ -254,7 +275,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 				end
 			end
 			pcall(function()
-				chassis:SetNetworkOwner(nil)
+				own(model, nil)
 			end)
 			model:PivotTo(
 				CFrame.lookAt(
@@ -266,7 +287,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			task.delay(0.3, function()
 				if driver and model.Parent then
 					pcall(function()
-						chassis:SetNetworkOwner(player)
+						own(model, player)
 					end)
 				end
 			end)
