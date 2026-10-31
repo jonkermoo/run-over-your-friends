@@ -176,6 +176,15 @@ local function track(car: Instance)
 	local trailer = if trailerModel and trailerModel:IsA("Model")
 		then trailerModel.PrimaryPart
 		else nil
+	if stats.trailer and not trailer then
+		-- a big rig can replicate in pieces: wait for the trailer, or its hits and wheels are never tracked
+		task.delay(0.2, function()
+			if car.Parent then
+				track(car)
+			end
+		end)
+		return
+	end
 	local welds = chassis:GetChildren()
 	if trailer then
 		local more = trailer:GetChildren()
