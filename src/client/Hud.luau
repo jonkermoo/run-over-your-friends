@@ -779,8 +779,11 @@ end, function()
 	Drive.input.feature = false
 end)
 local thrustB = holdButton("BOOST", UDim2.fromOffset(160, 80), "orange", function()
+	Drive.input.thrust = true
 	Drive.thruster()
-end, function() end)
+end, function()
+	Drive.input.thrust = false
+end)
 local bombB = holdButton("BOMB", UDim2.fromOffset(0, 0), "red", function()
 	Drive.input.bomb = true
 end, function()
@@ -827,7 +830,7 @@ RunService.RenderStepped:Connect(function()
 	end
 	jetBar.Visible = hasJet
 	jetFill.Size = UDim2.fromScale(s.boost / 100, 1)
-	thrustBar.Visible = hasThruster
+	thrustBar.Visible = hasThruster and not hasJet -- the Roadster's rear jet runs on the flight meter
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
 	local keys = { "WASD drive", "SPACE get out" }
 	if feature then
@@ -837,7 +840,9 @@ RunService.RenderStepped:Connect(function()
 		table.insert(keys, "hold SHIFT jet up")
 		table.insert(keys, "hold Q/E roll")
 	end
-	if hasThruster then
+	if hasJet then
+		table.insert(keys, "hold R rear jet")
+	elseif hasThruster then
 		table.insert(keys, "R thruster")
 	end
 	if wrecker then

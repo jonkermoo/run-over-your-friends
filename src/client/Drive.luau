@@ -35,6 +35,7 @@ Drive.state = {
 -- held inputs; keyboard and gamepad set them here, and so do the phone buttons
 Drive.input = {
 	boost = false,
+	thrust = false, -- Roadster rear jet, held
 	roll = 0,
 	feature = false,
 	bomb = false,
@@ -391,6 +392,7 @@ local flingUntil = 0
 local stuckFor = 0
 local flying = false -- Roadster in the air under flight control
 local jetOn = false -- its jet is lifting it right now
+local rearOn = false -- its rear jet is pushing it along the nose right now
 local liftedAt = 0
 local flyYaw = 0
 local bombHeld = 0
@@ -409,7 +411,7 @@ local function stopDriving()
 		end
 	end
 	driving = nil
-	flying, jetOn = false, false
+	flying, jetOn, rearOn = false, false, false
 	speed, lateral, yawRate, steer = 0, 0, 0, 0
 	Drive.state.driving = false
 	camera.FieldOfView = baseFov
@@ -625,6 +627,7 @@ local function bind()
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.G, Enum.KeyCode.ButtonY)
 	ContextActionService:BindAction("RoyfThruster", function(_, state)
+		Drive.input.thrust = state == Enum.UserInputState.Begin
 		if state == Enum.UserInputState.Begin then
 			Drive.thruster()
 		end
@@ -649,7 +652,12 @@ local function bind()
 end
 
 function Drive.thruster()
-	if not driving or not Vehicles.has(driving.stats, "Thruster") then
+	-- a one-shot burst; the Roadster's rear jet is held instead (Drive.input.thrust)
+	if
+		not driving
+		or not Vehicles.has(driving.stats, "Thruster")
+		or Vehicles.has(driving.stats, "Jet")
+	then
 		return
 	end
 	local now = os.clock()
@@ -749,6 +757,7 @@ local function features(s: CarState, dt: number)
 	end
 	Drive.state.bombHold = bombHeld / BOMB_HOLD
 	Drive.state.thruster = if Vehicles.has(s.stats, "Thruster")
+			and not Vehicles.has(s.stats, "Jet")
 		then math.clamp(1 - (thrustReadyAt - now) / THRUST_COOLDOWN, 0, 1)
 		else 1
 end
@@ -800,16 +809,25 @@ local function step(dt: number)
 			yawRate = chassis.AssemblyAngularVelocity.Y
 		end
 
-		-- flight meter (Roadster): lift burns it, it fills back up on the ground
+		-- flight meter (Roadster): the lift jet and the rear jet burn it, it fills back up on the ground
 		local canFly = Vehicles.has(stats, "Jet")
 		local lifting = canFly and Drive.input.boost and Drive.state.boost > 0
-		if lifting then
+		local thrusting = canFly and Drive.input.thrust and Drive.state.boost > 0
+		if thrusting then
+			Drive.state.boost = math.max(0, Drive.state.boost - Flight.thrustDrain * dt)
+		end
+		if lifting or thrusting then
 			boostUsedAt = now
 		elseif not flying and now - boostUsedAt > Flight.refillDelay then
 			Drive.state.boost = math.min(100, Drive.state.boost + Flight.refill * dt)
 		end
+		rearOn = thrusting
 
 		local topSpeed = stats.topSpeed / MPH
+		if canFly and (thrusting or speed > topSpeed) then
+			-- the rear jet takes it past its top speed; let go and it eases back down
+			topSpeed = math.max(topSpeed, if thrusting then Flight.thrustTop else speed - 6 * dt)
+		end
 		local launch = stats.launch
 		local power = stats.power
 
@@ -836,6 +854,9 @@ local function step(dt: number)
 		local cornering = math.min(grip, speed * speed * math.abs(math.tan(steer)) / wheelbase)
 		local spare = math.sqrt(math.max(0, (grip * 0.98) ^ 2 - cornering * cornering))
 		local a = math.clamp(wanted, -math.max(spare, grip * 0.3), math.max(spare, 0.5))
+		if thrusting then
+			a += Flight.thrust -- the rear jet pushes the car, not the tyres
+		end
 
 		local v = math.abs(speed)
 		local maxSteer = math.rad(stats.maxSteer)
@@ -893,13 +914,20 @@ local function step(dt: number)
 					forward += THRUST_DV / THRUST_TIME * math.min(dt, thrustLeft)
 					thrustLeft -= dt
 				end
+				local velocity = look * forward - right * f.side + Vector3.yAxis * f.up
+				if thrusting then
+					-- the rear jet pushes along wherever the nose points, up, down or rolled
+					velocity += nose * Flight.thrust * dt
+				end
 				drive.MaxAxesForce = FLY_FORCE
 				drive.Enabled = true
-				drive.VectorVelocity = (look * forward - right * f.side + Vector3.yAxis * f.up)
-					* spm
+				drive.VectorVelocity = velocity * spm
 			else
-				-- jet off: it drops, carried by its momentum; the thruster still pushes along the nose
+				-- lift jet off: it drops, carried by its momentum; the rear jet still pushes along the nose
 				drive.Enabled = false
+				if thrusting then
+					chassis.AssemblyLinearVelocity += nose * Flight.thrust * spm * dt
+				end
 				if thrustLeft > 0 then
 					chassis.AssemblyLinearVelocity += nose * (THRUST_DV / THRUST_TIME) * spm * math.min(
 						dt,
@@ -934,7 +962,7 @@ local function step(dt: number)
 			for _ = 1, steps do
 				alphaF, alphaR = stepTyres(dt / steps, a, wheelbase, grip, stats.rearGrip)
 			end
-			if throttle == 0 and math.sign(speed) ~= math.sign(before) then
+			if throttle == 0 and not thrusting and math.sign(speed) ~= math.sign(before) then
 				speed, lateral, yawRate = 0, 0, 0
 			end
 			if thrustLeft > 0 then
@@ -1075,7 +1103,7 @@ local function step(dt: number)
 				p.Enabled = hovering
 				p.Rate = if up > 1 then 90 else 35
 			end
-			local pushing = if s == driving then thrustLeft > 0 else s.accel.Z > 2.5 * G
+			local pushing = if s == driving then rearOn else s.accel.Z > 1.7 * G
 			for _, p in s.jets do
 				p.Enabled = pushing
 			end

@@ -1,5 +1,6 @@
 --!strict
 -- Roadster flight: holding the jet lifts it on its belly thrusters; letting go cuts the jet and it drops.
+-- Holding R fires the rear jet along the nose, wherever the nose points.
 -- It keeps itself level, and Q/E roll it while held. Speeds in m/s, angles in degrees, fuel 0-100.
 
 return table.freeze({
@@ -13,6 +14,9 @@ return table.freeze({
 	sideDrag = 12, -- sideways drift after a turn dies out at this rate, so it ends up flying where it points
 	drain = 25, -- meter per second of jet (4 s from full)
 	refill = 20, -- meter per second back, on the ground only
+	thrust = 18, -- m/s^2 the rear jet (R, held) pushes along the nose, on the ground or in the air
+	thrustTop = 145, -- m/s it can reach on the ground with the rear jet (about 325 mph)
+	thrustDrain = 20, -- meter per second of rear jet (5 s from full)
 	refillDelay = 0.6,
 	yawRate = 1.7, -- rad/s on A/D at full speed
 	yawSpeed = 12, -- m/s from which it turns at the full rate; slower, it turns slower
