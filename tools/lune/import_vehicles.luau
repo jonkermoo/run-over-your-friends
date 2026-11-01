@@ -49,8 +49,9 @@ for id, parts in groups do
 		p.CanQuery = false
 		p.Massless = true
 		p.Name = string.sub(p.Name, #id + 2)
-		-- some source bodies have open or flipped panels (the Roadster's door seams): draw both sides
-		if p.Name == "Body" then
+		-- some source bodies have open or flipped panels (the Roadster's door seams), and glass is one sheet
+		-- seen from inside and out: draw both sides
+		if p.Name == "Body" or p.Name == "Glass" then
 			p.DoubleSided = true
 		end
 		p.Parent = model

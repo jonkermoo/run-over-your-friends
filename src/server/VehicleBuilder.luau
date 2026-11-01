@@ -1,6 +1,6 @@
 --!strict
--- Builds a drivable rig from a vehicle model (Body + Wheel_<Corner><n> meshes, base centre at the origin,
--- front facing -Z): an invisible box Chassis that collides and carries the Drive/Turn constraints,
+-- Builds a drivable rig from a vehicle model (Body + Wheel_<Corner><n> meshes, plus Glass, Interior and Steer
+-- for cars you can see into; base centre at the origin, front facing -Z): an invisible box Chassis that collides and carries the Drive/Turn constraints,
 -- a Sprung part the body hangs from (the client animates its weld for suspension), wheel welds
 -- tagged with Corner and Spin, a VehicleSeat and the sound loops. A vehicle with a trailer row also gets the
 -- trailer model as a child Model "Trailer": its own collider on a ball-joint hitch, with tyres that resist sliding.
@@ -18,6 +18,8 @@ local SOUNDS = {
 	Squeal = "rbxassetid://71105905939198",
 }
 local BIG = 1e8
+local GLASS_SEE_THROUGH = 0.45
+local STEER_TILT = 22 -- degrees the cabin steering wheel leans back towards the driver, unless the row says
 
 local function weld(name: string, part0: BasePart, part1: BasePart): Weld
 	local w = Instance.new("Weld")
@@ -149,21 +151,25 @@ function VehicleBuilder.build(id: string): Model
 	local length, width = size.Z, size.X
 	local wheels: { BasePart } = {}
 	local wheelRadius = 0
+	local track = 0 -- half the width across the outside of the tyres
 	for _, p in model:GetChildren() do
 		if p:IsA("BasePart") and string.sub(p.Name, 1, 6) == "Wheel_" then
 			table.insert(wheels, p)
 			wheelRadius = math.max(wheelRadius, p.Size.Y / 2)
+			track = math.max(track, math.abs(p.Position.X - cf.Position.X) + p.Size.X / 2)
 		end
 	end
 
-	-- the chassis: a box up to about the bumpers, a little inside the body's outline, riding on four
-	-- invisible balls at its corners so kerbs and ramp lips roll under instead of stopping it dead
+	-- the chassis: a box up to about the bumpers, a little inside the body's outline but at least as wide
+	-- as the tyres (so they can't push into walls), riding on four invisible balls at its corners so kerbs
+	-- and ramp lips roll under instead of stopping it dead
 	local skid = math.clamp(wheelRadius * 0.8, 0.8, 2)
 	local lift = skid * 0.7
 	local chassisHeight = math.clamp(body.Size.Y * 0.35, 1.6, 5)
 	local chassis = Instance.new("Part")
 	chassis.Name = "Chassis"
-	chassis.Size = Vector3.new(math.max(width * 0.82, 3), chassisHeight, math.max(length * 0.86, 4))
+	chassis.Size =
+		Vector3.new(math.max(width * 0.82, track * 2, 3), chassisHeight, math.max(length * 0.86, 4))
 	chassis.CFrame = CFrame.new(0, lift + chassisHeight / 2, cf.Position.Z)
 	chassis.Transparency = 1
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)
@@ -197,6 +203,31 @@ function VehicleBuilder.build(id: string): Model
 	sprung.Parent = model
 	weld("Suspension", chassis, sprung):SetAttribute("Suspension", true)
 	weld("BodyWeld", sprung, body)
+	-- the cabin rides on the suspension with the body: see-through glass, seats and dash, and a steering
+	-- wheel the client turns (its weld is tagged Steer; the driver's hands reach for its Grip attachments)
+	local glass = model:FindFirstChild("Glass") :: BasePart?
+	if glass then
+		glass.Transparency = GLASS_SEE_THROUGH
+		glass.CastShadow = false
+		weld("GlassWeld", sprung, glass)
+	end
+	local interior = model:FindFirstChild("Interior") :: BasePart?
+	if interior then
+		weld("InteriorWeld", sprung, interior)
+	end
+	local steerPart = model:FindFirstChild("Steer") :: BasePart?
+	if steerPart then
+		local sw = weld("SteerWeld", sprung, steerPart)
+		sw.C0 *= CFrame.Angles(-math.rad(stats.steerTilt or STEER_TILT), 0, 0)
+		sw:SetAttribute("Steer", true)
+		local reach = steerPart.Size.X * 0.45
+		for side, x in { GripL = -reach, GripR = reach } do
+			local grip = Instance.new("Attachment")
+			grip.Name = side
+			grip.Position = Vector3.new(x, 0, 0)
+			grip.Parent = steerPart
+		end
+	end
 
 	for _, w in wheels do
 		local corner = string.sub(w.Name, 7, 8)
@@ -210,6 +241,11 @@ function VehicleBuilder.build(id: string): Model
 	seat.Name = "DriverSeat"
 	seat.Size = Vector3.new(2, 1, 2)
 	seat.CFrame = CFrame.new(seatPos[1], seatPos[2], seatPos[3])
+	if model:FindFirstChild("Interior") then
+		-- a thin seat with its top flush with the cabin cushion, so the driver sits in it rather than on top
+		seat.Size = Vector3.new(2, 0.2, 2)
+		seat.CFrame = CFrame.new(seatPos[1], seatPos[2] + 0.075, seatPos[3])
+	end
 	seat.Transparency = 1
 	seat.CanCollide = false
 	seat.CanTouch = true

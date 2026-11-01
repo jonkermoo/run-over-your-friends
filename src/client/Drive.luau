@@ -64,6 +64,14 @@ local ESC_DRIFT_SLACK, ESC_DRIFT_GAIN = 0.08, 12
 local THRUST_DV, THRUST_TIME, THRUST_COOLDOWN = 25, 0.6, 12
 local BIG = 1e8
 local GROUND_FORCE = Vector3.new(BIG, 0, BIG)
+-- per-tyre ground contact: how far a tyre can ride up and hang down (shares of its radius), and from how
+-- far away other cars bother
+local WHEEL_TRAVEL, WHEEL_DROOP = 0.6, 0.3
+local WHEEL_CONTACT_RANGE = 300
+local STEER_WHEEL_RATIO = 4 -- steering wheel turns per road-wheel turn
+local wheelParams = RaycastParams.new()
+wheelParams.FilterType = Enum.RaycastFilterType.Exclude
+wheelParams.CollisionGroup = "Vehicles"
 -- cold-gas thruster sounds (Pro Sound Effects, see ASSETS_LICENSES.md): a steady stretch of an air
 -- release for the big jets, a short spray burst when a steering nozzle opens
 local GAS_LOOP, GAS_LOOP_REGION = "rbxassetid://9116496074", NumberRange.new(1, 3.1)
@@ -109,7 +117,10 @@ local SURFACES: { [Enum.Material]: Surface } = {
 	[Enum.Material.Wood] = { grip = 0.8, rough = 1.5, squeal = true, mark = RUBBER },
 }
 
-type Wheel = { weld: Weld, base: CFrame, front: boolean, spin: boolean }
+-- lift: how far the tyre sits above (+) or below (-) its rest spot, in studs, so it rides on kerbs and
+-- ramps instead of sinking into them, and hangs down a little in the air
+type Wheel =
+	{ weld: Weld, base: CFrame, front: boolean, spin: boolean, radius: number, lift: number }
 type CarState = {
 	car: Model,
 	stats: Vehicles.Vehicle,
@@ -152,6 +163,11 @@ type CarState = {
 	tone: number,
 	seat: VehicleSeat?,
 	trailer: BasePart?,
+	steerWeld: Weld?, -- the cabin steering wheel's weld (cars with an interior)
+	steerBase: CFrame,
+	ik: { IKControl }, -- the driver's hands on that wheel
+	ikFor: Humanoid?,
+	tucked: { [BasePart]: number }, -- the driver's hats and hair hidden under the roof, with their transparency
 }
 
 local cars: { [Model]: CarState } = {}
@@ -225,10 +241,14 @@ local function track(car: Instance)
 		if w:IsA("Weld") and typeof(c) == "string" and w.Part0 then
 			local front = string.sub(c, 1, 1) == "F"
 			local onTrailer = w.Part0 ~= chassis
-			table.insert(
-				wheels,
-				{ weld = w, base = w.C0, front = front, spin = w:GetAttribute("Spin") == true }
-			)
+			table.insert(wheels, {
+				weld = w,
+				base = w.C0,
+				front = front,
+				spin = w:GetAttribute("Spin") == true,
+				radius = if w.Part1 then w.Part1.Size.Y / 2 else 1,
+				lift = 0,
+			})
 			if front then
 				frontZ = math.min(frontZ, w.C0.Position.Z)
 			elseif not onTrailer then
@@ -427,6 +447,11 @@ local function track(car: Instance)
 		tone = stats.engineTone or 1,
 		seat = car:FindFirstChild("DriverSeat") :: VehicleSeat?,
 		trailer = trailer,
+		steerWeld = nil,
+		steerBase = CFrame.identity,
+		ik = {},
+		ikFor = nil,
+		tucked = {},
 	}
 end
 
@@ -1128,8 +1153,34 @@ local function step(dt: number)
 		s.steer += (target - s.steer) * math.min(1, dt * 12)
 		local steerCF = CFrame.Angles(0, s.steer, 0)
 		local spinCF = CFrame.Angles(s.spin, 0, 0)
+		-- each tyre finds the ground under it (nearby cars only): pushed up over whatever it would sink
+		-- into, hanging a little lower when there's nothing below
+		local near = (chassis.Position - camera.CFrame.Position).Magnitude < WHEEL_CONTACT_RANGE
+		if near then
+			wheelParams.FilterDescendantsInstances =
+				{ s.car, workspace:FindFirstChild("Npcs") :: Instance, character :: Instance }
+		end
 		for _, w in s.wheels do
-			local cf = w.base
+			local settle = 0
+			local part0 = w.weld.Part0
+			if near and part0 then
+				local rise, droop = w.radius * WHEEL_TRAVEL, w.radius * WHEEL_DROOP
+				local upward = part0.CFrame.UpVector
+				local hub = part0.CFrame:PointToWorldSpace(w.base.Position)
+				local hit = workspace:Raycast(
+					hub + upward * rise,
+					-upward * (rise + w.radius + droop),
+					wheelParams
+				)
+				settle = if hit
+					then math.clamp(rise - hit.Distance + w.radius, -droop, rise)
+					else -droop
+			end
+			-- up at once (never into the kerb), down gently (springs)
+			w.lift = if settle > w.lift
+				then settle
+				else w.lift + (settle - w.lift) * math.min(1, dt * 14)
+			local cf = CFrame.new(0, w.lift, 0) * w.base
 			if w.front then
 				cf *= steerCF
 			end
@@ -1137,6 +1188,68 @@ local function step(dt: number)
 				cf *= spinCF
 			end
 			w.weld.C0 = cf
+		end
+
+		-- the cabin steering wheel turns with the front wheels, and the driver's hands stay on it
+		if not s.steerWeld then
+			local sprung = s.car:FindFirstChild("Sprung")
+			local sw = sprung and sprung:FindFirstChild("SteerWeld")
+			if sw and sw:IsA("Weld") then
+				s.steerWeld, s.steerBase = sw, sw.C0
+			end
+		end
+		if s.steerWeld then
+			s.steerWeld.C0 = s.steerBase * CFrame.Angles(0, 0, s.steer * STEER_WHEEL_RATIO)
+		end
+		local occupant = s.seat and s.seat.Occupant
+		if occupant ~= s.ikFor then
+			for _, k in s.ik do
+				k:Destroy()
+			end
+			table.clear(s.ik)
+			for part, t in s.tucked do
+				part.Transparency = t
+			end
+			table.clear(s.tucked)
+			s.ikFor = occupant
+			local wheelPart = s.steerWeld and s.steerWeld.Part1
+			local body = occupant and occupant.Parent
+			local shell = s.car:FindFirstChild("Body")
+			if wheelPart and body and shell and shell:IsA("BasePart") and s.stats.showDriver then
+				-- tall hats and hair would poke out through the roof: once they've sat down, hide those
+				task.delay(0.4, function()
+					if s.ikFor ~= occupant or not shell.Parent then
+						return
+					end
+					local roof = shell.Position.Y + shell.Size.Y / 2 - 0.15
+					for _, acc in body:GetChildren() do
+						local handle = acc:IsA("Accessory") and acc:FindFirstChild("Handle")
+						if
+							handle
+							and handle:IsA("BasePart")
+							and handle.Position.Y + handle.Size.Y / 2 > roof
+						then
+							s.tucked[handle] = handle.Transparency
+							handle.Transparency = 1
+						end
+					end
+				end)
+				for side, gripName in { Left = "GripL", Right = "GripR" } do
+					local hand = body:FindFirstChild(side .. "Hand")
+					local upper = body:FindFirstChild(side .. "UpperArm")
+					local grip = wheelPart:FindFirstChild(gripName)
+					if hand and upper and grip and grip:IsA("Attachment") then
+						local k = Instance.new("IKControl")
+						k.Name = "RoyfGrip" .. side
+						k.Type = Enum.IKControlType.Position
+						k.EndEffector = hand :: BasePart
+						k.ChainRoot = upper :: BasePart
+						k.Target = grip
+						k.Parent = occupant
+						table.insert(s.ik, k)
+					end
+				end
+			end
 		end
 
 		if now - s.surfaceAt > 0.12 then
