@@ -2,7 +2,7 @@
 -- Driving for whoever sits in a tagged Vehicle's seat (the driver's client owns the physics), plus the
 -- visuals every client runs for every vehicle: wheel spin and steer, suspension, skid marks and sound.
 -- Tyres are a bicycle model with a Pacejka-style curve; each vehicle's numbers come from Config/Vehicles.
--- Also: Roadster jet and air control, thruster, hit detection (NPCs, buildings, Wrecker), features,
+-- Also: Roadster hover flight (Config/Flight, Rules/Flight), thruster, hit detection (NPCs, buildings, Wrecker), features,
 -- self-destruct, and flings sent by the server.
 
 local CollectionService = game:GetService("CollectionService")
@@ -12,6 +12,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Flight = require(ReplicatedStorage.Shared.Config.Flight)
+local FlightRules = require(ReplicatedStorage.Shared.Rules.Flight)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -26,7 +28,7 @@ Drive.state = {
 	speedMph = 0,
 	reverse = false,
 	airborne = false,
-	boost = 100, -- Roadster jet meter, 0-100
+	boost = 100, -- Roadster flight meter, 0-100
 	thruster = 1, -- 0 = just used, 1 = ready
 	bombHold = 0, -- 0-1 while holding self-destruct
 }
@@ -57,13 +59,11 @@ local FRONT_DRIVE, FRONT_BRAKE = 0.4, 0.7
 local KINEMATIC_SPEED = 2.5
 local ESC_SLACK, ESC_GAIN = 0.1, 9
 local ESC_DRIFT_SLACK, ESC_DRIFT_GAIN = 0.08, 12
--- jet, thruster, air control
-local JET_ACCEL = 12
-local JET_POWER = 1.8
-local JET_TOP_MPH = 330
-local JET_DRAIN, JET_REFILL, JET_REFILL_DELAY = 25, 8, 1
+-- thruster, the drive constraint's force (no vertical hold on the ground, full hold in flight)
 local THRUST_DV, THRUST_TIME, THRUST_COOLDOWN = 25, 0.6, 12
-local AIR_RATE, AIR_RAMP = 5.5, 10
+local BIG = 1e8
+local GROUND_FORCE = Vector3.new(BIG, 0, BIG)
+local FLY_FORCE = Vector3.new(BIG, BIG, BIG)
 local BOMB_HOLD = 1.5
 -- suspension
 local ROLL_PER_G = 1.8
@@ -138,7 +138,10 @@ type CarState = {
 	frontSlide: number,
 	rearSlide: number,
 	marks: { { trail: Trail, front: boolean } },
-	jet: ParticleEmitter?,
+	lift: { ParticleEmitter }, -- belly gas jets (Roadster)
+	jets: { ParticleEmitter }, -- rear gas jets (Roadster thruster)
+	dust: ParticleEmitter,
+	fall: number, -- fastest m/s down during the current time in the air
 	engine: Vehicles.Engine,
 	tone: number,
 	seat: VehicleSeat?,
@@ -234,28 +237,73 @@ local function track(car: Instance)
 		end
 	end
 	local _, size = car:GetBoundingBox()
-	-- the Roadster's jet flame, at the tail
-	local jet: ParticleEmitter? = nil
-	if Vehicles.has(stats, "Jet") then
+	-- cold-gas nozzles on the Roadster: four under the floor, four across the tail
+	local function gas(at: Vector3, face: Enum.NormalId, puff: number): ParticleEmitter
 		local a = Instance.new("Attachment")
-		a.Position = Vector3.new(0, chassis.Size.Y * 0.2, chassis.Size.Z / 2 + 0.5)
+		a.Position = at
 		a.Parent = chassis
 		local p = Instance.new("ParticleEmitter")
-		p.Color = ColorSequence.new(Color3.fromRGB(190, 230, 255), Color3.fromRGB(80, 140, 255))
-		p.LightEmission = 1
+		p.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(205, 212, 222))
+		p.LightEmission = 0.15
 		p.Size = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1.6),
-			NumberSequenceKeypoint.new(1, 0),
+			NumberSequenceKeypoint.new(0, puff * 0.4),
+			NumberSequenceKeypoint.new(1, puff * 2.2),
 		})
-		p.Transparency = NumberSequence.new(0.1, 1)
-		p.Lifetime = NumberRange.new(0.12, 0.22)
-		p.Speed = NumberRange.new(40, 60)
-		p.EmissionDirection = Enum.NormalId.Back
-		p.Rate = 220
+		p.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.3),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		p.Lifetime = NumberRange.new(0.25, 0.4)
+		p.Speed = NumberRange.new(30, 45)
+		p.Drag = 5
+		p.SpreadAngle = Vector2.new(8, 8)
+		p.EmissionDirection = face
+		p.Rate = 50
 		p.Enabled = false
 		p.Parent = a
-		jet = p
+		return p
 	end
+	local lift, jets = {}, {}
+	if Vehicles.has(stats, "Jet") then
+		local hx, hz = chassis.Size.X * 0.32, chassis.Size.Z * 0.32
+		local floor = -chassis.Size.Y / 2
+		for _, x in { -hx, hx } do
+			for _, z in { -hz, hz } do
+				table.insert(lift, gas(Vector3.new(x, floor, z), Enum.NormalId.Bottom, 1.2))
+			end
+		end
+		for _, x in { -0.36, -0.12, 0.12, 0.36 } do
+			table.insert(
+				jets,
+				gas(
+					Vector3.new(x * chassis.Size.X, 0, chassis.Size.Z / 2 + 0.3),
+					Enum.NormalId.Back,
+					0.8
+				)
+			)
+		end
+	end
+	-- a puff of dust when it lands hard
+	local dustAt = Instance.new("Attachment")
+	dustAt.Position = Vector3.new(0, -chassis.Size.Y / 2, 0)
+	dustAt.Parent = chassis
+	local dust = Instance.new("ParticleEmitter")
+	dust.Color = ColorSequence.new(Color3.fromRGB(200, 190, 170))
+	dust.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 2),
+		NumberSequenceKeypoint.new(1, 7),
+	})
+	dust.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	dust.Lifetime = NumberRange.new(0.6, 1)
+	dust.Speed = NumberRange.new(10, 18)
+	dust.Drag = 3
+	dust.SpreadAngle = Vector2.new(80, 80)
+	dust.EmissionDirection = Enum.NormalId.Top
+	dust.Rate = 0
+	dust.Parent = dustAt
 	local function loop(name: string): Sound?
 		local s = chassis:FindFirstChild(name)
 		if s and s:IsA("Sound") then
@@ -298,7 +346,10 @@ local function track(car: Instance)
 		frontSlide = 0,
 		rearSlide = 0,
 		marks = marks,
-		jet = jet,
+		lift = lift,
+		jets = jets,
+		dust = dust,
+		fall = 0,
 		engine = Vehicles.Engines[stats.engine],
 		tone = stats.engineTone or 1,
 		seat = car:FindFirstChild("DriverSeat") :: VehicleSeat?,
@@ -317,7 +368,10 @@ local thrustReadyAt = 0
 local boostUsedAt = 0
 local flingUntil = 0
 local stuckFor = 0
-local airSpin = Vector3.zero
+local flying = false -- Roadster in hover flight
+local liftedAt = 0
+local flyForward, flySide, flyUp, flyYaw = 0, 0, 0, 0
+local flipLeft, flipDir, lastRoll = 0, 0, 0
 local bombHeld = 0
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
 
@@ -330,12 +384,11 @@ local function stopDriving()
 			turn.AngularVelocity = Vector3.zero
 			drive.Enabled = true
 			turn.Enabled = true
-		end
-		if driving.jet then
-			driving.jet.Enabled = false
+			drive.MaxAxesForce = GROUND_FORCE
 		end
 	end
 	driving = nil
+	flying = false
 	speed, lateral, yawRate, steer = 0, 0, 0, 0
 	Drive.state.driving = false
 	camera.FieldOfView = baseFov
@@ -705,28 +758,18 @@ local function step(dt: number)
 			yawRate = chassis.AssemblyAngularVelocity.Y
 		end
 
-		-- jet meter (Roadster)
-		local hasJet = Vehicles.has(stats, "Jet")
-		local jetting = hasJet and Drive.input.boost and Drive.state.boost > 0
-		if jetting then
-			Drive.state.boost = math.max(0, Drive.state.boost - JET_DRAIN * dt)
+		-- flight meter (Roadster): lift burns it, it fills back up on the ground
+		local canFly = Vehicles.has(stats, "Jet")
+		local lifting = canFly and Drive.input.boost and Drive.state.boost > 0
+		if lifting then
 			boostUsedAt = now
-		elseif now - boostUsedAt > JET_REFILL_DELAY then
-			Drive.state.boost = math.min(100, Drive.state.boost + JET_REFILL * dt)
-		end
-		if s.jet then
-			s.jet.Enabled = jetting
+		elseif not flying and now - boostUsedAt > Flight.refillDelay then
+			Drive.state.boost = math.min(100, Drive.state.boost + Flight.refill * dt)
 		end
 
 		local topSpeed = stats.topSpeed / MPH
-		if hasJet and (jetting or speed > topSpeed) then
-			topSpeed = math.max(
-				topSpeed,
-				math.min(JET_TOP_MPH / MPH, if jetting then JET_TOP_MPH / MPH else speed - 6 * dt)
-			)
-		end
-		local launch = stats.launch * (if jetting then 1.2 else 1)
-		local power = stats.power * (if jetting then JET_POWER else 1)
+		local launch = stats.launch
+		local power = stats.power
 
 		local grip = stats.grip * s.surface.grip
 		local wheelbase = s.wheelbase / spm
@@ -751,9 +794,6 @@ local function step(dt: number)
 		local cornering = math.min(grip, speed * speed * math.abs(math.tan(steer)) / wheelbase)
 		local spare = math.sqrt(math.max(0, (grip * 0.98) ^ 2 - cornering * cornering))
 		local a = math.clamp(wanted, -math.max(spare, grip * 0.3), math.max(spare, 0.5))
-		if jetting then
-			a += JET_ACCEL -- the jet pushes the car, not the tyres
-		end
 
 		local v = math.abs(speed)
 		local maxSteer = math.rad(stats.maxSteer)
@@ -774,8 +814,79 @@ local function step(dt: number)
 			speed, lateral = actualForward, actualLeft
 		end
 
+		-- into hover flight on lift or off a ramp; back to driving once it's down with lift let go
+		if canFly and not flung then
+			if not flying and (lifting or s.airborne) then
+				flying = true
+				liftedAt = if lifting then now else 0
+				flyForward, flySide, flyUp = actualForward, actualLeft, actual.Y
+				flyYaw = chassis.AssemblyAngularVelocity.Y
+			elseif
+				flying
+				and not s.airborne
+				and not lifting
+				and now - liftedAt > Flight.minLift
+			then
+				flying = false
+				drive.MaxAxesForce = GROUND_FORCE
+				speed, lateral = actualForward, actualLeft
+			end
+		end
+		local roll = Drive.input.roll
+		if flying and roll ~= 0 and lastRoll == 0 and flipLeft <= 0 then
+			flipLeft, flipDir = Flight.flipTime, roll
+		end
+		lastRoll = roll
+
 		local alphaF, alphaR = 0, 0
-		if not flung and not s.airborne then
+		if flying and not flung then
+			-- keep in step with what actually happened (walls, roofs, landings)
+			if math.abs(actual.Y - flyUp) > 4 then
+				flyUp = actual.Y
+			end
+			if math.abs(actualForward - flyForward) > 4 then
+				flyForward = actualForward
+			end
+			local f = FlightRules.step(
+				{ forward = flyForward, side = flySide, up = flyUp, fuel = Drive.state.boost },
+				throttle,
+				lifting,
+				dt,
+				Flight
+			)
+			flyForward, flySide, flyUp, Drive.state.boost = f.forward, f.side, f.up, f.fuel
+			if thrustLeft > 0 then
+				flyForward += THRUST_DV / THRUST_TIME * math.min(dt, thrustLeft)
+				thrustLeft -= dt
+			end
+			local wantYaw = -seat.SteerFloat * Flight.yawRate
+			flyYaw += (wantYaw - flyYaw) * math.min(1, dt * Flight.yawRamp)
+			drive.MaxAxesForce = FLY_FORCE
+			drive.Enabled = true
+			drive.VectorVelocity = (look * flyForward - right * flySide + Vector3.yAxis * flyUp)
+				* spm
+			if flipLeft > 0 then
+				-- Q/E: a full roll about the nose, then it levels itself again
+				flipLeft -= dt
+				turn.AngularVelocity = chassis.CFrame.LookVector
+						* (flipDir * 2 * math.pi / Flight.flipTime)
+					+ Vector3.yAxis * flyYaw
+			else
+				-- stay level, lean into turns, dip the nose speeding up
+				local pose = CFrame.lookAt(Vector3.zero, look)
+					* CFrame.Angles(
+						math.rad(-Flight.tilt * throttle),
+						0,
+						math.rad(-Flight.bank * seat.SteerFloat)
+					)
+				local axis, angle = (pose * chassis.CFrame.Rotation:Inverse()):ToAxisAngle()
+				local fix = if angle == angle and angle > 1e-4
+					then axis * angle * Flight.level
+					else Vector3.zero
+				turn.AngularVelocity = fix + Vector3.yAxis * flyYaw
+			end
+			speed, lateral, yawRate = flyForward, flySide, flyYaw
+		elseif not flung and not s.airborne then
 			local before = speed
 			local steps = math.clamp(math.ceil(dt * 480), 1, 32)
 			for _ = 1, steps do
@@ -796,14 +907,10 @@ local function step(dt: number)
 			drive.VectorVelocity = (look * speed - right * lateral) * spm
 			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * LEVEL_RATE
 			turn.AngularVelocity = Vector3.new(level.X, yawRate, level.Z)
-			airSpin = Vector3.zero
 		elseif not flung then
-			-- in the air momentum carries the car; the jet and thruster push along the nose
+			-- in the air momentum carries the car; the thruster pushes along the nose
 			drive.Enabled = false
 			local nose = chassis.CFrame.LookVector
-			if jetting then
-				chassis.AssemblyLinearVelocity += nose * JET_ACCEL * spm * dt
-			end
 			if thrustLeft > 0 then
 				chassis.AssemblyLinearVelocity += nose * (THRUST_DV / THRUST_TIME) * spm * math.min(
 					dt,
@@ -811,16 +918,9 @@ local function step(dt: number)
 				)
 				thrustLeft -= dt
 			end
-			if hasJet then
-				-- Rocket League air control: pitch on throttle, yaw on steer, roll on Q/E
-				local want = Vector3.new(-throttle, -seat.SteerFloat, -Drive.input.roll) * AIR_RATE
-				airSpin = airSpin:Lerp(want, math.min(1, dt * AIR_RAMP))
-				turn.AngularVelocity = chassis.CFrame:VectorToWorldSpace(airSpin)
-			else
-				local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * (LEVEL_RATE * 0.5)
-				turn.AngularVelocity =
-					Vector3.new(level.X, chassis.AssemblyAngularVelocity.Y * 0.98, level.Z)
-			end
+			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * (LEVEL_RATE * 0.5)
+			turn.AngularVelocity =
+				Vector3.new(level.X, chassis.AssemblyAngularVelocity.Y * 0.98, level.Z)
 		end
 		s.frontSlide = math.clamp(math.abs(alphaF) / PEAK_SLIP - 0.8, 0, 1)
 		s.rearSlide = math.max(
@@ -852,7 +952,7 @@ local function step(dt: number)
 		local fov = baseFov
 			+ 14 * math.clamp(v / 110, 0, 1) ^ 0.75
 			+ 5 * math.clamp(a / 15, 0, 1)
-			+ (if jetting then 6 else 0)
+			+ (if flying then 6 else 0)
 		camera.FieldOfView += (fov - camera.FieldOfView) * math.min(1, dt * 4)
 	end
 
@@ -914,9 +1014,30 @@ local function step(dt: number)
 			local reach = chassis.Size.Y / 2 + 0.35 * spm
 			local hit =
 				workspace:Raycast(chassis.Position, -chassis.CFrame.UpVector * reach, params)
+			local was = s.airborne
 			s.airborne = hit == nil
 			if hit then
 				s.surface = SURFACES[hit.Material] or HARD
+			end
+			if was and not s.airborne and s.fall > 6 then
+				s.dust:Emit(math.clamp(math.floor(s.fall * 2), 10, 40))
+			end
+		end
+		local up = chassis.AssemblyLinearVelocity.Y / spm
+		s.fall = if s.airborne then math.max(s.fall, -up) else 0
+
+		-- the gas jets: the driver knows; everyone else reads it off the car's motion
+		if #s.lift > 0 then
+			local hovering = if s == driving
+				then flying
+				else s.airborne and up > -(Flight.sink + 1.5)
+			for _, p in s.lift do
+				p.Enabled = hovering
+				p.Rate = if up > 1 then 90 else 35
+			end
+			local pushing = if s == driving then thrustLeft > 0 else s.accel.Z > 2.5 * G
+			for _, p in s.jets do
+				p.Enabled = pushing
 			end
 		end
 

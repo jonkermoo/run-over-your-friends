@@ -2,6 +2,8 @@
 -- Run with: lune run tests/run
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
+local Flight = require("../src/shared/Rules/Flight")
+local FlightConfig = require("../src/shared/Config/Flight")
 local Impact = require("../src/shared/Rules/Impact")
 local EventConfig = require("../src/shared/Config/Events")
 local EventRules = require("../src/shared/Rules/Events")
@@ -336,6 +338,47 @@ check(
 	"event list has the four events",
 	evKeys.LowGravity and evKeys.GoldenRush and evKeys.Giant and evKeys.Stampede
 )
+
+-- hover flight
+local function fly(s: Flight.State, throttle: number, lift: boolean, seconds: number): Flight.State
+	for _ = 1, math.floor(seconds * 60) do
+		s = Flight.step(s, throttle, lift, 1 / 60, FlightConfig)
+	end
+	return s
+end
+local still = { forward = 0, side = 0, up = 0, fuel = 100 }
+local climbed = fly(still, 0, true, 2)
+check("lift climbs at the climb rate", near(climbed.up, FlightConfig.climb, 1e-6))
+check("lift burns fuel", near(climbed.fuel, 100 - FlightConfig.drain * 2, 0.5))
+check(
+	"letting go sinks no faster than the cap",
+	near(fly(climbed, 0, false, 5).up, -FlightConfig.sink, 1e-6)
+)
+check(
+	"no fuel, no climb",
+	fly({ forward = 0, side = 0, up = 0, fuel = 0 }, 0, true, 2).up <= -FlightConfig.sink + 1e-6
+)
+check(
+	"a fast fall is cushioned to the sink rate",
+	near(
+		fly({ forward = 0, side = 0, up = -30, fuel = 0 }, 0, false, 3).up,
+		-FlightConfig.sink,
+		1e-6
+	)
+)
+check("W flies at top speed", near(fly(still, 1, false, 6).forward, FlightConfig.top, 1e-6))
+check("S backs up", near(fly(still, -1, false, 3).forward, -FlightConfig.reverseTop, 1e-6))
+local boosted = Flight.step({ forward = 80, side = 0, up = 0, fuel = 0 }, 1, false, 1, FlightConfig)
+check("over top speed slows by drag", near(boosted.forward, 80 - FlightConfig.drag, 1e-6))
+check(
+	"no throttle drifts to a stop",
+	fly({ forward = 20, side = 0, up = 0, fuel = 0 }, 0, false, 5).forward == 0
+)
+check(
+	"sideways slide dies out",
+	fly({ forward = 0, side = 9, up = 0, fuel = 0 }, 0, false, 1).side == 0
+)
+check("gliding keeps the fuel", fly(still, 1, false, 2).fuel == 100)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

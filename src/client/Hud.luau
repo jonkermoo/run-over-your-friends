@@ -768,7 +768,7 @@ local function holdButton(
 	end)
 	return b
 end
-local boostB = holdButton("JET", UDim2.fromOffset(160, 0), "blue", function()
+local boostB = holdButton("FLY", UDim2.fromOffset(160, 0), "blue", function()
 	Drive.input.boost = true
 end, function()
 	Drive.input.boost = false
@@ -786,12 +786,12 @@ local bombB = holdButton("BOMB", UDim2.fromOffset(0, 0), "red", function()
 end, function()
 	Drive.input.bomb = false
 end)
-local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), "dark", function()
+local rollL = holdButton("FLIP L", UDim2.fromOffset(0, 80), "dark", function()
 	Drive.input.roll = -1
 end, function()
 	Drive.input.roll = 0
 end)
-local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
+local rollR = holdButton("FLIP R", UDim2.fromOffset(80, 80), "dark", function()
 	Drive.input.roll = 1
 end, function()
 	Drive.input.roll = 0
@@ -834,8 +834,8 @@ RunService.RenderStepped:Connect(function()
 		table.insert(keys, "G " .. string.lower(feature))
 	end
 	if hasJet then
-		table.insert(keys, "SHIFT jet")
-		table.insert(keys, "Q/E roll in air")
+		table.insert(keys, "hold SHIFT fly")
+		table.insert(keys, "Q/E flip in air")
 	end
 	if hasThruster then
 		table.insert(keys, "R thruster")
