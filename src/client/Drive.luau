@@ -68,6 +68,7 @@ local GROUND_FORCE = Vector3.new(BIG, 0, BIG)
 -- far away other cars bother
 local WHEEL_TRAVEL, WHEEL_DROOP = 0.6, 0.3
 local WHEEL_CONTACT_RANGE = 300
+local STEER_WHEEL_RATIO = 4 -- steering wheel turns per road-wheel turn
 local wheelParams = RaycastParams.new()
 wheelParams.FilterType = Enum.RaycastFilterType.Exclude
 wheelParams.CollisionGroup = "Vehicles"
@@ -162,6 +163,11 @@ type CarState = {
 	tone: number,
 	seat: VehicleSeat?,
 	trailer: BasePart?,
+	steerWeld: Weld?, -- the cabin steering wheel's weld (cars with an interior)
+	steerBase: CFrame,
+	ik: { IKControl }, -- the driver's hands on that wheel
+	ikFor: Humanoid?,
+	tucked: { [BasePart]: number }, -- the driver's hats and hair hidden under the roof, with their transparency
 }
 
 local cars: { [Model]: CarState } = {}
@@ -441,6 +447,11 @@ local function track(car: Instance)
 		tone = stats.engineTone or 1,
 		seat = car:FindFirstChild("DriverSeat") :: VehicleSeat?,
 		trailer = trailer,
+		steerWeld = nil,
+		steerBase = CFrame.identity,
+		ik = {},
+		ikFor = nil,
+		tucked = {},
 	}
 end
 
@@ -1177,6 +1188,68 @@ local function step(dt: number)
 				cf *= spinCF
 			end
 			w.weld.C0 = cf
+		end
+
+		-- the cabin steering wheel turns with the front wheels, and the driver's hands stay on it
+		if not s.steerWeld then
+			local sprung = s.car:FindFirstChild("Sprung")
+			local sw = sprung and sprung:FindFirstChild("SteerWeld")
+			if sw and sw:IsA("Weld") then
+				s.steerWeld, s.steerBase = sw, sw.C0
+			end
+		end
+		if s.steerWeld then
+			s.steerWeld.C0 = s.steerBase * CFrame.Angles(0, 0, s.steer * STEER_WHEEL_RATIO)
+		end
+		local occupant = s.seat and s.seat.Occupant
+		if occupant ~= s.ikFor then
+			for _, k in s.ik do
+				k:Destroy()
+			end
+			table.clear(s.ik)
+			for part, t in s.tucked do
+				part.Transparency = t
+			end
+			table.clear(s.tucked)
+			s.ikFor = occupant
+			local wheelPart = s.steerWeld and s.steerWeld.Part1
+			local body = occupant and occupant.Parent
+			local shell = s.car:FindFirstChild("Body")
+			if wheelPart and body and shell and shell:IsA("BasePart") and s.stats.showDriver then
+				-- tall hats and hair would poke out through the roof: once they've sat down, hide those
+				task.delay(0.4, function()
+					if s.ikFor ~= occupant or not shell.Parent then
+						return
+					end
+					local roof = shell.Position.Y + shell.Size.Y / 2 - 0.15
+					for _, acc in body:GetChildren() do
+						local handle = acc:IsA("Accessory") and acc:FindFirstChild("Handle")
+						if
+							handle
+							and handle:IsA("BasePart")
+							and handle.Position.Y + handle.Size.Y / 2 > roof
+						then
+							s.tucked[handle] = handle.Transparency
+							handle.Transparency = 1
+						end
+					end
+				end)
+				for side, gripName in { Left = "GripL", Right = "GripR" } do
+					local hand = body:FindFirstChild(side .. "Hand")
+					local upper = body:FindFirstChild(side .. "UpperArm")
+					local grip = wheelPart:FindFirstChild(gripName)
+					if hand and upper and grip and grip:IsA("Attachment") then
+						local k = Instance.new("IKControl")
+						k.Name = "RoyfGrip" .. side
+						k.Type = Enum.IKControlType.Position
+						k.EndEffector = hand :: BasePart
+						k.ChainRoot = upper :: BasePart
+						k.Target = grip
+						k.Parent = occupant
+						table.insert(s.ik, k)
+					end
+				end
+			end
 		end
 
 		if now - s.surfaceAt > 0.12 then

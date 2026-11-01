@@ -619,6 +619,210 @@ for o in [body] + wheels:
     o.data.transform(Matrix.Scale(0.54, 4))  # real size to pack size
 place("Roadster", body, wheels, STUDS)
 
+# ---- interiors: glass you can see through, two seats, a dash and a steering wheel (its own part, so the game
+# can turn it). Seat spots come from the game's Config/Vehicles (Roblox studs from the model's base centre,
+# front -Z); the driver sits on the left. The Roblox point (x, y, z) is Blender (-x, z, y) in a vehicle's slot.
+import re
+
+config = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "shared", "Config", "Vehicles.luau"), encoding="utf-8").read()
+SEATS = {m.group(1): tuple(float(v) for v in m.group(2).split(",")) for m in re.finditer(r'id = "(\w+)",.*?seat = \{([^}]*)\}', config, re.S)}
+INTERIOR = ("Hatchback", "Sedan", "Taxi", "Muscle", "Supercar", "IceCream", "FireTruck", "Semi", "Monster", "Roadster")
+SEAT_RGB, DASH_RGB, WHEEL_RGB = (0.2, 0.2, 0.21), (0.12, 0.12, 0.13), (0.07, 0.07, 0.08)
+PANE = (0.14, 0.14, 0.12)  # the pack paints its windows this near-black
+
+
+def cell_colour(rgb):
+    """The palette colour paint(obj, rgb) actually lands on."""
+    u, v = uv_for(rgb)
+    x, y = min(PW - 1, int(u * PW)), min(PH - 1, int(v * PH))
+    k = (y * PW + x) * 4
+    return tuple(round(c, 2) for c in pix[k:k + 3])
+
+
+def in_slot(vid, rx, ry, rz):
+    return Vector((vehicles.index(vid) * SPACING - rx, rz, ry))
+
+
+def split_off(obj, test, name):
+    """Move the faces where test(centre, colour) holds into a new object called name."""
+    me = obj.data
+    picked = {p.index for p in me.polygons if test(p.center, face_colour(me, p))}
+    if not picked:
+        return None
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    keep = bm.copy()
+    keep.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.faces[i] for i in range(len(bm.faces)) if i not in picked], context="FACES")
+    bmesh.ops.delete(keep, geom=[keep.faces[i] for i in picked], context="FACES")
+    glass = bpy.data.meshes.new(name)
+    bm.to_mesh(glass)
+    keep.to_mesh(me)
+    bm.free()
+    keep.free()
+    o = bpy.data.objects.new(name, glass)
+    scene.collection.objects.link(o)
+    finish(o)
+    return o
+
+
+def rb(vid, size, at, rgb, bevel=0.0, pitch=0.0):
+    """A box in Roblox terms: size (width, height, depth) studs, centred at the Roblox point at, leaned back by
+    pitch degrees (top towards the tail)."""
+    o = box("p", (size[0], size[2], size[1]), (0, 0, 0), rgb, bevel)
+    if pitch:
+        o.data.transform(Matrix.Rotation(math.radians(pitch), 4, "X"))
+    o.data.transform(Matrix.Translation(in_slot(vid, *at)))
+    return o
+
+
+def rc(vid, radius, depth, at, rgb, axis="Z", verts=12):
+    """A cylinder in Roblox terms: axis "Z" faces the driver, "Y" stands up, "X" runs across."""
+    return cyl("c", radius, depth, tuple(in_slot(vid, *at)), rgb, {"Z": "Y", "Y": "Z", "X": "X"}[axis], verts)
+
+
+def steering_wheel(name, centre, radius, kind="round", accent=None):
+    """A wheel facing the driver (axis along Blender Y), centred on its middle so it turns in place: "round"
+    (rim, two spokes), "sport" (thick rim, three spokes, a top marker), "truck" (big, four spokes) or "yoke"
+    (two grips joined by a bar, open at the top)."""
+    def bar(n, size, off, rgb=WHEEL_RGB):
+        return box(n, size, tuple(centre + Vector(off)), rgb)
+    parts = [cyl("hub", radius * 0.28, radius * 0.25, tuple(centre), DASH_RGB, "Y", 10)]
+    if kind == "yoke":
+        parts += [bar("grip", (radius * 0.22, radius * 0.2, radius * 1.1), (radius * 0.9, 0, 0)),
+                  bar("grip", (radius * 0.22, radius * 0.2, radius * 1.1), (-radius * 0.9, 0, 0)),
+                  bar("bar", (radius * 1.8, radius * 0.18, radius * 0.22), (0, 0, -radius * 0.42)),
+                  bar("spoke", (radius * 1.8, radius * 0.12, radius * 0.12), (0, 0, 0))]
+    else:
+        thick = {"sport": 0.15, "truck": 0.09}.get(kind, 0.12)
+        bpy.ops.mesh.primitive_torus_add(major_radius=radius, minor_radius=radius * thick, major_segments=20,
+                                         minor_segments=6, rotation=(math.pi / 2, 0, 0), location=centre)
+        ring = bpy.context.active_object
+        bake(ring)
+        paint(ring, WHEEL_RGB)
+        parts.append(ring)
+        spokes = {"sport": 3, "truck": 4}.get(kind, 2)
+        for i in range(spokes):
+            # three spokes: left, right and one pointing down; otherwise evenly round
+            a = (math.pi / 2, -math.pi / 2, math.pi)[i] if spokes == 3 else i * 2 * math.pi / spokes + math.pi / 2
+            sp = box("spoke", (radius * 0.12, radius * 0.1, radius), (0, 0, radius / 2), WHEEL_RGB)
+            sp.data.transform(Matrix.Rotation(a, 4, "Y"))
+            sp.data.transform(Matrix.Translation(centre))
+            parts.append(sp)
+        if accent:
+            parts.append(bar("marker", (radius * 0.12, radius * 0.3, radius * 0.22), (0, 0, radius), accent))
+    return join(parts, name)
+
+
+# richer cabins for the expensive vehicles: seat colours, steering wheel, and what fills the dash
+CABIN = {
+    "Roadster": {"seat": (0.86, 0.85, 0.82), "trim": (0.1, 0.1, 0.11), "wheel": "yoke", "screen": True},
+    "Supercar": {"seat": (0.1, 0.1, 0.11), "trim": (0.91, 0.64, 0.22), "wheel": "sport", "shifter": True},
+    "Monster": {"seat": (0.24, 0.22, 0.2), "trim": (0.85, 0.3, 0.1), "wheel": "sport", "cage": True, "shifter": True},
+    "Semi": {"seat": (0.3, 0.27, 0.24), "trim": (0.55, 0.56, 0.58), "wheel": "truck", "radius": 1.0, "gauges": 5,
+             "shifter": True, "radio": True},
+    "FireTruck": {"seat": (0.16, 0.16, 0.17), "trim": (0.68, 0.24, 0.16), "wheel": "truck", "radius": 1.0,
+                  "gauges": 4, "radio": True},
+}
+WHITE_FACE, RED_LAMP, SCREEN = (0.9, 0.9, 0.88), (0.75, 0.1, 0.08), (0.1, 0.13, 0.18)
+
+
+def plain_cabin(vid, sx, sy, sz, width):
+    seat_w = width * 0.26
+    parts = []
+    for x in (sx, -sx):
+        parts.append(rb(vid, (seat_w, 0.5, 2.0), (x, sy - 0.1, sz), SEAT_RGB, 0.08))
+        parts.append(rb(vid, (seat_w, 2.4, 0.45), (x, sy + 1.2, sz + 1.1), SEAT_RGB, 0.08))
+    parts.append(rb(vid, (width * 0.74, 0.9, 1.3), (0, sy + 1.0, sz - 3.3), DASH_RGB, 0.1))
+    parts.append(rb(vid, (width * 0.74, 0.15, 5.5), (0, sy - 0.45, sz - 0.8), DASH_RGB))
+    parts.append(rb(vid, (0.25, 0.25, 2.0), (sx, sy + 1.35, sz - 2.2), WHEEL_RGB))
+    return parts
+
+
+def rich_cabin(vid, sx, sy, sz, width, c):
+    seat, trim = c["seat"], c["trim"]
+    parts = []
+    for x in (sx, -sx):
+        w = min(width * 0.3, 2.0)
+        # bucket seat: cushion and back with side bolsters, a headrest, a stripe in the trim colour
+        parts.append(rb(vid, (w, 0.45, 1.9), (x, sy - 0.05, sz), seat, 0.08))
+        parts.append(rb(vid, (w, 2.3, 0.42), (x, sy + 1.2, sz + 1.1), seat, 0.08, 12))
+        for side in (-1, 1):
+            parts.append(rb(vid, (0.28, 0.4, 1.8), (x + side * (w / 2 - 0.1), sy + 0.22, sz), seat, 0.06))
+            parts.append(rb(vid, (0.28, 1.9, 0.45), (x + side * (w / 2 - 0.1), sy + 1.1, sz + 0.95), seat, 0.06, 12))
+        parts.append(rb(vid, (w * 0.55, 0.7, 0.38), (x, sy + 2.7, sz + 1.35), seat, 0.08, 12))
+        parts.append(rb(vid, (0.22, 2.0, 0.05), (x, sy + 1.25, sz + 0.87), trim, 0, 12))
+    # dash, a trim strip, the gauge hood and gauges in front of the driver
+    parts.append(rb(vid, (width * 0.86, 1.0, 1.5), (0, sy + 1.0, sz - 3.3), DASH_RGB, 0.12))
+    parts.append(rb(vid, (width * 0.86, 0.12, 0.2), (0, sy + 1.45, sz - 2.6), trim))
+    gauges = c.get("gauges", 2)
+    parts.append(rb(vid, (0.45 * gauges + 0.3, 0.45, 0.7), (sx, sy + 1.7, sz - 2.95), DASH_RGB, 0.05))
+    for i in range(gauges):
+        gx = sx + (i - (gauges - 1) / 2) * 0.45
+        parts.append(rc(vid, 0.19, 0.05, (gx, sy + 1.55, sz - 2.58), WHITE_FACE, "Z", 10))
+        parts.append(rc(vid, 0.14, 0.06, (gx, sy + 1.55, sz - 2.56), DASH_RGB, "Z", 10))
+    if c.get("screen"):
+        parts.append(rb(vid, (1.5, 0.95, 0.08), (0, sy + 1.95, sz - 2.75), DASH_RGB, 0.02, -12))
+        parts.append(rb(vid, (1.35, 0.8, 0.09), (0, sy + 1.95, sz - 2.73), SCREEN, 0, -12))
+    if c.get("radio"):
+        parts.append(rb(vid, (0.9, 0.3, 0.7), (0, sy + 3.2, sz - 2.4), DASH_RGB, 0.03))
+        for i in range(3):
+            parts.append(rb(vid, (0.12, 0.08, 0.04), (-0.25 + i * 0.25, sy + 3.2, sz - 2.03), RED_LAMP))
+    # centre console, shifter, pedals, floor and a steering column
+    parts.append(rb(vid, (0.7, 0.7, 2.6), (0, sy + 0.05, sz - 0.9), DASH_RGB, 0.06))
+    if c.get("shifter"):
+        parts.append(rc(vid, 0.06, 0.8, (0, sy + 0.75, sz - 1.5), (0.6, 0.6, 0.62), "Y", 8))
+        parts.append(rc(vid, 0.15, 0.2, (0, sy + 1.15, sz - 1.5), trim, "Y", 10))
+    for dx in (-0.35, 0, 0.35):
+        parts.append(rb(vid, (0.22, 0.4, 0.06), (sx + dx, sy - 0.2, sz - 2.75), (0.5, 0.5, 0.52), 0, -30))
+    parts.append(rb(vid, (width * 0.86, 0.15, 5.8), (0, sy - 0.45, sz - 0.8), DASH_RGB))
+    parts.append(rb(vid, (0.28, 0.28, 2.0), (sx, sy + 1.35, sz - 2.2), WHEEL_RGB))
+    if c.get("cage"):
+        # roll cage: a hoop behind the seats and two bars running forward over the doors
+        for side in (-1, 1):
+            parts.append(rb(vid, (0.22, 3.0, 0.22), (side * width * 0.38, sy + 1.4, sz + 1.75), trim))
+            parts.append(rb(vid, (0.22, 0.22, 3.8), (side * width * 0.38, sy + 2.85, sz - 0.1), trim))
+        parts.append(rb(vid, (width * 0.76 + 0.22, 0.22, 0.22), (0, sy + 2.85, sz + 1.75), trim))
+        parts.append(rb(vid, (width * 0.76, 0.22, 0.22), (0, sy + 1.6, sz + 1.75), trim))
+    return parts
+
+
+def add_interior(vid):
+    body = bpy.data.objects[vid + "_Body"]
+    lo, hi = bounds([body])
+    height = hi.z - lo.z
+    pane = cell_colour(RGLASS) if vid == "Roadster" else PANE
+    glass = split_off(body, lambda c, col: near(col, pane) and c.z - lo.z > height * 0.4, vid + "_Glass")
+    # the cabin is as wide as the windows (the whole vehicle can be far wider: mirrors, giant wheels)
+    width = hi.x - lo.x
+    if glass:
+        exported.append(glass)
+        glo, ghi = bounds([glass])
+        width = min(width, ghi.x - glo.x)
+    _, sy, sz = SEATS[vid]
+    sx = -round(width * 0.2, 1)  # left of centre
+    if glass:
+        # sit high enough to be seen through the side windows (tall cabs)
+        sy = max(sy, round(glo.z - lo.z - 2.3, 1))
+    print(f"SEAT {vid} {{ {sx}, {sy}, {sz} }}")
+    c = CABIN.get(vid)
+    parts = rich_cabin(vid, sx, sy, sz, width, c) if c else plain_cabin(vid, sx, sy, sz, width)
+    interior = join(parts, vid + "_Interior")
+    finish(interior)
+    radius = c.get("radius", 0.75) if c else 0.75
+    kind = c["wheel"] if c else "round"
+    accent = c["trim"] if c and kind == "sport" else None
+    # within reach of a seated R15 avatar's hands (measured in Studio: shoulder about 2.4 above and 0.1 behind
+    # the seat spot, arm about 1.7 long)
+    wheel_obj = steering_wheel(vid + "_Steer", in_slot(vid, sx, sy + 1.55, sz - 1.1), radius, kind, accent)
+    finish(wheel_obj)
+    exported.extend([interior, wheel_obj])
+
+
+for vid in INTERIOR:
+    add_interior(vid)
+
 # ---- export
 tri = 0
 for o in exported:
