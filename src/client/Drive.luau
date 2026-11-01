@@ -407,6 +407,7 @@ end
 ---------------------------------------------------------------- hits
 
 local hitNpcAt: { [Model]: number } = {}
+local hitPropAt: { [Model]: number } = {}
 local wreckAt: { [Model]: number } = {}
 local loosened: { { part: BasePart, at: number } } = {}
 local lastBreakSent = 0
@@ -428,6 +429,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 	local npcFolder = workspace:FindFirstChild("Npcs")
 	local map = workspace:FindFirstChild("Map")
 	local buildings = map and map:FindFirstChild("Buildings")
+	local props = map and map:FindFirstChild("Props")
 	local vehiclesFolder = workspace:FindFirstChild("Vehicles")
 	local wrecker = player:GetAttribute("PassWrecker") == true
 	local include: { Instance } = {}
@@ -436,6 +438,9 @@ local function detectHits(s: CarState, velocity: Vector3)
 	end
 	if buildings and s.stats.breaksBuildings then
 		table.insert(include, buildings)
+	end
+	if props then
+		table.insert(include, props)
 	end
 	if wrecker then
 		if vehiclesFolder then
@@ -477,6 +482,22 @@ local function detectHits(s: CarState, velocity: Vector3)
 			if npc and not npc:GetAttribute("Down") and (hitNpcAt[npc] or 0) + 1 < now then
 				hitNpcAt[npc] = now
 				Net.waitFor("HitNpc"):FireServer(npc, velocity)
+			end
+		elseif props and p:IsDescendantOf(props) then
+			-- street furniture: every vehicle knocks it flying; drive straight through it here at once
+			local prop = p:FindFirstAncestorOfClass("Model")
+			while prop and prop.Parent ~= props do
+				prop = prop:FindFirstAncestorOfClass("Model")
+			end
+			if prop and (hitPropAt[prop] or 0) + 1.5 < now then
+				hitPropAt[prop] = now
+				for _, part in prop:GetDescendants() do
+					if part:IsA("BasePart") and part.CanCollide then
+						part.CanCollide = false
+						table.insert(loosened, { part = part, at = now })
+					end
+				end
+				Net.waitFor("KnockProp"):FireServer(prop, velocity)
 			end
 		elseif buildings and p:IsDescendantOf(buildings) then
 			if p.Anchored and p.CanCollide and not p:GetAttribute("Broken") then

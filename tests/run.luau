@@ -3,6 +3,8 @@
 local CityPlan = require("../src/shared/Rules/CityPlan")
 local CrowdConfig = require("../src/shared/Config/Crowd")
 local CrowdRules = require("../src/shared/Rules/Crowd")
+local Districts = require("../src/shared/Rules/Districts")
+local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Impact = require("../src/shared/Rules/Impact")
@@ -651,6 +653,67 @@ for _, n in signNames do
 	end
 end
 check("sign names are parodies, not real brands", namesOk)
+
+-- districts and the street kit
+local districtCount = {}
+for i = 0, 7 do
+	for j = 0, 7 do
+		local d = Districts.of(i, j, 8, 8)
+		districtCount[d] = (districtCount[d] or 0) + 1
+	end
+end
+check(
+	"canal quarter is the east two columns",
+	districtCount.canal == 16 and Districts.of(7, 0, 8, 8) == "canal"
+)
+check(
+	"old town is the north-west corner",
+	Districts.of(0, 0, 8, 8) == "old" and districtCount.old == 9
+)
+check(
+	"stadium row, dockside and maple hills exist",
+	districtCount.stadium == 6 and districtCount.dock == 3 and (districtCount.maple or 0) >= 12
+)
+check(
+	"downtown is the middle",
+	Districts.of(4, 4, 8, 8) == "neon" and (districtCount.neon or 0) >= 10
+)
+local MATERIALS = {
+	SmoothPlastic = true,
+	Brick = true,
+	Cobblestone = true,
+	WoodPlanks = true,
+	CorrodedMetal = true,
+	Concrete = true,
+	Wood = true,
+	Metal = true,
+	Slate = true,
+}
+local stylesOk = true
+for key, d in Streets.Districts do
+	stylesOk = stylesOk
+		and MATERIALS[d.wallMaterial] == true
+		and MATERIALS[d.sidewalkMaterial] == true
+		and rgbOk(d.walls)
+		and rgbOk({ d.sidewalk, d.accent })
+		and d.trees >= 0
+		and d.trees <= 1
+		and districtCount[key] ~= nil
+end
+check("every district has a valid look and appears on the map", stylesOk)
+local pitchS = World.Map.BlockSize
+check(
+	"crossings sit inside the block span, stop lines behind them",
+	Streets.ZebraInset + Streets.ZebraLength / 2 < Streets.StopLineInset
+		and Streets.StopLineInset < Streets.EndClear + 4
+		and Streets.EndClear * 2 < pitchS
+)
+check(
+	"lane dashes fit",
+	Streets.DashLength > 0 and Streets.DashGap > 0 and Streets.ZebraStripes >= 3
+)
+check("billboards are parodies", #Streets.Billboards >= 4)
+check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

@@ -43,6 +43,7 @@ local RateLimit = require(script.RateLimit)
 
 local world = MapBuilder.build()
 BuildingService.register(world.buildings)
+BuildingService.registerProps(world.props)
 CrowdService.setup(world.places, world.grid)
 VehicleService.setSpawnPoints(world.spawnPoints)
 -- the giant appears at a downtown crossing
