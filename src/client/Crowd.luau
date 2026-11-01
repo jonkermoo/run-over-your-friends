@@ -6,6 +6,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
+local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
 
 local Crowd = {}
 
@@ -48,6 +49,7 @@ local function load(model: Model): Rig?
 		idle = idle,
 		walk = idOf(model, "AnimWalk", Config.RthroWalk),
 		run = idOf(model, "AnimRun", Config.RthroRun),
+		sit = idOf(model, "AnimSit", InteriorConfig.SitAnim),
 	}
 	local rig: Rig = { tracks = {}, playing = nil }
 	for name, id in ids do
@@ -111,7 +113,11 @@ local function update(folder: Instance)
 			rig = rig or load(model)
 			if rig then
 				local gait = model:GetAttribute("Gait")
-				local want = if gait == "walk" or gait == "run" then gait else "idle"
+				local want = if gait == "walk"
+						or gait == "run"
+						or gait == "sit"
+					then gait
+					else "idle"
 				local track = rig.tracks[want]
 				if track and rig.playing ~= want then
 					for name, t in rig.tracks do

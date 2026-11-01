@@ -155,6 +155,7 @@ local function prepare(model: Model, displayName: string?, nameRange: number)
 		model:SetAttribute("AnimWalk", id("walk", "WalkAnim"))
 		model:SetAttribute("AnimRun", id("run", "RunAnim"))
 		model:SetAttribute("AnimFall", id("fall", "FallAnim"))
+		model:SetAttribute("AnimSit", id("sit", "SitAnim"))
 		animate:Destroy()
 	end
 	for _, d in model:GetDescendants() do
@@ -184,6 +185,7 @@ function NpcLooks.init()
 		model:SetAttribute("AnimWalk", nil)
 		model:SetAttribute("AnimRun", nil)
 		model:SetAttribute("AnimFall", nil)
+		model:SetAttribute("AnimSit", nil)
 		for _, a in model:GetChildren() do
 			if a:IsA("Accessory") or a:IsA("Shirt") or a:IsA("Pants") or a:IsA("ShirtGraphic") then
 				a:Destroy()
@@ -427,6 +429,8 @@ function NpcLooks.give(model: Model)
 	for _, name in { "Down", "Golden", "GiantHp", "Gait" } do
 		model:SetAttribute(name, nil)
 	end
+	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart
+	root.Anchored = false -- it may have been sitting
 	local glow = model:FindFirstChild("GoldenGlow")
 	if glow then
 		glow:Destroy()

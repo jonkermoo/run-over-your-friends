@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local H = require(ReplicatedStorage.Shared.Config.Houses)
+local Interiors = require(ReplicatedStorage.Shared.Config.Interiors)
 local Places = require(script.Parent.Places)
 
 local HouseKit = {}
@@ -464,6 +465,7 @@ local function chimney(ctx: Ctx, x: number, z: number, top: number, height: numb
 	put(ctx, Vector3.new(3.6, 0.6, 3.6), x, top + height + 0.3, z, ctx.trim)
 end
 
+-- the wooden floor; furniture is drawn by each client near the camera (Config/Interiors)
 local function interior(ctx: Ctx, cx: number, w: number, zFront: number, zBack: number)
 	local T = H.Wall
 	put(
@@ -474,15 +476,6 @@ local function interior(ctx: Ctx, cx: number, w: number, zFront: number, zBack: 
 		(zFront + zBack) / 2,
 		Color3.fromRGB(150, 110, 74),
 		Enum.Material.WoodPlanks
-	)
-	put(
-		ctx,
-		Vector3.new(8, 3, 3.5),
-		cx + w / 5,
-		Y0 + 1.5,
-		zBack + T + 2.2,
-		ctx.wall:Lerp(Color3.fromRGB(60, 60, 70), 0.6),
-		Enum.Material.Fabric
 	)
 end
 
@@ -702,20 +695,35 @@ function HouseKit.build(
 		material = (Enum.Material :: any)[palette.material] or Enum.Material.SmoothPlastic,
 	}
 	local info = BUILD[kind](ctx)
+	-- the client furnishes the house from its frame, type and mirror flag
+	model.WorldPivot = base
+	model:SetAttribute("Mirror", mirror)
 	model.Parent = parent
 	local function at(x: number, z: number): Vector3
 		return (base * CFrame.new(x * ctx.m, Y0, -z)).Position
 	end
+	local function facing(fx: number, fz: number): Vector3
+		return base:VectorToWorldSpace(Vector3.new(fx * ctx.m, 0, -fz))
+	end
 	local doorX = info.door
+	local spots: { Places.Spot } = {}
+	local layout = (Interiors.Layouts :: any)[kind] :: Interiors.Layout?
+	if layout then
+		for _, sp in layout.spots do
+			-- step in past the door first, then across the room
+			table.insert(spots, {
+				path = { at(doorX, info.front - 5), at(sp.x, sp.z) },
+				face = facing(sp.fx, sp.fz),
+				sit = sp.sit,
+			})
+		end
+	end
 	return {
 		kind = "home",
 		name = name,
 		door = at(doorX, info.front + 3),
 		entry = at(doorX, info.front - 3),
-		spots = {
-			{ path = { at(info.living.X, info.living.Z) }, face = out },
-			{ path = { at(doorX, info.front - 6), at(0, info.back + 6) }, face = -out },
-		},
+		spots = spots,
 		staffSpots = {},
 		indoors = true,
 	}

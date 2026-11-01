@@ -11,7 +11,7 @@ local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
 
 local Places = {}
 
-export type Spot = { path: { Vector3 }, face: Vector3? }
+export type Spot = { path: { Vector3 }, face: Vector3?, sit: boolean? } -- sit: on furniture the client draws
 export type Place = {
 	kind: CrowdRules.PlaceKind,
 	name: string?,

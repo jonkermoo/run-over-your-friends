@@ -6,6 +6,7 @@ local CrowdRules = require("../src/shared/Rules/Crowd")
 local Districts = require("../src/shared/Rules/Districts")
 local HouseConfig = require("../src/shared/Config/Houses")
 local HouseRules = require("../src/shared/Rules/Houses")
+local InteriorConfig = require("../src/shared/Config/Interiors")
 local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
@@ -773,6 +774,52 @@ for _, pal in HouseConfig.Palettes do
 		and MATERIALS[pal.material] == true
 end
 check("house palettes are valid", palsOk)
+
+-- house interiors
+local interiorOk, sitOnSeat, spotsInside = true, true, true
+for kind, t in HouseConfig.Types do
+	local layout = InteriorConfig.Layouts[kind]
+	interiorOk = interiorOk and layout ~= nil and #layout.spots >= 3
+	if layout then
+		local xLo, xHi = -t.width / 2 + 1.5, t.width / 2 - 1.5
+		if kind == "C" then
+			xHi = -t.width / 2 + 22 - 1.5 -- the two-storey block; the garage is on the right
+		end
+		local zLim = t.depth / 2 - 1.5
+		for _, piece in layout.pieces do
+			spotsInside = spotsInside
+				and piece.x >= xLo
+				and piece.x <= xHi
+				and math.abs(piece.z) <= zLim
+		end
+		for _, sp in layout.spots do
+			spotsInside = spotsInside and sp.x >= xLo and sp.x <= xHi and math.abs(sp.z) <= zLim
+			if sp.sit then
+				local seat = false
+				for _, piece in layout.pieces do
+					if
+						(piece.kind == "Sofa" or piece.kind == "Chair")
+						and math.abs(piece.x - sp.x) < 0.01
+						and math.abs(piece.z - sp.z) < 0.01
+					then
+						seat = seat or (piece.fx == sp.fx and piece.fz == sp.fz)
+					end
+				end
+				sitOnSeat = sitOnSeat and seat
+			end
+		end
+	end
+end
+check("every house type has a furnished ground floor with spots", interiorOk)
+check("furniture and spots sit inside the house", spotsInside)
+check("people only sit on a sofa or chair, facing its way", sitOnSeat)
+check(
+	"interior settings sane",
+	InteriorConfig.Radius > 0
+		and InteriorConfig.MaxFurnished > 0
+		and InteriorConfig.SitHeight > 1
+		and InteriorConfig.SitHeight < 3.5
+)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

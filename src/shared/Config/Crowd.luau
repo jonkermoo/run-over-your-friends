@@ -45,7 +45,8 @@ return table.freeze({
 	SpotIdleMax = 18,
 	InsideMin = 20, -- out of sight inside a building
 	InsideMax = 70,
-	HomeStayChance = 0.55, -- a resident at home stays in for another round
+	HomeStayChance = 0.8, -- a resident at home stays in for another round (homes look lived in)
+	HomeSpotChance = 0.85, -- a resident at home sits or stands somewhere you can see (else out of sight)
 	OfficeLunchChance = 0.3, -- an office worker who comes out heads for the restaurant
 
 	-- animation (client): ordinary people use the Rthro set, friends their own

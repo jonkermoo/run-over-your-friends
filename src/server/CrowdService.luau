@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
+local Interiors = require(ReplicatedStorage.Shared.Config.Interiors)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
@@ -123,8 +124,36 @@ local function freeSpot(list: { Spot }): Spot?
 	return nil
 end
 
+-- get up off a seat (a seated root is held still)
+local function unseat(p: Person)
+	local root = p.model and p.model:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root and root.Anchored then
+		root.Anchored = false
+	end
+end
+
+-- at a spot: face the right way; on a seat (furniture the client draws), sit down
+local function settle(p: Person)
+	local spot, m = p.spot, p.model
+	local root = m and m:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not (spot and root) then
+		return
+	end
+	local face = spot.face or root.CFrame.LookVector
+	if spot.sit then
+		local seat = spot.path[#spot.path]
+		local at = Vector3.new(seat.X, seat.Y + Interiors.SitHeight, seat.Z)
+		root.Anchored = true
+		root.CFrame = CFrame.lookAt(at, at + face)
+		setGait(p, "sit")
+	else
+		root.CFrame = CFrame.lookAt(root.Position, root.Position + face)
+	end
+end
+
 -- start walking the route just built (a built character gets its first MoveTo now)
 local function startRoute(p: Person)
+	unseat(p)
 	p.mode = "walk"
 	setGait(p, "walk")
 	local m = p.model
@@ -269,7 +298,7 @@ end
 
 local function visitorSpot(place: Place): Spot?
 	if place.kind == "home" then
-		return if rng() < 0.6 then freeSpot(place.spots) else nil
+		return if rng() < Config.HomeSpotChance then freeSpot(place.spots) else nil
 	elseif place.kind == "office" then
 		return if rng() < 0.3 then freeSpot(place.spots) else nil
 	elseif place.kind == "shop" then
@@ -330,11 +359,6 @@ local function arrive(p: Person)
 		if p.goingSpot then
 			p.mode = "idle"
 			p.untilT = now + rand(Config.SpotIdleMin, Config.SpotIdleMax)
-			local face = p.goingSpot.face
-			local root = p.model and p.model:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if face and root then
-				root.CFrame = CFrame.lookAt(root.Position, root.Position + face)
-			end
 		elseif dest.indoors then
 			p.mode = "inside"
 			p.spotPath = nil
@@ -351,6 +375,9 @@ local function arrive(p: Person)
 			+ (if rng() < Config.PauseChance then rand(Config.PauseMin, Config.PauseMax) else 0)
 	end
 	setGait(p, "idle")
+	if p.mode == "idle" and p.spot then
+		settle(p)
+	end
 end
 
 -- a fresh person of a role
@@ -563,6 +590,9 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		root:SetNetworkOwner(nil)
 	end)
 	setGait(p, if p.mode == "walk" then "walk" else "idle")
+	if p.mode == "idle" and p.spot and p.goingTo == nil then
+		settle(p)
+	end
 	if p.golden then
 		CrowdService.glow(m, true)
 	end
@@ -641,6 +671,7 @@ end
 function CrowdService.down(m: Model)
 	local p = byModel[m]
 	if p then
+		unseat(p)
 		p.mode = "down"
 		releaseSpot(p)
 		setGait(p, "idle")
@@ -681,6 +712,7 @@ function CrowdService.hold(m: Model, pos: Vector3, seconds: number, run: boolean
 	if not p or not humanoid or p.mode == "down" then
 		return
 	end
+	unseat(p)
 	releaseSpot(p)
 	p.mode = "held"
 	p.at, p.goingTo, p.goingSpot, p.spotPath = nil, nil, nil, nil
@@ -821,6 +853,7 @@ local function refreshActive()
 	end
 	local cands: { Rules.Candidate } = {}
 	local who: { Person } = {}
+	local nearestHome, nearestHomeBuilt = math.huge, false
 	for _, p in people do
 		if p.giant or p.mode == "down" then
 			continue
@@ -865,6 +898,9 @@ local function refreshActive()
 					break
 				end
 			end
+		end
+		if p.role == "resident" and p.mode == "idle" and p.spot and best < nearestHome then
+			nearestHome, nearestHomeBuilt = best, p.model ~= nil
 		end
 		table.insert(cands, { dist = best, indoor = indoorNow(p), active = p.model ~= nil })
 		table.insert(who, p)
@@ -914,6 +950,10 @@ local function refreshActive()
 	folder:SetAttribute("FriendsShown", s.friendsShown)
 	folder:SetAttribute("Inside", s.inside)
 	folder:SetAttribute("FriendCast", #cast)
+	folder:SetAttribute("HomeSpot", s.homeSpot)
+	folder:SetAttribute("HomeHidden", s.homeHidden)
+	folder:SetAttribute("NearestHome", math.floor(math.min(nearestHome, 99999)))
+	folder:SetAttribute("NearestHomeBuilt", nearestHomeBuilt)
 end
 
 function CrowdService.start()
@@ -948,7 +988,16 @@ end
 
 -- numbers for a performance check (Studio command bar / play test)
 function CrowdService.stats(): { [string]: number }
-	local s = { people = 0, active = 0, friendsShown = 0, walking = 0, inside = 0, hairs = 0 }
+	local s = {
+		people = 0,
+		active = 0,
+		friendsShown = 0,
+		walking = 0,
+		inside = 0,
+		hairs = 0,
+		homeSpot = 0,
+		homeHidden = 0,
+	}
 	for _, p in people do
 		if p.mode ~= "dormant" then
 			s.people += 1
@@ -963,6 +1012,13 @@ function CrowdService.stats(): { [string]: number }
 			s.walking += 1
 		elseif p.mode == "inside" then
 			s.inside += 1
+		end
+		if p.role == "resident" and p.at and p.at == p.home then
+			if p.mode == "idle" and p.spot then
+				s.homeSpot += 1
+			elseif p.mode == "inside" then
+				s.homeHidden += 1
+			end
 		end
 	end
 	s.hairs = NpcLooks.hairCount()
