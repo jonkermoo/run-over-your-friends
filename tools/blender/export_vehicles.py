@@ -1,5 +1,5 @@
 # Build every vehicle mesh for the game and export them in one FBX for Roblox.
-# blender -b --factory-startup --python export_vehicles.py -- <pack_dir> <roadster.blend> <out.fbx> [preview.png]
+# blender -b --factory-startup --python export_vehicles.py -- <pack_dir> <roadster.blend> <out.fbx> [preview.png] [wheels.png]
 #   <pack_dir>: the extracted "Low Poly City Vehicles Pack" (Pavel 3D, CC BY 4.0), holding BLEND/ and the palette png.
 #   <roadster.blend>: the Roadster parts file (simplified here to the pack's flat palette style).
 # Every vehicle is exported as <Id>_Body plus <Id>_Wheel_<FL|FR|RL|RR><n> meshes, all textured with the pack palette.
@@ -11,6 +11,7 @@ from mathutils.bvhtree import BVHTree
 args = sys.argv[sys.argv.index("--") + 1:]
 pack, roadster_path, out = args[0], args[1], args[2]
 preview = args[3] if len(args) > 3 else None
+wheel_preview = args[4] if len(args) > 4 else None
 palette_path = os.path.join(pack, "city_vehicles_pallete.png")
 
 STUDS = 8.0  # studs per pack unit (pack is ~0.54x real; ~4.3 studs per real metre, as the Roadster test)
@@ -164,12 +165,109 @@ def scale_wheel(w, factor, push_out=0.0, lift=0.0):
     w.data.transform(m)
 
 
+TYRE_RGB, TREAD_RGB = (0.12, 0.12, 0.13), (0.17, 0.17, 0.18)
+SILVER, CHROME_RGB, GUN, STEEL_RGB = (0.72, 0.73, 0.75), (0.86, 0.87, 0.9), (0.24, 0.25, 0.27), (0.55, 0.56, 0.58)
+WHITE_RGB, NUT = (0.93, 0.93, 0.92), (0.4, 0.4, 0.42)
+# rim per vehicle: (look, rim colour, spoke count); vehicles not listed keep their own wheels
+WHEEL_STYLE = {
+    "Hatchback": ("spokes", SILVER, 6),
+    "Sedan": ("spokes", SILVER, 5),
+    "Taxi": ("hubcap", STEEL_RGB, 0),
+    "Muscle": ("spokes", CHROME_RGB, 5),
+    "Supercar": ("twin", SILVER, 5),
+    "Roadster": ("aero", SILVER, 10),
+    "IceCream": ("hubcap", WHITE_RGB, 0),
+    "FireTruck": ("truck", WHITE_RGB, 8),
+    "Semi": ("truck", SILVER, 10),
+    "SemiTrailer": ("truck", SILVER, 10),
+    "Monster": ("offroad", STEEL_RGB, 6),
+}
+
+
+def spun(name, size, centre, angle, offset, rgb):
+    """A box at `offset` (y, z) from centre in the wheel's plane, turned `angle` around the axle (X)."""
+    o = box(name, size, (0, offset[0], offset[1]), rgb)
+    o.data.transform(Matrix.Rotation(angle, 4, "X"))
+    o.data.transform(Matrix.Translation(centre))
+    return o
+
+
+def new_wheel(w, style):
+    """Swap a wheel's mesh for a tyre with a block tread plus a rim in this vehicle's style, same size and place.
+    The rim face goes on the outside (+X on the left side, -X on the right)."""
+    look, rim_rgb, spokes = style
+    lo, hi = bounds([w])
+    c = (lo + hi) / 2
+    r = (hi.z - lo.z) / 2
+    width = hi.x - lo.x
+    out = 1 if c.x > 0 else -1
+    chunky = look == "offroad"
+    lugs = 14 if chunky else 20
+    depth = r * (0.12 if chunky else 0.05)
+    # tyre: a cylinder with every other tread face pushed out into a block
+    me = bpy.data.meshes.new("tyre")
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=lugs * 2, radius1=r - depth, radius2=r - depth, depth=width * 0.94)
+    bmesh.ops.transform(bm, matrix=Matrix.Rotation(math.pi / 2, 4, "Y"), verts=bm.verts)
+    tread = [f for f in bm.faces if abs(f.normal.x) < 0.5]
+    tread.sort(key=lambda f: math.atan2(f.calc_center_median().z, f.calc_center_median().y))
+    blocks = tread[::2]
+    res = bmesh.ops.extrude_discrete_faces(bm, faces=blocks)
+    for f in res["faces"]:
+        n = f.normal.copy()
+        for v in f.verts:
+            v.co += n * depth
+    bmesh.ops.translate(bm, vec=c, verts=bm.verts)
+    bm.to_mesh(me)
+    bm.free()
+    tyre = bpy.data.objects.new("tyre", me)
+    scene.collection.objects.link(tyre)
+    paint(tyre, TYRE_RGB)
+    parts = [tyre]
+    face = c + Vector((out * width * 0.47, 0, 0))
+    rim_r = r * (0.55 if chunky else 0.66)
+    # dark well behind the rim, then the rim itself on the outside face
+    parts.append(cyl("well", rim_r, r * 0.05, face - Vector((out * r * 0.025, 0, 0)), (0.07, 0.07, 0.08), "X", 20))
+    if look == "hubcap":
+        parts.append(cyl("cap", rim_r * 0.98, r * 0.1, face + Vector((out * r * 0.037, 0, 0)), rim_rgb, "X", 20))
+        parts.append(cyl("capRing", rim_r * 0.6, r * 0.125, face + Vector((out * r * 0.05, 0, 0)), GUN, "X", 16))
+        parts.append(cyl("capHub", rim_r * 0.25, r * 0.2, face + Vector((out * r * 0.075, 0, 0)), rim_rgb, "X", 10))
+    else:
+        parts.append(cyl("lip", rim_r, r * 0.1, face - Vector((out * r * 0.03, 0, 0)), rim_rgb, "X", 20))
+        parts.append(cyl("barrel", rim_r * 0.86, r * 0.12, face, (0.07, 0.07, 0.08), "X", 20))
+        thick = r * (0.1 if look in ("truck", "offroad") else 0.07)
+        for i in range(spokes):
+            a = i * 2 * math.pi / spokes
+            if look == "twin":
+                for d in (-0.09, 0.09):
+                    parts.append(spun("spoke", (r * 0.1, thick * 0.7, rim_r * 0.82), face + Vector((out * r * 0.075, 0, 0)), a + d, (0, rim_r * 0.45), rim_rgb))
+            elif look == "aero":
+                parts.append(spun("vane", (r * 0.1, thick * 1.4, rim_r * 0.85), face + Vector((out * r * 0.075, 0, 0)), a + 0.25, (0, rim_r * 0.45), rim_rgb))
+            elif look == "truck":
+                parts.append(spun("nut", (r * 0.175, r * 0.06, r * 0.06), face + Vector((out * r * 0.125, 0, 0)), a, (0, rim_r * 0.42), NUT))
+            else:
+                parts.append(spun("spoke", (r * 0.1, thick, rim_r * 0.85), face + Vector((out * r * 0.075, 0, 0)), a, (0, rim_r * 0.45), rim_rgb))
+        if look == "truck":
+            parts.append(cyl("dish", rim_r * 0.82, r * 0.075, face + Vector((out * r * 0.062, 0, 0)), rim_rgb, "X", 20))
+        if look == "offroad":
+            for i in range(12):
+                a = i * 2 * math.pi / 12
+                parts.append(spun("bolt", (r * 0.15, r * 0.04, r * 0.04), face + Vector((out * r * 0.1, 0, 0)), a, (0, rim_r * 0.94), NUT))
+        parts.append(cyl("hub", rim_r * 0.24, r * 0.25, face + Vector((out * r * 0.1, 0, 0)), GUN if rim_rgb != GUN else SILVER, "X", 10))
+    new = join(parts, "w")
+    w.data = new.data
+    bpy.data.objects.remove(new)
+
+
 exported = []
 vehicles = []
 
 
 def place(vid, body, wheels, scale):
     """Scale to studs, centre, name parts, move to this vehicle's slot."""
+    if vid in WHEEL_STYLE:
+        for w in wheels:
+            new_wheel(w, WHEEL_STYLE[vid])
     objs = [body] + wheels
     for o in objs:
         o.data.transform(Matrix.Scale(scale, 4))
@@ -530,6 +628,41 @@ for o in bpy.data.objects:
 bpy.ops.export_scene.fbx(filepath=out, use_selection=True, object_types={"MESH"}, mesh_smooth_type="FACE",
                          add_leaf_bones=False, bake_anim=False, path_mode="STRIP")
 print("EXPORTED", out)
+
+if wheel_preview:
+    # preview only: one left wheel per vehicle, side on, in a row, same size so the rims compare
+    saved = {o: (o.location.copy(), o.scale.copy(), o.hide_render) for o in exported}
+    shown = []
+    for vid in vehicles:
+        ws = sorted((o for o in exported if o.name.startswith(vid + "_Wheel_") and o.name[-2] == "L"), key=lambda o: o.name)
+        if ws:
+            shown.append(ws[0])
+    for o in exported:
+        o.hide_render = o not in shown
+    for i, o in enumerate(shown):
+        lo, hi = bounds([o])
+        size = hi.z - lo.z
+        o.scale = Vector((1, 1, 1)) * (6.0 / size)
+        o.location = Vector((0, (i % 6) * 8.0, -(i // 6) * 8.0))
+    cam = bpy.data.objects.new("WheelCam", bpy.data.cameras.new("WheelCam"))
+    cam.data.type = "ORTHO"
+    rows = (len(shown) + 5) // 6
+    cam.location = (60, 5 * 8.0 / 2, -(rows - 1) * 8.0 / 2)
+    cam.rotation_euler = (math.radians(90), 0, math.radians(90))
+    cam.data.ortho_scale = 6 * 8.0 * 1.05
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.display.shading.light = "STUDIO"
+    scene.display.shading.color_type = "TEXTURE"
+    scene.render.resolution_x = 1800
+    scene.render.resolution_y = 300 * rows + 60
+    scene.render.filepath = wheel_preview
+    bpy.ops.render.render(write_still=True)
+    print("WHEEL PREVIEW", wheel_preview)
+    for o, (loc, sc, hid) in saved.items():
+        o.location, o.scale, o.hide_render = loc, sc, hid
+    bpy.data.objects.remove(cam)
 
 if preview:
     for o in list(bpy.data.objects):
