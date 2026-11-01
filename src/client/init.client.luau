@@ -1,6 +1,7 @@
 --!strict
 -- Client entry.
 local Boards = require(script.Boards)
+local Crowd = require(script.Crowd)
 local Drive = require(script.Drive)
 local EventBanner = require(script.EventBanner)
 local Fx = require(script.Fx)
@@ -15,3 +16,4 @@ Goals.start()
 Fx.start()
 Boards.start()
 EventBanner.start()
+Crowd.start()
