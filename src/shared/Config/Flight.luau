@@ -10,12 +10,11 @@ return table.freeze({
 	top = 45, -- forward m/s on W under the jet (about 100 mph)
 	reverseTop = 10,
 	accel = 14, -- forward/back m/s^2 under the jet
-	brake = 20, -- m/s^2 the nose jets slow it by on S in the air
 	drag = 5, -- m/s^2 it slows by with no throttle (and above top speed)
 	sideDrag = 12, -- sideways drift after a turn dies out at this rate, so it ends up flying where it points
 	drain = 25, -- meter per second of jet (4 s from full)
 	refill = 20, -- meter per second back, on the ground only
-	thrust = 18, -- m/s^2 the rear jet (R, held) pushes along the nose, on the ground or in the air
+	thrust = 18, -- m/s^2 the rear jet (R, held) pushes along the nose, on the ground or in the air; the nose jets (S in the air) push back
 	thrustTop = 145, -- m/s it can reach on the ground with the rear jet (about 325 mph)
 	thrustDrain = 20, -- meter per second of rear jet (5 s from full)
 	refillDelay = 0.6,

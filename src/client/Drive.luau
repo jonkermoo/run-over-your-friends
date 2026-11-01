@@ -265,7 +265,7 @@ local function track(car: Instance)
 	end
 	local _, size = car:GetBoundingBox()
 	-- cold-gas nozzles on the Roadster, by job: Lift (four under the floor), Rear (four across the tail),
-	-- Brake (two in the nose), YawL/YawR (side pairs, front on one side and back on the other) and
+	-- Nose (two in the nose, S in the air), YawL/YawR (side pairs, front on one side and back on the other) and
 	-- RollL/RollR (one up on one flank, one down on the other)
 	local function gas(at: Vector3, face: Enum.NormalId, puff: number): ParticleEmitter
 		local a = Instance.new("Attachment")
@@ -307,7 +307,7 @@ local function track(car: Instance)
 		for _, x in { -0.36, -0.12, 0.12, 0.36 } do
 			table.insert(thrusters.Rear, gas(Vector3.new(x * X, 0, Z / 2 + 0.3), N.Back, 0.8))
 		end
-		thrusters.Brake = {
+		thrusters.Nose = {
 			gas(Vector3.new(-X * 0.3, 0, -Z / 2 - 0.3), N.Front, 1.1),
 			gas(Vector3.new(X * 0.3, 0, -Z / 2 - 0.3), N.Front, 1.1),
 		}
@@ -444,7 +444,7 @@ local stuckFor = 0
 local flying = false -- Roadster in the air under flight control
 local jetOn = false -- its jet is lifting it right now
 local rearOn = false -- its rear jet is pushing it along the nose right now
-local braking = false -- its nose jets are braking it in the air right now
+local reversing = false -- its nose jets are pushing it backwards in the air right now
 local liftedAt = 0
 local flyYaw = 0
 local bombHeld = 0
@@ -463,7 +463,7 @@ local function stopDriving()
 		end
 	end
 	driving = nil
-	flying, jetOn, rearOn, braking = false, false, false, false
+	flying, jetOn, rearOn, reversing = false, false, false, false
 	speed, lateral, yawRate, steer = 0, 0, 0, 0
 	Drive.state.driving = false
 	camera.FieldOfView = baseFov
@@ -948,8 +948,12 @@ local function step(dt: number)
 		end
 		jetOn = flying and lifting
 
-		-- S in the air fires the nose jets to brake; they run off their own small tank, so it always works
-		braking = flying and throttle < 0 and actualForward > 0.5
+		-- S in the air fires the nose jets: they push it backwards along the nose, on the flight meter
+		reversing = flying and throttle < 0 and Drive.state.boost > 0
+		if reversing then
+			Drive.state.boost = math.max(0, Drive.state.boost - Flight.thrustDrain * dt)
+			boostUsedAt = now
+		end
 
 		local alphaF, alphaR = 0, 0
 		if flying and not flung then
@@ -962,7 +966,7 @@ local function step(dt: number)
 					side = actualLeft,
 					up = actual.Y,
 					fuel = Drive.state.boost,
-				}, throttle, true, dt, Flight)
+				}, math.max(throttle, 0), true, dt, Flight)
 				Drive.state.boost = f.fuel
 				local forward = f.forward
 				if thrustLeft > 0 then
@@ -974,20 +978,17 @@ local function step(dt: number)
 					-- the rear jet pushes along wherever the nose points, up, down or rolled
 					velocity += nose * Flight.thrust * dt
 				end
+				if reversing then
+					velocity -= nose * Flight.thrust * dt
+				end
 				drive.MaxAxesForce = FLY_FORCE
 				drive.Enabled = true
 				drive.VectorVelocity = velocity * spm
 			else
 				-- lift jet off: it drops, carried by its momentum; the rear jet still pushes along the nose
 				drive.Enabled = false
-				if braking then
-					-- the nose jets bleed off its speed over the ground (they never push it backwards)
-					local moving = chassis.AssemblyLinearVelocity
-					local flat = Vector3.new(moving.X, 0, moving.Z)
-					local cut = math.min(flat.Magnitude, Flight.brake * spm * dt)
-					if cut > 0 then
-						chassis.AssemblyLinearVelocity = moving - flat.Unit * cut
-					end
+				if reversing then
+					chassis.AssemblyLinearVelocity -= nose * Flight.thrust * spm * dt
 				end
 				if thrusting then
 					chassis.AssemblyLinearVelocity += nose * Flight.thrust * spm * dt
@@ -1167,7 +1168,7 @@ local function step(dt: number)
 			local spinNose = chassis.AssemblyAngularVelocity:Dot(chassis.CFrame.LookVector)
 			if s == driving then
 				local steerIn = seat and seat:IsA("VehicleSeat") and seat.SteerFloat or 0
-				on.Lift, on.Rear, on.Brake = jetOn, rearOn, braking
+				on.Lift, on.Rear, on.Nose = jetOn, rearOn, reversing
 				on.YawR, on.YawL = flying and steerIn > 0, flying and steerIn < 0
 				on.RollR, on.RollL =
 					flying and Drive.input.roll > 0, flying and Drive.input.roll < 0
@@ -1175,7 +1176,7 @@ local function step(dt: number)
 				local air = s.airborne
 				on.Lift = air and up > -1
 				on.Rear = s.accel.Z > 1.7 * G
-				on.Brake = air and s.accel.Z < -1.2 * G
+				on.Nose = air and s.accel.Z < -1.2 * G
 				on.YawR, on.YawL = air and spinY < -0.5, air and spinY > 0.5
 				on.RollR, on.RollL = air and spinNose > 1, air and spinNose < -1
 			end
@@ -1187,7 +1188,7 @@ local function step(dt: number)
 			for _, p in s.thrusters.Lift do
 				p.Rate = if up > 1 then 90 else 35
 			end
-			local puffing = on.Brake or on.YawR or on.YawL or on.RollR or on.RollL
+			local puffing = on.Nose or on.YawR or on.YawL or on.RollR or on.RollL
 			if puffing and not s.puffing then
 				s.jetSounds.Burst:Play()
 			end
@@ -1197,7 +1198,7 @@ local function step(dt: number)
 				{
 					Lift = if on.Lift then 1.1 else 0,
 					Rear = if on.Rear then 1.2 else 0,
-					Puff = if puffing then (if on.Brake then 0.9 else 0.5) else 0,
+					Puff = if puffing then (if on.Nose then 0.9 else 0.5) else 0,
 				}
 			do
 				local snd = s.jetSounds[name]
