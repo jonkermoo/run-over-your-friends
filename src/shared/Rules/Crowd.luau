@@ -5,8 +5,17 @@
 
 local Crowd = {}
 
-export type Role = "walker" | "resident" | "office" | "food" | "warehouse" | "crowd" | "spectator"
-export type Outfit = "casual" | "food" | "warehouse" | "office"
+export type Role =
+	"walker"
+	| "resident"
+	| "office"
+	| "reception"
+	| "shopkeeper"
+	| "food"
+	| "warehouse"
+	| "crowd"
+	| "spectator"
+export type Outfit = "casual" | "food" | "warehouse" | "office" | "shop"
 export type Person = { role: Role, home: number?, outfit: Outfit, friend: boolean }
 export type PlaceKind =
 	"home"
@@ -37,6 +46,8 @@ export type RosterConfig = {
 	ResidentsMax: number,
 	OfficeWorkersMin: number,
 	OfficeWorkersMax: number,
+	Receptionists: number,
+	ShopStaff: number,
 	RestaurantStaff: number,
 	WarehouseStaff: number,
 	Spectators: number,
@@ -65,6 +76,9 @@ function Crowd.roster(
 			add("resident", k, "casual", int(rng, cfg.ResidentsMin, cfg.ResidentsMax))
 		elseif kind == "office" then
 			add("office", k, "office", int(rng, cfg.OfficeWorkersMin, cfg.OfficeWorkersMax))
+			add("reception", k, "office", cfg.Receptionists)
+		elseif kind == "shop" then
+			add("shopkeeper", k, "shop", cfg.ShopStaff)
 		elseif kind == "restaurant" then
 			add("food", k, "food", cfg.RestaurantStaff)
 		elseif kind == "warehouse" then
@@ -139,7 +153,11 @@ function Crowd.pickActive(list: { Candidate }, cfg: ActiveConfig): { [number]: b
 	return out
 end
 
-export type GoalConfig = { HomeStayChance: number, OfficeLunchChance: number }
+export type GoalConfig = {
+	HomeStayChance: number,
+	OfficeStayChance: number,
+	OfficeLunchChance: number,
+}
 
 local function weighted(rng: () -> number, options: { { goal: Goal, w: number } }): Goal
 	local total = 0
@@ -156,9 +174,14 @@ local function weighted(rng: () -> number, options: { { goal: Goal, w: number } 
 	return options[#options].goal
 end
 
+-- people who work at a counter, desk or shelf and never leave their workplace
+function Crowd.isStaff(role: Role): boolean
+	return role == "food" or role == "warehouse" or role == "shopkeeper" or role == "reception"
+end
+
 -- where someone goes when they finish; `atHome` means they're inside their own home or workplace
 function Crowd.nextGoal(role: Role, atHome: boolean, rng: () -> number, cfg: GoalConfig): Goal
-	if role == "food" or role == "warehouse" then
+	if Crowd.isStaff(role) then
 		return "spot"
 	elseif role == "crowd" then
 		return "crowd"
@@ -182,7 +205,7 @@ function Crowd.nextGoal(role: Role, atHome: boolean, rng: () -> number, cfg: Goa
 		if not atHome then
 			return "work"
 		end
-		if rng() < 0.5 then
+		if rng() < cfg.OfficeStayChance then
 			return "stay"
 		end
 		if rng() < cfg.OfficeLunchChance then

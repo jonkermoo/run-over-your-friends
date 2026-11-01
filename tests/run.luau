@@ -1,5 +1,7 @@
 --!strict
 -- Run with: lune run tests/run
+local BuildingConfig = require("../src/shared/Config/Buildings")
+local BuildingRules = require("../src/shared/Rules/Buildings")
 local CityPlan = require("../src/shared/Rules/CityPlan")
 local CrowdConfig = require("../src/shared/Config/Crowd")
 local CrowdRules = require("../src/shared/Rules/Crowd")
@@ -7,6 +9,7 @@ local Districts = require("../src/shared/Rules/Districts")
 local HouseConfig = require("../src/shared/Config/Houses")
 local HouseRules = require("../src/shared/Rules/Houses")
 local InteriorConfig = require("../src/shared/Config/Interiors")
+local InteriorRules = require("../src/shared/Rules/Interiors")
 local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
@@ -692,6 +695,7 @@ local MATERIALS = {
 	Wood = true,
 	Metal = true,
 	Slate = true,
+	Limestone = true,
 }
 local stylesOk = true
 for key, d in Streets.Districts do
@@ -845,6 +849,304 @@ check(
 	#Tiles.split(220, 220, 2048) == 1 and Tiles.split(220, 220, 2048)[1].x == 0
 )
 check("exactly 2048 stays one piece", #Tiles.split(2048, 10, 2048) == 1)
+
+-- town buildings (offices, shops, the burger place, the warehouse)
+local function piecesOk(length: number, maxPiece: number): boolean
+	local list = BuildingRules.pieces(length, maxPiece)
+	local ok = #list >= 1 and math.abs(list[1].from + length / 2) < 1e-6
+	for k, sp in list do
+		ok = ok and sp.to - sp.from <= maxPiece + 1e-6 and sp.to > sp.from
+		if k > 1 then
+			ok = ok and math.abs(sp.from - list[k - 1].to) < 1e-6
+		end
+	end
+	return ok and math.abs(list[#list].to - length / 2) < 1e-6
+end
+check(
+	"trim bands are cut into pieces that cover them, none too long",
+	piecesOk(130, 48) and piecesOk(48, 48) and piecesOk(10, 48) and piecesOk(168.4, 48)
+)
+check("a band no longer than a piece stays whole", #BuildingRules.pieces(48, 48) == 1)
+local pil = BuildingRules.pilasters(8, 2)
+check("pilasters every 2 panels, never on a corner", #pil == 3 and pil[1] == 2 and pil[3] == 6)
+check("a narrow face gets no inner pilaster", #BuildingRules.pilasters(2, 2) == 0)
+local secOk = true
+for floors = 1, 9 do
+	local secs = BuildingRules.sections(floors, BuildingConfig.Office.CorniceEvery)
+	secOk = secOk and secs[1].from == 0 and secs[1].to == 1 and secs[#secs].to == floors
+	for k = 2, #secs do
+		secOk = secOk
+			and secs[k].from == secs[k - 1].to
+			and secs[k].to - secs[k].from <= BuildingConfig.Office.CorniceEvery
+	end
+end
+check("office storeys split into a lobby and sections of at most 3 floors", secOk)
+local blockInner = World.Map.BlockSize - 2 * World.Map.SidewalkWidth
+local SH = BuildingConfig.Shops
+local fw = blockInner / SH.PerBlock
+local segs, doorX = BuildingRules.shopFront(fw, SH.Door)
+local frontOk = math.abs(segs[1].a + fw / 2) < 1e-6 and math.abs(segs[#segs].b - fw / 2) < 1e-6
+local doorW, winW = 0, 0
+for k, sg in segs do
+	frontOk = frontOk and sg.b > sg.a
+	if k > 1 then
+		frontOk = frontOk and math.abs(sg.a - segs[k - 1].b) < 1e-6
+	end
+	if sg.k == "d" then
+		doorW = sg.b - sg.a
+		frontOk = frontOk and math.abs((sg.a + sg.b) / 2 - doorX) < 1e-6
+	elseif sg.k == "sw" then
+		winW = sg.b - sg.a
+	end
+end
+check(
+	"a shop front covers its width with one door and a big window",
+	frontOk and doorW == SH.Door and winW >= 20
+)
+check(
+	"the shop row, its forecourt and a car park fit the block",
+	SH.Setback + SH.Depth + 20 < inner
+		and fw >= 40
+		and SH.Floors[1] >= 2
+		and SH.Floors[2] >= SH.Floors[1]
+)
+local shopNamesOk = #SH.Names >= SH.PerBlock
+for _, n in SH.Names do
+	shopNamesOk = shopNamesOk and #n > 0 and #n <= 14
+end
+check("shop names fit their hanging signs", shopNamesOk)
+local looksOk = true
+for key in Streets.Districts do
+	local look = BuildingConfig.Office.Looks[key]
+	looksOk = looksOk and look ~= nil and rgbOk({ look.trim, look.stone, look.roof })
+	if look then
+		-- a trim colour equal to a wall colour would pick up the district's wall material
+		for _, c in Streets.Districts[key].walls do
+			looksOk = looksOk
+				and not (c[1] == look.trim[1] and c[2] == look.trim[2] and c[3] == look.trim[3])
+		end
+	end
+end
+check("every district has office trim, lobby stone and roof colours", looksOk)
+local landmarkOk = true
+for _, colours in { BuildingConfig.Restaurant.Colours, BuildingConfig.Warehouse.Colours } do
+	landmarkOk = landmarkOk
+		and rgbOk({ colours.wall, colours.trim, colours.accent, colours.roof })
+		and MATERIALS[colours.material] == true
+end
+check(
+	"landmark colours and materials are valid",
+	landmarkOk
+		and rgbOk({ BuildingConfig.Office.Glass, SH.AwningWhite })
+		and MATERIALS[BuildingConfig.Office.StoneMaterial] == true
+)
+local R = BuildingConfig.Restaurant
+check(
+	"the barn roof has a knee below its ridge",
+	R.KneeShare > 0 and R.KneeShare < 1 and R.KneeRise > 0 and R.PeakRise > R.KneeRise
+)
+local WB = BuildingConfig.Warehouse
+local panels = CrowdConfig.WarehouseSize[1] // WB.Panel
+local wareOk = true
+for _, k in WB.Pilasters do
+	-- never beside a bay (5, 8, 11) or the door (2)
+	wareOk = wareOk
+		and k > 0
+		and k < panels
+		and k ~= 4
+		and k ~= 5
+		and k ~= 7
+		and k ~= 8
+		and k ~= 10
+		and k ~= 11
+end
+for _, k in WB.Windows do
+	wareOk = wareOk and k >= 1 and k <= panels
+end
+check("warehouse pilasters and windows sit on real panels clear of the bays", wareOk)
+check("a part budget is set", BuildingConfig.PartBudget > 30000 and BuildingConfig.BandPiece >= 12)
+
+-- town interiors: furniture and people inside each building, seats under every sitting spot
+local layoutCfg = {
+	FloorHeight = World.Map.FloorHeight,
+	Floors = InteriorConfig.Town.OfficeFloors,
+	DeskEvery = InteriorConfig.Town.DeskEvery,
+	Tables = BuildingConfig.Restaurant.Tables,
+	TableZ = BuildingConfig.Restaurant.TableZ,
+}
+local function layoutInside(
+	l: InteriorRules.Layout,
+	hw: number,
+	hd: number,
+	ceiling: number
+): boolean
+	local ok = true
+	local function inBox(x: number, y: number, z: number)
+		ok = ok and math.abs(x) <= hw and math.abs(z) <= hd and y >= 0 and y <= ceiling
+	end
+	for _, p in l.pieces do
+		inBox(p.x, p.y, p.z)
+	end
+	for _, list in { l.spots, l.staff } do
+		for _, sp in list do
+			inBox(sp.x, sp.y, sp.z)
+			for _, q in sp.via do
+				inBox(q.x, q.y, q.z)
+			end
+		end
+	end
+	return ok
+end
+local function seated(l: InteriorRules.Layout): boolean
+	local ok = true
+	for _, list in { l.spots, l.staff } do
+		for _, sp in list do
+			if sp.sit then
+				local seat = false
+				for _, p in l.pieces do
+					seat = seat
+						or (
+							InteriorRules.Seats[p.kind] == true
+							and math.abs(p.x - sp.x) < 0.01
+							and math.abs(p.z - sp.z) < 0.01
+							and math.abs(p.y - sp.y) < 0.01
+							and p.fx == sp.fx
+							and p.fz == sp.fz
+						)
+				end
+				ok = ok and seat
+			end
+		end
+	end
+	return ok
+end
+-- every change of floor along a way in is a lift ride: two points in a row at the same x, z
+local function liftsOk(l: InteriorRules.Layout): boolean
+	local ok = true
+	for _, sp in l.spots do
+		local path = table.clone(sp.via)
+		table.insert(path, { x = sp.x, y = sp.y, z = sp.z })
+		local prevY = 0
+		for k, q in path do
+			if math.abs(q.y - prevY) > 0.01 then
+				local before = path[k - 1]
+				ok = ok
+					and before ~= nil
+					and math.abs(before.x - q.x) < 0.01
+					and math.abs(before.z - q.z) < 0.01
+			end
+			prevY = q.y
+		end
+	end
+	return ok
+end
+local officeIn, officeSeats, officeLifts, desksUp, staffAtDesk = true, true, true, true, true
+local FH = World.Map.FloorHeight
+for _, size in { { 106, 106 }, { 154, 120 }, { 120, 154 } } do
+	for _, floors in { 3, 5, 9 } do
+		for _, officeDoor in { -8, 0, 8 } do
+			local l = InteriorRules.office(size[1], size[2], floors, officeDoor, layoutCfg)
+			officeIn = officeIn and layoutInside(l, size[1] / 2 - 1, size[2] / 2 - 1, floors * FH)
+			officeSeats = officeSeats and seated(l)
+			officeLifts = officeLifts and liftsOk(l)
+			local top = 0
+			for _, sp in l.spots do
+				top = math.max(top, sp.y)
+			end
+			desksUp = desksUp and top == math.min(floors - 1, layoutCfg.Floors) * FH
+			staffAtDesk = staffAtDesk and #l.staff >= 1 and l.hub ~= nil and #l.staffIn >= 1
+		end
+	end
+end
+check("office furniture and people stay inside the tower", officeIn)
+check("office sitters sit on a chair or a sofa", officeSeats)
+check("office workers change floors only in the lift", officeLifts)
+check("desks fill the first few floors above the lobby", desksUp)
+check("each office lobby has a receptionist's desk", staffAtDesk)
+
+local SHC = BuildingConfig.Shops
+local themesOk, islandKinds = true, {}
+for _, k in SHC.IslandKinds do
+	islandKinds[k] = true
+end
+for _, name in SHC.Names do
+	local t = SHC.Themes[name]
+	themesOk = themesOk and t ~= nil and islandKinds[t.island] == true and #t.goods >= 3
+end
+check("every shop has a theme with a known island and goods", themesOk)
+local shopW = blockInner / SHC.PerBlock
+local _, shopDoor = BuildingRules.shopFront(shopW, SHC.Door)
+local shopL = InteriorRules.shop(shopW, SHC.Depth, SHC.GroundHeight, shopDoor, "Table")
+check(
+	"shop furniture and people stay inside the shop floor",
+	layoutInside(shopL, shopW / 2 - 0.5, SHC.Depth / 2 - 0.5, SHC.GroundHeight)
+)
+check(
+	"a shopkeeper's counter and shoppers' spots",
+	#shopL.staff >= 1 and #shopL.spots >= 4 and shopL.hub ~= nil and seated(shopL)
+)
+
+local RS = CrowdConfig.RestaurantSize
+local restL = InteriorRules.restaurant(RS[1], RS[2], layoutCfg)
+local restSit = 0
+for _, sp in restL.spots do
+	restSit += if sp.sit then 1 else 0
+end
+check(
+	"burger place: a chair either side of every table",
+	restSit == 2 * #BuildingConfig.Restaurant.Tables
+)
+check(
+	"burger place chairs sit on chairs inside",
+	seated(restL)
+		and layoutInside(restL, RS[1] / 2 - 1.5, RS[2] / 2 - 1.5, BuildingConfig.Restaurant.Height)
+)
+local WS = CrowdConfig.WarehouseSize
+local wareL = InteriorRules.warehouse(WS[1], WS[2], CrowdConfig.WarehouseHeight, -66, 18)
+check(
+	"warehouse packing tables and desk have staff spots",
+	#wareL.staff >= 3
+		and seated(wareL)
+		and layoutInside(wareL, WS[1] / 2 - 2, WS[2] / 2 - 2, CrowdConfig.WarehouseHeight)
+)
+check("layouts come from a model's attributes", InteriorRules.of({
+	Interior = "Shop",
+	W = shopW,
+	D = SHC.Depth,
+	H = SHC.GroundHeight,
+	DoorX = shopDoor,
+	Island = "Case",
+}, layoutCfg) ~= nil and InteriorRules.of({ Interior = "Nothing" }, layoutCfg) == nil)
+
+-- staff of the shops and offices
+local staffPlaces = { "shop", "shop", "office", "home" }
+local staffRoster = CrowdRules.roster(staffPlaces :: any, CrowdConfig, 0, math.random)
+local keepers, receptionists = 0, 0
+for _, p in staffRoster do
+	keepers += if p.role == "shopkeeper" and p.outfit == "shop" then 1 else 0
+	receptionists += if p.role == "reception" and p.home == 3 then 1 else 0
+end
+check(
+	"every shop has its shopkeeper and every office a receptionist",
+	keepers == 2 * CrowdConfig.ShopStaff and receptionists == CrowdConfig.Receptionists
+)
+check(
+	"shopkeepers and receptionists keep to their workplace",
+	CrowdRules.nextGoal("shopkeeper", true, math.random, CrowdConfig) == "spot"
+		and CrowdRules.nextGoal("reception", false, math.random, CrowdConfig) == "spot"
+		and CrowdRules.isStaff("shopkeeper")
+		and not CrowdRules.isStaff("office")
+)
+check(
+	"a shopkeeper in an apron is never a friend",
+	not CrowdRules.canBeFriend({ role = "shopkeeper", outfit = "shop", friend = false })
+)
+check(
+	"office and shop visitors usually show",
+	CrowdConfig.OfficeSpotChance > 0.5
+		and CrowdConfig.ShopSpotChance > 0.5
+		and #CrowdConfig.Shop.Aprons >= 2
+)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

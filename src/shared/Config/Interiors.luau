@@ -52,6 +52,16 @@ return table.freeze({
 	LampRange = 13,
 	LampBrightness = 1.4,
 
+	-- offices, shops, the burger place and the warehouse (layouts in Rules/Interiors, from each one's size)
+	Town = table.freeze({
+		Radius = 240, -- clients furnish town buildings this close to the camera...
+		MaxFurnished = 6, -- ...at most this many at once, nearest first (an office is about 500 parts)
+		OfficeFloors = 3, -- office floors above the lobby with desks (and people at them)
+		DeskEvery = 16, -- desks along each window, at most this far apart
+		LightRange = 18,
+		LightBrightness = 1.2,
+	}),
+
 	Layouts = table.freeze({
 		A = detached(1),
 		B = detached(34 / 30),

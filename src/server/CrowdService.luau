@@ -57,6 +57,7 @@ export type Person = {
 }
 
 local Y = 0.08 -- ground level on the blocks
+local LIFT = 4 -- two waypoints in a row this far apart in height are a ride in an office lift
 local folder = Instance.new("Folder")
 folder.Name = "Npcs"
 folder.Parent = workspace
@@ -91,7 +92,7 @@ local function nodePos(id: number): Vector3
 end
 
 local function isStaff(p: Person): boolean
-	return p.role == "food" or p.role == "warehouse"
+	return Rules.isStaff(p.role)
 end
 
 local function setGait(p: Person, gait: string)
@@ -300,9 +301,9 @@ local function visitorSpot(place: Place): Spot?
 	if place.kind == "home" then
 		return if rng() < Config.HomeSpotChance then freeSpot(place.spots) else nil
 	elseif place.kind == "office" then
-		return if rng() < 0.3 then freeSpot(place.spots) else nil
+		return if rng() < Config.OfficeSpotChance then freeSpot(place.spots) else nil
 	elseif place.kind == "shop" then
-		return nil
+		return if rng() < Config.ShopSpotChance then freeSpot(place.spots) else nil
 	end
 	return freeSpot(place.spots)
 end
@@ -579,7 +580,13 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		look = Vector3.new(0, 0, -1)
 	end
 	local up = humanoid.HipHeight + root.Size.Y / 2
-	m:PivotTo(CFrame.lookAt(p.pos + Vector3.new(0, up, 0), p.pos + Vector3.new(0, up, 0) + look))
+	-- on an upper office floor (walking there, or at a spot up there) the feet go on that floor
+	local floorAt = if p.mode == "walk" and target
+		then target
+		elseif p.spot then p.spot.path[#p.spot.path]
+		else nil
+	local feet = Vector3.new(p.pos.X, if floorAt then floorAt.Y else p.pos.Y, p.pos.Z)
+	m:PivotTo(CFrame.lookAt(feet + Vector3.new(0, up, 0), feet + Vector3.new(0, up, 0) + look))
 	root.AssemblyLinearVelocity = Vector3.zero
 	root.AssemblyAngularVelocity = Vector3.zero
 	p.gait = nil
@@ -712,6 +719,10 @@ function CrowdService.hold(m: Model, pos: Vector3, seconds: number, run: boolean
 	if not p or not humanoid or p.mode == "down" then
 		return
 	end
+	local root = rootOf(m)
+	if root and root.Position.Y > LIFT + 6 then
+		return -- upstairs in an office: they can't hear it
+	end
 	unseat(p)
 	releaseSpot(p)
 	p.mode = "held"
@@ -785,6 +796,13 @@ local function step(p: Person, dt: number, now: number)
 		if (flat(target) - p.pos).Magnitude <= Config.WaypointReach then
 			p.step += 1
 			local nextTarget = p.route[p.step]
+			if nextTarget and math.abs(nextTarget.Y - target.Y) > LIFT then
+				-- the next point is on another floor right above or below: ride the lift
+				local up = humanoid.HipHeight + root.Size.Y / 2
+				m:PivotTo(root.CFrame.Rotation + nextTarget + Vector3.new(0, up, 0))
+				p.step += 1
+				nextTarget = p.route[p.step]
+			end
 			if nextTarget then
 				humanoid:MoveTo(nextTarget)
 				p.movedAt = now

@@ -1,13 +1,19 @@
 --!strict
--- Buildings with a purpose: homes, the burger place, the parcel warehouse, office lobbies and signs.
--- Everything is anchored chunks like the rest of the city, so BuildingService smashes and rebuilds it.
+-- Buildings with a purpose: the burger place, the parcel warehouse, office lobbies, shops and signs, in the
+-- town style (Kit, Config/Buildings). Everything is anchored chunks like the rest of the city, so
+-- BuildingService smashes and rebuilds it.
 -- Each builder returns a Place: where its door is and where people stand inside (paths from the door or
 -- from the staff area), which the crowd uses.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Buildings = require(ReplicatedStorage.Shared.Config.Buildings)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
+local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
+local Layouts = require(ReplicatedStorage.Shared.Rules.Interiors)
+local World = require(ReplicatedStorage.Shared.Config.World)
+local Kit = require(script.Parent.Kit)
 
 local Places = {}
 
@@ -26,8 +32,7 @@ export type Place = {
 	node: number?, -- sidewalk node in front of the door (set by the crowd)
 }
 
-local GLASS = Color3.fromRGB(96, 140, 170)
-local Y0 = 0.08 -- top of the block's sidewalk slab: floor level for everything on a block
+local Y0 = Kit.Y0
 
 local function part(
 	parent: Instance,
@@ -46,13 +51,6 @@ local function part(
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
-end
-
-local function glass(parent: Instance, size: Vector3, cf: CFrame): Part
-	local g = part(parent, size, cf, GLASS, Enum.Material.Glass)
-	g.Transparency = 0.25
-	g:SetAttribute("Glass", true)
-	return g
 end
 
 -- a board with big text on its front (and back) face
@@ -87,147 +85,166 @@ function Places.sign(
 	return board
 end
 
--- one storey of wall along a face. kinds per segment: "solid", "window", "door", "shop" (tall glass)
-local function face(
-	parent: Instance,
-	centre: Vector3, -- middle of the face at floor level
-	out: Vector3,
-	along: Vector3,
-	segments: { { from: number, to: number, kind: string } },
-	y0: number,
-	height: number,
-	thick: number,
-	color: Color3
-)
-	for _, s in segments do
-		local len = s.to - s.from
-		local mid = centre + along * ((s.from + s.to) / 2)
-		local cf = CFrame.lookAt(mid, mid + out)
-		local function slab(h0: number, h1: number)
-			part(
-				parent,
-				Vector3.new(len, h1 - h0, thick),
-				cf + Vector3.new(0, y0 + (h0 + h1) / 2, 0),
-				color
-			)
-		end
-		if s.kind == "solid" then
-			slab(0, height)
-		elseif s.kind == "door" then
-			slab(8.5, height)
-		elseif s.kind == "window" then
-			slab(0, 4)
-			glass(
-				parent,
-				Vector3.new(len, height - 7, thick * 0.6),
-				cf + Vector3.new(0, y0 + 4 + (height - 7) / 2, 0)
-			)
-			slab(height - 3, height)
-		elseif s.kind == "upper" then
-			slab(0, 4)
-			glass(
-				parent,
-				Vector3.new(len, height - 4, thick * 0.6),
-				cf + Vector3.new(0, y0 + 4 + (height - 4) / 2, 0)
-			)
-		elseif s.kind == "shop" then
-			slab(0, 1.5)
-			glass(
-				parent,
-				Vector3.new(len, height - 4.5, thick * 0.6),
-				cf + Vector3.new(0, y0 + 1.5 + (height - 4.5) / 2, 0)
-			)
-			slab(height - 3, height)
-		end
-	end
-end
-
--- even segments across a length, every one the same kind except those listed in `special`
-local function split(
-	length: number,
-	n: number,
-	kind: string,
-	special: { [number]: string }?
-): { { from: number, to: number, kind: string } }
-	local out = {}
-	local w = length / n
-	for k = 1, n do
-		table.insert(out, {
-			from = -length / 2 + (k - 1) * w,
-			to = -length / 2 + k * w,
-			kind = (special and special[k]) or kind,
-		})
-	end
-	return out
-end
-
 local function rightOf(out: Vector3): Vector3
 	return Vector3.new(-out.Z, 0, out.X)
+end
+
+-- what the layouts need to know (the client furnishes from the same numbers)
+Places.LayoutConfig = table.freeze({
+	FloorHeight = World.Map.FloorHeight,
+	Floors = InteriorConfig.Town.OfficeFloors,
+	DeskEvery = InteriorConfig.Town.DeskEvery,
+	Tables = Buildings.Restaurant.Tables,
+	TableZ = Buildings.Restaurant.TableZ,
+}) :: Layouts.Config
+
+type Inside = { spots: { Spot }, staff: { Spot }, hub: Vector3?, staffIn: { Vector3 }? }
+
+-- the inside of a model that carries an Interior layout (its frame is the model's pivot, mirrored when the
+-- Mirror attribute is set), turned into the crowd's spots in the world
+local function inside(model: Model): Inside
+	local layout = Layouts.of(model:GetAttributes(), Places.LayoutConfig)
+	if not layout then
+		return { spots = {}, staff = {} }
+	end
+	local pivot = model.WorldPivot
+	local m = if model:GetAttribute("Mirror") then -1 else 1
+	local function at(x: number, y: number, z: number): Vector3
+		return (pivot * CFrame.new(x * m, y + Y0, -z)).Position
+	end
+	local function convert(list: { Layouts.Spot }): { Spot }
+		local out: { Spot } = {}
+		for _, sp in list do
+			local path = {}
+			for _, p in sp.via do
+				table.insert(path, at(p.x, p.y, p.z))
+			end
+			table.insert(path, at(sp.x, sp.y, sp.z))
+			table.insert(out, {
+				path = path,
+				face = pivot:VectorToWorldSpace(Vector3.new(sp.fx * m, 0, -sp.fz)),
+				sit = sp.sit,
+			})
+		end
+		return out
+	end
+	local hub = layout.hub
+	local staffIn: { Vector3 } = {}
+	for _, p in layout.staffIn do
+		table.insert(staffIn, at(p.x, p.y, p.z))
+	end
+	return {
+		spots = convert(layout.spots),
+		staff = convert(layout.staff),
+		hub = if hub then at(hub.x, hub.y, hub.z) else nil,
+		staffIn = if #staffIn > 0 then staffIn else nil,
+	}
 end
 
 -- the burger place; `out` points to the street it faces
 function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 	local model = Instance.new("Model")
 	model.Name = "Restaurant"
-	local W, D, H, T = Crowd.RestaurantSize[1], Crowd.RestaurantSize[2], 16, 1.5
-	local red, yellow, cream =
-		Color3.fromRGB(196, 44, 40), Color3.fromRGB(250, 196, 40), Color3.fromRGB(246, 236, 214)
+	local R = Buildings.Restaurant
+	local W, D, H, T = Crowd.RestaurantSize[1], Crowd.RestaurantSize[2], R.Height, R.Wall
+	local col = R.Colours
+	local red, yellow, cream = Kit.rgb(col.wall), Kit.rgb(col.accent), Kit.rgb(col.trim)
+	local ctx = Kit.context(
+		model,
+		c,
+		out,
+		false,
+		{ wall = red, trim = cream, accent = yellow, roof = Kit.rgb(col.roof) },
+		(Enum.Material :: any)[col.material],
+		T
+	)
+	local put, seg = Kit.put, Kit.seg
 	local along = rightOf(out)
 	local base = Vector3.new(c.X, 0, c.Z)
-	face(
-		model,
-		base + out * (D / 2 - T / 2),
-		out,
-		along,
-		split(W, 7, "shop", { [4] = "door" }),
-		Y0,
-		H,
-		T,
-		red
-	)
-	face(model, base - out * (D / 2 - T / 2), -out, along, split(W, 7, "solid"), Y0, H, T, red)
-	for _, s in { 1, -1 } do
-		face(
-			model,
-			base + along * s * (W / 2 - T / 2),
-			along * s,
-			out,
-			split(D - 2 * T, 3, "solid", { [2] = "shop" }),
-			Y0,
-			H,
-			T,
-			red
-		)
+	local zf, zb, hw = D / 2, -D / 2, W / 2
+	local top = Y0 + H
+	-- each client draws the chairs, tills, kitchen and lamps from this (Rules/Interiors)
+	model.WorldPivot = ctx.base
+	model:SetAttribute("Interior", "Restaurant")
+	model:SetAttribute("Accent", yellow)
+	model:SetAttribute("W", W)
+	model:SetAttribute("D", D)
+	-- front: four shop windows, the wide door in the middle under a porch
+	local wins = { { -hw + 4, -hw + 20 }, { -hw + 22, -6 }, { 6, hw - 22 }, { hw - 20, hw - 4 } }
+	Kit.row(ctx, zf, 1, Y0, H, {
+		seg(-hw, wins[1][1], "s"),
+		seg(wins[1][1], wins[1][2], "sw"),
+		seg(wins[1][2], wins[2][1], "s"),
+		seg(wins[2][1], wins[2][2], "sw"),
+		seg(-6, -4, "s"),
+		seg(-4, 4, "d", { bare = true }),
+		seg(4, 6, "s"),
+		seg(wins[3][1], wins[3][2], "sw"),
+		seg(wins[3][2], wins[4][1], "s"),
+		seg(wins[4][1], wins[4][2], "sw"),
+		seg(wins[4][2], hw, "s"),
+	})
+	local back = {}
+	for k = 0, 6 do
+		table.insert(back, seg(-hw + k * W / 7, -hw + (k + 1) * W / 7, "s"))
 	end
-	for _, s in { -1, 1 } do
-		part(
-			model,
-			Vector3.new(W / 2, 1.2, D),
-			CFrame.new(base + along * s * (W / 4) + Vector3.new(0, Y0 + H + 0.6, 0)),
-			yellow
-		)
-	end
-	-- awning over the door, signs, and a giant burger on the roof
-	part(
-		model,
-		Vector3.new(W, 0.6, 5),
-		CFrame.lookAt(
-			base + out * (D / 2 + 2.5) + Vector3.new(0, Y0 + H - 3, 0),
-			base + out * (D / 2 + 10) + Vector3.new(0, Y0 + H - 3, 0)
-		),
-		yellow
-	)
-	local roofSign = base + out * (D / 2 - 2) + Vector3.new(0, Y0 + H + 6, 0)
+	Kit.row(ctx, zb, -1, Y0, H, back)
+	Kit.sides(ctx, hw, zf, zb, Y0, H, true) -- the side windows are the drive-through hatches
+	Kit.trims(ctx, 0, hw, zf, zb, top, true)
+	Kit.gambrel(ctx, W, zf, zb, top, R.KneeShare, R.KneeRise, R.PeakRise)
+	-- the hay-loft panel in the barn end carries the name
+	put(ctx, Vector3.new(16, 8.4, 0.3), 0, top + R.KneeRise / 2, zf + 0.15, cream)
+	local loft = Kit.at(ctx, 0, top + R.KneeRise / 2, zf + 0.45)
 	Places.sign(
 		model,
-		Vector3.new(46, 9, 1),
-		CFrame.lookAt(roofSign, roofSign + out),
+		Vector3.new(14.4, 6.8, 0.3),
+		CFrame.lookAt(loft, loft + out),
 		string.upper(Crowd.RestaurantName),
-		red,
 		yellow,
+		red
+	)
+	-- porch over the door: a roof on two posts
+	put(ctx, Vector3.new(13, 0.5, 6.5), 0, Y0 + 10.4, zf + 3.1, ctx.roof)
+	put(ctx, Vector3.new(13.4, 0.8, 0.4), 0, Y0 + 10.4, zf + 6.4, cream)
+	for _, e in { -5.8, 5.8 } do
+		put(ctx, Vector3.new(0.8, 10.2, 0.8), e, Y0 + 5.1, zf + 5.8, cream)
+	end
+	-- striped awnings over the windows
+	local tilt = math.rad(22)
+	for _, wpair in wins do
+		local sw = (wpair[2] - wpair[1]) / 4
+		for k = 0, 3 do
+			put(
+				ctx,
+				Vector3.new(sw, 0.3, 3.6),
+				wpair[1] + (k + 0.5) * sw,
+				Y0 + H - 3.4 - math.sin(tilt) * 1.8,
+				zf + math.cos(tilt) * 1.8,
+				if k % 2 == 0 then yellow else cream,
+				nil,
+				CFrame.Angles(-tilt, 0, 0)
+			)
+		end
+	end
+	-- drive-through canopy on the right-hand side, over the hatch
+	local reach, len = R.DriveThru[1], R.DriveThru[2]
+	put(ctx, Vector3.new(reach + 1, 0.6, len), hw + reach / 2, Y0 + 11.3, 0, ctx.roof)
+	put(ctx, Vector3.new(0.4, 1, len + 0.4), hw + reach + 0.7, Y0 + 11.3, 0, cream)
+	for _, e in { -1, 1 } do
+		put(ctx, Vector3.new(0.9, 11, 0.9), hw + reach - 0.5, Y0 + 5.5, e * (len / 2 - 0.6), cream)
+	end
+	local thru = Kit.at(ctx, hw + reach / 2, Y0 + 12.9, len / 2 - 0.2)
+	Places.sign(
+		model,
+		Vector3.new(14, 2.6, 0.3),
+		CFrame.lookAt(thru, thru + out),
+		"DRIVE-THRU",
+		yellow,
+		red,
 		true
 	)
-	local burger = base - out * 6 + Vector3.new(0, Y0 + H + 1.2, 0)
+	-- a giant burger on the ridge, at the street end
+	local burger = base + out * (zf - 8) + Vector3.new(0, top + R.PeakRise + 1, 0)
 	local function disc(dia: number, h: number, y: number, color: Color3)
 		local p = part(
 			model,
@@ -291,9 +308,8 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 		Color3.fromRGB(30, 30, 34),
 		yellow
 	)
-	local tables: { Vector3 } = {}
-	for _, a in { -0.32, -0.12, 0.12, 0.32 } do
-		local at = base + out * (D * 0.28) + along * (a * W)
+	for _, a in R.Tables do
+		local at = base + out * (D * R.TableZ) + along * (a * W)
 		part(model, Vector3.new(6, 0.6, 6), CFrame.new(at + Vector3.new(0, Y0 + 3, 0)), cream)
 		part(
 			model,
@@ -301,7 +317,6 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 			CFrame.new(at + Vector3.new(0, Y0 + 1.5, 0)),
 			Color3.fromRGB(60, 60, 64)
 		)
-		table.insert(tables, at)
 	end
 	-- a pole sign by the road
 	local poleAt = base + out * (D / 2 + 14) + along * (W / 2 + 4)
@@ -340,13 +355,8 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 	for _, a in { -10, 10 } do
 		table.insert(staffSpots, { path = { grillAt + out * 4.5 + along * a + y }, face = -out })
 	end
-	local spots: { Spot } = {}
-	for _, a in { -8, 0, 8 } do
-		table.insert(spots, { path = { base - out * (D * 0.1 - 5) + along * a + y }, face = -out })
-	end
-	for _, at in tables do
-		table.insert(spots, { path = { at + out * 4.5 + y }, face = -out })
-	end
+	-- customers queue at the tills and sit at the tables
+	local spots = inside(model).spots
 	return {
 		kind = "restaurant",
 		name = Crowd.RestaurantName,
@@ -365,48 +375,100 @@ end
 function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 	local model = Instance.new("Model")
 	model.Name = "Warehouse"
-	local W, D, H, T = Crowd.WarehouseSize[1], Crowd.WarehouseSize[2], Crowd.WarehouseHeight, 2
-	local wall, trim = Color3.fromRGB(150, 156, 166), Color3.fromRGB(38, 92, 170)
+	local WB = Buildings.Warehouse
+	local W, D, H, T =
+		Crowd.WarehouseSize[1], Crowd.WarehouseSize[2], Crowd.WarehouseHeight, WB.Wall
+	local col = WB.Colours
+	local trim = Kit.rgb(col.trim)
+	local ctx = Kit.context(model, c, out, false, {
+		wall = Kit.rgb(col.wall),
+		trim = trim,
+		accent = Kit.rgb(col.accent),
+		roof = Kit.rgb(col.roof),
+	}, (Enum.Material :: any)[col.material], T)
+	local put, seg = Kit.put, Kit.seg
 	local along = rightOf(out)
 	local base = Vector3.new(c.X, 0, c.Z)
-	local n = math.floor(W / 12)
-	local lower: { [number]: string } = { [2] = "door", [5] = "bay", [8] = "bay", [11] = "bay" }
+	local P = WB.Panel
+	local n = math.floor(W / P)
+	local zf, zb, hw = D / 2, -D / 2, W / 2
 	local half = H / 2
-	-- two rows of tall panels; bays leave the lower row out, the door leaves a lintel
-	for _, front in { true, false } do
-		local o = if front then out else -out
-		local lowerRow = split(W, n, "solid")
-		for k, s in lowerRow do
-			local kind = if front then lower[k] else nil
-			if kind == "bay" then
-				s.kind = "skip"
-			elseif kind == "door" then
-				s.kind = "door"
-			end
-		end
-		local centre = base + o * (D / 2 - T / 2)
-		for _, s in lowerRow do
-			if s.kind ~= "skip" then
-				face(model, centre, o, along, { s }, Y0, half, T, wall)
-			end
-		end
-		face(model, centre, o, along, split(W, n, "solid"), Y0 + half, half, T, wall)
+	local top = Y0 + H
+	model.WorldPivot = ctx.base
+	local bays = { [5] = true, [8] = true, [11] = true }
+	local windows: { [number]: boolean } = {}
+	for _, k in WB.Windows do
+		windows[k] = true
 	end
-	for _, s in { 1, -1 } do
-		local o = along * s
-		local rows = split(D - 2 * T, math.floor(D / 12), "solid")
-		face(model, base + o * (W / 2 - T / 2), o, out, rows, Y0, half, T, wall)
-		face(model, base + o * (W / 2 - T / 2), o, out, rows, Y0 + half, half, T, wall)
+	-- two rows of tall panels; the bays leave the lower row open, the office door sits in panel 2
+	local lower, upper, backRow = {}, {}, {}
+	for k = 1, n do
+		local a, b = -hw + (k - 1) * P, -hw + k * P
+		if k == 2 then
+			table.insert(lower, seg(a, a + 3.5, "s"))
+			table.insert(lower, seg(a + 3.5, b - 3.5, "d"))
+			table.insert(lower, seg(b - 3.5, b, "s"))
+		else
+			table.insert(lower, seg(a, b, if bays[k] then "x" else "s"))
+		end
+		table.insert(upper, seg(a, b, if windows[k] then "p" else "s"))
+		table.insert(backRow, seg(a, b, "s"))
 	end
-	part(
-		model,
-		Vector3.new(W + 1, 2, 2.2),
-		CFrame.lookAt(
-			base + out * (D / 2) + Vector3.new(0, Y0 + H - 1, 0),
-			base + out * (D / 2 + 1) + Vector3.new(0, Y0 + H - 1, 0)
-		),
-		trim
+	Kit.row(ctx, zf, 1, Y0, half, lower)
+	Kit.row(ctx, zf, 1, Y0 + half, half, upper)
+	Kit.row(ctx, zb, -1, Y0, half, backRow)
+	Kit.row(ctx, zb, -1, Y0 + half, half, backRow)
+	Kit.sides(ctx, hw, zf, zb, Y0, half)
+	Kit.sides(ctx, hw, zf, zb, Y0 + half, half)
+	Kit.trims(ctx, 0, hw, zf, zb, top, true)
+	-- blue pilasters and a band across the front (the band is the header over the bays)
+	for _, k in WB.Pilasters do
+		local h = H - 2.3
+		put(
+			ctx,
+			Vector3.new(1.6, h, T + 0.6),
+			-hw + k * P,
+			Y0 + 1.5 + h / 2,
+			zf - T / 2 + 0.3,
+			trim
+		)
+	end
+	Kit.bandX(ctx, 0, W, Y0 + half, 0.8, T + 0.8, zf - T / 2 + 0.4, trim)
+	-- bays framed like a house door, each roll-up door rolled into its drum
+	for k in bays do
+		local a = -hw + (k - 0.5) * P
+		for _, e in { -1, 1 } do
+			put(
+				ctx,
+				Vector3.new(0.8, half, T + 0.6),
+				a + e * (P / 2 - 0.4),
+				Y0 + half / 2,
+				zf - T / 2 + 0.3,
+				trim
+			)
+		end
+		put(
+			ctx,
+			Vector3.new(P - 1.6, 2.4, 1.6),
+			a,
+			Y0 + half - 1.6,
+			zf - T - 0.8,
+			Color3.fromRGB(216, 219, 224)
+		)
+	end
+	-- a canopy over the office door, a parapet with a cap along the front
+	put(ctx, Vector3.new(8, 0.4, 3), -hw + 1.5 * P, Y0 + 9.5, zf + 1.5, trim)
+	Kit.bandX(
+		ctx,
+		0,
+		W + 0.4,
+		top + WB.Parapet / 2,
+		WB.Parapet,
+		T,
+		zf - T / 2,
+		ctx.wall:Lerp(Color3.new(0, 0, 0), 0.25)
 	)
+	Kit.bandX(ctx, 0, W + 0.8, top + WB.Parapet + 0.25, 0.5, T + 0.6, zf - T / 2, trim)
 	local tx, tz = 4, 3
 	for i = 0, tx - 1 do
 		for j = 0, tz - 1 do
@@ -420,7 +482,7 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 					at + Vector3.new(0, Y0 + H + 0.6, 0),
 					at + out + Vector3.new(0, Y0 + H + 0.6, 0)
 				),
-				Color3.fromRGB(110, 114, 122)
+				ctx.roof
 			)
 		end
 	end
@@ -573,6 +635,17 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 			{ path = { base + out * (D / 2 - 6) + along * a + y }, face = out }
 		)
 	end
+	-- lights, forklifts, packing tables and the office desk, drawn by each client (Rules/Interiors)
+	model:SetAttribute("Interior", "Warehouse")
+	model:SetAttribute("Accent", Kit.rgb(col.accent))
+	model:SetAttribute("W", W)
+	model:SetAttribute("D", D)
+	model:SetAttribute("H", H)
+	model:SetAttribute("DoorA", doorA)
+	model:SetAttribute("Walkway", walkway)
+	for _, sp in inside(model).staff do
+		table.insert(staffSpots, sp)
+	end
 	return {
 		kind = "warehouse",
 		name = Crowd.WarehouseName,
@@ -585,30 +658,19 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 	}
 end
 
--- an office tower's lobby desk and name sign (the tower itself, with its glass lobby and door, is built by
--- MapBuilder); `door` is the middle of the doorway at ground level, `width` the length of that face
+-- an office tower's name sign and the people inside (the tower is built by TownKit, which marks its
+-- interior: the lobby and the desks upstairs); `door` is the middle of the doorway at ground level,
+-- `width` the length of that face
 function Places.office(
 	model: Model,
 	door: Vector3,
 	out: Vector3,
 	width: number,
 	top: number,
-	name: string,
-	trim: Color3
+	name: string
 ): Place
-	local along = rightOf(out)
 	local y = Vector3.new(0, Y0, 0)
 	local front = Vector3.new(door.X, 0, door.Z)
-	local deskAt = front - out * 14 + along * 10
-	part(
-		model,
-		Vector3.new(10, 3.6, 3),
-		CFrame.lookAt(
-			deskAt + Vector3.new(0, Y0 + 1.8, 0),
-			deskAt + out + Vector3.new(0, Y0 + 1.8, 0)
-		),
-		trim
-	)
 	local signAt = front - out * 2 + Vector3.new(0, top + 5, 0)
 	Places.sign(
 		model,
@@ -619,33 +681,33 @@ function Places.office(
 		Color3.new(1, 1, 1),
 		true
 	)
-	local entry = front - out * 3 + y
+	local i = inside(model)
 	return {
 		kind = "office",
 		name = name,
 		door = front + out * 3 + y,
-		entry = entry,
-		hub = deskAt - out * 3 + y,
-		spots = {
-			{ path = { front - out * 8 - along * 8 + y }, face = out },
-			{ path = { front - out * 10 - along * 16 + y }, face = along },
-			{ path = { front - out * 6 + along * 22 + y }, face = out },
-		},
-		staffSpots = { { path = { deskAt - out * 3 + y }, face = out } },
+		entry = front - out * 3 + y,
+		hub = i.hub,
+		staffIn = i.staffIn,
+		spots = i.spots,
+		staffSpots = i.staff,
 		indoors = true,
 	}
 end
 
--- a shop in a row (people go in and out of sight)
-function Places.shop(front: Vector3, out: Vector3, name: string): Place
+-- a shop in a row: shoppers browse, the shopkeeper keeps the till (TownKit marks its interior)
+function Places.shop(model: Model, front: Vector3, out: Vector3, name: string): Place
 	local y = Vector3.new(0, Y0, 0)
+	local i = inside(model)
 	return {
 		kind = "shop",
 		name = name,
 		door = front + out * 3 + y,
 		entry = front - out * 4 + y,
-		spots = {},
-		staffSpots = {},
+		hub = i.hub,
+		staffIn = i.staffIn,
+		spots = i.spots,
+		staffSpots = i.staff,
 		indoors = true,
 	}
 end

@@ -98,6 +98,11 @@ function NpcLooks.roll(outfit: string): Look
 			tie = rgb(pick(o.Ties)),
 			shirtFront = if jacket then shirt else nil,
 		}
+	elseif outfit == "shop" then
+		-- casual clothes under the shop's apron
+		look = NpcLooks.roll("casual")
+		look.apron = rgb(pick(Crowd.Shop.Aprons))
+		look.cap = nil
 	else
 		local c = Crowd.Casual
 		local shirt = rgb(pick(c.Shirts))

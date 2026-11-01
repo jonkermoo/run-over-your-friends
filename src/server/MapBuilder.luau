@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BuildingConfig = require(ReplicatedStorage.Shared.Config.Buildings)
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
@@ -19,6 +20,7 @@ local World = require(ReplicatedStorage.Shared.Config.World)
 local HouseKit = require(script.Parent.HouseKit)
 local Places = require(script.Parent.Places)
 local StreetKit = require(script.Parent.StreetKit)
+local TownKit = require(script.Parent.TownKit)
 
 local MapBuilder = {}
 local M = World.Map
@@ -43,7 +45,6 @@ local COLORS = {
 	concrete = Color3.fromRGB(190, 190, 195),
 	ramp = Color3.fromRGB(240, 170, 50),
 	rampStripe = Color3.fromRGB(40, 40, 44),
-	glass = Color3.fromRGB(96, 140, 170),
 	trunk = Color3.fromRGB(110, 78, 52),
 	leaves = Color3.fromRGB(70, 140, 70),
 }
@@ -56,6 +57,10 @@ local CONTAINERS = {
 }
 
 local random = Random.new(M.Seed)
+
+local function rgb(c: { number }): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
 
 local MAX_PART = 2048 -- Roblox cuts any bigger part down, which left holes at the city's edges
 
@@ -119,111 +124,6 @@ local function tree(parent: Instance, at: Vector3)
 	ball.Color = COLORS.leaves
 	ball.Material = Enum.Material.SmoothPlastic
 	ball.Parent = parent
-end
-
--- a building made of chunks: wall panels with windows per floor, floor slabs in tiles, a roof.
--- With `front` (a flat unit vector), that face gets a glass ground floor and a doorway in the middle panel;
--- returns the model and the middle of the doorway at ground level.
-local function building(
-	parent: Folder,
-	centre: Vector3,
-	w: number,
-	d: number,
-	floors: number,
-	color: Color3,
-	name: string,
-	front: Vector3?
-): (Model, Vector3?)
-	local model = Instance.new("Model")
-	model.Name = name
-	local FH, PW, T = M.FloorHeight, M.PanelWidth, M.WallThickness
-	local door: Vector3? = nil
-	local function side(origin: Vector3, along: Vector3, outward: Vector3, length: number)
-		local n = math.max(1, math.floor(length / PW + 0.5))
-		local pw = length / n
-		local isFront = front ~= nil and outward:Dot(front) > 0.9
-		local doorAt = n // 2
-		for f = 0, floors - 1 do
-			local y0 = centre.Y + f * FH
-			for i = 0, n - 1 do
-				local mid = origin + along * ((i + 0.5) * pw)
-				local cf = CFrame.lookAt(mid, mid + outward)
-				if f == 0 and isFront and i == doorAt then
-					-- doorway: only the lintel
-					part(
-						model,
-						Vector3.new(pw, FH - 8.5, T),
-						cf + Vector3.new(0, y0 + 8.5 + (FH - 8.5) / 2, 0),
-						color
-					)
-					door = Vector3.new(mid.X, 0, mid.Z)
-				elseif f == 0 and isFront then
-					-- lobby or shop window
-					part(model, Vector3.new(pw, 1.5, T), cf + Vector3.new(0, y0 + 0.75, 0), color)
-					local lobby = part(
-						model,
-						Vector3.new(pw, FH - 4.5, T * 0.6),
-						cf + Vector3.new(0, y0 + 1.5 + (FH - 4.5) / 2, 0),
-						COLORS.glass,
-						Enum.Material.Glass
-					)
-					lobby.Transparency = 0.25
-					lobby:SetAttribute("Glass", true)
-					part(model, Vector3.new(pw, 3, T), cf + Vector3.new(0, y0 + FH - 1.5, 0), color)
-				elseif f == 0 then
-					part(model, Vector3.new(pw, FH, T), cf + Vector3.new(0, y0 + FH / 2, 0), color)
-				else
-					-- sill below, window above
-					local sill = FH * 0.4
-					part(
-						model,
-						Vector3.new(pw, sill, T),
-						cf + Vector3.new(0, y0 + sill / 2, 0),
-						color
-					)
-					local glass = part(
-						model,
-						Vector3.new(pw, FH - sill, T * 0.6),
-						cf + Vector3.new(0, y0 + sill + (FH - sill) / 2, 0),
-						COLORS.glass,
-						Enum.Material.Glass
-					)
-					glass.Transparency = 0.25
-					glass:SetAttribute("Glass", true)
-				end
-			end
-		end
-	end
-	local hw, hd = w / 2, d / 2
-	local base = Vector3.new(centre.X, 0, centre.Z)
-	side(base + Vector3.new(-hw, 0, -hd), Vector3.new(1, 0, 0), Vector3.new(0, 0, -1), w)
-	side(base + Vector3.new(-hw, 0, hd), Vector3.new(1, 0, 0), Vector3.new(0, 0, 1), w)
-	side(
-		base + Vector3.new(-hw, 0, -hd + T),
-		Vector3.new(0, 0, 1),
-		Vector3.new(-1, 0, 0),
-		d - 2 * T
-	)
-	side(base + Vector3.new(hw, 0, -hd + T), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), d - 2 * T)
-	-- floors and roof in tiles about 45 studs across
-	local tx, tz = math.max(1, math.floor(w / 45 + 0.5)), math.max(1, math.floor(d / 45 + 0.5))
-	for f = 1, floors do
-		local y = centre.Y + f * FH - 0.6
-		for i = 0, tx - 1 do
-			for j = 0, tz - 1 do
-				local cx = centre.X - hw + (i + 0.5) * w / tx
-				local cz = centre.Z - hd + (j + 0.5) * d / tz
-				part(
-					model,
-					Vector3.new(w / tx, 1.2, d / tz),
-					CFrame.new(cx, y, cz),
-					if f == floors then color:Lerp(Color3.new(0, 0, 0), 0.25) else COLORS.concrete
-				)
-			end
-		end
-	end
-	model.Parent = parent
-	return model, door
 end
 
 function MapBuilder.build(): Result
@@ -351,7 +251,7 @@ function MapBuilder.build(): Result
 	local centreI, centreJ = math.floor(M.BlocksX / 2), math.floor(M.BlocksZ / 2)
 	local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
 	local places: { Places.Place } = {}
-	local count, offices = 0, 0
+	local count, offices, shops = 0, 0, 0
 	local function addPlace(place: Places.Place, i: number, j: number)
 		place.block = { i, j }
 		table.insert(places, place)
@@ -371,12 +271,8 @@ function MapBuilder.build(): Result
 			local cx = x0 + R + i * pitch + B / 2
 			local cz = z0 + R + j * pitch + B / 2
 			local centre = Vector3.new(cx, 0, cz)
-			local style = (Streets.Districts :: any)[Districts.of(
-					i,
-					j,
-					M.BlocksX,
-					M.BlocksZ
-				)] :: Streets.District
+			local district = Districts.of(i, j, M.BlocksX, M.BlocksZ)
+			local style = (Streets.Districts :: any)[district] :: Streets.District
 			local function wallColour(): Color3
 				local c = style.walls[random:NextInteger(1, #style.walls)]
 				return Color3.fromRGB(c[1], c[2], c[3])
@@ -465,7 +361,7 @@ function MapBuilder.build(): Result
 				end
 				addPlace(Places.open("spawn", centre, crowdPoints), i, j)
 			elseif kind == "office" then
-				-- office towers: a glass lobby with a door, the company name on the roof
+				-- office towers in the town style: a stone lobby with a door, window bands, the name on the roof
 				local floors = if distFromCentre < 2.5
 					then random:NextInteger(5, 9)
 					else random:NextInteger(3, 5)
@@ -475,30 +371,30 @@ function MapBuilder.build(): Result
 				offices += 1
 				local out = SIDES[random:NextInteger(1, 4)]
 				local wall = wallColour()
+				local look = (BuildingConfig.Office.Looks :: any)[district] :: BuildingConfig.OfficeLook
+				local colours = {
+					wall = wall,
+					trim = rgb(look.trim),
+					accent = rgb(style.accent),
+					roof = rgb(look.roof),
+					stone = rgb(look.stone),
+				}
 				local model, door =
-					building(buildings, centre, w, d, floors, wall, "Office" .. count, out)
-				if door then
-					local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
-					local width = math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
-					local trim = wall:Lerp(Color3.new(0, 0, 0), 0.35)
-					addPlace(
-						Places.office(model, door, out, width, floors * M.FloorHeight, name, trim),
-						i,
-						j
-					)
-				end
-				-- a parody billboard on the roof, facing the street with the door
-				local top = floors * M.FloorHeight
+					TownKit.office(buildings, centre, w, d, floors, colours, "Office" .. count, out)
+				-- the company name and a parody billboard stand on the roof, behind the parapet
+				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
+				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
+				local width = math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
+				addPlace(Places.office(model, door, out, width, top, name), i, j)
 				local boardAt = centre - out * 10 + Vector3.new(0, top + 14, 0)
 				local ad = Streets.Billboards[random:NextInteger(1, #Streets.Billboards)]
-				local accent = Color3.fromRGB(style.accent[1], style.accent[2], style.accent[3])
 				Places.sign(
 					model,
 					Vector3.new(34, 11, 1),
 					CFrame.lookAt(boardAt, boardAt + out),
 					ad,
 					Color3.fromRGB(250, 250, 245),
-					accent:Lerp(Color3.new(0, 0, 0), 0.4),
+					colours.accent:Lerp(Color3.new(0, 0, 0), 0.4),
 					true
 				)
 				local along = Vector3.new(-out.Z, 0, out.X)
@@ -511,47 +407,50 @@ function MapBuilder.build(): Result
 					)
 				end
 			elseif kind == "shops" then
-				-- a row of low shops
-				local n = random:NextInteger(2, 3)
-				local w = inner / n - 8
-				for k = 0, n - 1 do
+				-- a row of shop fronts facing the south sidewalk, flats above, a car park behind
+				local SH = BuildingConfig.Shops
+				local fw = inner / SH.PerBlock
+				local z = inner / 2 - SH.Setback - SH.Depth / 2
+				local wallMaterial = (Enum.Material :: any)[style.wallMaterial] :: Enum.Material
+				local lastPalette: number? = nil
+				for k = 0, SH.PerBlock - 1 do
 					count += 1
-					local c = centre
-						+ Vector3.new(-inner / 2 + (k + 0.5) * inner / n, 0, -inner * 0.15)
-					local shop, door = building(
+					shops += 1
+					local pal =
+						HouseRules.pickPalette(#Houses.Palettes, lastPalette, random:NextNumber())
+					lastPalette = pal
+					local place = TownKit.shop(
 						buildings,
-						c,
-						w,
-						inner * 0.55,
-						random:NextInteger(1, 3),
+						centre + Vector3.new(-inner / 2 + (k + 0.5) * fw, 0, z),
+						Vector3.new(0, 0, 1),
+						fw,
+						random:NextInteger(SH.Floors[1], SH.Floors[2]),
 						wallColour(),
-						"Shop" .. count,
-						Vector3.new(0, 0, 1)
+						wallMaterial,
+						Houses.Palettes[pal],
+						random:NextNumber() < 0.5,
+						SH.Names[(shops - 1) % #SH.Names + 1],
+						"Shop" .. count
 					)
-					if door then
-						addPlace(Places.shop(door, Vector3.new(0, 0, 1), "Shop" .. count), i, j)
-						-- a striped awning over the shop front
-						local accent =
-							Color3.fromRGB(style.accent[1], style.accent[2], style.accent[3])
-						local front = Vector3.new(c.X, 0, door.Z)
-						part(
-							shop,
-							Vector3.new(w * 0.94, 0.5, 5),
-							CFrame.new(front + Vector3.new(0, M.FloorHeight - 2.5, 2.5)),
-							accent
-						)
-						part(
-							shop,
-							Vector3.new(w * 0.94, 1.2, 0.3),
-							CFrame.new(front + Vector3.new(0, M.FloorHeight - 3.1, 5)),
-							Color3.new(1, 1, 1)
-						)
-					end
+					addPlace(place, i, j)
 				end
+				local yard = inner - SH.Setback - SH.Depth - 4
+				part(
+					static,
+					Vector3.new(inner, 1, yard),
+					CFrame.new(cx, -0.39, cz - inner / 2 + yard / 2),
+					COLORS.road,
+					Enum.Material.Asphalt
+				)
 				for k = 0, 5 do
 					table.insert(
 						walkPoints,
-						centre + Vector3.new(-inner / 2 + (k + 0.5) * inner / 6, 0.5, inner * 0.32)
+						centre
+							+ Vector3.new(
+								-inner / 2 + (k + 0.5) * inner / 6,
+								0.5,
+								inner / 2 - SH.Setback / 2
+							)
 					)
 				end
 			elseif kind == "park" then
@@ -645,7 +544,6 @@ function MapBuilder.build(): Result
 					Enum.Material.Grass
 				)
 				-- house kit: three lots along each sidewalk, types by district, neighbours never share a palette
-				local district = Districts.of(i, j, M.BlocksX, M.BlocksZ)
 				local weights = (Houses.ByDistrict :: any)[district] or Houses.ByDistrict.maple
 				local lot = inner / Houses.PerSide
 				local lastPalette: number? = nil

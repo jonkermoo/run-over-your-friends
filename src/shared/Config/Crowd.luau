@@ -10,10 +10,12 @@ return table.freeze({
 	Walkers = 160, -- casual people out on the sidewalks
 	ResidentsMin = 1, -- per home
 	ResidentsMax = 3,
-	OfficeWorkersMin = 3, -- per office building
-	OfficeWorkersMax = 6,
+	OfficeWorkersMin = 5, -- per office building
+	OfficeWorkersMax = 9,
+	Receptionists = 1, -- per office, at the lobby desk
+	ShopStaff = 1, -- per shop, behind the counter
 	RestaurantStaff = 4, -- two at the counter, two at the grill
-	WarehouseStaff = 8,
+	WarehouseStaff = 10,
 	Spectators = 14, -- watching at the stunt park
 	FriendEvery = 6, -- one person in this many wears a friend's avatar (never staff in uniform)
 
@@ -47,6 +49,9 @@ return table.freeze({
 	InsideMax = 70,
 	HomeStayChance = 0.8, -- a resident at home stays in for another round (homes look lived in)
 	HomeSpotChance = 0.85, -- a resident at home sits or stands somewhere you can see (else out of sight)
+	OfficeStayChance = 0.75, -- an office worker at work stays in for another round
+	OfficeSpotChance = 0.85, -- an office worker inside sits at a desk or in the lobby (else out of sight)
+	ShopSpotChance = 0.75, -- a shopper browses somewhere you can see (else out of sight)
 	OfficeLunchChance = 0.3, -- an office worker who comes out heads for the restaurant
 
 	-- animation (client): ordinary people use the Rthro set, friends their own
@@ -102,6 +107,9 @@ return table.freeze({
 		Pants = { 34, 34, 38 } :: RGB,
 		Cap = { 250, 200, 40 } :: RGB,
 		Apron = { 245, 245, 240 } :: RGB,
+	}),
+	Shop = table.freeze({
+		Aprons = table.freeze({ { 40, 110, 70 }, { 160, 40, 50 }, { 40, 70, 140 }, { 90, 60, 40 } }) :: { RGB },
 	}),
 	Warehouse = table.freeze({
 		Shirts = table.freeze({ { 40, 56, 90 }, { 90, 92, 98 } }) :: { RGB },
