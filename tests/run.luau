@@ -18,6 +18,7 @@ local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
 local Routes = require("../src/shared/Rules/Routes")
+local Tiles = require("../src/shared/Rules/Tiles")
 local Quests = require("../src/shared/Rules/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
 local World = require("../src/shared/Config/World")
@@ -820,6 +821,30 @@ check(
 		and InteriorConfig.SitHeight > 1
 		and InteriorConfig.SitHeight < 3.5
 )
+
+-- long map parts are tiled under Roblox's 2048-stud cap
+local function tilesCover(lenX: number, lenZ: number): boolean
+	local list = Tiles.split(lenX, lenZ, 2048)
+	local area, ok = 0, true
+	for _, t in list do
+		area += t.sx * t.sz
+		ok = ok and t.sx <= 2048 and t.sz <= 2048
+		ok = ok
+			and math.abs(t.x) + t.sx / 2 <= lenX / 2 + 1e-6
+			and math.abs(t.z) + t.sz / 2 <= lenZ / 2 + 1e-6
+	end
+	return ok and math.abs(area - lenX * lenZ) < 1e-3
+end
+check(
+	"the 6000-stud ground becomes 9 tiles that cover it",
+	#Tiles.split(6000, 6000, 2048) == 9 and tilesCover(6000, 6000)
+)
+check("a long road becomes 2 tiles", #Tiles.split(64, 2336, 2048) == 2 and tilesCover(64, 2336))
+check(
+	"a short part stays one piece",
+	#Tiles.split(220, 220, 2048) == 1 and Tiles.split(220, 220, 2048)[1].x == 0
+)
+check("exactly 2048 stays one piece", #Tiles.split(2048, 10, 2048) == 1)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

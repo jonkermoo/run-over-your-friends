@@ -14,6 +14,7 @@ local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
+local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local HouseKit = require(script.Parent.HouseKit)
 local Places = require(script.Parent.Places)
@@ -56,23 +57,32 @@ local CONTAINERS = {
 
 local random = Random.new(M.Seed)
 
+local MAX_PART = 2048 -- Roblox cuts any bigger part down, which left holes at the city's edges
+
+-- an anchored part; one longer than MAX_PART is laid as tiles (the first tile is returned)
 local function part(
 	parent: Instance,
 	size: Vector3,
 	cf: CFrame,
 	color: Color3,
-	material: Enum.Material?
+	material: Enum.Material?,
+	transparency: number?
 ): Part
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = material or Enum.Material.SmoothPlastic
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Parent = parent
-	return p
+	local first: Part? = nil
+	for _, t in Tiles.split(size.X, size.Z, MAX_PART) do
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.Size = Vector3.new(t.sx, size.Y, t.sz)
+		p.CFrame = cf * CFrame.new(t.x, 0, t.z)
+		p.Color = color
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.Transparency = transparency or 0
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p.Parent = parent
+		first = first or p
+	end
+	return first :: Part
 end
 
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
@@ -242,13 +252,14 @@ function MapBuilder.build(): Result
 	local G = M.GroundSize
 	part(static, Vector3.new(G, 20, G), CFrame.new(0, -10, 0), COLORS.grass, Enum.Material.Grass)
 	for _, s in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
-		local wall = part(
+		part(
 			static,
 			Vector3.new(if s[1] ~= 0 then 10 else G, 60, if s[2] ~= 0 then 10 else G),
 			CFrame.new(s[1] * G / 2, 30, s[2] * G / 2),
-			COLORS.concrete
+			COLORS.concrete,
+			nil,
+			0.6
 		)
-		wall.Transparency = 0.6
 	end
 
 	-- city grid
