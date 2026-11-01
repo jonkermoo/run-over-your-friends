@@ -193,6 +193,27 @@ local function track(car: Instance)
 		local more = trailer:GetChildren()
 		table.move(more, 1, #more, #welds + 1, welds)
 	end
+	-- the wheel welds can land a moment after the car: wait for all of them, or the wheelbase comes out
+	-- near zero and any steering at speed spins the car on the spot
+	local found = 0
+	for _, w in welds do
+		if
+			w:IsA("Weld")
+			and typeof(w:GetAttribute("Corner")) == "string"
+			and w.Part0
+			and w.Part1
+		then
+			found += 1
+		end
+	end
+	if found < ((car:GetAttribute("Wheels") or 0) :: number) then
+		task.delay(0.2, function()
+			if car.Parent then
+				track(car)
+			end
+		end)
+		return
+	end
 	for _, w in welds do
 		local c = w:GetAttribute("Corner")
 		if w:IsA("Weld") and typeof(c) == "string" and w.Part0 then
@@ -368,10 +389,10 @@ local thrustReadyAt = 0
 local boostUsedAt = 0
 local flingUntil = 0
 local stuckFor = 0
-local flying = false -- Roadster in hover flight
+local flying = false -- Roadster in the air under flight control
+local jetOn = false -- its jet is lifting it right now
 local liftedAt = 0
-local flyForward, flySide, flyUp, flyYaw = 0, 0, 0, 0
-local flipLeft, flipDir, lastRoll = 0, 0, 0
+local flyYaw = 0
 local bombHeld = 0
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
 
@@ -388,7 +409,7 @@ local function stopDriving()
 		end
 	end
 	driving = nil
-	flying = false
+	flying, jetOn = false, false
 	speed, lateral, yawRate, steer = 0, 0, 0, 0
 	Drive.state.driving = false
 	camera.FieldOfView = baseFov
@@ -835,12 +856,11 @@ local function step(dt: number)
 			speed, lateral = actualForward, actualLeft
 		end
 
-		-- into hover flight on lift or off a ramp; back to driving once it's down with lift let go
+		-- into flight on lift or off a ramp; back to driving once it's down with the jet off
 		if canFly and not flung then
 			if not flying and (lifting or s.airborne) then
 				flying = true
 				liftedAt = if lifting then now else 0
-				flyForward, flySide, flyUp = actualForward, actualLeft, actual.Y
 				flyYaw = chassis.AssemblyAngularVelocity.Y
 			elseif
 				flying
@@ -853,60 +873,61 @@ local function step(dt: number)
 				speed, lateral = actualForward, actualLeft
 			end
 		end
-		local roll = Drive.input.roll
-		if flying and roll ~= 0 and lastRoll == 0 and flipLeft <= 0 then
-			flipLeft, flipDir = Flight.flipTime, roll
-		end
-		lastRoll = roll
+		jetOn = flying and lifting
 
 		local alphaF, alphaR = 0, 0
 		if flying and not flung then
-			-- keep in step with what actually happened (walls, roofs, landings)
-			if math.abs(actual.Y - flyUp) > 4 then
-				flyUp = actual.Y
-			end
-			if math.abs(actualForward - flyForward) > 4 then
-				flyForward = actualForward
-			end
-			local f = FlightRules.step(
-				{ forward = flyForward, side = flySide, up = flyUp, fuel = Drive.state.boost },
-				throttle,
-				lifting,
-				dt,
-				Flight
-			)
-			flyForward, flySide, flyUp, Drive.state.boost = f.forward, f.side, f.up, f.fuel
-			if thrustLeft > 0 then
-				flyForward += THRUST_DV / THRUST_TIME * math.min(dt, thrustLeft)
-				thrustLeft -= dt
-			end
-			local wantYaw = -seat.SteerFloat * Flight.yawRate
-			flyYaw += (wantYaw - flyYaw) * math.min(1, dt * Flight.yawRamp)
-			drive.MaxAxesForce = FLY_FORCE
-			drive.Enabled = true
-			drive.VectorVelocity = (look * flyForward - right * flySide + Vector3.yAxis * flyUp)
-				* spm
-			if flipLeft > 0 then
-				-- Q/E: a full roll about the nose, then it levels itself again
-				flipLeft -= dt
-				turn.AngularVelocity = chassis.CFrame.LookVector
-						* (flipDir * 2 * math.pi / Flight.flipTime)
-					+ Vector3.yAxis * flyYaw
+			local nose = chassis.CFrame.LookVector
+			if jetOn then
+				-- the jet holds it: climb, and W/S push along the nose; turning swings the nose first and the
+				-- sideways drift dies out after it, like a car, instead of the whole path snapping round
+				local f = FlightRules.step({
+					forward = actualForward,
+					side = actualLeft,
+					up = actual.Y,
+					fuel = Drive.state.boost,
+				}, throttle, true, dt, Flight)
+				Drive.state.boost = f.fuel
+				local forward = f.forward
+				if thrustLeft > 0 then
+					forward += THRUST_DV / THRUST_TIME * math.min(dt, thrustLeft)
+					thrustLeft -= dt
+				end
+				drive.MaxAxesForce = FLY_FORCE
+				drive.Enabled = true
+				drive.VectorVelocity = (look * forward - right * f.side + Vector3.yAxis * f.up)
+					* spm
 			else
-				-- stay level, lean into turns, dip the nose speeding up
-				local pose = CFrame.lookAt(Vector3.zero, look)
-					* CFrame.Angles(
-						math.rad(-Flight.tilt * throttle),
-						0,
-						math.rad(-Flight.bank * seat.SteerFloat)
+				-- jet off: it drops, carried by its momentum; the thruster still pushes along the nose
+				drive.Enabled = false
+				if thrustLeft > 0 then
+					chassis.AssemblyLinearVelocity += nose * (THRUST_DV / THRUST_TIME) * spm * math.min(
+						dt,
+						thrustLeft
 					)
-				local axis, angle = (pose * chassis.CFrame.Rotation:Inverse()):ToAxisAngle()
-				local fix = if angle == angle and angle > 1e-4
-					then axis * angle * Flight.level
-					else Vector3.zero
-				turn.AngularVelocity = fix + Vector3.yAxis * flyYaw
+					thrustLeft -= dt
+				end
 			end
-			speed, lateral, yawRate = flyForward, flySide, flyYaw
+			-- A/D turn it, harder the faster it's going, so it can't spin on the spot
+			local moving =
+				math.clamp(Vector3.new(actual.X, 0, actual.Z).Magnitude / Flight.yawSpeed, 0.25, 1)
+			local wantYaw = -seat.SteerFloat * Flight.yawRate * moving
+			flyYaw += (wantYaw - flyYaw) * math.min(1, dt * Flight.yawRamp)
+			-- stay level (lean into turns, nose down speeding up); Q/E roll it for as long as they're held
+			local pose = CFrame.lookAt(Vector3.zero, look)
+				* CFrame.Angles(
+					math.rad(if jetOn then -Flight.tilt * throttle else 0),
+					0,
+					math.rad(-Flight.bank * seat.SteerFloat * moving)
+				)
+			local axis, angle = (pose * chassis.CFrame.Rotation:Inverse()):ToAxisAngle()
+			local err = if angle == angle and angle > 1e-4 then axis * angle else Vector3.zero
+			local along = nose * err:Dot(nose)
+			local roll = Drive.input.roll
+			local spin = (err - along) * Flight.level
+				+ (if roll ~= 0 then nose * (roll * Flight.rollRate) else along * Flight.rollLevel)
+			turn.AngularVelocity = spin + Vector3.yAxis * flyYaw
+			speed, lateral, yawRate = actualForward, actualLeft, flyYaw
 		elseif not flung and not s.airborne then
 			local before = speed
 			local steps = math.clamp(math.ceil(dt * 480), 1, 32)
@@ -1049,9 +1070,7 @@ local function step(dt: number)
 
 		-- the gas jets: the driver knows; everyone else reads it off the car's motion
 		if #s.lift > 0 then
-			local hovering = if s == driving
-				then flying
-				else s.airborne and up > -(Flight.sink + 1.5)
+			local hovering = if s == driving then jetOn else s.airborne and up > -1
 			for _, p in s.lift do
 				p.Enabled = hovering
 				p.Rate = if up > 1 then 90 else 35

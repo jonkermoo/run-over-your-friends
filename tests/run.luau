@@ -349,46 +349,40 @@ check(
 	evKeys.LowGravity and evKeys.GoldenRush and evKeys.Giant and evKeys.Stampede
 )
 
--- hover flight
-local function fly(s: Flight.State, throttle: number, lift: boolean, seconds: number): Flight.State
+-- flight
+local function fly(s: Flight.State, throttle: number, jet: boolean, seconds: number): Flight.State
 	for _ = 1, math.floor(seconds * 60) do
-		s = Flight.step(s, throttle, lift, 1 / 60, FlightConfig)
+		s = Flight.step(s, throttle, jet, 1 / 60, FlightConfig)
 	end
 	return s
 end
 local still = { forward = 0, side = 0, up = 0, fuel = 100 }
 local climbed = fly(still, 0, true, 2)
-check("lift climbs at the climb rate", near(climbed.up, FlightConfig.climb, 1e-6))
-check("lift burns fuel", near(climbed.fuel, 100 - FlightConfig.drain * 2, 0.5))
+check("the jet climbs at the climb rate", near(climbed.up, FlightConfig.climb, 1e-6))
+check("the jet burns fuel", near(climbed.fuel, 100 - FlightConfig.drain * 2, 0.5))
+check("a full tank lasts 4 s", fly(still, 0, true, 4.1).fuel == 0)
 check(
-	"letting go sinks no faster than the cap",
-	near(fly(climbed, 0, false, 5).up, -FlightConfig.sink, 1e-6)
+	"letting go drops it like a stone",
+	near(fly(climbed, 0, false, 1).up, FlightConfig.climb - FlightConfig.gravity, 0.2)
 )
+check("no fuel, no climb", fly({ forward = 0, side = 0, up = 0, fuel = 0 }, 0, true, 1).up < -9)
 check(
-	"no fuel, no climb",
-	fly({ forward = 0, side = 0, up = 0, fuel = 0 }, 0, true, 2).up <= -FlightConfig.sink + 1e-6
+	"jet off keeps its momentum",
+	fly({ forward = 30, side = 5, up = 0, fuel = 50 }, 1, false, 1).forward == 30
 )
-check(
-	"a fast fall is cushioned to the sink rate",
-	near(
-		fly({ forward = 0, side = 0, up = -30, fuel = 0 }, 0, false, 3).up,
-		-FlightConfig.sink,
-		1e-6
-	)
-)
-check("W flies at top speed", near(fly(still, 1, false, 6).forward, FlightConfig.top, 1e-6))
-check("S backs up", near(fly(still, -1, false, 3).forward, -FlightConfig.reverseTop, 1e-6))
-local boosted = Flight.step({ forward = 80, side = 0, up = 0, fuel = 0 }, 1, false, 1, FlightConfig)
+check("W flies at top speed", near(fly(still, 1, true, 3.5).forward, FlightConfig.top, 1e-6))
+check("S backs up", near(fly(still, -1, true, 2).forward, -FlightConfig.reverseTop, 1e-6))
+local boosted =
+	Flight.step({ forward = 80, side = 0, up = 0, fuel = 100 }, 1, true, 1, FlightConfig)
 check("over top speed slows by drag", near(boosted.forward, 80 - FlightConfig.drag, 1e-6))
 check(
 	"no throttle drifts to a stop",
-	fly({ forward = 20, side = 0, up = 0, fuel = 0 }, 0, false, 5).forward == 0
+	fly({ forward = 15, side = 0, up = 0, fuel = 100 }, 0, true, 3.5).forward == 0
 )
 check(
-	"sideways slide dies out",
-	fly({ forward = 0, side = 9, up = 0, fuel = 0 }, 0, false, 1).side == 0
+	"sideways drift dies out",
+	fly({ forward = 0, side = 9, up = 0, fuel = 100 }, 0, true, 1).side == 0
 )
-check("gliding keeps the fuel", fly(still, 1, false, 2).fuel == 100)
 -- city plan
 local M = World.Map
 local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
