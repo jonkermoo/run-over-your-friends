@@ -202,8 +202,8 @@ def new_wheel(w, style):
     width = hi.x - lo.x
     out = 1 if c.x > 0 else -1
     chunky = look == "offroad"
-    lugs = 14 if chunky else 20
-    depth = r * (0.12 if chunky else 0.05)
+    lugs = 14 if chunky else 30
+    depth = r * (0.12 if chunky else 0.025)
     # tyre: a cylinder with every other tread face pushed out into a block
     me = bpy.data.meshes.new("tyre")
     bm = bmesh.new()
@@ -570,11 +570,12 @@ place("Cart", body, wheels, STUDS)
 with bpy.data.libraries.load(roadster_path) as (src, dst):
     dst.objects = list(src.objects)
 DROP = ("Brake", "Interior", "Seat", "Steering", "RearCamera", "Badge", "Marker", "ThirdBrake", "RearviewMirror",
-        "FenderVent", "ReverseLight")
+        "ReverseLight")
 PAINT, RGLASS, RBLACK, TYRE, RIM = (0.8, 0.12, 0.1), (0.16, 0.22, 0.28), (0.1, 0.1, 0.11), (0.12, 0.12, 0.13), (0.62, 0.63, 0.66)
 keep = []
 for o in dst.objects:
-    if not o or o.type != "MESH" or o.name.startswith(DROP):
+    # match anywhere in the name: "FrontBadge" and "RearBadge" must go too (no maker's badge on our car)
+    if not o or o.type != "MESH" or any(k in o.name for k in DROP):
         continue
     scene.collection.objects.link(o)
     keep.append(o)
@@ -583,7 +584,8 @@ body_parts, corners = [], {}
 for o in keep:
     bake(o)
     n = len(o.data.polygons)
-    target = 40 if o.name.startswith(("Tire", "Rim", "Taillight", "Headlight", "SideMirror", "RearSpoiler", "TrunkLid", "BodyTrim")) else 110
+    # big panels keep enough faces that their edges still meet their neighbours' (fewer opens cracks)
+    target = 40 if o.name.startswith(("Tire", "Rim", "Taillight", "Headlight", "SideMirror", "RearSpoiler", "TrunkLid", "BodyTrim")) else 220
     m = o.modifiers.new("dec", "DECIMATE")
     m.ratio = min(1.0, target / max(n, 1))
     m.use_collapse_triangulate = True
