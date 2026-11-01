@@ -58,8 +58,16 @@ return table.freeze({
 		MaxFurnished = 6, -- ...at most this many at once, nearest first (an office is about 500 parts)
 		OfficeFloors = 3, -- office floors above the lobby with desks (and people at them)
 		DeskEvery = 16, -- desks along each window, at most this far apart
-		LightRange = 18,
-		LightBrightness = 1.2,
+		LightRange = 18, -- ceiling panels: a surface light shining down
+		LightBrightness = 1.3,
+		LightAngle = 120,
+		CeilingGrid = 8, -- ceiling-tile bars this far apart
+		CheckSize = 6, -- the burger place's floor checks
+		-- while the camera is inside a town building, the shade indoors warms and lifts to this (eased in
+		-- over EaseTime seconds), so a room feels lit rather than dim
+		IndoorAmbient = { 78, 74, 68 },
+		IndoorExposure = 0.1,
+		EaseTime = 0.6,
 	}),
 
 	Layouts = table.freeze({
