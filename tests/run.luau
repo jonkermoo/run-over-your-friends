@@ -372,6 +372,14 @@ check(
 )
 check("W flies at top speed", near(fly(still, 1, true, 3.5).forward, FlightConfig.top, 1e-6))
 check("S backs up", near(fly(still, -1, true, 2).forward, -FlightConfig.reverseTop, 1e-6))
+check(
+	"S air-brakes at the brake rate",
+	near(
+		Flight.step({ forward = 30, side = 0, up = 0, fuel = 100 }, -1, true, 0.5, FlightConfig).forward,
+		30 - FlightConfig.brake * 0.5,
+		1e-6
+	)
+)
 local boosted =
 	Flight.step({ forward = 80, side = 0, up = 0, fuel = 100 }, 1, true, 1, FlightConfig)
 check("over top speed slows by drag", near(boosted.forward, 80 - FlightConfig.drag, 1e-6))

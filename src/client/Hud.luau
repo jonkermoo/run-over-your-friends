@@ -839,6 +839,7 @@ RunService.RenderStepped:Connect(function()
 	if hasJet then
 		table.insert(keys, "hold SHIFT jet up")
 		table.insert(keys, "hold Q/E roll")
+		table.insert(keys, "S air brake")
 	end
 	if hasJet then
 		table.insert(keys, "hold R rear jet")

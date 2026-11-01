@@ -10,6 +10,7 @@ return table.freeze({
 	top = 45, -- forward m/s on W under the jet (about 100 mph)
 	reverseTop = 10,
 	accel = 14, -- forward/back m/s^2 under the jet
+	brake = 20, -- m/s^2 the nose jets slow it by on S in the air
 	drag = 5, -- m/s^2 it slows by with no throttle (and above top speed)
 	sideDrag = 12, -- sideways drift after a turn dies out at this rate, so it ends up flying where it points
 	drain = 25, -- meter per second of jet (4 s from full)

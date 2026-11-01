@@ -64,6 +64,10 @@ local ESC_DRIFT_SLACK, ESC_DRIFT_GAIN = 0.08, 12
 local THRUST_DV, THRUST_TIME, THRUST_COOLDOWN = 25, 0.6, 12
 local BIG = 1e8
 local GROUND_FORCE = Vector3.new(BIG, 0, BIG)
+-- cold-gas thruster sounds (Pro Sound Effects, see ASSETS_LICENSES.md): a steady stretch of an air
+-- release for the big jets, a short spray burst when a steering nozzle opens
+local GAS_LOOP, GAS_LOOP_REGION = "rbxassetid://9116496074", NumberRange.new(1, 3.1)
+local GAS_BURST = "rbxassetid://9113046025"
 local FLY_FORCE = Vector3.new(BIG, BIG, BIG)
 local BOMB_HOLD = 1.5
 -- suspension
@@ -139,8 +143,9 @@ type CarState = {
 	frontSlide: number,
 	rearSlide: number,
 	marks: { { trail: Trail, front: boolean } },
-	lift: { ParticleEmitter }, -- belly gas jets (Roadster)
-	jets: { ParticleEmitter }, -- rear gas jets (Roadster thruster)
+	thrusters: { [string]: { ParticleEmitter } }, -- Roadster gas nozzles by job (see Thrusters below)
+	jetSounds: { [string]: Sound }, -- Roadster: Lift, Rear and Puff loops, Burst one-shot
+	puffing: boolean,
 	dust: ParticleEmitter,
 	fall: number, -- fastest m/s down during the current time in the air
 	engine: Vehicles.Engine,
@@ -259,7 +264,9 @@ local function track(car: Instance)
 		end
 	end
 	local _, size = car:GetBoundingBox()
-	-- cold-gas nozzles on the Roadster: four under the floor, four across the tail
+	-- cold-gas nozzles on the Roadster, by job: Lift (four under the floor), Rear (four across the tail),
+	-- Brake (two in the nose), YawL/YawR (side pairs, front on one side and back on the other) and
+	-- RollL/RollR (one up on one flank, one down on the other)
 	local function gas(at: Vector3, face: Enum.NormalId, puff: number): ParticleEmitter
 		local a = Instance.new("Attachment")
 		a.Position = at
@@ -285,25 +292,68 @@ local function track(car: Instance)
 		p.Parent = a
 		return p
 	end
-	local lift, jets = {}, {}
+	local thrusters: { [string]: { ParticleEmitter } } = {}
+	local jetSounds: { [string]: Sound } = {}
 	if Vehicles.has(stats, "Jet") then
-		local hx, hz = chassis.Size.X * 0.32, chassis.Size.Z * 0.32
-		local floor = -chassis.Size.Y / 2
-		for _, x in { -hx, hx } do
-			for _, z in { -hz, hz } do
-				table.insert(lift, gas(Vector3.new(x, floor, z), Enum.NormalId.Bottom, 1.2))
+		local X, Y, Z = chassis.Size.X, chassis.Size.Y, chassis.Size.Z
+		local N = Enum.NormalId
+		thrusters.Lift = {}
+		for _, x in { -X * 0.32, X * 0.32 } do
+			for _, z in { -Z * 0.32, Z * 0.32 } do
+				table.insert(thrusters.Lift, gas(Vector3.new(x, -Y / 2, z), N.Bottom, 1.2))
 			end
 		end
+		thrusters.Rear = {}
 		for _, x in { -0.36, -0.12, 0.12, 0.36 } do
-			table.insert(
-				jets,
-				gas(
-					Vector3.new(x * chassis.Size.X, 0, chassis.Size.Z / 2 + 0.3),
-					Enum.NormalId.Back,
-					0.8
-				)
-			)
+			table.insert(thrusters.Rear, gas(Vector3.new(x * X, 0, Z / 2 + 0.3), N.Back, 0.8))
 		end
+		thrusters.Brake = {
+			gas(Vector3.new(-X * 0.3, 0, -Z / 2 - 0.3), N.Front, 1.1),
+			gas(Vector3.new(X * 0.3, 0, -Z / 2 - 0.3), N.Front, 1.1),
+		}
+		local side, fore = X / 2 + 0.2, Z * 0.36
+		-- turning right: the front blows out to the left and the back out to the right
+		thrusters.YawR = {
+			gas(Vector3.new(-side, 0, -fore), N.Left, 0.9),
+			gas(Vector3.new(side, 0, fore), N.Right, 0.9),
+		}
+		thrusters.YawL = {
+			gas(Vector3.new(side, 0, -fore), N.Right, 0.9),
+			gas(Vector3.new(-side, 0, fore), N.Left, 0.9),
+		}
+		-- rolling right: the left flank blows down and the right flank blows up
+		thrusters.RollR = {
+			gas(Vector3.new(-side, -Y / 2, 0), N.Bottom, 0.9),
+			gas(Vector3.new(side, Y / 2, 0), N.Top, 0.9),
+		}
+		thrusters.RollL = {
+			gas(Vector3.new(side, -Y / 2, 0), N.Bottom, 0.9),
+			gas(Vector3.new(-side, Y / 2, 0), N.Top, 0.9),
+		}
+		for name, pitch in { Lift = 0.85, Rear = 1.15, Puff = 1.6 } do
+			local snd = Instance.new("Sound")
+			snd.Name = name .. "Jet"
+			snd.SoundId = GAS_LOOP
+			snd.PlaybackRegionsEnabled = true
+			snd.PlaybackRegion = GAS_LOOP_REGION
+			snd.LoopRegion = GAS_LOOP_REGION
+			snd.Looped = true
+			snd.PlaybackSpeed = pitch
+			snd.Volume = 0
+			snd.RollOffMinDistance = 15
+			snd.RollOffMaxDistance = 250
+			snd.Parent = chassis
+			snd:Play()
+			jetSounds[name] = snd
+		end
+		local burst = Instance.new("Sound")
+		burst.Name = "GasBurst"
+		burst.SoundId = GAS_BURST
+		burst.Volume = 0.7
+		burst.RollOffMinDistance = 15
+		burst.RollOffMaxDistance = 200
+		burst.Parent = chassis
+		jetSounds.Burst = burst
 	end
 	-- a puff of dust when it lands hard
 	local dustAt = Instance.new("Attachment")
@@ -368,8 +418,9 @@ local function track(car: Instance)
 		frontSlide = 0,
 		rearSlide = 0,
 		marks = marks,
-		lift = lift,
-		jets = jets,
+		thrusters = thrusters,
+		jetSounds = jetSounds,
+		puffing = false,
 		dust = dust,
 		fall = 0,
 		engine = Vehicles.Engines[stats.engine],
@@ -393,6 +444,7 @@ local stuckFor = 0
 local flying = false -- Roadster in the air under flight control
 local jetOn = false -- its jet is lifting it right now
 local rearOn = false -- its rear jet is pushing it along the nose right now
+local braking = false -- its nose jets are braking it in the air right now
 local liftedAt = 0
 local flyYaw = 0
 local bombHeld = 0
@@ -411,7 +463,7 @@ local function stopDriving()
 		end
 	end
 	driving = nil
-	flying, jetOn, rearOn = false, false, false
+	flying, jetOn, rearOn, braking = false, false, false, false
 	speed, lateral, yawRate, steer = 0, 0, 0, 0
 	Drive.state.driving = false
 	camera.FieldOfView = baseFov
@@ -896,6 +948,9 @@ local function step(dt: number)
 		end
 		jetOn = flying and lifting
 
+		-- S in the air fires the nose jets to brake; they run off their own small tank, so it always works
+		braking = flying and throttle < 0 and actualForward > 0.5
+
 		local alphaF, alphaR = 0, 0
 		if flying and not flung then
 			local nose = chassis.CFrame.LookVector
@@ -925,6 +980,15 @@ local function step(dt: number)
 			else
 				-- lift jet off: it drops, carried by its momentum; the rear jet still pushes along the nose
 				drive.Enabled = false
+				if braking then
+					-- the nose jets bleed off its speed over the ground (they never push it backwards)
+					local moving = chassis.AssemblyLinearVelocity
+					local flat = Vector3.new(moving.X, 0, moving.Z)
+					local cut = math.min(flat.Magnitude, Flight.brake * spm * dt)
+					if cut > 0 then
+						chassis.AssemblyLinearVelocity = moving - flat.Unit * cut
+					end
+				end
 				if thrusting then
 					chassis.AssemblyLinearVelocity += nose * Flight.thrust * spm * dt
 				end
@@ -1096,16 +1160,48 @@ local function step(dt: number)
 		local up = chassis.AssemblyLinearVelocity.Y / spm
 		s.fall = if s.airborne then math.max(s.fall, -up) else 0
 
-		-- the gas jets: the driver knows; everyone else reads it off the car's motion
-		if #s.lift > 0 then
-			local hovering = if s == driving then jetOn else s.airborne and up > -1
-			for _, p in s.lift do
-				p.Enabled = hovering
+		-- the gas jets: the driver knows which are firing; everyone else reads it off the car's motion
+		if s.thrusters.Lift then
+			local on: { [string]: boolean } = {}
+			local spinY = chassis.AssemblyAngularVelocity.Y
+			local spinNose = chassis.AssemblyAngularVelocity:Dot(chassis.CFrame.LookVector)
+			if s == driving then
+				local steerIn = seat and seat:IsA("VehicleSeat") and seat.SteerFloat or 0
+				on.Lift, on.Rear, on.Brake = jetOn, rearOn, braking
+				on.YawR, on.YawL = flying and steerIn > 0, flying and steerIn < 0
+				on.RollR, on.RollL =
+					flying and Drive.input.roll > 0, flying and Drive.input.roll < 0
+			else
+				local air = s.airborne
+				on.Lift = air and up > -1
+				on.Rear = s.accel.Z > 1.7 * G
+				on.Brake = air and s.accel.Z < -1.2 * G
+				on.YawR, on.YawL = air and spinY < -0.5, air and spinY > 0.5
+				on.RollR, on.RollL = air and spinNose > 1, air and spinNose < -1
+			end
+			for job, list in s.thrusters do
+				for _, p in list do
+					p.Enabled = on[job] == true
+				end
+			end
+			for _, p in s.thrusters.Lift do
 				p.Rate = if up > 1 then 90 else 35
 			end
-			local pushing = if s == driving then rearOn else s.accel.Z > 1.7 * G
-			for _, p in s.jets do
-				p.Enabled = pushing
+			local puffing = on.Brake or on.YawR or on.YawL or on.RollR or on.RollL
+			if puffing and not s.puffing then
+				s.jetSounds.Burst:Play()
+			end
+			s.puffing = puffing
+			local fade = math.min(1, dt * 12)
+			for name, want in
+				{
+					Lift = if on.Lift then 1.1 else 0,
+					Rear = if on.Rear then 1.2 else 0,
+					Puff = if puffing then (if on.Brake then 0.9 else 0.5) else 0,
+				}
+			do
+				local snd = s.jetSounds[name]
+				snd.Volume += (want - snd.Volume) * fade
 			end
 		end
 

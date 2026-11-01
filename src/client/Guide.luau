@@ -251,7 +251,7 @@ local function vehicleTips(id: string)
 	if Vehicles.has(v, "Jet") then
 		text = if touch
 			then "Hold FLY to jet upward; let go and you drop. Steer as normal; hold ROLL L/R to roll, hold BOOST for the rear jet."
-			else "Hold SHIFT to jet upward; let go and you drop. W/S and A/D fly it, hold Q/E to roll, hold R for the rear jet."
+			else "Hold SHIFT to jet upward; let go and you drop. A/D steer, S air-brakes, hold Q/E to roll, hold R for the rear jet."
 	elseif Vehicles.has(v, "Thruster") then
 		text = if touch then "Tap BOOST for a thruster burst." else "Press R for a thruster burst."
 	elseif Vehicles.has(v, "Taxi") then

@@ -1,7 +1,7 @@
 --!strict
 -- Flight maths: the car's speeds along its heading, sideways and up, one step at a time.
--- With the jet on it climbs and burns fuel, W/S speed it up and slow it down, and sideways drift dies
--- out; with the jet off (or out of fuel) it just falls, keeping its momentum. Pure numbers, so Lune tests it.
+-- With the jet on it climbs and burns fuel, W speeds it up, S air-brakes it (then backs it up), and
+-- sideways drift dies out; with the jet off (or out of fuel) it just falls, keeping its momentum. Pure numbers, so Lune tests it.
 
 local Flight = {}
 
@@ -12,6 +12,7 @@ export type Config = {
 	top: number,
 	reverseTop: number,
 	accel: number,
+	brake: number,
 	drag: number,
 	sideDrag: number,
 	drain: number,
@@ -36,7 +37,16 @@ function Flight.step(s: State, throttle: number, jet: boolean, dt: number, c: Co
 		else 0
 	local pushing = throttle ~= 0 and math.sign(target - s.forward) == math.sign(throttle)
 	return {
-		forward = toward(s.forward, target, (if pushing then c.accel else c.drag) * dt),
+		forward = toward(
+			s.forward,
+			target,
+			(
+				if not pushing
+					then c.drag
+					elseif throttle < 0 and s.forward > 0 then c.brake
+					else c.accel
+			) * dt
+		),
 		side = toward(s.side, 0, c.sideDrag * dt),
 		up = toward(s.up, c.climb, c.climbAccel * dt),
 		fuel = math.max(0, s.fuel - c.drain * dt),
