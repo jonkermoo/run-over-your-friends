@@ -14,6 +14,7 @@ Net.Messages = table.freeze({
 	ClaimLike = "ClaimLike", -- ()
 	HitNpc = "HitNpc", -- (npc: Model, velocity: Vector3)
 	BreakAt = "BreakAt", -- (position: Vector3, velocity: Vector3)
+	KnockProp = "KnockProp", -- (prop: Model, velocity: Vector3): street furniture hit by a vehicle
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
@@ -35,6 +36,7 @@ export type MessageName =
 	| "ClaimLike"
 	| "HitNpc"
 	| "BreakAt"
+	| "KnockProp"
 	| "WreckerHit"
 	| "SelfDestruct"
 	| "Feature"

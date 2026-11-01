@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local VehicleService = require(script.Parent.VehicleService)
@@ -19,6 +20,8 @@ type Chunk = { cf: CFrame, transparency: number, glass: boolean }
 local chunks: { [BasePart]: Chunk } = {}
 local loose: { { part: BasePart, at: number } } = {}
 local buildingsFolder: Folder? = nil
+local propsFolder: Folder? = nil
+local propDownUntil: { [Model]: number } = {}
 local lastBreak: { [Player]: number } = {}
 local random = Random.new()
 
@@ -31,6 +34,16 @@ function BuildingService.register(folder: Folder)
 				transparency = p.Transparency,
 				glass = p:GetAttribute("Glass") == true,
 			}
+		end
+	end
+end
+
+-- street furniture: knocked flying by any vehicle, stood back up later
+function BuildingService.registerProps(folder: Folder)
+	propsFolder = folder
+	for _, p in folder:GetDescendants() do
+		if p:IsA("BasePart") then
+			chunks[p] = { cf = p.CFrame, transparency = p.Transparency, glass = false }
 		end
 	end
 end
@@ -205,8 +218,98 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	BuildingService.breakAt(pos, Impact.breakRadius(energy), velocity.Unit * speed, player)
 end
 
+local function spray(at: Vector3)
+	local a = Instance.new("Attachment")
+	a.Parent = workspace.Terrain
+	a.WorldPosition = at
+	local fx = Instance.new("ParticleEmitter")
+	fx.Color = ColorSequence.new(Color3.fromRGB(200, 230, 255))
+	fx.Size = NumberSequence.new(0.8, 2.4)
+	fx.Transparency = NumberSequence.new(0.2, 1)
+	fx.Speed = NumberRange.new(40, 60)
+	fx.SpreadAngle = Vector2.new(12, 12)
+	fx.Lifetime = NumberRange.new(1, 1.6)
+	fx.Acceleration = Vector3.new(0, -70, 0)
+	fx.EmissionDirection = Enum.NormalId.Top
+	fx.Rate = 120
+	fx.Parent = a
+	Debris:AddItem(a, Streets.HydrantSpraySeconds)
+end
+
+local lastProp: { [Player]: number } = {}
+
+local function onKnockProp(player: Player, prop: unknown, velocity: unknown)
+	local folder = propsFolder
+	if
+		not folder
+		or typeof(prop) ~= "Instance"
+		or not prop:IsA("Model")
+		or prop.Parent ~= folder
+		or typeof(velocity) ~= "Vector3"
+		or velocity ~= velocity
+	then
+		return
+	end
+	local now = os.clock()
+	if (lastProp[player] or 0) + 0.03 > now or (propDownUntil[prop] or 0) > now then
+		return
+	end
+	lastProp[player] = now
+	local vehicle = VehicleService.of(player)
+	local stats = vehicle and VehicleService.stats(vehicle)
+	local chassis = vehicle and vehicle.PrimaryPart
+	if not (vehicle and stats and chassis) then
+		return
+	end
+	local spm = Vehicles.StudsPerMetre
+	local maxStuds = stats.topSpeed
+			/ 2.237
+			* spm
+			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
+		+ 10
+	local speed = math.min(velocity.Magnitude, maxStuds)
+	local pivot = prop:GetPivot().Position
+	local body = VehicleService.bodyNear(vehicle, pivot) or chassis
+	if (pivot - body.Position).Magnitude > body.Size.Magnitude / 2 + 18 + speed * 0.3 then
+		return
+	end
+	propDownUntil[prop] = now + Streets.PropRebuildSeconds
+	local push = (if speed > 0.1 then velocity.Unit * speed else Vector3.zero) * 0.8
+	for _, p in prop:GetDescendants() do
+		if p:IsA("BasePart") and chunks[p] and not p:GetAttribute("Broken") then
+			p:SetAttribute("Broken", true)
+			p.CollisionGroup = "Debris"
+			p.Anchored = false
+			p.AssemblyLinearVelocity = push
+				+ Vector3.new(
+					random:NextNumber(-6, 6),
+					random:NextNumber(18, 34),
+					random:NextNumber(-6, 6)
+				)
+			p.AssemblyAngularVelocity = Vector3.new(
+				random:NextNumber(-6, 6),
+				random:NextNumber(-6, 6),
+				random:NextNumber(-6, 6)
+			)
+			pcall(function()
+				p:SetNetworkOwner(nil)
+			end)
+			task.delay(Streets.PropRebuildSeconds, restore, p)
+		end
+	end
+	if prop:GetAttribute("Prop") == "Hydrant" then
+		spray(pivot + Vector3.new(0, 1, 0))
+	end
+	Net.remote("Fx"):FireAllClients("Break", pivot, 3, 4, player.UserId)
+end
+
 function BuildingService.start()
 	Net.remote("BreakAt").OnServerEvent:Connect(onBreak)
+	Net.remote("KnockProp").OnServerEvent:Connect(onKnockProp)
+	game:GetService("Players").PlayerRemoving:Connect(function(p)
+		lastProp[p] = nil
+		lastBreak[p] = nil
+	end)
 	-- debris: fade out after a while; over budget, the oldest goes first
 	task.spawn(function()
 		while true do

@@ -1,12 +1,15 @@
 --!strict
 -- Client entry.
 local Boards = require(script.Boards)
+local Crowd = require(script.Crowd)
 local Drive = require(script.Drive)
 local EventBanner = require(script.EventBanner)
 local Fx = require(script.Fx)
 local Goals = require(script.Goals)
 local Guide = require(script.Guide)
 local Hud = require(script.Hud)
+local Interiors = require(script.Interiors)
+local Streets = require(script.Streets)
 
 Drive.start()
 Hud.start()
@@ -15,3 +18,6 @@ Goals.start()
 Fx.start()
 Boards.start()
 EventBanner.start()
+Crowd.start()
+Streets.start()
+Interiors.start()

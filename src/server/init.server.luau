@@ -22,10 +22,13 @@ PhysicsService:CollisionGroupSetCollidable("Vehicles", "Characters", false)
 PhysicsService:CollisionGroupSetCollidable("Vehicles", "Npcs", false)
 PhysicsService:CollisionGroupSetCollidable("Vehicles", "Debris", false)
 PhysicsService:CollisionGroupSetCollidable("Npcs", "Characters", false)
+-- people walk through each other instead of shoving into clumps
+PhysicsService:CollisionGroupSetCollidable("Npcs", "Npcs", false)
 
 local Data = require(script.Data)
 local Passes = require(script.Passes)
 local VehicleService = require(script.VehicleService)
+local CrowdService = require(script.CrowdService)
 local NpcService = require(script.NpcService)
 local BuildingService = require(script.BuildingService)
 local WreckerService = require(script.WreckerService)
@@ -40,7 +43,8 @@ local RateLimit = require(script.RateLimit)
 
 local world = MapBuilder.build()
 BuildingService.register(world.buildings)
-NpcService.setWalkPoints(world.walkPoints, world.crowdPoints)
+BuildingService.registerProps(world.props)
+CrowdService.setup(world.places, world.grid)
 VehicleService.setSpawnPoints(world.spawnPoints)
 -- the giant appears at a downtown crossing
 local downtown = {}

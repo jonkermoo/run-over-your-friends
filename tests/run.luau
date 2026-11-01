@@ -1,5 +1,13 @@
 --!strict
 -- Run with: lune run tests/run
+local CityPlan = require("../src/shared/Rules/CityPlan")
+local CrowdConfig = require("../src/shared/Config/Crowd")
+local CrowdRules = require("../src/shared/Rules/Crowd")
+local Districts = require("../src/shared/Rules/Districts")
+local HouseConfig = require("../src/shared/Config/Houses")
+local HouseRules = require("../src/shared/Rules/Houses")
+local InteriorConfig = require("../src/shared/Config/Interiors")
+local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
 local Flight = require("../src/shared/Rules/Flight")
@@ -11,6 +19,8 @@ local Products = require("../src/shared/Config/Products")
 local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
+local Routes = require("../src/shared/Rules/Routes")
+local Tiles = require("../src/shared/Rules/Tiles")
 local Quests = require("../src/shared/Rules/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
 local World = require("../src/shared/Config/World")
@@ -379,6 +389,504 @@ check(
 	fly({ forward = 0, side = 9, up = 0, fuel = 0 }, 0, false, 1).side == 0
 )
 check("gliding keeps the fuel", fly(still, 1, false, 2).fuel == 100)
+-- city plan
+local M = World.Map
+local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
+local kindsCount = CityPlan.count(plan)
+local ci, cj = CityPlan.centre(M.BlocksX, M.BlocksZ)
+check("spawn plaza in the middle, once", plan[ci][cj] == "spawn" and kindsCount.spawn == 1)
+check(
+	"one delivery warehouse on the west edge",
+	kindsCount.warehouse == 1 and plan[0][cj] == "warehouse"
+)
+check(
+	"two fast-food places, one next to spawn",
+	kindsCount.restaurant == 2 and plan[ci][cj - 1] == "restaurant"
+)
+check("plenty of offices", (kindsCount.office or 0) >= 8)
+check("lots of home blocks", (kindsCount.homes or 0) >= 12)
+check(
+	"parks, plazas, shops and parking remain",
+	(kindsCount.park or 0) >= 2
+		and (kindsCount.plaza or 0) >= 2
+		and (kindsCount.shops or 0) >= 2
+		and (kindsCount.parking or 0) >= 1
+)
+local samePlan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
+local planStable = true
+for i = 0, M.BlocksX - 1 do
+	for j = 0, M.BlocksZ - 1 do
+		if samePlan[i][j] ~= plan[i][j] then
+			planStable = false
+		end
+	end
+end
+check("same seed, same city", planStable)
+local rollsOk, rollBuckets = true, {}
+for i = 0, 40 do
+	local r = CityPlan.roll(M.Seed, i, i * 3)
+	rollsOk = rollsOk and r >= 0 and r < 1
+	rollBuckets[math.floor(r * 20)] = true
+end
+local distinctN = 0
+for _ in rollBuckets do
+	distinctN += 1
+end
+check("block rolls spread over [0, 1)", rollsOk and distinctN >= 12)
+
+-- sidewalk routes
+local pitch = M.BlockSize + M.RoadWidth
+local grid = {
+	blocksX = M.BlocksX,
+	blocksZ = M.BlocksZ,
+	block = M.BlockSize,
+	road = M.RoadWidth,
+	sidewalk = M.SidewalkWidth,
+	x0 = -(M.BlocksX * pitch + M.RoadWidth) / 2,
+	z0 = -(M.BlocksZ * pitch + M.RoadWidth) / 2,
+}
+local graph = Routes.new(grid)
+local doors = {}
+for i = 0, M.BlocksX - 1 do
+	for j = 0, M.BlocksZ - 1 do
+		local cx, cz = Routes.blockCentre(grid, i, j)
+		table.insert(doors, Routes.addOnSide(graph, i, j, cx + 20, cz - 60))
+		table.insert(doors, Routes.addOnSide(graph, i, j, cx - 70, cz + 10))
+	end
+end
+Routes.finish(graph)
+local inner = M.BlockSize / 2 - M.SidewalkWidth
+local function insideBlock(x: number, z: number): boolean
+	for i = 0, M.BlocksX - 1 do
+		for j = 0, M.BlocksZ - 1 do
+			local cx, cz = Routes.blockCentre(grid, i, j)
+			if math.abs(x - cx) < inner - 0.01 and math.abs(z - cz) < inner - 0.01 then
+				return true
+			end
+		end
+	end
+	return false
+end
+local linksOk = true
+for from, list in graph.links do
+	for _, to in list do
+		local na, nb = graph.nodes[from], graph.nodes[to]
+		for t = 0, 1, 0.25 do
+			if insideBlock(na.x + (nb.x - na.x) * t, na.z + (nb.z - na.z) * t) then
+				linksOk = false
+			end
+		end
+		if na.x ~= nb.x and na.z ~= nb.z then
+			linksOk = false -- every link runs straight along a sidewalk or across a road
+		end
+	end
+end
+check("no sidewalk link cuts through a block", linksOk)
+local far = Routes.path(
+	graph,
+	Routes.corner(graph, 0, 0, -1, -1),
+	Routes.corner(graph, M.BlocksX - 1, M.BlocksZ - 1, 1, 1)
+)
+local pathOk = far ~= nil
+if far then
+	for k = 2, #far do
+		local linked = false
+		for _, n in graph.links[far[k - 1]] do
+			if n == far[k] then
+				linked = true
+			end
+		end
+		pathOk = pathOk and linked
+	end
+end
+check("a path crosses the whole city along links", pathOk)
+local reachAll = true
+for _, d in doors do
+	if not Routes.path(graph, doors[1], d) then
+		reachAll = false
+	end
+end
+check("every door is reachable", reachAll)
+local scx, scz = Routes.blockCentre(grid, 2, 2)
+local _, sx, sz = Routes.onSide(grid, 2, 2, scx + 1, scz)
+check("a door near the middle snaps onto a sidewalk", math.abs(sx - scx) + math.abs(sz - scz) > 90)
+check(
+	"nearest node of a corner is that corner",
+	Routes.nearest(graph, graph.nodes[5].x, graph.nodes[5].z) == 5
+)
+check("path to itself is one node", #(Routes.path(graph, 7, 7) :: { number }) == 1)
+
+-- crowd
+math.randomseed(42)
+local places = {}
+for _ = 1, 60 do
+	table.insert(places, "home")
+end
+for _, k in
+	{
+		"office",
+		"office",
+		"office",
+		"office",
+		"restaurant",
+		"restaurant",
+		"warehouse",
+		"spawn",
+		"stunt",
+		"shop",
+		"park",
+	}
+do
+	table.insert(places, k)
+end
+local people = CrowdRules.roster(places :: any, CrowdConfig, 12, math.random)
+local perHome, staff, walkers, crowdN = {}, 0, 0, 0
+for _, p in people do
+	if p.role == "resident" then
+		perHome[p.home :: number] = (perHome[p.home :: number] or 0) + 1
+	elseif p.role == "food" or p.role == "warehouse" then
+		staff += 1
+	elseif p.role == "walker" then
+		walkers += 1
+	elseif p.role == "crowd" then
+		crowdN += 1
+	end
+end
+local homesOk = true
+for k = 1, 60 do
+	local n = perHome[k] or 0
+	homesOk = homesOk and n >= CrowdConfig.ResidentsMin and n <= CrowdConfig.ResidentsMax
+end
+check("every home has 1 to 3 residents", homesOk)
+check(
+	"restaurant and warehouse staff",
+	staff == 2 * CrowdConfig.RestaurantStaff + CrowdConfig.WarehouseStaff
+)
+check("walkers and the spawn crowd", walkers == CrowdConfig.Walkers and crowdN == 12)
+local friendsN = CrowdRules.pickFriends(people, CrowdConfig.FriendEvery, math.random)
+local friendsMarked, staffFriends = 0, 0
+for _, p in people do
+	if p.friend then
+		friendsMarked += 1
+		if not CrowdRules.canBeFriend(p) then
+			staffFriends += 1
+		end
+	end
+end
+check(
+	"one in six is a friend",
+	friendsN == friendsMarked and friendsMarked == math.floor(#people / 6)
+)
+check("staff in uniform are never friends", staffFriends == 0)
+check(
+	"picking friends twice doesn't add more",
+	CrowdRules.pickFriends(people, 6, math.random) == friendsMarked
+)
+check("no friends from a tiny crowd", CrowdRules.pickFriends({ people[1] }, 6, math.random) == 0)
+check(
+	"first of six shown: no friend yet, then one",
+	not CrowdRules.wantFriend(0, 1, 6) and CrowdRules.wantFriend(0, 5, 6)
+)
+check(
+	"one friend in six shown is enough",
+	not CrowdRules.wantFriend(1, 6, 6) and CrowdRules.wantFriend(1, 11, 6)
+)
+local sim, simFriends = 0, 0
+for _ = 1, 90 do
+	if CrowdRules.wantFriend(simFriends, sim, 6) then
+		simFriends += 1
+	end
+	sim += 1
+end
+check("building 90 people one by one gives 15 friends", simFriends == 15)
+local cands = {}
+for k = 1, 200 do
+	table.insert(cands, { dist = k * 3, indoor = k % 5 == 0, active = k % 7 == 0 })
+end
+local act = CrowdRules.pickActive(cands, CrowdConfig)
+local actN, actOk = 0, true
+for k in act do
+	actN += 1
+	local c = cands[k]
+	local r = if c.indoor
+		then (if c.active then CrowdConfig.IndoorLeave else CrowdConfig.IndoorRadius)
+		else (if c.active then CrowdConfig.DeactivateRadius else CrowdConfig.ActivateRadius)
+	actOk = actOk and c.dist <= r
+end
+check("active people stay under the cap and in range", actN <= CrowdConfig.MaxActive and actOk)
+local edge = CrowdRules.pickActive({
+	{ dist = CrowdConfig.ActivateRadius + 10, indoor = false, active = true },
+	{ dist = CrowdConfig.ActivateRadius + 10, indoor = false, active = false },
+}, CrowdConfig)
+check(
+	"someone built stays a bit past the edge, a newcomer there doesn't appear",
+	edge[1] == true and edge[2] == nil
+)
+local few = CrowdRules.pickActive(
+	{ { dist = 10, indoor = false, active = false }, { dist = 5, indoor = true, active = false } },
+	{
+		MaxActive = 1,
+		ActivateRadius = 100,
+		DeactivateRadius = 120,
+		IndoorRadius = 50,
+		IndoorLeave = 60,
+	}
+)
+check("the cap keeps the nearest", few[2] == true and few[1] == nil)
+local goalsOk = true
+for _ = 1, 200 do
+	goalsOk = goalsOk
+		and CrowdRules.nextGoal("food", true, math.random, CrowdConfig) == "spot"
+		and CrowdRules.nextGoal("warehouse", false, math.random, CrowdConfig) == "spot"
+		and CrowdRules.nextGoal("resident", false, math.random, CrowdConfig) == "home"
+		and CrowdRules.nextGoal("office", false, math.random, CrowdConfig) == "work"
+		and CrowdRules.nextGoal("crowd", false, math.random, CrowdConfig) == "crowd"
+		and CrowdRules.nextGoal("resident", true, math.random, CrowdConfig) ~= "home"
+		and CrowdRules.nextGoal("walker", false, math.random, CrowdConfig) ~= "stay"
+end
+check("staff stay at work, people out go home or back to work", goalsOk)
+local stays = 0
+for _ = 1, 1000 do
+	if CrowdRules.nextGoal("resident", true, math.random, CrowdConfig) == "stay" then
+		stays += 1
+	end
+end
+check(
+	"residents at home stay in about HomeStayChance of the time",
+	math.abs(stays / 1000 - CrowdConfig.HomeStayChance) < 0.06
+)
+local function rgbOk(list: { { number } }): boolean
+	for _, c in list do
+		if #c ~= 3 then
+			return false
+		end
+		for _, v in c do
+			if v < 0 or v > 255 then
+				return false
+			end
+		end
+	end
+	return true
+end
+check(
+	"outfit colours are RGB",
+	rgbOk(CrowdConfig.Skin)
+		and rgbOk(CrowdConfig.Casual.Shirts)
+		and rgbOk(CrowdConfig.Casual.Pants)
+		and rgbOk(CrowdConfig.Office.Shirts)
+		and rgbOk({ CrowdConfig.Food.Shirt, CrowdConfig.Food.Cap, CrowdConfig.Warehouse.Vest })
+)
+check(
+	"walkers reappear out of view but inside the build radius",
+	CrowdConfig.RecallMin < CrowdConfig.RecallMax
+		and CrowdConfig.RecallMax < CrowdConfig.ActivateRadius
+		and CrowdConfig.RecallDistance > CrowdConfig.DeactivateRadius
+)
+check(
+	"activate inside deactivate radius",
+	CrowdConfig.ActivateRadius < CrowdConfig.DeactivateRadius
+		and CrowdConfig.IndoorRadius < CrowdConfig.IndoorLeave
+)
+local namesOk = #CrowdConfig.OfficeNames >= 4
+local signNames = { CrowdConfig.RestaurantName, CrowdConfig.WarehouseName }
+for _, n in CrowdConfig.OfficeNames do
+	table.insert(signNames, n)
+end
+for _, n in signNames do
+	local low = string.lower(n)
+	if string.find(low, "amazon") or string.find(low, "mcdonald") or string.find(low, "^mc") then
+		namesOk = false
+	end
+end
+check("sign names are parodies, not real brands", namesOk)
+
+-- districts and the street kit
+local districtCount = {}
+for i = 0, 7 do
+	for j = 0, 7 do
+		local d = Districts.of(i, j, 8, 8)
+		districtCount[d] = (districtCount[d] or 0) + 1
+	end
+end
+check(
+	"canal quarter is the east two columns",
+	districtCount.canal == 16 and Districts.of(7, 0, 8, 8) == "canal"
+)
+check(
+	"old town is the north-west corner",
+	Districts.of(0, 0, 8, 8) == "old" and districtCount.old == 9
+)
+check(
+	"stadium row, dockside and maple hills exist",
+	districtCount.stadium == 6 and districtCount.dock == 3 and (districtCount.maple or 0) >= 12
+)
+check(
+	"downtown is the middle",
+	Districts.of(4, 4, 8, 8) == "neon" and (districtCount.neon or 0) >= 10
+)
+local MATERIALS = {
+	SmoothPlastic = true,
+	Brick = true,
+	Cobblestone = true,
+	WoodPlanks = true,
+	CorrodedMetal = true,
+	Concrete = true,
+	Wood = true,
+	Metal = true,
+	Slate = true,
+}
+local stylesOk = true
+for key, d in Streets.Districts do
+	stylesOk = stylesOk
+		and MATERIALS[d.wallMaterial] == true
+		and MATERIALS[d.sidewalkMaterial] == true
+		and rgbOk(d.walls)
+		and rgbOk({ d.sidewalk, d.accent })
+		and d.trees >= 0
+		and d.trees <= 1
+		and districtCount[key] ~= nil
+end
+check("every district has a valid look and appears on the map", stylesOk)
+local pitchS = World.Map.BlockSize
+check(
+	"crossings sit inside the block span, stop lines behind them",
+	Streets.ZebraInset + Streets.ZebraLength / 2 < Streets.StopLineInset
+		and Streets.StopLineInset < Streets.EndClear + 4
+		and Streets.EndClear * 2 < pitchS
+)
+check(
+	"lane dashes fit",
+	Streets.DashLength > 0 and Streets.DashGap > 0 and Streets.ZebraStripes >= 3
+)
+check("billboards are parodies", #Streets.Billboards >= 4)
+check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
+
+-- house kit
+check(
+	"type picks follow the weight bands",
+	HouseRules.pickType({ A = 0.5, B = 0.5 }, 0.1) == "A"
+		and HouseRules.pickType({ A = 0.5, B = 0.5 }, 0.9) == "B"
+)
+check(
+	"a single-type district always builds it",
+	HouseRules.pickType(HouseConfig.ByDistrict.old, 0.99) == "D"
+)
+local palOk = true
+math.randomseed(7)
+local prev = nil
+for _ = 1, 500 do
+	local k = HouseRules.pickPalette(#HouseConfig.Palettes, prev, math.random())
+	palOk = palOk and k >= 1 and k <= #HouseConfig.Palettes and k ~= prev
+	prev = k
+end
+check("neighbours never share a palette", palOk)
+check(
+	"one palette, no choice",
+	HouseRules.pickPalette(1, 1, 0.5) == 1 and HouseRules.pickPalette(3, 9, 0.99) <= 3
+)
+local lotWidth = (World.Map.BlockSize - 2 * World.Map.SidewalkWidth) / HouseConfig.PerSide
+local houseOk = true
+for key, t in HouseConfig.Types do
+	houseOk = houseOk and t.width * t.perLot <= lotWidth - 2 and t.floors >= 1 and t.perLot >= 1
+	houseOk = houseOk
+		and (World.Map.BlockSize - 2 * World.Map.SidewalkWidth) / 2
+				- HouseConfig.Yard
+				- t.depth
+			> 20
+	for _, w in HouseConfig.ByDistrict do
+		if w[key] then
+			houseOk = houseOk and w[key] > 0
+		end
+	end
+end
+check("every house type fits its lot with a garden behind", houseOk)
+local distOk = true
+for _, w in HouseConfig.ByDistrict do
+	for key in w do
+		distOk = distOk and HouseConfig.Types[key] ~= nil
+	end
+end
+for key in Streets.Districts do
+	distOk = distOk and HouseConfig.ByDistrict[key] ~= nil
+end
+check("every district builds known house types", distOk)
+local palsOk = #HouseConfig.Palettes >= 4
+for _, pal in HouseConfig.Palettes do
+	palsOk = palsOk
+		and rgbOk({ pal.wall, pal.trim, pal.accent, pal.roof })
+		and MATERIALS[pal.material] == true
+end
+check("house palettes are valid", palsOk)
+
+-- house interiors
+local interiorOk, sitOnSeat, spotsInside = true, true, true
+for kind, t in HouseConfig.Types do
+	local layout = InteriorConfig.Layouts[kind]
+	interiorOk = interiorOk and layout ~= nil and #layout.spots >= 3
+	if layout then
+		local xLo, xHi = -t.width / 2 + 1.5, t.width / 2 - 1.5
+		if kind == "C" then
+			xHi = -t.width / 2 + 22 - 1.5 -- the two-storey block; the garage is on the right
+		end
+		local zLim = t.depth / 2 - 1.5
+		for _, piece in layout.pieces do
+			spotsInside = spotsInside
+				and piece.x >= xLo
+				and piece.x <= xHi
+				and math.abs(piece.z) <= zLim
+		end
+		for _, sp in layout.spots do
+			spotsInside = spotsInside and sp.x >= xLo and sp.x <= xHi and math.abs(sp.z) <= zLim
+			if sp.sit then
+				local seat = false
+				for _, piece in layout.pieces do
+					if
+						(piece.kind == "Sofa" or piece.kind == "Chair")
+						and math.abs(piece.x - sp.x) < 0.01
+						and math.abs(piece.z - sp.z) < 0.01
+					then
+						seat = seat or (piece.fx == sp.fx and piece.fz == sp.fz)
+					end
+				end
+				sitOnSeat = sitOnSeat and seat
+			end
+		end
+	end
+end
+check("every house type has a furnished ground floor with spots", interiorOk)
+check("furniture and spots sit inside the house", spotsInside)
+check("people only sit on a sofa or chair, facing its way", sitOnSeat)
+check(
+	"interior settings sane",
+	InteriorConfig.Radius > 0
+		and InteriorConfig.MaxFurnished > 0
+		and InteriorConfig.SitHeight > 1
+		and InteriorConfig.SitHeight < 3.5
+)
+
+-- long map parts are tiled under Roblox's 2048-stud cap
+local function tilesCover(lenX: number, lenZ: number): boolean
+	local list = Tiles.split(lenX, lenZ, 2048)
+	local area, ok = 0, true
+	for _, t in list do
+		area += t.sx * t.sz
+		ok = ok and t.sx <= 2048 and t.sz <= 2048
+		ok = ok
+			and math.abs(t.x) + t.sx / 2 <= lenX / 2 + 1e-6
+			and math.abs(t.z) + t.sz / 2 <= lenZ / 2 + 1e-6
+	end
+	return ok and math.abs(area - lenX * lenZ) < 1e-3
+end
+check(
+	"the 6000-stud ground becomes 9 tiles that cover it",
+	#Tiles.split(6000, 6000, 2048) == 9 and tilesCover(6000, 6000)
+)
+check("a long road becomes 2 tiles", #Tiles.split(64, 2336, 2048) == 2 and tilesCover(64, 2336))
+check(
+	"a short part stays one piece",
+	#Tiles.split(220, 220, 2048) == 1 and Tiles.split(220, 220, 2048)[1].x == 0
+)
+check("exactly 2048 stays one piece", #Tiles.split(2048, 10, 2048) == 1)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)
