@@ -242,7 +242,7 @@ function Kit.row(
 			end
 		elseif g.k == "d" then
 			wallPart(ctx, Vector3.new(len, h - 8.5, T), mid, y0 + 8.5 + (h - 8.5) / 2, zc)
-			put(ctx, Vector3.new(len + 1, 0.6, T + 0.4), mid, y0 + 8.8, zFace + s * 0.2, ctx.trim)
+			put(ctx, Vector3.new(len + 1, 0.6, T + 0.4), mid, y0 + 8.75, zFace + s * 0.2, ctx.trim)
 			if not g.bare then
 				-- the door stands open inside, hinged on its left
 				put(
@@ -277,7 +277,7 @@ function Kit.row(
 				zFace - s * 0.4,
 				Color3.fromRGB(233, 230, 223)
 			)
-			put(ctx, Vector3.new(len + 1, 0.6, T + 0.4), mid, y0 + 9.3, zFace + s * 0.2, ctx.trim)
+			put(ctx, Vector3.new(len + 1, 0.6, T + 0.4), mid, y0 + 9.25, zFace + s * 0.2, ctx.trim)
 			put(
 				ctx,
 				Vector3.new(len + 2, 0.3, 8),
@@ -393,6 +393,9 @@ function Kit.trims(
 	local d = zFront - zBack
 	local zm = (zFront + zBack) / 2
 	local band = ctx.wall:Lerp(Color3.new(0, 0, 0), 0.35)
+	-- the bands run from the middle of the wall outward, never into the room; the cornice stands a hair
+	-- above the wall tops and the roof so their top faces don't flicker
+	local plinth, cornice = T / 2 + 0.15, T / 2 + 0.25
 	for _, z in { zFront, zBack } do
 		local s = if z == zFront then 1 else -1
 		Kit.bandX(
@@ -401,24 +404,52 @@ function Kit.trims(
 			xHalf * 2 + 0.4,
 			Y0 + H.Plinth / 2,
 			H.Plinth,
-			T + 0.3,
-			z - s * T / 2,
+			plinth,
+			z - s * (T - plinth) / 2,
 			band,
 			ctx.material
 		)
-		Kit.bandX(ctx, cx, xHalf * 2 + 0.6, top - 0.4, 0.8, T + 0.5, z - s * T / 2, ctx.trim)
+		Kit.bandX(
+			ctx,
+			cx,
+			xHalf * 2 + 0.6,
+			top - 0.35,
+			0.8,
+			cornice,
+			z - s * (T - cornice) / 2,
+			ctx.trim
+		)
 	end
 	for _, e in { -1, 1 } do
-		local x = cx + e * (xHalf - T / 2)
-		Kit.bandZ(ctx, x, d, Y0 + H.Plinth / 2, H.Plinth, T + 0.3, zm, band, ctx.material)
-		Kit.bandZ(ctx, x, d + 0.6, top - 0.4, 0.8, T + 0.5, zm, ctx.trim)
+		Kit.bandZ(
+			ctx,
+			cx + e * (xHalf - (T - plinth) / 2),
+			d,
+			Y0 + H.Plinth / 2,
+			H.Plinth,
+			plinth,
+			zm,
+			band,
+			ctx.material
+		)
+		Kit.bandZ(
+			ctx,
+			cx + e * (xHalf - (T - cornice) / 2),
+			d + 0.6,
+			top - 0.35,
+			0.8,
+			cornice,
+			zm,
+			ctx.trim
+		)
 		if pilasters then
-			for _, z in { zFront - 0.4, zBack + 0.4 } do
+			-- corner posts, kept inside the wall's thickness on the room side
+			for _, z in { zFront - 0.2, zBack + 0.2 } do
 				local hgt = top - Y0 - H.Plinth - 0.8
 				put(
 					ctx,
-					Vector3.new(1.2, hgt, 1.2),
-					cx + e * (xHalf - 0.4),
+					Vector3.new(0.8, hgt, 0.8),
+					cx + e * (xHalf - 0.2),
 					Y0 + H.Plinth + hgt / 2,
 					z,
 					ctx.trim

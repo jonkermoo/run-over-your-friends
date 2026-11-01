@@ -1,14 +1,19 @@
 --!strict
 -- Interiors, drawn on this screen only: furniture and lamps in the houses nearest the camera (layouts in
 -- Config/Interiors) and in the nearest town buildings (offices, shops, the burger place, the warehouse;
--- layouts in Rules/Interiors, worked out from each building's size). Both match where the server puts
--- people. Nothing here collides or is hit-tested, and a building being smashed loses its furniture until
--- it's rebuilt.
+-- layouts in Rules/Interiors, worked out from each building's size), with their floors, wall linings,
+-- ceilings and lights. Both match where the server puts people. Furniture stops this player on foot (not
+-- in a vehicle, not anyone else); nothing is hit-tested, and a building being smashed loses its furniture
+-- until it's rebuilt. Inside a town building the shade indoors eases warmer and brighter.
 
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Buildings = require(ReplicatedStorage.Shared.Config.Buildings)
 local Config = require(ReplicatedStorage.Shared.Config.Interiors)
+local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Layouts = require(ReplicatedStorage.Shared.Rules.Interiors)
 local World = require(ReplicatedStorage.Shared.Config.World)
 
@@ -16,13 +21,7 @@ local Interiors = {}
 
 local Y0 = 0.08
 local TOWN = Config.Town
-local LAYOUT_CONFIG: Layouts.Config = {
-	FloorHeight = World.Map.FloorHeight,
-	Floors = TOWN.OfficeFloors,
-	DeskEvery = TOWN.DeskEvery,
-	Tables = Buildings.Restaurant.Tables,
-	TableZ = Buildings.Restaurant.TableZ,
-}
+local LAYOUT_CONFIG = Layouts.config(World, Buildings, Houses, Config)
 local WOOD = Color3.fromRGB(140, 98, 62)
 local DARK_WOOD = Color3.fromRGB(96, 66, 44)
 local WHITE = Color3.fromRGB(236, 234, 228)
@@ -49,7 +48,11 @@ local RUGS = {
 local BOOKS =
 	{ Color3.fromRGB(180, 50, 50), Color3.fromRGB(50, 90, 160), Color3.fromRGB(220, 180, 60) }
 
--- how one building is dressed: its fabric and rug, its goods (shops), its accent, and the piece's width
+local PLASTER = Color3.fromRGB(236, 230, 218)
+local SKIRTING = Color3.fromRGB(70, 56, 46)
+local CEILING = Color3.fromRGB(242, 242, 238)
+
+-- how one building is dressed: its fabric and rug, its goods (shops), its accent, and the piece's size
 type Look = {
 	fabric: Color3,
 	rug: Color3,
@@ -57,9 +60,55 @@ type Look = {
 	accent: Color3,
 	w: number,
 	d: number,
+	h: number,
 	m: number, -- -1 when the building is mirrored
 }
 type Build = (folder: Folder, at: CFrame, look: Look) -> ()
+
+-- furniture people bump into on foot (never the floors, linings, ceilings or lamps); it stops being solid
+-- while this player sits in a vehicle, so a car driven into a shop isn't caught on the shelves
+local SOLID: { [string]: boolean } = {}
+for _, k in
+	{
+		"Sofa",
+		"CoffeeTable",
+		"TV",
+		"Bookshelf",
+		"Counter",
+		"Fridge",
+		"DiningTable",
+		"Chair",
+		"Plant",
+		"Reception",
+		"WaterCooler",
+		"LiftCore",
+		"LiftShaft",
+		"CoffeeBar",
+		"CafeTable",
+		"Desk",
+		"Partition",
+		"Shelf",
+		"ShopCounter",
+		"Table",
+		"Case",
+		"Rack",
+		"Bikes",
+		"Crates",
+		"Lamps",
+		"Tanks",
+		"Stands",
+		"Fryer",
+		"DrinkMachine",
+		"Bin",
+		"Forklift",
+		"PackingTable",
+	}
+do
+	SOLID[k] = true
+end
+local solidParts: { [BasePart]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+local solidNow = true -- false while this player is seated
+local building = false -- set while a solid piece is being built
 
 local function block(
 	folder: Folder,
@@ -78,6 +127,11 @@ local function block(
 	p.CFrame = cf
 	p.Color = color
 	p.Material = material or Enum.Material.SmoothPlastic
+	if building then
+		p.CollisionGroup = "Furniture"
+		p.CanCollide = solidNow
+		solidParts[p] = true
+	end
 	p.Parent = folder
 	return p
 end
@@ -101,6 +155,51 @@ local function light(part: BasePart, range: number?, brightness: number?, color:
 	l.Color = color or WARM
 	l.Shadows = false
 	l.Parent = part
+end
+
+-- a ceiling panel's light, shining down over the room
+local function downLight(part: BasePart, range: number?, brightness: number?, color: Color3?)
+	local l = Instance.new("SurfaceLight")
+	l.Face = Enum.NormalId.Bottom
+	l.Angle = TOWN.LightAngle
+	l.Range = range or TOWN.LightRange
+	l.Brightness = brightness or TOWN.LightBrightness
+	l.Color = color or COOL
+	l.Shadows = false
+	l.Parent = part
+end
+
+-- a lining against a wall: the piece's origin is on the wall's inside face, the room in front (-Z); `parts`
+-- go from the floor up as { height, colour, material, proud } (proud = how far it stands off the wall)
+local function lining(f: Folder, at: CFrame, w: number, parts: { { any } })
+	local y = 0
+	for _, p in parts do
+		local h, proud = p[1] :: number, (p[4] or 0.2) :: number
+		if h > 0 then
+			block(
+				f,
+				Vector3.new(w, h, proud),
+				at * CFrame.new(0, y + h / 2, -proud / 2),
+				p[2],
+				p[3]
+			)
+		end
+		y += h
+	end
+end
+
+-- a rail standing off a lining at height `y` (skirting tops, dado rails, window ledges)
+local function rail(
+	f: Folder,
+	at: CFrame,
+	w: number,
+	y: number,
+	h: number,
+	proud: number,
+	color: Color3,
+	material: Enum.Material?
+)
+	block(f, Vector3.new(w, h, proud), at * CFrame.new(0, y + h / 2, -proud / 2), color, material)
 end
 
 local function glassBox(f: Folder, size: Vector3, cf: CFrame, color: Color3?): Part
@@ -298,8 +397,8 @@ local PIECES: { [string]: Build } = {
 		bottle.Shape = Enum.PartType.Ball
 		bottle.Transparency = 0.3
 	end,
-	LiftCore = function(f, at)
-		local h = World.Map.FloorHeight - 0.4
+	LiftCore = function(f, at, look)
+		local h = look.h
 		block(
 			f,
 			Vector3.new(24, h, 10),
@@ -362,13 +461,26 @@ local PIECES: { [string]: Build } = {
 		round(f, 3, 0.25, at * CFrame.new(0, 3, 0), WHITE)
 		block(f, Vector3.new(0.4, 2.9, 0.4), at * CFrame.new(0, 1.5, 0), DARK)
 	end,
+	-- ceiling panels hang from their origin (the ceiling's underside); a framed light shining down
 	PanelLight = function(f, at)
+		block(
+			f,
+			Vector3.new(4.4, 0.16, 4.4),
+			at * CFrame.new(0, -0.08, 0),
+			STEEL,
+			Enum.Material.Metal
+		)
 		local panel =
-			block(f, Vector3.new(4, 0.2, 4), at * CFrame.new(0, -0.1, 0), COOL, Enum.Material.Neon)
-		light(panel, TOWN.LightRange, TOWN.LightBrightness, COOL)
+			block(f, Vector3.new(4, 0.1, 4), at * CFrame.new(0, -0.21, 0), COOL, Enum.Material.Neon)
+		downLight(panel)
 	end,
 	PanelGlow = function(f, at)
 		block(f, Vector3.new(5, 0.2, 2), at * CFrame.new(0, -0.1, 0), COOL, Enum.Material.Neon)
+	end,
+	PanelLamp = function(f, at)
+		local panel =
+			block(f, Vector3.new(5, 0.2, 2), at * CFrame.new(0, -0.1, 0), COOL, Enum.Material.Neon)
+		downLight(panel)
 	end,
 	Desk = function(f, at)
 		block(f, Vector3.new(6, 0.3, 2.6), at * CFrame.new(0, 2.95, 0), WHITE)
@@ -387,22 +499,44 @@ local PIECES: { [string]: Build } = {
 	end,
 
 	-- shops
+	-- floors are 0.2 thick about their origin, so they meet the slab or ground whatever its exact height
 	Floor = function(f, at, look)
 		block(
 			f,
-			Vector3.new(look.w, 0.1, look.d),
-			at * CFrame.new(0, 0.05, 0),
+			Vector3.new(look.w, 0.2, look.d),
+			at,
 			Color3.fromRGB(176, 132, 90),
 			Enum.Material.WoodPlanks
 		)
 	end,
+	-- the stock-room wall: plaster from the floor to the ceiling, skirting, and the stock-room door
 	Partition = function(f, at, look)
-		block(f, Vector3.new(look.w, 13.4, 0.6), at * CFrame.new(0, 6.7, 0), STONE)
+		block(
+			f,
+			Vector3.new(look.w, look.h, 0.6),
+			at * CFrame.new(0, look.h / 2, 0),
+			PLASTER,
+			Enum.Material.Plaster
+		)
+		block(
+			f,
+			Vector3.new(look.w, 0.6, 0.8),
+			at * CFrame.new(0, 0.3, 0),
+			SKIRTING,
+			Enum.Material.Wood
+		)
 		block(
 			f,
 			Vector3.new(4.4, 8.4, 0.2),
-			at * CFrame.new(-look.w / 2 + 5, 4.2, -0.35),
+			at * CFrame.new(-look.w / 2 + 5, 4.2, -0.4),
 			look.accent
+		)
+		block(
+			f,
+			Vector3.new(5.2, 9, 0.12),
+			at * CFrame.new(-look.w / 2 + 5, 4.5, -0.36),
+			SKIRTING,
+			Enum.Material.Wood
 		)
 	end,
 	Shelf = function(f, at, look)
@@ -694,6 +828,284 @@ local PIECES: { [string]: Build } = {
 		)
 		round(f, 0.7, 0.4, at * CFrame.new(0.2, 3.6, -0.6), Color3.fromRGB(200, 190, 160))
 	end,
+
+	-- the rooms themselves: floors (0.2 thick about the origin), linings (origin on the wall's inside face,
+	-- the room in front), ceilings (hung under the origin, Rules/Interiors.Ceiling thick)
+	LobbyFloor = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, look.d),
+			at,
+			Color3.fromRGB(226, 222, 214),
+			Enum.Material.Marble
+		)
+		-- a darker border round the edge, a hair higher so it never fights the floor
+		local border = Color3.fromRGB(122, 116, 108)
+		for _, e in { -1, 1 } do
+			block(
+				f,
+				Vector3.new(look.w, 0.24, 2),
+				at * CFrame.new(0, 0, e * (look.d / 2 - 1)),
+				border,
+				Enum.Material.Marble
+			)
+			block(
+				f,
+				Vector3.new(2, 0.24, look.d - 4),
+				at * CFrame.new(e * (look.w / 2 - 1), 0, 0),
+				border,
+				Enum.Material.Marble
+			)
+		end
+	end,
+	Runner = function(f, at, look)
+		block(f, Vector3.new(look.w, 0.28, look.d), at, look.accent, Enum.Material.Carpet)
+	end,
+	Carpet = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, look.d),
+			at,
+			look.fabric:Lerp(Color3.fromRGB(90, 92, 100), 0.7),
+			Enum.Material.Carpet
+		)
+	end,
+	LobbyWall = function(f, at, look)
+		-- skirting, wood panelling to the dado rail, plaster to the ceiling
+		lining(f, at, look.w, {
+			{ 0.6, SKIRTING, Enum.Material.Wood, 0.35 },
+			{ 3.4, DARK_WOOD, Enum.Material.WoodPlanks, 0.25 },
+			{ look.h - 4, PLASTER, Enum.Material.Plaster, 0.15 },
+		})
+		rail(f, at, look.w, 3.9, 0.3, 0.35, WOOD, Enum.Material.Wood)
+	end,
+	-- under an office window band: plaster up to the glass, a ledge on top
+	Sill = function(f, at, look)
+		lining(f, at, look.w, {
+			{ 0.5, SKIRTING, Enum.Material.Wood, 0.3 },
+			{ look.h - 0.5, PLASTER, Enum.Material.Plaster, 0.2 },
+		})
+		rail(f, at, look.w, look.h - 0.1, 0.3, 1, WHITE, Enum.Material.Marble)
+	end,
+	ShopWall = function(f, at, look)
+		lining(f, at, look.w, {
+			{ 0.6, SKIRTING, Enum.Material.Wood, 0.3 },
+			{ look.h - 0.6, PLASTER:Lerp(look.accent, 0.12), Enum.Material.Plaster, 0.15 },
+		})
+		rail(f, at, look.w, look.h - 1.6, 0.3, 0.3, WHITE)
+	end,
+	Ceiling = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, Layouts.Ceiling, look.d),
+			at * CFrame.new(0, -Layouts.Ceiling / 2, 0),
+			CEILING,
+			Enum.Material.SmoothPlastic
+		)
+		-- a ceiling-tile grid, its bars a hair under the panel
+		local every = TOWN.CeilingGrid
+		for _, x in Layouts.across(look.w, every, every / 2) do
+			block(
+				f,
+				Vector3.new(0.2, 0.06, look.d),
+				at * CFrame.new(x, -Layouts.Ceiling - 0.03, 0),
+				STEEL,
+				Enum.Material.Metal
+			)
+		end
+		for _, z in Layouts.across(look.d, every, every / 2) do
+			block(
+				f,
+				Vector3.new(look.w, 0.06, 0.2),
+				at * CFrame.new(0, -Layouts.Ceiling - 0.03, z),
+				STEEL,
+				Enum.Material.Metal
+			)
+		end
+	end,
+	CeilingPlain = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, Layouts.Ceiling, look.d),
+			at * CFrame.new(0, -Layouts.Ceiling / 2, 0),
+			CEILING
+		)
+	end,
+	WoodCeiling = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, Layouts.Ceiling, look.d),
+			at * CFrame.new(0, -Layouts.Ceiling / 2, 0),
+			Color3.fromRGB(176, 132, 90),
+			Enum.Material.WoodPlanks
+		)
+	end,
+	-- a plain stone lift shaft on the empty floors
+	LiftShaft = function(f, at, look)
+		block(
+			f,
+			Vector3.new(24, look.h, 10),
+			at * CFrame.new(0, look.h / 2, 0),
+			STONE,
+			Enum.Material.Limestone
+		)
+	end,
+	-- a rail of spotlights hung from the ceiling, along the wall behind it (+Z), one of them lit
+	TrackLight = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.3, 0.3),
+			at * CFrame.new(0, -0.15, 0),
+			DARK,
+			Enum.Material.Metal
+		)
+		local n = 5
+		for k = 0, n - 1 do
+			local x = -look.w / 2 + (k + 0.5) * look.w / n
+			local can = block(
+				f,
+				Vector3.new(0.7, 0.7, 0.9),
+				at * CFrame.new(x, -0.7, 0.1) * CFrame.Angles(math.rad(40), 0, 0),
+				DARK,
+				Enum.Material.Metal
+			)
+			local lens = block(
+				f,
+				Vector3.new(0.5, 0.5, 0.1),
+				can.CFrame * CFrame.new(0, 0, 0.46),
+				WARM,
+				Enum.Material.Neon
+			)
+			if k == n // 2 then
+				local s = Instance.new("SpotLight")
+				s.Face = Enum.NormalId.Back
+				s.Angle = 80
+				s.Range = 16
+				s.Brightness = 1.5
+				s.Color = WARM
+				s.Shadows = false
+				s.Parent = lens
+			end
+		end
+	end,
+	-- the burger place: black and white checks in front of the counter, quarry tiles behind it
+	Checker = function(f, at, look)
+		block(f, Vector3.new(look.w, 0.2, look.d), at, WHITE, Enum.Material.Marble)
+		local size = TOWN.CheckSize
+		local nx, nz = math.floor(look.w / size), math.floor(look.d / size)
+		local x0, z0 = -nx * size / 2, -look.d / 2
+		for i = 0, nx - 1 do
+			for j = 0, nz - 1 do
+				if (i + j) % 2 == 0 then
+					block(
+						f,
+						Vector3.new(size, 0.04, size),
+						at * CFrame.new(x0 + (i + 0.5) * size, 0.12, z0 + (j + 0.5) * size),
+						Color3.fromRGB(34, 34, 38),
+						Enum.Material.Marble
+					)
+				end
+			end
+		end
+	end,
+	KitchenFloor = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, look.d),
+			at,
+			Color3.fromRGB(150, 82, 60),
+			Enum.Material.CeramicTiles
+		)
+	end,
+	KitchenWall = function(f, at, look)
+		lining(f, at, look.w, {
+			{ 8, WHITE, Enum.Material.CeramicTiles, 0.15 },
+			{ 0.6, look.accent, Enum.Material.CeramicTiles, 0.2 },
+			{ look.h - 8.6, PLASTER, Enum.Material.Plaster, 0.15 },
+		})
+	end,
+	Wainscot = function(f, at, look)
+		lining(f, at, look.w, {
+			{ 0.5, DARK, Enum.Material.SmoothPlastic, 0.3 },
+			{ look.h - 0.5, Color3.fromRGB(150, 30, 30), Enum.Material.SmoothPlastic, 0.2 },
+		})
+		rail(f, at, look.w, look.h, 0.3, 0.3, STEEL, Enum.Material.Metal)
+	end,
+	-- over the front windows: plaster with a trim along its bottom edge
+	Header = function(f, at, look)
+		lining(f, at, look.w, { { look.h, PLASTER, Enum.Material.Plaster, 0.15 } })
+		rail(f, at, look.w, 0, 0.4, 0.3, WHITE)
+	end,
+	-- the screen between back-to-back desks in a pod
+	Divider = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 1.8, 0.3),
+			at * CFrame.new(0, 4, 0),
+			look.fabric,
+			Enum.Material.Fabric
+		)
+		block(f, Vector3.new(look.w, 0.15, 0.4), at * CFrame.new(0, 4.95, 0), DARK)
+	end,
+	-- a beam under the ceiling, across the room
+	Beam = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 1.2, 1),
+			at * CFrame.new(0, -0.6, 0),
+			DARK_WOOD,
+			Enum.Material.Wood
+		)
+	end,
+	-- the warehouse: sealed concrete, painted lines, a kerb round the walls, girders under the roof
+	ConcreteFloor = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, look.d),
+			at,
+			Color3.fromRGB(150, 152, 154),
+			Enum.Material.Concrete
+		)
+	end,
+	FloorLine = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 0.24, 0.6),
+			at,
+			Color3.fromRGB(240, 196, 40),
+			Enum.Material.SmoothPlastic
+		)
+	end,
+	Kerb = function(f, at, look)
+		lining(f, at, look.w, {
+			{ look.h - 0.4, Color3.fromRGB(170, 170, 168), Enum.Material.Concrete, 0.5 },
+			{ 0.4, Color3.fromRGB(240, 196, 40), Enum.Material.SmoothPlastic, 0.5 },
+		})
+	end,
+	Girder = function(f, at, look)
+		local steel = Color3.fromRGB(70, 74, 82)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, 1.4),
+			at * CFrame.new(0, -0.1, 0),
+			steel,
+			Enum.Material.Metal
+		)
+		block(
+			f,
+			Vector3.new(look.w, 1.4, 0.3),
+			at * CFrame.new(0, -0.9, 0),
+			steel,
+			Enum.Material.Metal
+		)
+		block(
+			f,
+			Vector3.new(look.w, 0.2, 1.4),
+			at * CFrame.new(0, -1.7, 0),
+			steel,
+			Enum.Material.Metal
+		)
+	end,
 }
 
 local function hash(s: string): number
@@ -730,6 +1142,7 @@ type AnyPiece = {
 	y: number?,
 	w: number?,
 	d: number?,
+	h: number?,
 }
 
 -- the pieces of a house (by type) or a town building (by its Interior attribute), cached per model
@@ -769,6 +1182,7 @@ local function furnish(model: Model, into: Folder): Folder?
 		accent = if typeof(accent) == "Color3" then accent else WOOD,
 		w = 8,
 		d = 8,
+		h = 0,
 		m = m,
 	}
 	local folder = Instance.new("Folder")
@@ -780,7 +1194,10 @@ local function furnish(model: Model, into: Folder): Folder?
 			local face = base:VectorToWorldSpace(Vector3.new(piece.fx * m, 0, -piece.fz))
 			look.w = piece.w or 8
 			look.d = piece.d or 8
+			look.h = piece.h or 0
+			building = SOLID[piece.kind] == true
 			build(folder, CFrame.lookAt(pos, pos + face), look)
+			building = false
 		end
 	end
 	folder.Parent = into
@@ -829,7 +1246,84 @@ local function keep(
 	end
 end
 
+local function setSolid(on: boolean)
+	if on == solidNow then
+		return
+	end
+	solidNow = on
+	for p in solidParts do
+		p.CanCollide = on
+	end
+end
+
+-- furniture is solid on foot, not while this player sits (in a vehicle)
+local function watchSeat()
+	local player = Players.LocalPlayer
+	local function onCharacter(character: Model)
+		local humanoid = character:WaitForChild("Humanoid", 10) :: Humanoid?
+		if not humanoid then
+			return
+		end
+		setSolid(humanoid.SeatPart == nil)
+		humanoid:GetPropertyChangedSignal("SeatPart"):Connect(function()
+			setSolid(humanoid.SeatPart == nil)
+		end)
+	end
+	if player.Character then
+		task.spawn(onCharacter, player.Character)
+	end
+	player.CharacterAdded:Connect(onCharacter)
+end
+
+-- is the camera inside this town building's walls (its frame is the pivot, W × D, up to its roof)?
+local function holds(model: Model, eye: Vector3): boolean
+	local w, d = model:GetAttribute("W"), model:GetAttribute("D")
+	if typeof(w) ~= "number" or typeof(d) ~= "number" then
+		return false
+	end
+	local floors = model:GetAttribute("Floors")
+	local h = if typeof(floors) == "number"
+		then floors * World.Map.FloorHeight
+		else model:GetAttribute("H")
+	local p = model.WorldPivot:PointToObjectSpace(eye)
+	return math.abs(p.X) < w / 2
+		and math.abs(p.Z) < d / 2
+		and p.Y > 0
+		and p.Y < (if typeof(h) == "number" then h else 16)
+end
+
+-- indoors the shade warms and lifts (the sky can't reach in), eased so walking through a door is smooth
+local function easeIndoors(built: { [Model]: Folder })
+	local outAmbient, outExposure = Lighting.Ambient, Lighting.ExposureCompensation
+	local c = TOWN.IndoorAmbient
+	local inAmbient = Color3.fromRGB(c[1], c[2], c[3])
+	local inExposure = outExposure + TOWN.IndoorExposure
+	local t = 0
+	RunService.RenderStepped:Connect(function(dt)
+		local camera = workspace.CurrentCamera
+		local inside = false
+		if camera then
+			local eye = camera.CFrame.Position
+			for model in built do
+				if holds(model, eye) then
+					inside = true
+					break
+				end
+			end
+		end
+		local goal = if inside then 1 else 0
+		if t == goal then
+			return
+		end
+		local step = dt / TOWN.EaseTime
+		t = if goal > t then math.min(goal, t + step) else math.max(goal, t - step)
+		Lighting.Ambient = outAmbient:Lerp(inAmbient, t)
+		Lighting.ExposureCompensation = outExposure + (inExposure - outExposure) * t
+	end)
+end
+
 function Interiors.start()
+	watchSeat()
 	task.spawn(function()
 		local map = workspace:WaitForChild("Map")
 		local buildings = map:WaitForChild("Buildings")
@@ -850,6 +1344,7 @@ function Interiors.start()
 				end
 			end
 		end
+		easeIndoors(builtTown)
 		while true do
 			task.wait(1)
 			local camera = workspace.CurrentCamera

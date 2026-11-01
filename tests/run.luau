@@ -1003,13 +1003,7 @@ check("warehouse pilasters and windows sit on real panels clear of the bays", wa
 check("a part budget is set", BuildingConfig.PartBudget > 30000 and BuildingConfig.BandPiece >= 12)
 
 -- town interiors: furniture and people inside each building, seats under every sitting spot
-local layoutCfg = {
-	FloorHeight = World.Map.FloorHeight,
-	Floors = InteriorConfig.Town.OfficeFloors,
-	DeskEvery = InteriorConfig.Town.DeskEvery,
-	Tables = BuildingConfig.Restaurant.Tables,
-	TableZ = BuildingConfig.Restaurant.TableZ,
-}
+local layoutCfg = InteriorRules.config(World, BuildingConfig, HouseConfig, InteriorConfig)
 local function layoutInside(
 	l: InteriorRules.Layout,
 	hw: number,
@@ -1082,7 +1076,10 @@ for _, size in { { 106, 106 }, { 154, 120 }, { 120, 154 } } do
 	for _, floors in { 3, 5, 9 } do
 		for _, officeDoor in { -8, 0, 8 } do
 			local l = InteriorRules.office(size[1], size[2], floors, officeDoor, layoutCfg)
-			officeIn = officeIn and layoutInside(l, size[1] / 2 - 1, size[2] / 2 - 1, floors * FH)
+			-- office walls stand on the footprint's edges, half in, half out
+			local wallIn = World.Map.WallThickness / 2
+			officeIn = officeIn
+				and layoutInside(l, size[1] / 2 - wallIn, size[2] / 2 - wallIn, floors * FH)
 			officeSeats = officeSeats and seated(l)
 			officeLifts = officeLifts and liftsOk(l)
 			local top = 0

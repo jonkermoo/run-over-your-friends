@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Buildings = require(ReplicatedStorage.Shared.Config.Buildings)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
+local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
 local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
 local Layouts = require(ReplicatedStorage.Shared.Rules.Interiors)
@@ -90,13 +91,7 @@ local function rightOf(out: Vector3): Vector3
 end
 
 -- what the layouts need to know (the client furnishes from the same numbers)
-Places.LayoutConfig = table.freeze({
-	FloorHeight = World.Map.FloorHeight,
-	Floors = InteriorConfig.Town.OfficeFloors,
-	DeskEvery = InteriorConfig.Town.DeskEvery,
-	Tables = Buildings.Restaurant.Tables,
-	TableZ = Buildings.Restaurant.TableZ,
-}) :: Layouts.Config
+Places.LayoutConfig = Layouts.config(World, Buildings, Houses, InteriorConfig)
 
 type Inside = { spots: { Spot }, staff: { Spot }, hub: Vector3?, staffIn: { Vector3 }? }
 
@@ -169,6 +164,7 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 	model:SetAttribute("Accent", yellow)
 	model:SetAttribute("W", W)
 	model:SetAttribute("D", D)
+	model:SetAttribute("H", H)
 	-- front: four shop windows, the wide door in the middle under a porch
 	local wins = { { -hw + 4, -hw + 20 }, { -hw + 22, -6 }, { 6, hw - 22 }, { hw - 20, hw - 4 } }
 	Kit.row(ctx, zf, 1, Y0, H, {
@@ -421,29 +417,31 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 	Kit.sides(ctx, hw, zf, zb, Y0, half)
 	Kit.sides(ctx, hw, zf, zb, Y0 + half, half)
 	Kit.trims(ctx, 0, hw, zf, zb, top, true)
-	-- blue pilasters and a band across the front (the band is the header over the bays)
+	-- blue pilasters and a band across the front (the band is the header over the bays), from the middle
+	-- of the wall out so they never fight its inside face
 	for _, k in WB.Pilasters do
 		local h = H - 2.3
 		put(
 			ctx,
-			Vector3.new(1.6, h, T + 0.6),
+			Vector3.new(1.6, h, T / 2 + 0.6),
 			-hw + k * P,
 			Y0 + 1.5 + h / 2,
-			zf - T / 2 + 0.3,
+			zf - T / 4 + 0.3,
 			trim
 		)
 	end
-	Kit.bandX(ctx, 0, W, Y0 + half, 0.8, T + 0.8, zf - T / 2 + 0.4, trim)
+	Kit.bandX(ctx, 0, W, Y0 + half, 0.8, T / 2 + 0.8, zf - T / 4 + 0.4, trim)
 	-- bays framed like a house door, each roll-up door rolled into its drum
 	for k in bays do
 		local a = -hw + (k - 0.5) * P
+		-- the jambs line the opening, a little proud of the wall on both sides
 		for _, e in { -1, 1 } do
 			put(
 				ctx,
-				Vector3.new(0.8, half, T + 0.6),
+				Vector3.new(0.8, half, T + 0.7),
 				a + e * (P / 2 - 0.4),
 				Y0 + half / 2,
-				zf - T / 2 + 0.3,
+				zf - T / 2 + 0.25,
 				trim
 			)
 		end
@@ -520,7 +518,7 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 			local endAt = mid + out * e * (rackLen / 2)
 			part(
 				model,
-				Vector3.new(4, 14, 1),
+				Vector3.new(4.2, 14, 1),
 				CFrame.lookAt(
 					endAt + Vector3.new(0, Y0 + 7, 0),
 					endAt + out + Vector3.new(0, Y0 + 7, 0)

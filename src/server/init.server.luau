@@ -14,8 +14,12 @@ for name in Net.Messages do
 end
 
 -- Vehicles pass through players, NPCs, debris and each other: NPC and Wrecker hits are found by overlap
-for _, g in { "Vehicles", "Characters", "Npcs", "Debris" } do
+for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture" } do
 	PhysicsService:RegisterCollisionGroup(g)
+end
+-- furniture inside buildings (each client's own) stops people on foot, nothing else
+for _, g in { "Vehicles", "Npcs", "Debris", "Furniture" } do
+	PhysicsService:CollisionGroupSetCollidable("Furniture", g, false)
 end
 PhysicsService:CollisionGroupSetCollidable("Vehicles", "Vehicles", false)
 PhysicsService:CollisionGroupSetCollidable("Vehicles", "Characters", false)

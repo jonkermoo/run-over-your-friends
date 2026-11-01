@@ -88,7 +88,8 @@ function TownKit.office(
 		local doorAt = n // 2
 		local mid0 = origin + along * (length / 2)
 		local faceCf = CFrame.lookAt(mid0, mid0 + outward)
-		-- a band across the whole face, in pieces, `out` studs proud of the wall's middle
+		-- a band across the whole face, in pieces, from the middle of the wall out to `depth - T / 2` proud
+		-- of it (never into the room, where it would fight the wall's inside face)
 		local function band(
 			y: number,
 			h: number,
@@ -97,12 +98,13 @@ function TownKit.office(
 			extra: number,
 			material: Enum.Material?
 		)
+			local reach = depth - T / 2
 			for _, sp in Rules.pieces(length + extra, B.BandPiece) do
 				local x = (sp.from + sp.to) / 2
 				part(
 					model,
-					Vector3.new(sp.to - sp.from, h, depth),
-					faceCf * CFrame.new(-x, y, -(depth - T) / 2),
+					Vector3.new(sp.to - sp.from, h, reach),
+					faceCf * CFrame.new(-x, y, -reach / 2),
 					colour,
 					material
 				)
@@ -126,7 +128,7 @@ function TownKit.office(
 					part(
 						model,
 						Vector3.new(pw, 0.8, T + 0.6),
-						cf + Vector3.new(0, DH + 0.4, 0),
+						cf + Vector3.new(0, DH + 0.35, 0),
 						c.accent
 					)
 					for _, e in { -1, 1 } do
@@ -194,8 +196,8 @@ function TownKit.office(
 						c.wall
 					)
 					glass(
-						Vector3.new(pw, FH - sill, T * 0.6),
-						cf + Vector3.new(0, y0 + sill + (FH - sill) / 2, 0)
+						Vector3.new(pw, FH - sill - 0.05, T * 0.6),
+						cf + Vector3.new(0, y0 + sill + (FH - sill - 0.05) / 2, 0)
 					)
 				end
 			end
@@ -217,10 +219,11 @@ function TownKit.office(
 			local y0, y1 = sections[k].from * FH, sections[k].to * FH
 			for _, b in Rules.pilasters(n, O.PilasterEvery) do
 				local at = origin + along * (b * pw)
+				local reach = T / 2 + 0.8
 				part(
 					model,
-					Vector3.new(1.2, y1 - y0, T + 0.8),
-					CFrame.lookAt(at, at + outward) * CFrame.new(0, (y0 + y1) / 2, -0.4),
+					Vector3.new(1.2, y1 - y0, reach),
+					CFrame.lookAt(at, at + outward) * CFrame.new(0, (y0 + y1) / 2, -reach / 2),
 					c.trim
 				)
 			end
@@ -228,15 +231,22 @@ function TownKit.office(
 	end
 	local hw, hd = w / 2, d / 2
 	local base = Vector3.new(centre.X, 0, centre.Z)
-	side(base + Vector3.new(-hw, 0, -hd), Vector3.new(1, 0, 0), Vector3.new(0, 0, -1), w)
-	side(base + Vector3.new(-hw, 0, hd), Vector3.new(1, 0, 0), Vector3.new(0, 0, 1), w)
+	-- the walls stand on the footprint's edges (half in, half out): the long faces run the full width plus
+	-- the wall's thickness and the sides fit between them, so the corners are closed
 	side(
-		base + Vector3.new(-hw, 0, -hd + T),
+		base + Vector3.new(-hw - T / 2, 0, -hd),
+		Vector3.new(1, 0, 0),
+		Vector3.new(0, 0, -1),
+		w + T
+	)
+	side(base + Vector3.new(-hw - T / 2, 0, hd), Vector3.new(1, 0, 0), Vector3.new(0, 0, 1), w + T)
+	side(
+		base + Vector3.new(-hw, 0, -hd + T / 2),
 		Vector3.new(0, 0, 1),
 		Vector3.new(-1, 0, 0),
-		d - 2 * T
+		d - T
 	)
-	side(base + Vector3.new(hw, 0, -hd + T), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), d - 2 * T)
+	side(base + Vector3.new(hw, 0, -hd + T / 2), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0), d - T)
 	-- corner pilasters, one per section
 	for _, sec in sections do
 		local y0 = if sec.from == 0 then 1.5 else sec.from * FH
@@ -329,7 +339,7 @@ function TownKit.shop(
 			Kit.seg(-half + third, half - third, "p"),
 			Kit.seg(half - third, half, "p", { fl = f == 1 }),
 		})
-		put(ctx, Vector3.new(width + 0.6, 0.5, T + 0.4), 0, y0, zf - T / 2, ctx.trim)
+		put(ctx, Vector3.new(width + 0.6, 0.5, T / 2 + 0.2), 0, y0, zf - T / 4 + 0.1, ctx.trim)
 		put(
 			ctx,
 			Vector3.new(width - 2 * T, 0.8, d - 2 * T),
@@ -347,7 +357,7 @@ function TownKit.shop(
 	Kit.sides(ctx, half, zf, zb, Y0, top - Y0, false)
 	Kit.trims(ctx, 0, half, zf, zb, top, true)
 	-- flat roof, parapet with a cap
-	put(ctx, Vector3.new(width, 0.8, d), 0, top - 0.4, 0, ctx.roof)
+	put(ctx, Vector3.new(width, 0.8, d), 0, top - 0.45, 0, ctx.roof)
 	put(
 		ctx,
 		Vector3.new(width + 0.4, 2, T),
