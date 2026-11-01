@@ -8,11 +8,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
+local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
+local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local HouseKit = require(script.Parent.HouseKit)
 local Places = require(script.Parent.Places)
 local StreetKit = require(script.Parent.StreetKit)
 
@@ -42,12 +45,6 @@ local COLORS = {
 	glass = Color3.fromRGB(96, 140, 170),
 	trunk = Color3.fromRGB(110, 78, 52),
 	leaves = Color3.fromRGB(70, 140, 70),
-}
-local ROOFS = {
-	Color3.fromRGB(150, 60, 50),
-	Color3.fromRGB(90, 70, 60),
-	Color3.fromRGB(80, 84, 92),
-	Color3.fromRGB(60, 90, 120),
 }
 local CONTAINERS = {
 	Color3.fromRGB(190, 60, 50),
@@ -636,25 +633,39 @@ function MapBuilder.build(): Result
 					COLORS.grass,
 					Enum.Material.Grass
 				)
-				local lot = inner / Crowd.HousesPerSide
+				-- house kit: three lots along each sidewalk, types by district, neighbours never share a palette
+				local district = Districts.of(i, j, M.BlocksX, M.BlocksZ)
+				local weights = (Houses.ByDistrict :: any)[district] or Houses.ByDistrict.maple
+				local lot = inner / Houses.PerSide
+				local lastPalette: number? = nil
 				for _, sz in { -1, 1 } do
 					local out = Vector3.new(0, 0, sz)
-					for k = 0, Crowd.HousesPerSide - 1 do
-						count += 1
-						local c = centre
-							+ Vector3.new(
-								-inner / 2 + (k + 0.5) * lot,
-								0,
-								sz * (inner / 2 - 8 - Crowd.HouseDepth / 2)
+					for k = 0, Houses.PerSide - 1 do
+						local houseType = HouseRules.pickType(weights, random:NextNumber())
+						local t = (Houses.Types :: any)[houseType] :: Houses.HouseType
+						local z = sz * (inner / 2 - Houses.Yard - t.depth / 2)
+						local lotX = -inner / 2 + (k + 0.5) * lot
+						local mirror = random:NextNumber() < 0.5
+						for u = 0, t.perLot - 1 do
+							count += 1
+							local x = lotX + (u - (t.perLot - 1) / 2) * t.width
+							local pal = HouseRules.pickPalette(
+								#Houses.Palettes,
+								lastPalette,
+								random:NextNumber()
 							)
-						local floors = if random:NextNumber() < Crowd.TwoStoreyChance then 2 else 1
-						local wall = wallColour()
-						local roof = ROOFS[random:NextInteger(1, #ROOFS)]
-						addPlace(
-							Places.house(buildings, c, out, floors, wall, roof, "Home" .. count),
-							i,
-							j
-						)
+							lastPalette = pal
+							local home = HouseKit.build(
+								buildings,
+								houseType,
+								centre + Vector3.new(x, 0, z),
+								out,
+								Houses.Palettes[pal],
+								mirror,
+								"Home" .. count
+							)
+							addPlace(home, i, j)
+						end
 					end
 				end
 				for _ = 1, 3 do

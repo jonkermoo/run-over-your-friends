@@ -4,6 +4,8 @@ local CityPlan = require("../src/shared/Rules/CityPlan")
 local CrowdConfig = require("../src/shared/Config/Crowd")
 local CrowdRules = require("../src/shared/Rules/Crowd")
 local Districts = require("../src/shared/Rules/Districts")
+local HouseConfig = require("../src/shared/Config/Houses")
+local HouseRules = require("../src/shared/Rules/Houses")
 local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
@@ -714,6 +716,63 @@ check(
 )
 check("billboards are parodies", #Streets.Billboards >= 4)
 check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
+
+-- house kit
+check(
+	"type picks follow the weight bands",
+	HouseRules.pickType({ A = 0.5, B = 0.5 }, 0.1) == "A"
+		and HouseRules.pickType({ A = 0.5, B = 0.5 }, 0.9) == "B"
+)
+check(
+	"a single-type district always builds it",
+	HouseRules.pickType(HouseConfig.ByDistrict.old, 0.99) == "D"
+)
+local palOk = true
+math.randomseed(7)
+local prev = nil
+for _ = 1, 500 do
+	local k = HouseRules.pickPalette(#HouseConfig.Palettes, prev, math.random())
+	palOk = palOk and k >= 1 and k <= #HouseConfig.Palettes and k ~= prev
+	prev = k
+end
+check("neighbours never share a palette", palOk)
+check(
+	"one palette, no choice",
+	HouseRules.pickPalette(1, 1, 0.5) == 1 and HouseRules.pickPalette(3, 9, 0.99) <= 3
+)
+local lotWidth = (World.Map.BlockSize - 2 * World.Map.SidewalkWidth) / HouseConfig.PerSide
+local houseOk = true
+for key, t in HouseConfig.Types do
+	houseOk = houseOk and t.width * t.perLot <= lotWidth - 2 and t.floors >= 1 and t.perLot >= 1
+	houseOk = houseOk
+		and (World.Map.BlockSize - 2 * World.Map.SidewalkWidth) / 2
+				- HouseConfig.Yard
+				- t.depth
+			> 20
+	for _, w in HouseConfig.ByDistrict do
+		if w[key] then
+			houseOk = houseOk and w[key] > 0
+		end
+	end
+end
+check("every house type fits its lot with a garden behind", houseOk)
+local distOk = true
+for _, w in HouseConfig.ByDistrict do
+	for key in w do
+		distOk = distOk and HouseConfig.Types[key] ~= nil
+	end
+end
+for key in Streets.Districts do
+	distOk = distOk and HouseConfig.ByDistrict[key] ~= nil
+end
+check("every district builds known house types", distOk)
+local palsOk = #HouseConfig.Palettes >= 4
+for _, pal in HouseConfig.Palettes do
+	palsOk = palsOk
+		and rgbOk({ pal.wall, pal.trim, pal.accent, pal.roof })
+		and MATERIALS[pal.material] == true
+end
+check("house palettes are valid", palsOk)
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

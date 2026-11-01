@@ -128,11 +128,6 @@ return table.freeze({
 		"Quarterly Partners",
 		"Memo Group",
 	}),
-	HousesPerSide = 4, -- homes along the north and south sidewalks of a home block
-	HouseWidth = 30,
-	HouseDepth = 26,
-	HouseFloorHeight = 12,
-	TwoStoreyChance = 0.45,
 	RestaurantSize = { 84, 58 },
 	WarehouseSize = { 168, 112 },
 	WarehouseHeight = 30,
