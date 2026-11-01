@@ -149,21 +149,25 @@ function VehicleBuilder.build(id: string): Model
 	local length, width = size.Z, size.X
 	local wheels: { BasePart } = {}
 	local wheelRadius = 0
+	local track = 0 -- half the width across the outside of the tyres
 	for _, p in model:GetChildren() do
 		if p:IsA("BasePart") and string.sub(p.Name, 1, 6) == "Wheel_" then
 			table.insert(wheels, p)
 			wheelRadius = math.max(wheelRadius, p.Size.Y / 2)
+			track = math.max(track, math.abs(p.Position.X - cf.Position.X) + p.Size.X / 2)
 		end
 	end
 
-	-- the chassis: a box up to about the bumpers, a little inside the body's outline, riding on four
-	-- invisible balls at its corners so kerbs and ramp lips roll under instead of stopping it dead
+	-- the chassis: a box up to about the bumpers, a little inside the body's outline but at least as wide
+	-- as the tyres (so they can't push into walls), riding on four invisible balls at its corners so kerbs
+	-- and ramp lips roll under instead of stopping it dead
 	local skid = math.clamp(wheelRadius * 0.8, 0.8, 2)
 	local lift = skid * 0.7
 	local chassisHeight = math.clamp(body.Size.Y * 0.35, 1.6, 5)
 	local chassis = Instance.new("Part")
 	chassis.Name = "Chassis"
-	chassis.Size = Vector3.new(math.max(width * 0.82, 3), chassisHeight, math.max(length * 0.86, 4))
+	chassis.Size =
+		Vector3.new(math.max(width * 0.82, track * 2, 3), chassisHeight, math.max(length * 0.86, 4))
 	chassis.CFrame = CFrame.new(0, lift + chassisHeight / 2, cf.Position.Z)
 	chassis.Transparency = 1
 	chassis.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0, 0, 100, 1)

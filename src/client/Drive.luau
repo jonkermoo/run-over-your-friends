@@ -64,6 +64,13 @@ local ESC_DRIFT_SLACK, ESC_DRIFT_GAIN = 0.08, 12
 local THRUST_DV, THRUST_TIME, THRUST_COOLDOWN = 25, 0.6, 12
 local BIG = 1e8
 local GROUND_FORCE = Vector3.new(BIG, 0, BIG)
+-- per-tyre ground contact: how far a tyre can ride up and hang down (shares of its radius), and from how
+-- far away other cars bother
+local WHEEL_TRAVEL, WHEEL_DROOP = 0.6, 0.3
+local WHEEL_CONTACT_RANGE = 300
+local wheelParams = RaycastParams.new()
+wheelParams.FilterType = Enum.RaycastFilterType.Exclude
+wheelParams.CollisionGroup = "Vehicles"
 -- cold-gas thruster sounds (Pro Sound Effects, see ASSETS_LICENSES.md): a steady stretch of an air
 -- release for the big jets, a short spray burst when a steering nozzle opens
 local GAS_LOOP, GAS_LOOP_REGION = "rbxassetid://9116496074", NumberRange.new(1, 3.1)
@@ -109,7 +116,10 @@ local SURFACES: { [Enum.Material]: Surface } = {
 	[Enum.Material.Wood] = { grip = 0.8, rough = 1.5, squeal = true, mark = RUBBER },
 }
 
-type Wheel = { weld: Weld, base: CFrame, front: boolean, spin: boolean }
+-- lift: how far the tyre sits above (+) or below (-) its rest spot, in studs, so it rides on kerbs and
+-- ramps instead of sinking into them, and hangs down a little in the air
+type Wheel =
+	{ weld: Weld, base: CFrame, front: boolean, spin: boolean, radius: number, lift: number }
 type CarState = {
 	car: Model,
 	stats: Vehicles.Vehicle,
@@ -225,10 +235,14 @@ local function track(car: Instance)
 		if w:IsA("Weld") and typeof(c) == "string" and w.Part0 then
 			local front = string.sub(c, 1, 1) == "F"
 			local onTrailer = w.Part0 ~= chassis
-			table.insert(
-				wheels,
-				{ weld = w, base = w.C0, front = front, spin = w:GetAttribute("Spin") == true }
-			)
+			table.insert(wheels, {
+				weld = w,
+				base = w.C0,
+				front = front,
+				spin = w:GetAttribute("Spin") == true,
+				radius = if w.Part1 then w.Part1.Size.Y / 2 else 1,
+				lift = 0,
+			})
 			if front then
 				frontZ = math.min(frontZ, w.C0.Position.Z)
 			elseif not onTrailer then
@@ -1128,8 +1142,34 @@ local function step(dt: number)
 		s.steer += (target - s.steer) * math.min(1, dt * 12)
 		local steerCF = CFrame.Angles(0, s.steer, 0)
 		local spinCF = CFrame.Angles(s.spin, 0, 0)
+		-- each tyre finds the ground under it (nearby cars only): pushed up over whatever it would sink
+		-- into, hanging a little lower when there's nothing below
+		local near = (chassis.Position - camera.CFrame.Position).Magnitude < WHEEL_CONTACT_RANGE
+		if near then
+			wheelParams.FilterDescendantsInstances =
+				{ s.car, workspace:FindFirstChild("Npcs") :: Instance, character :: Instance }
+		end
 		for _, w in s.wheels do
-			local cf = w.base
+			local settle = 0
+			local part0 = w.weld.Part0
+			if near and part0 then
+				local rise, droop = w.radius * WHEEL_TRAVEL, w.radius * WHEEL_DROOP
+				local upward = part0.CFrame.UpVector
+				local hub = part0.CFrame:PointToWorldSpace(w.base.Position)
+				local hit = workspace:Raycast(
+					hub + upward * rise,
+					-upward * (rise + w.radius + droop),
+					wheelParams
+				)
+				settle = if hit
+					then math.clamp(rise - hit.Distance + w.radius, -droop, rise)
+					else -droop
+			end
+			-- up at once (never into the kerb), down gently (springs)
+			w.lift = if settle > w.lift
+				then settle
+				else w.lift + (settle - w.lift) * math.min(1, dt * 14)
+			local cf = CFrame.new(0, w.lift, 0) * w.base
 			if w.front then
 				cf *= steerCF
 			end
