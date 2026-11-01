@@ -13,6 +13,8 @@ local InteriorRules = require("../src/shared/Rules/Interiors")
 local Streets = require("../src/shared/Config/Streets")
 local Economy = require("../src/shared/Config/Economy")
 local Game = require("../src/shared/Config/Game")
+local Flight = require("../src/shared/Rules/Flight")
+local FlightConfig = require("../src/shared/Config/Flight")
 local Impact = require("../src/shared/Rules/Impact")
 local EventConfig = require("../src/shared/Config/Events")
 local EventRules = require("../src/shared/Rules/Events")
@@ -350,6 +352,40 @@ check(
 	evKeys.LowGravity and evKeys.GoldenRush and evKeys.Giant and evKeys.Stampede
 )
 
+-- flight
+local function fly(s: Flight.State, throttle: number, jet: boolean, seconds: number): Flight.State
+	for _ = 1, math.floor(seconds * 60) do
+		s = Flight.step(s, throttle, jet, 1 / 60, FlightConfig)
+	end
+	return s
+end
+local still = { forward = 0, side = 0, up = 0, fuel = 100 }
+local climbed = fly(still, 0, true, 2)
+check("the jet climbs at the climb rate", near(climbed.up, FlightConfig.climb, 1e-6))
+check("the jet burns fuel", near(climbed.fuel, 100 - FlightConfig.drain * 2, 0.5))
+check("a full tank lasts 4 s", fly(still, 0, true, 4.1).fuel == 0)
+check(
+	"letting go drops it like a stone",
+	near(fly(climbed, 0, false, 1).up, FlightConfig.climb - FlightConfig.gravity, 0.2)
+)
+check("no fuel, no climb", fly({ forward = 0, side = 0, up = 0, fuel = 0 }, 0, true, 1).up < -9)
+check(
+	"jet off keeps its momentum",
+	fly({ forward = 30, side = 5, up = 0, fuel = 50 }, 1, false, 1).forward == 30
+)
+check("W flies at top speed", near(fly(still, 1, true, 3.5).forward, FlightConfig.top, 1e-6))
+check("S backs up", near(fly(still, -1, true, 2).forward, -FlightConfig.reverseTop, 1e-6))
+local boosted =
+	Flight.step({ forward = 80, side = 0, up = 0, fuel = 100 }, 1, true, 1, FlightConfig)
+check("over top speed slows by drag", near(boosted.forward, 80 - FlightConfig.drag, 1e-6))
+check(
+	"no throttle drifts to a stop",
+	fly({ forward = 15, side = 0, up = 0, fuel = 100 }, 0, true, 3.5).forward == 0
+)
+check(
+	"sideways drift dies out",
+	fly({ forward = 0, side = 9, up = 0, fuel = 100 }, 0, true, 1).side == 0
+)
 -- city plan
 local M = World.Map
 local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)

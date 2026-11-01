@@ -276,6 +276,14 @@ function VehicleBuilder.build(id: string): Model
 	model:SetAttribute("VehicleId", id)
 	model:SetAttribute("StudsPerMetre", Vehicles.StudsPerMetre)
 	model:SetAttribute("WheelRadius", math.max(wheelRadius, 0.5))
+	-- clients wait until they have this many wheel welds before they start driving it
+	local wheelCount = 0
+	for _, w in model:GetDescendants() do
+		if w:IsA("Weld") and w:GetAttribute("Corner") then
+			wheelCount += 1
+		end
+	end
+	model:SetAttribute("Wheels", wheelCount)
 	model:SetAttribute("Length", length)
 	model.WorldPivot = CFrame.new()
 	CollectionService:AddTag(model, "Vehicle")

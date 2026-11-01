@@ -250,8 +250,8 @@ local function vehicleTips(id: string)
 	local text: string? = nil
 	if Vehicles.has(v, "Jet") then
 		text = if touch
-			then "Hold JET to fly. In the air, steer to pitch and yaw and use ROLL L/R."
-			else "Hold SHIFT for the jet. In the air: W/S pitch, A/D turn, Q/E roll. R fires the thruster."
+			then "Hold FLY to jet upward; let go and you drop. Steer as normal; hold ROLL L/R to roll, hold BOOST for the rear jet."
+			else "Hold SHIFT to jet upward; let go and you drop. A/D steer, S jets backwards, hold Q/E to roll, hold R for the rear jet."
 	elseif Vehicles.has(v, "Thruster") then
 		text = if touch then "Tap BOOST for a thruster burst." else "Press R for a thruster burst."
 	elseif Vehicles.has(v, "Taxi") then
