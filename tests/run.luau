@@ -247,6 +247,11 @@ check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
 check("Sedan breaks more than the Scooter", smashTop("Sedan") > smashTop("Scooter") + 5)
 check("Semi breaks more than the Sedan", smashTop("Semi") > smashTop("Sedan") + 5)
 check("Semi breaks at 15 mph", smashAt("Semi", 15) > Smash.MinRadius)
+check(
+	"Cart and Scooter never drop the floors above",
+	math.max(smashTop("Cart"), smashTop("Scooter")) < Smash.FloorsFallFrom
+)
+check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
 check("faster breaks more", smashAt("Sedan", 100) > smashAt("Sedan", 40))
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))

@@ -152,13 +152,15 @@ function BuildingService.breakAt(
 	if count == 0 then
 		return 0
 	end
-	-- whatever stood on the broken part falls too
+	-- whatever stood on the broken part falls too, unless the break is only a small hole
 	local reach = radius * CFG.ChunkFallReach
-	local above = workspace:GetPartBoundsInBox(
-		CFrame.new(pos.X, pos.Y + 300, pos.Z),
-		Vector3.new(reach * 2, 600, reach * 2),
-		params
-	)
+	local above = if radius >= Smash.FloorsFallFrom
+		then workspace:GetPartBoundsInBox(
+			CFrame.new(pos.X, pos.Y + 300, pos.Z),
+			Vector3.new(reach * 2, 600, reach * 2),
+			params
+		)
+		else {}
 	local dropped = 0
 	for _, p in above do
 		if dropped > 260 then

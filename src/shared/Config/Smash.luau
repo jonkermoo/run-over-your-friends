@@ -8,6 +8,7 @@ return table.freeze({
 	EnergyHigh = 15000000, -- joules: hits this hard break the most
 	MinRadius = 3, -- studs: a hit just over EnergyLow chips about one piece
 	MaxRadius = 28, -- studs
+	FloorsFallFrom = 10, -- studs: smaller breaks leave what stands above them up (a light car makes a hole)
 	MinSpeed = 6.7, -- m/s (15 mph): slower bumps break nothing, however heavy (matches Economy.MinHitSpeed)
 	Curve = 2, -- above 1 keeps light and mid hits small and saves the big radii for heavy, fast ones
 })
