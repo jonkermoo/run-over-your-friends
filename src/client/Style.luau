@@ -269,6 +269,20 @@ function Style.bar(parent: Instance, color: Color3?): (Frame, Frame)
 	return back, fill
 end
 
+-- cut gaps across a bar every 14 px so it reads as a painted lane line (the gaps take the colour behind)
+function Style.laneGaps(back: Frame, behind: Color3)
+	back.ClipsDescendants = true
+	for x = 10, 600, 14 do
+		local gap = Instance.new("Frame")
+		gap.BackgroundColor3 = behind
+		gap.BorderSizePixel = 0
+		gap.Position = UDim2.fromOffset(x, 0)
+		gap.Size = UDim2.new(0, 4, 1, 0)
+		gap.ZIndex = 2
+		gap.Parent = back
+	end
+end
+
 -- a square paint tag ("TUTORIAL", "HOURLY")
 function Style.pill(parent: Instance, text: string, color: Color3): TextLabel
 	local p = Style.label(parent, text, 12, F.heavy, C.ink)

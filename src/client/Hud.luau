@@ -24,6 +24,7 @@ local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 
 local Hud = {}
 Hud.onGoals = nil :: (() -> ())? -- set by the goals sheet; the GOALS tab calls it
+Hud.onMenu = nil :: (() -> ())? -- set by the goals sheet; called when the garage or store opens
 local C, F = Style.colors, Style.fonts
 local money = Style.money
 
@@ -826,12 +827,17 @@ storeButton.Activated:Connect(function()
 	end
 end)
 goalsButton.Activated:Connect(function()
+	garage.Visible = false
+	store.Visible = false
 	if Hud.onGoals then
 		Hud.onGoals()
 	end
 end)
 for _, p in { garage, store } do
 	p:GetPropertyChangedSignal("Visible"):Connect(function()
+		if p.Visible and Hud.onMenu then
+			Hud.onMenu()
+		end
 		markTab(if garage.Visible then garageButton elseif store.Visible then storeButton else nil)
 	end)
 end
@@ -946,6 +952,12 @@ local FEATURE_NAMES = { Taxi = "TAXI!", Jingle = "JINGLE", Cannon = "WATER" }
 
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
+	-- the GOALS tab is painted while the goals sheet is open
+	local goalsGui = playerGui:FindFirstChild("Goals")
+	local sheet = goalsGui and goalsGui:FindFirstChild("GoalsSheet") :: GuiObject?
+	if not (garage.Visible or store.Visible) then
+		markTab(if sheet and sheet.Visible then goalsButton else nil)
+	end
 	dash.Visible = s.driving
 	local guide = playerGui:FindFirstChild("Guide")
 	local tipShown = guide ~= nil

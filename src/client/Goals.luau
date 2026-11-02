@@ -1,12 +1,11 @@
 --!strict
--- The goals panel (right side): HOURLY and DAILY sets with reset countdowns, progress and rewards.
--- Hidden until the tutorial is done, so new players see one goal at a time. Collapses to its header.
+-- The goals sheet: HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
+-- under the job card (top left) from the GOALS tab and closes from its header or the tab. Not
+-- available until the tutorial is done, so new players see one goal at a time.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -22,7 +21,8 @@ type GoalView = { text: string, target: number, reward: number, progress: number
 type SetView = { goals: { GoalView }, endsAt: number }
 
 local ORDER = { "Hourly", "Daily" }
-local COLORS = { Hourly = C.blue, Daily = C.purple }
+local COLORS = { Hourly = C.blue, Daily = C.pink }
+local SHEET_W = 330
 local ROW_H, HEAD_H, SECTION_H = 52, 46, 30
 
 local gui = Instance.new("ScreenGui")
@@ -30,12 +30,14 @@ gui.Name = "Goals"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
-local panel = Style.panel(gui, 18)
-panel.AnchorPoint = Vector2.new(1, 0)
-panel.Position = UDim2.new(1, -14, 0.24, 0)
-panel.Size = UDim2.fromOffset(310, HEAD_H)
-panel.ClipsDescendants = true
+local panel = Style.panel(gui)
+panel.Name = "GoalsSheet"
+panel.Position = UDim2.fromOffset(14, 146)
+panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
+Style.setShadow(panel, C.blue)
+local headLine = Style.dashes(panel, C.yellow)
+headLine.Position = UDim2.fromOffset(0, HEAD_H - 3)
 
 local header = Instance.new("TextButton")
 header.BackgroundTransparency = 1
@@ -50,7 +52,7 @@ Style.outline(title, 1.5)
 local countPill = Style.pill(header, "0 / 0", C.gold)
 countPill.AnchorPoint = Vector2.new(1, 0.5)
 countPill.Position = UDim2.new(1, -44, 0.5, 0)
-local chevron = Style.label(header, "-", 26, F.display, C.dim)
+local chevron = Style.label(header, "X", 22, F.display, C.text)
 chevron.AnchorPoint = Vector2.new(1, 0.5)
 chevron.Position = UDim2.new(1, -12, 0.5, 0)
 chevron.Size = UDim2.fromOffset(24, 24)
@@ -63,7 +65,7 @@ body.Parent = panel
 
 local state: { [string]: SetView } = {}
 local clockOffset = 0 -- server unix time minus local unix time
-local open = not UserInputService.TouchEnabled
+local open = false
 local countdowns: { [string]: TextLabel } = {}
 local function fmt(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
@@ -165,8 +167,11 @@ local function rebuild()
 				reward.AnchorPoint = Vector2.new(1, 0)
 				reward.Position = UDim2.new(1, -10, 0, 6)
 				local back, fill = Style.bar(row, if g.done then C.green else COLORS[name])
-				back.Position = UDim2.fromOffset(12, 28)
-				back.Size = UDim2.new(1, -86, 0, 7)
+				back.BackgroundColor3 = C.panel
+				back.BackgroundTransparency = 0
+				back.Position = UDim2.fromOffset(12, 29)
+				back.Size = UDim2.new(1, -86, 0, 6)
+				Style.laneGaps(back, C.card)
 				fill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
 				local amount = Style.label(
 					row,
@@ -188,17 +193,18 @@ local function rebuild()
 	countPill.Text = `{done} / {total}`
 	tickCountdowns()
 	body.Size = UDim2.new(1, 0, 0, y)
-	chevron.Text = if open then "-" else "+"
-	TweenService:Create(
-		panel,
-		TweenInfo.new(0.25, Enum.EasingStyle.Quad),
-		{ Size = UDim2.fromOffset(310, height()) }
-	):Play()
+	panel.Size = UDim2.fromOffset(SHEET_W, height())
 end
 
 function Goals.toggle()
 	open = not open
 	rebuild()
+end
+
+function Goals.close()
+	if open then
+		Goals.toggle()
+	end
 end
 
 header.Activated:Connect(Goals.toggle)
@@ -238,7 +244,8 @@ function Goals.start()
 	local last = 0
 	RunService.RenderStepped:Connect(function()
 		local step = (player:GetAttribute("Tutorial") or 99) :: number
-		panel.Visible = player:GetAttribute("DataReady") == true
+		panel.Visible = open
+			and player:GetAttribute("DataReady") == true
 			and step >= Onboarding.Steps.Save
 			and next(state) ~= nil
 		local now = os.clock()

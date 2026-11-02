@@ -45,7 +45,7 @@ local SOUNDS: { [string]: { id: { number }, volume: number, pitch: { number }, p
 }
 local COMBO_WORDS =
 	{ "", "DOUBLE!", "TRIPLE!", "MULTI!", "MEGA!", "ULTRA!", "MONSTER!", "RAMPAGE!" }
-local COMBO_COLORS = { C.text, C.money, C.gold, C.orange, C.red, C.purple, C.blue, C.gold }
+local COMBO_COLORS = { C.text, C.money, C.yellow, C.orange, C.red, C.pink, C.blue, C.yellow }
 
 ---------------------------------------------------------------- sound pool
 
@@ -188,34 +188,49 @@ end
 
 ---------------------------------------------------------------- big text
 
+-- combo words slam in right of centre, slanted, with two hard offset copies behind (pink, then ink)
 local function announce(word: string, color: Color3, sizeBoost: number)
-	local l = Style.label(gui, word, 64 + sizeBoost, F.display, color)
-	l.AnchorPoint = Vector2.new(0.5, 0.5)
-	l.Position = UDim2.fromScale(0.5, 0.42) -- below the goal card
-	l.Size = UDim2.fromOffset(800, 90)
-	l.Rotation = math.random(-6, 6)
-	Style.outline(l, 5)
+	local slam = Instance.new("Frame")
+	slam.BackgroundTransparency = 1
+	slam.AnchorPoint = Vector2.new(0.5, 0.5)
+	slam.Position = UDim2.fromScale(0.66, 0.4)
+	slam.Size = UDim2.fromOffset(700, 100)
+	slam.Rotation = math.random(-8, -3)
+	slam.Parent = gui
+	local size = 64 + sizeBoost
+	local labels = {}
+	for i, look in
+		{ { C.ink, 10 }, { if color == C.pink then C.blue else C.pink, 5 }, { color, 0 } }
+	do
+		local l = Style.label(slam, word, size, F.display, look[1])
+		l.Position = UDim2.fromOffset(look[2], look[2])
+		l.Size = UDim2.fromScale(1, 1)
+		l.ZIndex = i
+		if i == 3 then
+			Style.outline(l, 4)
+		end
+		table.insert(labels, l)
+	end
 	local scale = Instance.new("UIScale")
 	scale.Scale = 2
-	scale.Parent = l
+	scale.Parent = slam
 	TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	task.delay(0.7, function()
-		TweenService:Create(
-			l,
-			TweenInfo.new(0.35),
-			{ TextTransparency = 1, Position = UDim2.fromScale(0.5, 0.38) }
-		):Play()
-		local s = l:FindFirstChildOfClass("UIStroke")
-		if s then
-			TweenService:Create(s, TweenInfo.new(0.35), { Transparency = 1 }):Play()
+		TweenService:Create(slam, TweenInfo.new(0.35), { Position = UDim2.fromScale(0.66, 0.36) })
+			:Play()
+		for _, l in labels do
+			TweenService:Create(l, TweenInfo.new(0.35), { TextTransparency = 1 }):Play()
+			local s = l:FindFirstChildOfClass("UIStroke")
+			if s then
+				TweenService:Create(s, TweenInfo.new(0.35), { Transparency = 1 }):Play()
+			end
 		end
 		task.delay(0.4, function()
-			l:Destroy()
+			slam:Destroy()
 		end)
 	end)
 end
 
--- a word that floats up from a spot in the world
 local function worldText(at: Vector3, text: string, color: Color3)
 	local anchor = Instance.new("Attachment")
 	anchor.WorldPosition = at + Vector3.new(0, 4, 0)
