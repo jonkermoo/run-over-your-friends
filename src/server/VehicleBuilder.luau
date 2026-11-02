@@ -469,6 +469,7 @@ function VehicleBuilder.build(id: string): Model
 		jingle.Name = "Jingle"
 		jingle.SoundId = Vehicles.Jingle.sound
 		jingle.Volume = Vehicles.Jingle.volume
+		jingle.Looped = true
 		jingle.RollOffMinDistance = 30
 		jingle.RollOffMaxDistance = 300
 		jingle.Parent = chassis

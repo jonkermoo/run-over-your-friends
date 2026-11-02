@@ -83,6 +83,7 @@ export type Vehicle = {
 	hornPitch: number?, -- PlaybackSpeed on the horn, default 1
 	steerTilt: number?, -- degrees the cabin steering wheel leans back towards the driver, default 22 (trucks lie flatter)
 	steerRatio: number?, -- steering wheel turns per road-wheel turn, default 4 (handlebars 1)
+	nozzle: { number }?, -- water cannon turret, studs from the chassis centre (x, y, z)
 	tracks: Tracks?, -- crawler tracks instead of tyres: turns on the spot when slow
 	trailer: Trailer?,
 	blurb: string,
@@ -237,7 +238,7 @@ local list: { Vehicle } = {
 		engine = "Jalopy",
 		horn = "Car",
 		hornPitch = 1.12,
-		blurb = "Play the jingle and they all come to you.",
+		blurb = "Turn the jingle on and they all come to you.",
 	}),
 	v({
 		id = "FireTruck",
@@ -255,6 +256,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -2.4, 6.4, -14.1 },
 		engine = "Diesel",
+		nozzle = { 0, 12, -6 }, -- on the roof behind the cab
 		horn = "Siren",
 		steerTilt = 50,
 		blurb = "Water cannon knocks people flat. Breaks buildings.",
@@ -471,7 +473,8 @@ return table.freeze({
 	Engines = table.freeze(engines),
 	Horns = table.freeze(horns),
 	HornCooldown = 0.35, -- seconds between honks (the server relays no faster)
-	-- the ice-cream truck's G: APM Music "Ice Cream Truck OL" (30 s); plays World.Npc.JingleSeconds, then fades
+	-- the ice-cream truck's G turns its tune on and off: APM Music "Ice Cream Truck OL" (30 s), looped while
+	-- on; it fades out over `fade` seconds when turned off
 	Jingle = table.freeze({ sound = "rbxassetid://1838797774", volume = 0.7, fade = 1.2 }),
 	Starter = "Hatchback",
 	StudsPerMetre = 4.32, -- every model is built to this scale

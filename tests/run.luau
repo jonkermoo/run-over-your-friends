@@ -1483,7 +1483,7 @@ do
 end
 
 do
-	-- every vehicle has a horn that exists, played at a sane pitch; the jingle fits inside its lure time
+	-- every vehicle has a horn that exists, played at a sane pitch
 	local hornsOk = true
 	for _, v in Vehicles.List do
 		local h = Vehicles.Horns[v.horn]
@@ -1502,10 +1502,23 @@ do
 	end
 	check("every vehicle has a known horn at a sane pitch and volume", hornsOk)
 	check(
-		"the jingle fades out inside the lure time",
+		"the jingle has a tune, a short fade and a lure interval",
 		Vehicles.Jingle.fade > 0
-			and Vehicles.Jingle.fade < World.Npc.JingleSeconds
+			and Vehicles.Jingle.fade < 3
+			and World.Npc.JingleEvery > 0.2
 			and string.match(Vehicles.Jingle.sound, "^rbxassetid://%d+$") ~= nil
+	)
+	-- the water cannon: every cannon vehicle has a turret spot on its roof, and the aim arc is sane
+	local nozzlesOk = true
+	for _, v in Vehicles.List do
+		if Vehicles.has(v, "Cannon") and not (v.nozzle and #v.nozzle == 3 and v.nozzle[2] > 0) then
+			nozzlesOk = false
+		end
+	end
+	local N = World.Npc
+	check(
+		"cannon vehicles have a roof turret and the aim arc holds",
+		nozzlesOk and N.CannonDown < 0 and N.CannonUp > 0 and N.CannonUp < 1 and N.CannonSend > 0
 	)
 end
 

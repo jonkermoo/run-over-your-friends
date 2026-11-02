@@ -31,7 +31,7 @@ local combos: { [Player]: { count: number, last: number } } = {}
 local lastCall: { [Player]: { [string]: number } } = {}
 local random = Random.new()
 local friendsAdded: { [Player]: boolean } = {}
-local jingleToken: { [Sound]: number } = {}
+local jingleToken: { [BasePart]: number } = {}
 
 local function rateOk(player: Player, key: string, interval: number): boolean
 	local t = lastCall[player]
@@ -339,7 +339,52 @@ local function walkTo(npc: Model, pos: Vector3, seconds: number, run: boolean)
 	CrowdService.hold(npc, pos, seconds, run)
 end
 
-local function onFeature(player: Player, feature: unknown)
+-- the ice-cream truck's tune: looped while on, and everyone in range keeps heading for the truck; a fade when
+-- turned off. Every client shows the truck's sign from the JingleOn attribute.
+local function setJingle(chassis: BasePart, on: boolean)
+	local s = chassis:FindFirstChild("Jingle") :: Sound?
+	chassis:SetAttribute("JingleOn", on)
+	local token = (jingleToken[chassis] or 0) + 1
+	jingleToken[chassis] = token
+	if token == 1 then
+		chassis.Destroying:Once(function()
+			jingleToken[chassis] = nil
+		end)
+	end
+	if not on then
+		if s then
+			local fade = Vehicles.Jingle.fade
+			TweenService
+				:Create(s, TweenInfo.new(fade, Enum.EasingStyle.Exponential), { Volume = 0 })
+				:Play()
+			task.delay(fade, function()
+				if jingleToken[chassis] == token and s.Parent then
+					s:Stop()
+				end
+			end)
+		end
+		return
+	end
+	if s then
+		s.Looped = true
+		-- a new tween on Volume cancels a fade still running from a quick off-on
+		TweenService:Create(s, TweenInfo.new(0.15), { Volume = Vehicles.Jingle.volume }):Play()
+		if not s.IsPlaying then
+			s.TimePosition = 0
+			s:Play()
+		end
+	end
+	task.spawn(function()
+		while jingleToken[chassis] == token and chassis.Parent do
+			for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
+				walkTo(npc, chassis.Position, CFG.JingleEvery + 0.4, false)
+			end
+			task.wait(CFG.JingleEvery)
+		end
+	end)
+end
+
+local function onFeature(player: Player, feature: unknown, aim: unknown)
 	if typeof(feature) ~= "string" then
 		return
 	end
@@ -368,57 +413,30 @@ local function onFeature(player: Player, feature: unknown)
 				end)
 			end
 		end
-	elseif feature == "Jingle" and rateOk(player, "Jingle", 4) then
-		bubble(chassis, "♪ ♫ ♪")
-		local s = chassis:FindFirstChild("Jingle") :: Sound?
-		if s then
-			-- the tune's first JingleSeconds, then a fade (a press while it plays starts it over)
-			local token = (jingleToken[s] or 0) + 1
-			jingleToken[s] = token
-			s.Volume = Vehicles.Jingle.volume
-			s.TimePosition = 0
-			s:Play()
-			local fade = Vehicles.Jingle.fade
-			task.delay(CFG.JingleSeconds - fade, function()
-				if jingleToken[s] ~= token or not s.Parent then
-					return
-				end
-				TweenService
-					:Create(s, TweenInfo.new(fade, Enum.EasingStyle.Exponential), { Volume = 0 })
-					:Play()
-				task.delay(fade, function()
-					if jingleToken[s] == token and s.Parent then
-						s:Stop()
-					end
-				end)
-			end)
-			if token == 1 then
-				s.Destroying:Once(function()
-					jingleToken[s] = nil
-				end)
-			end
+	elseif feature == "Jingle" and rateOk(player, "Jingle", 0.5) then
+		setJingle(chassis, not chassis:GetAttribute("JingleOn"))
+	elseif feature == "Cannon" and rateOk(player, "Cannon", CFG.CannonSend * 0.8) then
+		-- aimed by the driver (mouse, or where the camera looks); the server holds the aim to a sane arc
+		if typeof(aim) ~= "Vector3" or aim ~= aim or aim.Magnitude < 0.01 then
+			return
 		end
-		for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
-			for i = 0, math.floor(CFG.JingleSeconds / 0.8) do
-				task.delay(i * 0.8, function()
-					if npc.Parent and chassis.Parent and not npc:GetAttribute("Down") then
-						walkTo(npc, chassis.Position, 1, false)
-					end
-				end)
-			end
+		local dir = aim.Unit
+		local flat = Vector3.new(dir.X, 0, dir.Z)
+		if flat.Magnitude < 0.05 then
+			flat = chassis.CFrame.LookVector * Vector3.new(1, 0, 1)
 		end
-	elseif feature == "Cannon" and rateOk(player, "Cannon", 0.25) then
-		local look = chassis.CFrame.LookVector
-		for _, npc in NpcService.inRadius(chassis.Position, CFG.CannonRange) do
-			local to = npc:GetPivot().Position - chassis.Position
-			if to.Unit:Dot(look) > CFG.CannonCone then
-				NpcService.knock(
-					npc,
-					(look + Vector3.new(0, 0.5, 0)).Unit * 70,
-					200000,
-					player,
-					Economy.CannonShare
-				)
+		local y = math.clamp(dir.Y, CFG.CannonDown, CFG.CannonUp)
+		dir = (flat.Unit * math.sqrt(1 - y * y) + Vector3.new(0, y, 0)).Unit
+		local n = stats.nozzle or { 0, 0, 0 }
+		local nozzle = chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]))
+		-- every client draws the turret and the spray from these
+		chassis:SetAttribute("CannonAim", dir)
+		chassis:SetAttribute("CannonAt", workspace:GetServerTimeNow())
+		local push = (flat.Unit + Vector3.new(0, 0.5, 0)).Unit * 70
+		for _, npc in NpcService.inRadius(nozzle, CFG.CannonRange) do
+			local to = npc:GetPivot().Position - nozzle
+			if to.Magnitude > 0.1 and to.Unit:Dot(dir) > CFG.CannonCone then
+				NpcService.knock(npc, push, 200000, player, Economy.CannonShare)
 			end
 		end
 	end

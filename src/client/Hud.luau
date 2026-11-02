@@ -1132,7 +1132,15 @@ RunService.RenderStepped:Connect(function()
 	hint.Position = UDim2.new(0.5, 0, 1, -(18 + dash.Size.Y.Offset + 14))
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
 	local keys = { "WASD drive", "SPACE get out", "V view", "H horn" }
-	if feature then
+	local jingleOn = Drive.view.car ~= nil
+		and Drive.view.car.PrimaryPart ~= nil
+		and Drive.view.car.PrimaryPart:GetAttribute("JingleOn") == true
+	if feature == "JINGLE" then
+		table.insert(keys, if jingleOn then "G jingle off" else "G jingle on")
+		feature = if jingleOn then "JINGLE OFF" else "JINGLE ON"
+	elseif feature == "WATER" then
+		table.insert(keys, "aim with the mouse, hold CLICK or G water")
+	elseif feature then
 		table.insert(keys, "G " .. string.lower(feature))
 	end
 	if hasJet then

@@ -49,9 +49,12 @@ return table.freeze({
 		FriendNameRange = 45, -- nameplates show within this many studs
 		TaxiRange = 90,
 		JingleRange = 120,
-		JingleSeconds = 8,
+		JingleEvery = 0.8, -- while the jingle is on, people in JingleRange head for the truck this often
 		CannonRange = 70,
-		CannonCone = 0.8, -- dot product with the nose
+		CannonCone = 0.8, -- dot product with the aim
+		CannonSend = 0.2, -- seconds between aim updates sent while spraying
+		CannonUp = 0.6, -- the aim's height (unit vector y) is held between these
+		CannonDown = -0.45,
 	}),
 	Debris = table.freeze({
 		MaxLoose = 1500,
