@@ -1168,14 +1168,16 @@ local function piecesOf(model: Model): { AnyPiece }?
 	return list
 end
 
--- office floors far from the camera: each piece as one block, lights that only glow (Config Town.FullFloors)
+local function nothing() end
+
+-- office floors far from the camera (Config Town.FullFloors): each piece as one block, no chairs, and only
+-- the ceiling panels over the desks that would light the floor, glowing (chairs and panels were 3/4 of a floor)
 local SIMPLE: { [string]: Build } = {
 	Desk = function(f, at)
 		block(f, Vector3.new(6, 3.1, 2.6), at * CFrame.new(0, 1.55, 0), WHITE)
 	end,
-	Chair = function(f, at)
-		block(f, Vector3.new(1.9, 2, 1.9), at * CFrame.new(0, 1, 0), DARK_WOOD, Enum.Material.Wood)
-	end,
+	Chair = nothing,
+	PanelGlow = nothing,
 	Divider = function(f, at, look)
 		block(f, Vector3.new(look.w, 1.8, 0.3), at * CFrame.new(0, 4, 0), look.fabric)
 	end,
