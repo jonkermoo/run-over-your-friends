@@ -232,6 +232,14 @@ local function buildTracks(model: Model, chassis: BasePart)
 	shoe:Destroy()
 end
 
+-- colour a vehicle's painted panels (0-255 sRGB); everyone sees it, as the server sets it
+function VehicleBuilder.paint(model: Model, rgb: { number }?)
+	local part = model:FindFirstChild("Paint")
+	if rgb and part and part:IsA("BasePart") then
+		part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+	end
+end
+
 function VehicleBuilder.build(id: string): Model
 	local stats = assert(Vehicles.ById[id], "unknown vehicle " .. id)
 	local template = ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(id) :: Model
@@ -296,6 +304,11 @@ function VehicleBuilder.build(id: string): Model
 	sprung.Parent = model
 	weld("Suspension", chassis, sprung):SetAttribute("Suspension", true)
 	weld("BodyWeld", sprung, body)
+	-- the painted panels: their own untextured part, so the server can recolour them (Config/Paints)
+	local paint = model:FindFirstChild("Paint") :: BasePart?
+	if paint then
+		weld("PaintWeld", sprung, paint)
+	end
 	-- the cabin rides on the suspension with the body: see-through glass, seats and dash, and a steering
 	-- wheel the client turns (its weld is tagged Steer; the driver's hands reach for its Grip attachments)
 	local glass = model:FindFirstChild("Glass") :: BasePart?

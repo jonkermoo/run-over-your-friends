@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 
 local Ground = require(ReplicatedStorage.Shared.Ground)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Data = require(script.Parent.Data)
 local RateLimit = require(script.Parent.RateLimit)
@@ -164,6 +165,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	VehicleService.despawn(player)
 
 	local model = VehicleBuilder.build(id)
+	VehicleBuilder.paint(model, PaintRules.colour(id, profile.paint[id]))
 	local _, size = model:GetBoundingBox()
 	local ignore = { character, folder }
 	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
