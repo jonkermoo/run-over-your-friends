@@ -1132,11 +1132,11 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		table.insert(exclude, c)
 	end
 	local HC = Cfg.Hills
-	for _, h in
-		Rules.hills(half, exclude, HC, function()
-			return random:NextNumber()
-		end)
-	do
+	local function rng(): number
+		return random:NextNumber()
+	end
+	local hills = Rules.hills(half, exclude, HC, rng)
+	for _, h in hills do
 		terrain:FillBall(Vector3.new(h.x, -HC.Bury * h.r, h.z), h.r, Enum.Material.Grass)
 		if random:NextNumber() < HC.RockChance then
 			terrain:FillBall(
@@ -1145,6 +1145,37 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				Enum.Material.Rock
 			)
 		end
+	end
+
+	-- the flat grass between the hills: groves, ponds with a sandy bank, boulders
+	local W = Cfg.Wilds
+	for _, g in
+		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Groves, W.GroveRadius, W.Margin, rng)
+	do
+		for _ = 1, random:NextInteger(W.GroveTrees[1], W.GroveTrees[2]) do
+			local a, d = random:NextNumber(0, math.pi * 2), random:NextNumber(0, W.GroveRadius)
+			tree(static, Vector3.new(g.x + math.cos(a) * d, 0, g.z + math.sin(a) * d), random)
+		end
+		table.insert(exclude, { x = g.x, z = g.z, w = W.GroveRadius * 2, d = W.GroveRadius * 2 })
+	end
+	for _, p in
+		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Ponds, W.PondRadius, W.Margin, rng)
+	do
+		-- two flat discs (the ground is a part, so terrain water can't sit below it): a sandy bank, the water
+		local bank = post(static, 0.2, W.PondRadius * 2, Vector3.new(p.x, 0, p.z), COLORS.sand)
+		bank.Material = Enum.Material.Sand
+		local water =
+			post(static, 0.3, W.PondRadius * 2 - 14, Vector3.new(p.x, 0, p.z), rgb(C.water))
+		water.Material = Enum.Material.Glass
+		water.Transparency = 0.15
+		water.Reflectance = 0.15
+		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
+	end
+	for _, b in
+		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Boulders, W.BoulderRadius, W.Margin, rng)
+	do
+		local r = random:NextNumber(0.5, 1) * W.BoulderRadius
+		terrain:FillBall(Vector3.new(b.x, -r * 0.3, b.z), r, Enum.Material.Rock)
 	end
 
 	return { walkPoints = walkPoints, places = places }

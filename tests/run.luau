@@ -821,6 +821,10 @@ check(
 	Streets.DashLength > 0 and Streets.DashGap > 0 and Streets.ZebraStripes >= 3
 )
 check("billboards are parodies", #Streets.Billboards >= 4)
+check(
+	"the plaza fountain fits inside its ring of benches",
+	Streets.PlazaFountain.size / 2 + 4 < (World.Map.BlockSize - World.Map.SidewalkWidth * 2) * 0.22
+)
 check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
 
 -- house kit
@@ -1312,6 +1316,42 @@ do
 	end
 	check("hills fill the empty ground", #hills > 100)
 	check("no hill reaches a road or a zone", clear)
+	local function checkGroves()
+		local Wl = OutskirtsConfig.Wilds
+		local rects = { ring, z.stunt, z.port, z.desert, z.site }
+		local groves = OutskirtsRules.clearSpots(
+			half,
+			rects,
+			hills,
+			H.Bury,
+			Wl.Groves,
+			Wl.GroveRadius,
+			Wl.Margin,
+			rng
+		)
+		local groveClear = #groves > Wl.Groves / 2
+		for ia, g in groves do
+			for _, r in rects do
+				if OutskirtsRules.distance(r, g.x, g.z) < Wl.GroveRadius + Wl.Margin - 0.01 then
+					groveClear = false
+				end
+			end
+			for _, h in hills do
+				local d = math.sqrt((g.x - h.x) ^ 2 + (g.z - h.z) ^ 2)
+				if d < OutskirtsRules.footprint(h.r, H.Bury) + Wl.GroveRadius then
+					groveClear = false
+				end
+			end
+			for ib = ia + 1, #groves do
+				local o = groves[ib]
+				if math.sqrt((g.x - o.x) ^ 2 + (g.z - o.z) ^ 2) < Wl.GroveRadius * 2 then
+					groveClear = false
+				end
+			end
+		end
+		check("groves land on the open grass, apart, clear of roads, zones and hills", groveClear)
+	end
+	checkGroves()
 	check(
 		"a narrow sidewalk still fits benches and clutter",
 		Streets.BenchInset + 1 < MW.SidewalkWidth and Streets.KerbInset + 1 < MW.SidewalkWidth - 1.5

@@ -438,6 +438,42 @@ function StreetKit.build(
 					end
 				end
 			end
+			local inner = B - grid.sidewalk * 2
+			if kind == "plaza" then
+				-- a fountain in the middle, planters in a ring round it, benches between them facing in
+				local F = S.PlazaFountain
+				local stone = Color3.fromRGB(200, 196, 188)
+				cylinder(static, F.rim, F.size, centre + Vector3.new(0, F.rim / 2, 0), stone).Material =
+					Enum.Material.Concrete
+				local water = cylinder(
+					static,
+					0.4,
+					F.size - 3,
+					centre + Vector3.new(0, F.rim - 0.1, 0),
+					Color3.fromRGB(60, 170, 210)
+				)
+				water.Material = Enum.Material.Glass
+				water.Transparency = 0.15
+				cylinder(static, F.column, 4, centre + Vector3.new(0, F.column / 2, 0), stone)
+				cylinder(static, 1, 12, centre + Vector3.new(0, F.column, 0), stone)
+				for k = 0, S.PlazaPlanters - 1 do
+					local a = k / S.PlazaPlanters * math.pi * 2
+					local out = Vector3.new(math.cos(a), 0, math.sin(a))
+					planter(props, centre + out * (inner * 0.3), out)
+				end
+				for k = 0, S.PlazaBenches - 1 do
+					local a = (k + 0.5) / S.PlazaBenches * math.pi * 2
+					local out = Vector3.new(math.cos(a), 0, math.sin(a))
+					bench(props, centre + out * (inner * 0.22), -out)
+				end
+			elseif kind == "parking" then
+				-- a row of parked cars nosed into the back edge, east of the long ramp
+				for k = 0, S.LotCars - 1 do
+					local at = centre + Vector3.new(-inner / 2 + 60 + k * 10, 0, -inner / 2 + 9)
+					local colour = S.CarColours[random:NextInteger(1, #S.CarColours)]
+					parkedCar(props, at, Vector3.new(0, 0, -1), rgb(colour))
+				end
+			end
 			-- parked cars along the kerb, away from the crossings
 			for _ = 1, S.ParkedPerBlock do
 				local out = SIDES[random:NextInteger(1, 4)]

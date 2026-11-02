@@ -37,6 +37,10 @@ return table.freeze({
 	ClutterSlots = table.freeze({ -0.42, -0.06, 0.1, 0.42 }), -- along the side, as a share of the block (clear of lamps, trees, benches)
 	ParkedOffset = 4.5, -- parked cars: this far out into the road from the kerb
 	ShelterChance = 0.35, -- busy blocks get a bus shelter (a waiting crowd gathers there)
+	PlazaPlanters = 6, -- in a ring round the plaza's middle, benches between them facing in
+	PlazaBenches = 4,
+	PlazaFountain = table.freeze({ size = 30, rim = 2.5, column = 9 }),
+	LotCars = 8, -- parked in a row along a car park's back edge, clear of its ramps
 	SignalSeconds = 9, -- traffic lights: green this long each way
 	AmberSeconds = 2,
 	PropRebuildSeconds = 45, -- knocked props stand back up after this

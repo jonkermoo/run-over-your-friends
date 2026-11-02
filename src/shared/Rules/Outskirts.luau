@@ -104,4 +104,54 @@ function Outskirts.hills(
 	return out
 end
 
+-- up to `n` spots of radius `r` on the flat ground between the hills: clear of every rect and hill by
+-- `margin`, and of each other; tries a fixed number of times, so a crowded map gets fewer
+function Outskirts.clearSpots(
+	half: number,
+	exclude: { Rect },
+	hills: { Hill },
+	bury: number,
+	n: number,
+	r: number,
+	margin: number,
+	rng: () -> number
+): { { x: number, z: number } }
+	local out: { { x: number, z: number } } = {}
+	for _ = 1, n * 30 do
+		if #out >= n then
+			break
+		end
+		local x = (rng() * 2 - 1) * (half - r - margin)
+		local z = (rng() * 2 - 1) * (half - r - margin)
+		local ok = true
+		for _, e in exclude do
+			if Outskirts.distance(e, x, z) < r + margin then
+				ok = false
+				break
+			end
+		end
+		if ok then
+			for _, h in hills do
+				local f = Outskirts.footprint(h.r, bury)
+				if (x - h.x) ^ 2 + (z - h.z) ^ 2 < (f + r + margin) ^ 2 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			for _, p in out do
+				if (x - p.x) ^ 2 + (z - p.z) ^ 2 < (2 * r + margin) ^ 2 then
+					ok = false
+					break
+				end
+			end
+		end
+		if ok then
+			table.insert(out, { x = x, z = z })
+		end
+	end
+	return out
+end
+
 return Outskirts

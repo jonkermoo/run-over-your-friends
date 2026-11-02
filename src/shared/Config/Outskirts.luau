@@ -18,7 +18,7 @@ return table.freeze({
 	RingCells = table.freeze({
 		MoundHeight = 6,
 		BillboardEvery = 2,
-		Trees = 1,
+		Trees = 3,
 	}),
 
 	Stunt = table.freeze({
@@ -57,7 +57,7 @@ return table.freeze({
 		BowlHalf = 180, -- from the bowl centre to each quarter pipe's foot
 		BowlHeight = 30,
 		BowlLength = 50,
-		TyreStacks = 56,
+		TyreStacks = 64,
 		Flags = 10,
 		Stands = 2,
 		Spectators = 24, -- crowd spots in front of the stands
@@ -113,6 +113,18 @@ return table.freeze({
 		Bury = 0.6, -- share of each hill's radius under the ground
 		Margin = 30, -- kept clear around roads and zones
 		RockChance = 0.25,
+	}),
+
+	-- the flat grass between the hills: groves of trees, ponds (flat discs) with a sandy bank, boulders (terrain)
+	Wilds = table.freeze({
+		Margin = 20,
+		Groves = 22,
+		GroveRadius = 28,
+		GroveTrees = table.freeze({ 3, 5 }), -- fewest, most
+		Ponds = 6,
+		PondRadius = 34,
+		Boulders = 40,
+		BoulderRadius = 10,
 	}),
 
 	Colours = table.freeze({
