@@ -310,52 +310,54 @@ local function markTab(active: TextButton?)
 	end
 end
 
+-- the garage and the store share one full-height sheet under the menu strip (the strip's tabs switch
+-- between them): a big title, a dashed lane line, a yellow X, and a scrolling list
 local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
-	local p = Style.panel(gui, 22, 0.04)
-	p.AnchorPoint = Vector2.new(0.5, 0.5)
-	p.Position = UDim2.fromScale(0.5, 0.53)
-	p.Size = UDim2.fromScale(0.86, 0.78)
+	local p = Style.panel(gui)
+	p.AnchorPoint = Vector2.new(0.5, 0)
+	p.Position = UDim2.new(0.5, 0, 0, 68)
+	p.Size = UDim2.new(1, -28, 1, -86)
 	p.Visible = false
+	p.ZIndex = 5
+	Style.setShadow(p, accent)
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(1100, 700)
+	limit.MaxSize = Vector2.new(1100, 760)
 	limit.Parent = p
-	local stripe = Instance.new("Frame")
-	stripe.BackgroundColor3 = accent
-	stripe.BorderSizePixel = 0
-	stripe.Position = UDim2.fromOffset(22, 16)
-	stripe.Size = UDim2.fromOffset(6, 32)
-	stripe.Parent = p
-	Style.corner(stripe, 3)
-	local t = Style.label(p, title, 34, F.display, C.text)
-	t.Position = UDim2.fromOffset(38, 10)
-	t.Size = UDim2.new(1, -100, 0, 44)
-	t.TextXAlignment = Enum.TextXAlignment.Left
-	Style.outline(t)
-	local close = Style.button(p, "X", "dark", 20)
+	-- the title sits on the right, by the X: the job card can cover the sheet's top-left corner
+	local t = Style.label(p, title, 36, F.display, C.text)
+	t.AnchorPoint = Vector2.new(1, 0)
+	t.Position = UDim2.new(1, -72, 0, 12)
+	t.Size = UDim2.fromOffset(300, 40)
+	t.TextXAlignment = Enum.TextXAlignment.Right
+	local line = Style.dashes(p, C.yellow, false, 4)
+	line.Position = UDim2.fromOffset(0, 58)
+	local close = Style.button(p, "X", "gold", 22)
+	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, 12)
-	close.Size = UDim2.fromOffset(42, 42)
+	close.Position = UDim2.new(1, -14, 0, 9)
+	close.Size = UDim2.fromOffset(44, 44)
 	close.Activated:Connect(function()
 		p.Visible = false
 	end)
 	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.fromOffset(16, 66)
-	list.Size = UDim2.new(1, -32, 1, -80)
+	list.Position = UDim2.fromOffset(16, 72)
+	list.Size = UDim2.new(1, -32, 1, -84)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 5
-	list.ScrollBarImageColor3 = C.dim
+	list.ScrollBarThickness = 6
+	list.ScrollBarImageColor3 = C.yellow
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
 	list.Parent = p
 	local pad = Instance.new("UIPadding")
 	pad.PaddingTop = UDim.new(0, 4)
 	pad.PaddingLeft = UDim.new(0, 4)
+	pad.PaddingBottom = UDim.new(0, 12)
 	pad.Parent = list
 	return p, list
 end
 
-local garage, garageList = panel("GARAGE", C.red)
+local garage, garageList = panel("GARAGE", C.pink)
 garage.Name = "Garage"
 local grid = Instance.new("UIGridLayout")
 grid.CellSize = UDim2.fromOffset(244, 316)
@@ -368,26 +370,31 @@ local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
 local cards: { Card } = {}
 
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
-	local l = Style.label(parent, name, 11, F.heavy, C.dim)
+	local l = Style.label(parent, name, 10, F.heavy, C.dim)
 	l.Position = UDim2.fromOffset(14, y)
 	l.Size = UDim2.fromOffset(72, 12)
 	l.TextXAlignment = Enum.TextXAlignment.Left
 	local back, fill = Style.bar(parent, color)
+	back.BackgroundColor3 = C.panel
+	back.BackgroundTransparency = 0
 	back.Position = UDim2.fromOffset(88, y + 3)
 	back.Size = UDim2.new(1, -102, 0, 7)
 	fill.Size = UDim2.fromScale(math.clamp(value, 0.05, 1), 1)
+	Style.laneGaps(back, C.card)
 end
 
 local function preview(parent: Instance, id: string)
 	local vf = Instance.new("ViewportFrame")
 	vf.Position = UDim2.fromOffset(6, 6)
 	vf.Size = UDim2.new(1, -12, 0, 122)
-	vf.BackgroundColor3 = Color3.fromRGB(52, 54, 84) -- no UIGradient here: it would tint the 3D model
+	vf.BackgroundColor3 = Color3.fromRGB(46, 46, 54) -- no UIGradient here: it would tint the 3D model
 	vf.Ambient = Color3.fromRGB(175, 175, 190)
 	vf.LightColor = Color3.new(1, 1, 1)
 	vf.LightDirection = Vector3.new(-1, -2, -1)
 	vf.Parent = parent
-	Style.corner(vf, 12)
+	local line = Style.dashes(parent, C.yellow, false, 3)
+	line.Position = UDim2.fromOffset(6, 128)
+	line.Size = UDim2.new(1, -12, 0, 3)
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(id) :: Model?
 	if not template then
@@ -410,11 +417,19 @@ for _, stats in Vehicles.List do
 	card.LayoutOrder = stats.order
 	card.Name = stats.id
 	preview(card, stats.id)
-	local name = Style.label(card, stats.name, 21, F.display, C.text)
+	-- painted bay number in the corner of the preview
+	local bay = Style.label(card, string.format("%02d", stats.order), 30, F.display, C.yellow)
+	bay.Position = UDim2.fromOffset(14, 10)
+	bay.Size = UDim2.fromOffset(60, 32)
+	bay.TextXAlignment = Enum.TextXAlignment.Left
+	bay.TextTransparency = 0.15
+	bay.ZIndex = 2
+	Style.outline(bay, 2)
+	local name = Style.label(card, stats.name, 22, F.display, C.text)
 	name.Position = UDim2.fromOffset(14, 132)
 	name.Size = UDim2.new(1, -28, 0, 26)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = Style.label(card, stats.blurb, 12, F.medium, C.dim)
+	local blurb = Style.label(card, stats.blurb, 12, F.bold, C.dim)
 	blurb.Position = UDim2.fromOffset(14, 158)
 	blurb.Size = UDim2.new(1, -28, 0, 30)
 	blurb.TextWrapped = true
@@ -423,7 +438,7 @@ for _, stats in Vehicles.List do
 	statBar(card, 192, "SPEED", stats.topSpeed / 250, C.orange)
 	statBar(card, 208, "ACCEL", stats.launch / 15, C.blue)
 	statBar(card, 224, "HANDLING", stats.grip / 22, C.green)
-	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.purple)
+	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
 	if stats.breaksBuildings then
 		local tag = Style.pill(card, "BREAKS BUILDINGS", C.orange)
 		tag.AnchorPoint = Vector2.new(1, 0)
@@ -440,7 +455,6 @@ for _, stats in Vehicles.List do
 	price.Position = UDim2.fromOffset(14, 272)
 	price.Size = UDim2.fromOffset(110, 32)
 	price.TextXAlignment = Enum.TextXAlignment.Left
-	Style.outline(price, 1.5)
 	local action = Style.button(card, "SPAWN", "green", 18)
 	action.Name = "Action"
 	action.AnchorPoint = Vector2.new(1, 0)
@@ -504,7 +518,7 @@ storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 storeLayout.Parent = storeList
 
 local function header(order: number, text: string)
-	local h = Style.label(storeList, text, 22, F.display, C.dim)
+	local h = Style.label(storeList, text, 22, F.display, C.yellow)
 	h.Size = UDim2.new(1, -12, 0, 26)
 	h.TextXAlignment = Enum.TextXAlignment.Left
 	h.LayoutOrder = order
@@ -537,7 +551,7 @@ local function storeRow(
 	kind: string,
 	onClick: () -> ()
 ): TextButton
-	local row = Style.card(storeList, 16)
+	local row = Style.card(storeList)
 	row.Size = UDim2.new(1, -12, 0, 88)
 	row.LayoutOrder = order
 	local stripe = Instance.new("Frame")
@@ -546,13 +560,11 @@ local function storeRow(
 	stripe.Position = UDim2.fromOffset(0, 0)
 	stripe.Size = UDim2.new(0, 8, 1, 0)
 	stripe.Parent = row
-	Style.corner(stripe, 4)
 	local t = Style.label(row, title, 24, F.display, C.text)
 	t.Position = UDim2.fromOffset(24, 10)
 	t.Size = UDim2.new(1, -220, 0, 30)
 	t.TextXAlignment = Enum.TextXAlignment.Left
-	Style.outline(t, 1.5)
-	local d = Style.label(row, text, 14, F.medium, C.dim)
+	local d = Style.label(row, text, 13, F.bold, C.dim)
 	d.Position = UDim2.fromOffset(24, 42)
 	d.Size = UDim2.new(1, -220, 0, 36)
 	d.TextWrapped = true
@@ -613,7 +625,7 @@ packGrid.CellPadding = UDim2.fromOffset(12, 0)
 packGrid.SortOrder = Enum.SortOrder.LayoutOrder
 packGrid.Parent = packs
 for i, pack in Products.MoneyPacks do
-	local card = Style.card(packs, 16)
+	local card = Style.card(packs)
 	card.LayoutOrder = i
 	if pack.tag then
 		local tag =
@@ -624,11 +636,10 @@ for i, pack in Products.MoneyPacks do
 	local amount = Style.label(card, money(pack.money), 30, F.display, C.money)
 	amount.Position = UDim2.fromOffset(0, 36)
 	amount.Size = UDim2.new(1, 0, 0, 40)
-	Style.outline(amount, 2)
-	local name = Style.label(card, pack.title, 15, F.heavy, C.dim)
+	local name = Style.label(card, string.upper(pack.title), 13, F.heavy, C.dim)
 	name.Position = UDim2.fromOffset(0, 78)
 	name.Size = UDim2.new(1, 0, 0, 18)
-	local buy = Style.button(card, "", "green", 18)
+	local buy = Style.button(card, "", "gold", 18)
 	buy.AnchorPoint = Vector2.new(0.5, 1)
 	buy.Position = UDim2.new(0.5, 0, 1, -12)
 	buy.Size = UDim2.new(1, -24, 0, 46)
@@ -640,7 +651,7 @@ end
 
 header(5, "GAME PASSES")
 for i, p in PASSES do
-	passButtons[p.name] = storeRow(5 + i, p.title, p.text, "GET", p.accent, "blue", function()
+	passButtons[p.name] = storeRow(5 + i, p.title, p.text, "GET", p.accent, "gold", function()
 		Net.waitFor("BuyPass"):FireServer(p.name)
 	end)
 end
@@ -676,7 +687,7 @@ local function refreshStore()
 			Style.setKind(b, "dark")
 		else
 			b.Text = if test then "TEST TOGGLE" else "GET"
-			Style.setKind(b, "blue")
+			Style.setKind(b, "gold")
 		end
 	end
 	local bought = string.find(
@@ -707,32 +718,49 @@ end
 
 ---------------------------------------------------------------- offers
 
-local offer = Style.panel(gui, 20, 0.02)
+local offer = Style.panel(gui)
 offer.AnchorPoint = Vector2.new(0.5, 0.5)
 offer.Position = UDim2.fromScale(0.5, 0.5)
-offer.Size = UDim2.fromOffset(420, 250)
+offer.Size = UDim2.fromOffset(440, 270)
 offer.ZIndex = 10
 offer.Visible = false
-Style.stroke(offer, C.gold, 3, 0)
-local offerTitle = Style.label(offer, "", 30, F.display, C.gold)
-offerTitle.Position = UDim2.fromOffset(0, 16)
-offerTitle.Size = UDim2.new(1, 0, 0, 36)
+Style.stroke(offer, C.yellow, 4, 0)
+Style.setShadow(offer, C.pink)
+local hazard = Instance.new("Frame")
+hazard.BackgroundColor3 = C.yellow
+hazard.BorderSizePixel = 0
+hazard.Size = UDim2.new(1, 0, 0, 14)
+hazard.ClipsDescendants = true
+hazard.ZIndex = 11
+hazard.Parent = offer
+for x = -20, 460, 28 do
+	local stripe = Instance.new("Frame")
+	stripe.BackgroundColor3 = C.ink
+	stripe.BorderSizePixel = 0
+	stripe.Position = UDim2.fromOffset(x, -10)
+	stripe.Size = UDim2.fromOffset(12, 40)
+	stripe.Rotation = 40
+	stripe.ZIndex = 11
+	stripe.Parent = hazard
+end
+local offerTitle = Style.label(offer, "", 32, F.display, C.yellow)
+offerTitle.Position = UDim2.fromOffset(0, 28)
+offerTitle.Size = UDim2.new(1, 0, 0, 38)
 offerTitle.ZIndex = 11
-Style.outline(offerTitle, 2)
-local offerText = Style.label(offer, "", 17, F.bold, C.text)
-offerText.Position = UDim2.fromOffset(24, 58)
-offerText.Size = UDim2.new(1, -48, 0, 70)
+local offerText = Style.label(offer, "", 15, F.bold, C.text)
+offerText.Position = UDim2.fromOffset(28, 72)
+offerText.Size = UDim2.new(1, -56, 0, 64)
 offerText.TextWrapped = true
 offerText.ZIndex = 11
-local offerBuy = Style.button(offer, "", "green", 20)
+local offerBuy = Style.button(offer, "", "gold", 22)
 offerBuy.AnchorPoint = Vector2.new(0.5, 0)
-offerBuy.Position = UDim2.new(0.5, 0, 0, 136)
-offerBuy.Size = UDim2.fromOffset(260, 50)
+offerBuy.Position = UDim2.new(0.5, 0, 0, 146)
+offerBuy.Size = UDim2.fromOffset(300, 54)
 offerBuy.ZIndex = 11
 local offerNo = Style.button(offer, "KEEP DRIVING", "dark", 16)
 offerNo.AnchorPoint = Vector2.new(0.5, 0)
-offerNo.Position = UDim2.new(0.5, 0, 0, 194)
-offerNo.Size = UDim2.fromOffset(200, 38)
+offerNo.Position = UDim2.new(0.5, 0, 0, 214)
+offerNo.Size = UDim2.fromOffset(200, 40)
 offerNo.ZIndex = 11
 local offerKey = ""
 offerBuy.Activated:Connect(function()

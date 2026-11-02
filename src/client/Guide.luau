@@ -389,6 +389,11 @@ local function update()
 	end
 
 	glow(garageButton, glowGarage and not (garage and garage.Visible))
+	-- the nudge sits where the garage/store sheet opens: keep it out of the way while one is open
+	local store = hud and hud:FindFirstChild("Store") :: GuiObject?
+	if (garage and garage.Visible) or (store and store.Visible) then
+		hintText.Visible = false
+	end
 	if garage then
 		for _, c in garage:GetDescendants() do
 			if c:IsA("TextButton") and c.Name == "Action" then
