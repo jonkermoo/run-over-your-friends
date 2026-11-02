@@ -304,9 +304,17 @@ local function placeStrip()
 	strip.Visible = show and not stripShrunk
 	stripHide.Visible = show and not stripShrunk
 	stripChip.Visible = show and stripShrunk
-	strip.Position = UDim2.new(0.5, 0, 0, y)
-	stripChip.Position = UDim2.new(0.5, 0, 0, y)
-	stripHide.Position = UDim2.new(0.5, STRIP_W / 2 + 10, 0, y)
+	-- on a narrow screen the middle runs into the job card (top left, drawn above us): slide right of it
+	local width = if stripShrunk then stripChip.AbsoluteSize.X else STRIP_W
+	local x = gui.AbsoluteSize.X / 2
+	local guide = playerGui:FindFirstChild("Guide")
+	local card = guide and guide:FindFirstChild("JobCard") :: GuiObject?
+	if card and card.Visible and card.AbsolutePosition.Y < y + STRIP_H then
+		x = math.max(x, card.AbsolutePosition.X + card.AbsoluteSize.X + 12 + width / 2)
+	end
+	strip.Position = UDim2.fromOffset(x, y)
+	stripChip.Position = UDim2.fromOffset(x, y)
+	stripHide.Position = UDim2.fromOffset(x + STRIP_W / 2 + 10, y)
 end
 
 function EventBanner.start()
