@@ -16,6 +16,8 @@ local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
+local SocialConfig = require(ReplicatedStorage.Shared.Config.Social)
+local SocialRules = require(ReplicatedStorage.Shared.Rules.Social)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
@@ -69,6 +71,22 @@ feed.Position = UDim2.new(1, -14, 0, 76)
 feed.Size = UDim2.fromOffset(320, 260)
 feed.Parent = gui
 local feedItems: { GuiObject } = {}
+
+-- under the money: the friend bonus chip while Roblox friends are in the server (the feed moves down for it)
+local friendChip = Style.pill(gui, "", C.pink)
+friendChip.Name = "FriendChip"
+friendChip.TextColor3 = C.text
+friendChip.AnchorPoint = Vector2.new(1, 0)
+friendChip.Position = UDim2.new(1, -14, 0, 70)
+friendChip.Visible = false
+local function refreshFriends()
+	local n = (player:GetAttribute("Friends") or 0) :: number
+	local pct =
+		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
+	friendChip.Text = `{n} FRIEND{if n == 1 then "" else "S"} HERE  +{pct}% MONEY`
+	friendChip.Visible = n > 0
+	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 98 else 76)
+end
 
 local function fadeOut(obj: GuiObject, seconds: number)
 	local info = TweenInfo.new(seconds)
@@ -131,6 +149,9 @@ local function popup(text: string, kind: string)
 	elseif kind == "big" then
 		item = plate(text, C.yellow, C.ink, 26, F.display)
 		hold = 2.4
+	elseif kind == "social" then
+		item = plate(text, C.pink, C.text, 18, F.display)
+		hold = 2.6
 	elseif kind == "info" then
 		item = plate(text, C.panel, C.text, 15, F.heavy)
 		hold = 2.4
@@ -1125,6 +1146,8 @@ function Hud.start()
 		refreshCards()
 	end)
 	player:GetAttributeChangedSignal("Owned"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("Friends"):Connect(refreshFriends)
+	refreshFriends()
 	player:GetAttributeChangedSignal("LikeClaimed"):Connect(refreshStore)
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
 	local function tutorialStep()

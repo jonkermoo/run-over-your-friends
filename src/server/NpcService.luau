@@ -17,6 +17,7 @@ local Analytics = require(script.Parent.Analytics)
 local CrowdService = require(script.Parent.CrowdService)
 local Data = require(script.Parent.Data)
 local Passes = require(script.Parent.Passes)
+local SocialService = require(script.Parent.SocialService)
 local VehicleService = require(script.Parent.VehicleService)
 
 local NpcService = {}
@@ -164,6 +165,7 @@ function NpcService.knock(
 		if Passes.has(player, "DoubleMoney") then
 			pay *= Economy.DoubleMoney
 		end
+		pay *= SocialService.multiplier(player)
 		Data.addMoney(player, pay)
 		local text = "+$" .. tostring(math.floor(pay + 0.5))
 		if combo.count > 1 then
@@ -284,8 +286,11 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 				string.gsub(humanoid.DisplayName, "%(%d+ hits%)", `({giantHp - 1} hits)`)
 		end
 		root.AssemblyLinearVelocity += (dir * Vector3.new(1, 0, 1)) * 40
-		local pay = EventConfig.GiantHitPay
-			* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+		local pay = math.floor(
+			EventConfig.GiantHitPay
+				* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+				* SocialService.multiplier(player)
+		)
 		Data.addMoney(player, pay)
 		Net.remote("Popup"):FireClient(player, `+${pay}  GIANT HIT!`, "big")
 		Net.remote("Fx"):FireAllClients("Hit", root.Position, 1, 0, player.UserId)

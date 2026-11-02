@@ -1568,6 +1568,48 @@ do
 		)
 	end
 	checkDaily()
+	local function checkSocial()
+		local SocialConfig = require("../src/shared/Config/Social")
+		local Social = require("../src/shared/Rules/Social")
+		local per, max = SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax
+		check(
+			"friends boost money, capped",
+			Social.friendMultiplier(0, per, max) == 1
+				and math.abs(Social.friendMultiplier(2, per, max) - 1.2) < 1e-9
+				and math.abs(Social.friendMultiplier(9, per, max) - (1 + max)) < 1e-9
+		)
+		check(
+			"the friend chip shows a whole percent",
+			Social.friendPercent(1, per, max) == 10 and Social.friendPercent(5, per, max) == 30
+		)
+		local toastState = Social.newToasts()
+		local cfg = SocialConfig
+		check("a short flight gets no toast", not Social.allowToast(toastState, 1, 2, 10, 0, cfg))
+		check("you can't toast yourself", not Social.allowToast(toastState, 1, 1, 300, 0, cfg))
+		check("a long flight gets a toast", Social.allowToast(toastState, 1, 2, 300, 0, cfg))
+		check(
+			"the launcher waits between toasts",
+			not Social.allowToast(toastState, 1, 3, 300, cfg.ToastHitterGap - 0.1, cfg)
+				and Social.allowToast(toastState, 1, 3, 300, cfg.ToastHitterGap, cfg)
+		)
+		check(
+			"the same two players wait longer, either way round",
+			not Social.allowToast(toastState, 2, 1, 300, cfg.ToastPairGap - 0.1, cfg)
+				and Social.allowToast(toastState, 2, 1, 300, cfg.ToastPairGap, cfg)
+		)
+		Social.forget(toastState, 1)
+		local cleared = toastState.hitter[1] == nil
+		for key in toastState.pair do
+			cleared = cleared and not string.find(key, "^1:") and not string.find(key, ":1$")
+		end
+		check("a player who leaves is forgotten", cleared)
+		local mine, theirs = Social.toastText("Sam", "Alex", 312.4)
+		check(
+			"both players get a line",
+			mine == "You launched Alex 312 studs!" and theirs == "Sam launched you 312 studs!"
+		)
+	end
+	checkSocial()
 end
 
 if failures > 0 then
