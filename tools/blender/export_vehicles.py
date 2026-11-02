@@ -857,6 +857,12 @@ class Fit:
         """The inner face of the shell beside (x, y, z), looking along d (LEFT or RIGHT): its x."""
         return x + d[0] * self.dist((x, y, z), d)
 
+    def inner(self, x, z, d, heights):
+        """The innermost of the shell's inner faces beside (x, z) over several heights: a panel standing there
+        stays inside a body whose sides curve in (the Roadster's doors)."""
+        faces = [self.side(x, y, z, d) for y in heights]
+        return max(faces) if d[0] < 0 else min(faces)
+
     def roof(self, x, z, y0):
         """The underside of the roof above (x, z); an open top (the Roadster's middle) counts as a low roof line."""
         dd, kind = self.hit((x, y0, z), UP, 8)
@@ -904,7 +910,7 @@ CABIN = {
                    stack="radio", shift="pistol", rear=False, extras=("dice", "undergauges")),
     "Supercar": dict(seat="black", insert="orange", door="black", dash="black", trim="orange", wheel="sport",
                      cluster="digital", stack="toggles", shift="paddles", rear=False, extras=("carbon",)),
-    "Roadster": dict(seat="white", insert="pale", door="white", dash="black", trim="char", wheel="yoke",
+    "Roadster": dict(seat="white", insert="pale", door="char", dash="black", trim="char", wheel="yoke",
                      cluster="small", stack="bigscreen", shift="none", rear=False, extras=()),
     "IceCream": dict(seat="mint", insert="pale", door="pale", dash="grey", trim="pink", wheel="truck", cluster="twin",
                      stack="radio", shift="auto", rear=False, extras=("cone", "freezer", "jingle")),
@@ -913,7 +919,7 @@ CABIN = {
     "Semi": dict(seat="brown", insert="tan", door="brown", dash="char", trim="chrome", wheel="truck", cluster="row5",
                  stack="radio", shift="truck", rear=False, extras=("cb", "curtain", "horncord")),
     "Monster": dict(seat="black", insert="orange", door="black", dash="black", trim="orange", wheel="sport",
-                    cluster="bigtwin", stack="switches", shift="pistol", rear=False, extras=("cage", "harness", "net",
+                    cluster="bigtwin", stack="switches", shift="pistol", rear=False, extras=("cage", "harness",
                                                                                         "extinguisher")),
 }
 
@@ -1035,15 +1041,29 @@ def car_cabin(vid, f, glass, sp):
     floor = max(sy - f.dist((sx, sy, sz), DOWN) + 0.05, sy - 1.1)
     roof, _ = f.roof(0, sz, ey)
     w = xr - xl
+
+    def span(zs, ys, pad=0.15):
+        """How far a full-width piece can reach either side at these depths and heights and stay inside."""
+        lo = max(f.side(sx, y, z, LEFT) for z in zs for y in ys) + pad
+        hi = min(f.side(-sx, y, z, RIGHT) for z in zs for y in ys) - pad
+        return lo, hi
+
+    def wide(sides, h, d, y, z, rgb, bevel=0.0, r=None):
+        k.box((sides[1] - sides[0], h, d), ((sides[0] + sides[1]) / 2, y, z), rgb, bevel, r)
+
     print(f"FIT {vid} doors {xl:.2f}..{xr:.2f} belt {belt:.2f} dash {top:.2f} screen {zws:.2f} floor {floor:.2f} roof {roof:.2f} eye {ey:.2f}")
 
     # dash: a top slab out to the windscreen, a face towards the driver, a knee roll, the firewall below
-    depth = max(zd - zws, 0.6)
-    k.box((w, 0.9, depth), (0, top - 0.45, zws + depth / 2), dash, 0.12)
-    k.box((w - 0.1, 0.12, depth * 0.6), (0, top + 0.03, zws + depth * 0.3), C["black"] if dash != C["black"] else C["char"], 0)
-    k.box((w, 0.12, 0.14), (0, top - 0.1, zd + 0.02), trim, 0.03)
-    k.box((w, 1.0, 0.5), (0, top - 1.3, zd - 0.15), dash, 0.15, rot(-18))
-    k.box((w, top - floor, 0.3), (0, (top + floor) / 2, zfire), C["black"], 0)
+    # it stops short of the windscreen, whose sides sweep down lower than its middle (the Roadster's corners
+    # poked through the glass)
+    zdash = zws + 0.45
+    depth = max(zd - zdash, 0.6)
+    ds = span((zdash + 0.2, zdash + depth / 2, zd), (top - 0.85, top - 0.05))
+    wide(ds, 0.9, depth, top - 0.45, zdash + depth / 2, dash, 0.12)
+    wide((ds[0] + 0.05, ds[1] - 0.05), 0.12, depth * 0.6, top + 0.03, zdash + depth * 0.3, C["black"] if dash != C["black"] else C["char"])
+    wide(ds, 0.12, 0.14, top - 0.1, zd + 0.02, trim, 0.03)
+    wide(span((zd - 0.15,), (top - 1.75, top - 0.85)), 1.0, 0.5, top - 1.3, zd - 0.15, dash, 0.15, rot(-18))
+    wide(span((zfire,), (floor + 0.2, (floor + top) / 2, top - 0.1)), top - floor, 0.3, (top + floor) / 2, zfire, C["black"])
     # a brow over the cluster in front of the driver
     k.box((2.2, 0.14, 0.6), (sx, top + 0.04, zd + 0.1), dash, 0.06)
     k.box((1.95, 0.85, 0.1), (sx, top - 0.4, zd + 0.02), C["black"], 0.03, rot(-GAUGE_TILT))
@@ -1176,11 +1196,12 @@ def car_cabin(vid, f, glass, sp):
         for i in range(steps):
             za, zb = z0 + (z1 - z0) * i / steps, z0 + (z1 - z0) * (i + 1) / steps
             zc = (za + zb) / 2
-            xd = f.side(x0, elbow, zc, d) - side * 0.1
-            bl = min(f.belt(x0, zc, d), ey - 0.3)
+            # stop just under the window line, so the top cap can't show through the seam above it
+            bl = min(f.belt(x0, zc, d), ey - 0.3) - 0.15
+            xd = f.inner(x0, zc, d, (floor + 0.3, elbow, bl - 0.1)) - side * 0.15
             k.box((0.14, bl - floor, zb - za + 0.04), (xd, (bl + floor) / 2, zc), door, 0)
             k.box((0.24, 0.16, zb - za + 0.04), (xd - side * 0.05, bl - 0.04, zc), trim if sp["trim"] in ("chrome", "grey") else C["black"], 0.03)
-        xd = f.side(x0, elbow, sz - 0.4, d) - side * 0.1
+        xd = f.inner(x0, sz - 0.4, d, (floor + 0.3, elbow)) - side * 0.15
         k.box((0.4, 0.2, 1.7), (xd - side * 0.22, sy + 1.25, sz - 0.4), C[sp["seat"]], 0.07)
         k.box((0.1, 0.14, 0.5), (xd - side * 0.08, sy + 1.6, sz - 1.6), C["chrome"], 0.03)
         k.cyl(0.32, 0.06, (xd - side * 0.08, floor + 0.75, sz - 1.9), C["black"], rot(0, 90), 12)
@@ -1208,20 +1229,26 @@ def car_cabin(vid, f, glass, sp):
             k.box((1.2, 0.08, 0.45), (vx, ry - 0.3, zr0 + 0.65), C["dark"], 0.03, rot(-6))
     k.box((0.45, 0.05, 0.25), (0, f.roof(0, sz, ey)[0] - 0.28, sz), C["grey"], 0.02)
     mz = f.screen(0, ry - 0.5) + 0.35
-    k.box((0.08, 0.35, 0.08), (0, ry - 0.3, mz), C["black"])
-    k.box((1.3, 0.4, 0.16), (0, ry - 0.55, mz + 0.05), C["black"], 0.05)
-    mirror.box((1.18, 0.3, 0.02), (0, ry - 0.55, mz + 0.14), C["pale"])
+    if f.roof(0, mz, ey)[1]:
+        # the rear-view mirror hangs from the roof; an open top (the Roadster's middle) has none to hang from
+        k.box((0.08, 0.35, 0.08), (0, ry - 0.3, mz), C["black"])
+        k.box((1.3, 0.4, 0.16), (0, ry - 0.55, mz + 0.05), C["black"], 0.05)
+        mirror.box((1.18, 0.3, 0.02), (0, ry - 0.55, mz + 0.14), C["pale"])
 
     # floor: carpet, a mat on each side and the tunnel
     zback = sz + (4.6 if sp["rear"] else 2.0)
-    k.box((w, 0.1, zback - zfire), (0, floor, (zback + zfire) / 2), C["black"], 0)
+    # as wide as the shell at floor level, which can be narrower than at the elbows
+    fl = f.inner(sx, sz, LEFT, (floor + 0.3,)) + 0.1
+    fr = f.inner(-sx, sz, RIGHT, (floor + 0.3,)) - 0.1
+    k.box((fr - fl, 0.1, zback - zfire), ((fl + fr) / 2, floor, (zback + zfire) / 2), C["black"], 0)
     for vx in (sx, -sx):
         k.box((1.5, 0.04, 1.9), (vx, floor + 0.07, zfire + 1.3), C["char"], 0.02)
     if sp["rear"] and f.dist((sx, sy + 1, sz + 1.6), BACK) > 3.5:
-        bench(k, xl, xr, sy, sz + 3.3, sp)
+        bl_, br_ = span((sz + 2.6, sz + 4.4), (sy, sy + 1.3, sy + 2.6))
+        bench(k, bl_ - 0.2, br_ + 0.2, sy, sz + 3.3, sp)
     else:
         # a parcel shelf / back wall behind the seats
-        k.box((w, top - floor, 0.2), (0, (top + floor) / 2, sz + 2.2), C["black"], 0)
+        wide(span((sz + 2.2,), (floor + 0.2, (floor + top) / 2, top)), top - floor, 0.2, (top + floor) / 2, sz + 2.2, C["black"])
 
     bucket(k, sx, sy + 0.175, sz, sp, "harness" in sp["extras"])
     bucket(k, -sx, sy + 0.175, sz, sp, "harness" in sp["extras"])
@@ -1670,6 +1697,35 @@ if cabin_preview:
         o = in_slot(vid, *eye)
         near_d = min((h[3] for t in trees.get(vid, []) for d in dirs for h in [t.ray_cast(o, d, 5)] if h[0]), default=5)
         print(f"NEAR {vid} closest surface {near_d:.2f} studs from the eye")
+    # nothing of a cabin may stick out of its shell: from each cabin vertex, looking out to its own side, there
+    # must be body or glass
+    spots = {}
+    for vid in CABIN:
+        shell = [tree_of(bpy.data.objects[vid + "_Body"])]
+        if vid + "_Glass" in bpy.data.objects:
+            shell.append(tree_of(bpy.data.objects[vid + "_Glass"]))
+        cx = vehicles.index(vid) * SPACING
+        out = 0
+        for v in bpy.data.objects[vid + "_Interior"].data.vertices:
+            d = Vector((1 if v.co.x > cx else -1, 0, 0))
+            if not any(t.ray_cast(v.co, d, 30)[0] for t in shell):
+                out += 1
+                r = ROBLOX.inverted() @ (v.co - Vector((cx, 0, 0)))
+                spots.setdefault(vid, []).append((round(r.x, 1), round(r.y, 1), round(r.z, 1)))
+        print(f"OUTSIDE {vid} {out} cabin vertices stick out of the shell")
+        if out:
+            pts = spots[vid]
+            ys = sorted(set(round(p[1]) for p in pts))
+            zs = sorted(set(round(p[2]) for p in pts))
+            print(f"   heights {ys}  along {zs}  x {min(p[0] for p in pts)}..{max(p[0] for p in pts)}")
+            if vid in ("Roadster", "Supercar"):
+                groups = {}
+                for p_ in pts:
+                    key = (round(p_[1] * 2) / 2, round(p_[2]))
+                    groups.setdefault(key, []).append(p_[0])
+                for key in sorted(groups):
+                    xs_ = groups[key]
+                    print(f"     y {key[0]} z {key[1]}: {len(xs_)} at x {min(xs_)}..{max(xs_)}")
     for vid, (ex, ey, ez) in EYES.items():
         cam.location = in_slot(vid, ex, ey, ez)
         # Blender camera looks down its -Z; point it at the vehicle's front (Blender -Y), tipped down a little
@@ -1680,6 +1736,21 @@ if cabin_preview:
         scene.render.filepath = os.path.join(cabin_preview, "side", vid + ".png")
         bpy.ops.render.render(write_still=True)
     print("CABIN PREVIEW", cabin_preview)
+
+    # from outside, with the glass as see-through as it is in the game: no cabin piece may show through the body
+    bsdf.inputs["Alpha"].default_value = 0.55
+    cam.data.angle = math.radians(40)
+    for vid in ("Roadster", "Supercar", "Monster", "Semi", "FireTruck", "IceCream", "Hatchback"):
+        lo_, hi_ = bounds([bpy.data.objects[vid + "_Body"]])
+        mid_ = (lo_ + hi_) / 2
+        reach = max(hi_ - lo_)
+        for name, off in (("left", Vector((1.0, -0.55, 0.35))), ("right", Vector((-1.0, 0.35, 0.3)))):
+            eye_ = mid_ + off * reach * 1.1
+            cam.location = eye_
+            cam.rotation_euler = (mid_ - eye_).to_track_quat("-Z", "Y").to_euler()
+            scene.render.filepath = os.path.join(cabin_preview, "outside", f"{vid}_{name}.png")
+            bpy.ops.render.render(write_still=True)
+    bsdf.inputs["Alpha"].default_value = 1 - EYE_GLASS
 
     # the bulldozer's tracks as the game lays them: link plates copied round the loop past the idler (front)
     # and sprocket (rear), each turned to follow it

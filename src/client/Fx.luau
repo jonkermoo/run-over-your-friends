@@ -99,7 +99,8 @@ local function shake(amount: number)
 	trauma = math.min(1, trauma + amount)
 end
 
-RunService:BindToRenderStep("RoyfShake", Enum.RenderPriority.Camera.Value + 1, function(dt)
+-- after the first-person camera (Cockpit, Camera + 1)
+RunService:BindToRenderStep("RoyfShake", Enum.RenderPriority.Camera.Value + 2, function(dt)
 	if trauma <= 0 then
 		return
 	end
