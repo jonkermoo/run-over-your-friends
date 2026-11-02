@@ -1,5 +1,5 @@
 --!strict
--- The event banner (top left): next event countdown while quiet, a pulsing warning before one starts,
+-- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,28 +26,49 @@ gui.Name = "EventBanner"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
 
-local banner = Style.panel(gui, 16)
-banner.Position = UDim2.fromOffset(14, 8)
-banner.Size = UDim2.fromOffset(330, 40)
+-- a road sign at the top centre with painted lane lines along its top and bottom edges
+local banner = Style.panel(gui)
+banner.AnchorPoint = Vector2.new(0.5, 0)
+banner.Position = UDim2.new(0.5, 0, 0, 8)
+banner.Size = UDim2.fromOffset(250, 42)
 banner.Visible = false
-local edge = Style.stroke(banner, C.gold, 2.5, 1)
-local pill = Style.pill(banner, "", C.gold)
-pill.Position = UDim2.fromOffset(12, 11)
+local topLine = Style.dashes(banner, C.yellow)
+topLine.Position = UDim2.fromOffset(0, 3)
+local bottomLine = Style.dashes(banner, C.yellow)
+bottomLine.AnchorPoint = Vector2.new(0, 1)
+bottomLine.Position = UDim2.new(0, 0, 1, -3)
+local pill = Style.pill(banner, "", C.ink)
+pill.Position = UDim2.fromOffset(12, 10)
 local title = Style.label(banner, "", 20, F.display, C.text)
-title.Position = UDim2.fromOffset(12, 8)
-title.Size = UDim2.new(1, -24, 0, 24)
+title.Position = UDim2.fromOffset(14, 10)
+title.Size = UDim2.new(1, -28, 0, 24)
 title.TextXAlignment = Enum.TextXAlignment.Left
-Style.outline(title, 1.5)
-local text = Style.label(banner, "", 14, F.bold, C.dim)
-text.Position = UDim2.fromOffset(12, 56)
-text.Size = UDim2.new(1, -24, 0, 18)
+local text = Style.label(banner, "", 13, F.bold, C.text)
+text.Position = UDim2.fromOffset(14, 54)
+text.Size = UDim2.new(1, -28, 0, 16)
 text.TextXAlignment = Enum.TextXAlignment.Left
 text.TextTruncate = Enum.TextTruncate.AtEnd
-local timer = Style.label(banner, "", 16, F.display, C.text)
+local timer = Style.label(banner, "", 18, F.display, C.yellow)
 timer.AnchorPoint = Vector2.new(1, 0)
-timer.Position = UDim2.new(1, -12, 0, 10)
-timer.Size = UDim2.fromOffset(110, 20)
+timer.Position = UDim2.new(1, -14, 0, 11)
+timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
+
+-- dark text on bright paint, white on dark paint
+local function inkOn(color: Color3): Color3
+	local lum = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
+	return if lum > 0.5 then C.ink else C.text
+end
+
+local function paintLines(color: Color3)
+	for _, line in { topLine, bottomLine } do
+		for _, d in line:GetChildren() do
+			if d:IsA("Frame") then
+				d.BackgroundColor3 = color
+			end
+		end
+	end
+end
 
 local sting = Instance.new("Sound")
 sting.SoundId = "rbxassetid://9125648149"
@@ -62,31 +83,48 @@ end
 local function bigTitle(event: Config.Event)
 	sting:Play()
 	local color = Style.colors[event.color] or C.gold
-	local t = Style.label(gui, event.title, 72, F.display, color)
-	t.AnchorPoint = Vector2.new(0.5, 0.5)
-	t.Position = UDim2.fromScale(0.5, 0.3)
-	t.Size = UDim2.fromOffset(900, 90)
-	Style.outline(t, 5)
-	local s = Style.label(gui, event.text, 24, F.display, C.text)
-	s.AnchorPoint = Vector2.new(0.5, 0.5)
-	s.Position = UDim2.new(0.5, 0, 0.3, 64)
-	s.Size = UDim2.fromOffset(900, 30)
-	Style.outline(s, 3)
+	local holder = Instance.new("Frame")
+	holder.BackgroundTransparency = 1
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.Position = UDim2.fromScale(0.5, 0.3)
+	holder.Size = UDim2.fromOffset(900, 130)
+	holder.Rotation = -4
+	holder.Parent = gui
+	local back = Style.label(holder, event.title, 84, F.display, C.ink)
+	back.Position = UDim2.fromOffset(7, 7)
+	back.Size = UDim2.new(1, 0, 0, 92)
+	local t = Style.label(holder, event.title, 84, F.display, color)
+	t.Size = UDim2.new(1, 0, 0, 92)
+	t.ZIndex = 2
+	Style.outline(t, 4)
+	local s = Style.label(holder, event.text, 20, F.heavy, C.text)
+	s.BackgroundColor3 = C.ink
+	s.BackgroundTransparency = 0
+	s.AnchorPoint = Vector2.new(0.5, 0)
+	s.Position = UDim2.new(0.5, 0, 0, 100)
+	s.AutomaticSize = Enum.AutomaticSize.X
+	s.Size = UDim2.fromOffset(0, 30)
+	s.ZIndex = 2
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 14)
+	pad.PaddingRight = UDim.new(0, 14)
+	pad.Parent = s
 	local scale = Instance.new("UIScale")
 	scale.Scale = 2.5
-	scale.Parent = t
-	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	scale.Parent = holder
+	TweenService:Create(scale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	task.delay(3, function()
-		for _, l in { t, s } do
-			TweenService:Create(l, TweenInfo.new(0.5), { TextTransparency = 1 }):Play()
-			local stroke = l:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				TweenService:Create(stroke, TweenInfo.new(0.5), { Transparency = 1 }):Play()
-			end
+		for _, l in { back, t, s } do
+			TweenService
+				:Create(l, TweenInfo.new(0.5), { TextTransparency = 1, BackgroundTransparency = 1 })
+				:Play()
+		end
+		local stroke = t:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			TweenService:Create(stroke, TweenInfo.new(0.5), { Transparency = 1 }):Play()
 		end
 		task.delay(0.6, function()
-			t:Destroy()
-			s:Destroy()
+			holder:Destroy()
 		end)
 	end)
 end
@@ -115,34 +153,41 @@ local function update()
 	lastPhase, lastKey = phase, key
 
 	if phase == "quiet" then
-		-- a slim line: what's coming and when
-		banner.Size = UDim2.fromOffset(330, 40)
+		-- a slim asphalt sign: what's coming and when
+		banner.Size = UDim2.fromOffset(250, 42)
+		banner.BackgroundColor3 = C.panel
+		paintLines(C.yellow)
 		pill.Visible = false
 		text.Visible = false
 		title.Text = "NEXT EVENT"
-		title.TextSize = 18
-		title.TextColor3 = C.dim
+		title.TextColor3 = C.text
+		title.Position = UDim2.fromOffset(14, 10)
 		timer.Text = fmt(left + Config.WarnSeconds)
-		timer.TextColor3 = C.dim
-		edge.Transparency = 1
-	else
-		banner.Size = UDim2.fromOffset(330, 82)
-		pill.Visible = true
-		pill.Text = if phase == "live" then "EVENT LIVE" else "EVENT SOON"
-		pill.BackgroundColor3 = color
-		title.Text = event.title
-		title.TextSize = 20
-		title.TextColor3 = color
-		title.Position = UDim2.fromOffset(12, 30)
-		text.Visible = true
-		text.Text = event.text
-		timer.Text = (if phase == "live" then "ends in " else "starts in ") .. fmt(left)
-		timer.TextColor3 = C.text
-		edge.Color = color
-		edge.Transparency = if phase == "warn" then 0.3 + 0.3 * math.sin(os.clock() * 8) else 0.2
+		timer.TextColor3 = C.yellow
+		Style.setShadow(banner, C.ink)
 		return
 	end
-	title.Position = UDim2.fromOffset(12, 8)
+	-- warn or live: the sign is painted the event's colour
+	local ink = inkOn(color)
+	banner.Size = UDim2.fromOffset(380, 80)
+	banner.BackgroundColor3 = color
+	paintLines(ink)
+	pill.Visible = true
+	pill.Text = if phase == "live" then "LIVE" else "SOON"
+	pill.BackgroundColor3 = ink
+	pill.TextColor3 = color
+	pill.Position = UDim2.fromOffset(14, 12)
+	title.Text = event.title
+	title.TextColor3 = ink
+	title.Position = UDim2.fromOffset(14, 30)
+	text.Visible = true
+	text.Text = event.text
+	text.TextColor3 = ink
+	timer.Text = (if phase == "live" then "ENDS " else "IN ") .. fmt(left)
+	timer.TextColor3 = ink
+	-- the warning blinks its shadow
+	local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
+	Style.setShadow(banner, if blink then C.text else C.ink)
 end
 
 function EventBanner.start()

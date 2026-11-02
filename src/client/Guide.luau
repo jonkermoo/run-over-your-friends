@@ -1,5 +1,5 @@
 --!strict
--- First-session guidance and goals: the goal card under the money (spawn → run over 3 → next ride),
+-- First-session guidance and goals: the goal card under the menu strip (spawn → run over 3 → next ride),
 -- a bouncing arrow over the nearest pedestrian, glowing GARAGE button, timed hints for stuck players,
 -- one-time tips when you first drive a vehicle with a feature, and the confetti moment.
 
@@ -37,27 +37,40 @@ gui.Parent = playerGui
 
 ---------------------------------------------------------------- goal card
 
-local card = Style.panel(gui, 16)
-card.AnchorPoint = Vector2.new(0.5, 0)
-card.Position = UDim2.new(0.5, 0, 0, 64)
-card.Size = UDim2.fromOffset(440, 64)
+-- the job card, top left under the menu strip: a paint stripe down its left edge, a tag, the goal and
+-- a lane-line progress bar. Its yellow edge pulses when the goal needs your attention.
+local card = Style.panel(gui)
+card.Name = "JobCard"
+card.Position = UDim2.fromOffset(14, 68)
+card.Size = UDim2.fromOffset(420, 68)
 card.Visible = false
-local stroke = Style.stroke(card, GOLD, 2.5, 1)
+local stroke = Style.stroke(card, GOLD, 3, 1)
+local cardStripe = Instance.new("Frame")
+cardStripe.BorderSizePixel = 0
+cardStripe.BackgroundColor3 = GOLD
+cardStripe.Size = UDim2.new(0, 7, 1, 0)
+cardStripe.Parent = card
 local tag = Style.pill(card, "TUTORIAL", GOLD)
-tag.Position = UDim2.fromOffset(14, 9)
+tag.Position = UDim2.fromOffset(18, 8)
 local goalText = label(card, "", 19, F.display, WHITE)
-goalText.Position = UDim2.fromOffset(14, 28)
-goalText.Size = UDim2.new(1, -28, 0, 22)
+goalText.Position = UDim2.fromOffset(18, 28)
+goalText.Size = UDim2.new(1, -32, 0, 22)
 goalText.TextXAlignment = Enum.TextXAlignment.Left
-goalText.TextTruncate = Enum.TextTruncate.AtEnd
-Style.outline(goalText, 1.5)
+goalText.TextScaled = true
+local goalFit = Instance.new("UITextSizeConstraint")
+goalFit.MaxTextSize = 19
+goalFit.Parent = goalText
 local barBack, barFill = Style.bar(card, MONEY)
-barBack.Position = UDim2.fromOffset(14, 52)
-barBack.Size = UDim2.new(1, -28, 0, 6)
-local hintText = label(gui, "", 18, F.display, GOLD)
-hintText.AnchorPoint = Vector2.new(0.5, 0)
-hintText.Position = UDim2.new(0.5, 0, 0, 134)
-hintText.Size = UDim2.fromOffset(600, 24)
+barBack.BackgroundColor3 = C.card
+barBack.BackgroundTransparency = 0
+barBack.Position = UDim2.fromOffset(18, 54)
+barBack.Size = UDim2.new(1, -32, 0, 6)
+Style.laneGaps(barBack, C.panel)
+-- the "what to do now" nudge sits right under the card
+local hintText = label(gui, "", 17, F.display, GOLD)
+hintText.Position = UDim2.fromOffset(18, 146)
+hintText.Size = UDim2.fromOffset(420, 22)
+hintText.TextXAlignment = Enum.TextXAlignment.Left
 Style.outline(hintText, 2)
 hintText.Visible = false
 
@@ -90,18 +103,27 @@ end
 
 ---------------------------------------------------------------- tips and celebrations
 
-local tipBox = Style.panel(gui, 14)
+-- tips share the hint line above the speedometer (the Hud hides its key hint while a tip shows):
+-- an asphalt strip with a yellow edge line and a yellow TIP tag
+local tipBox = Style.panel(gui)
+tipBox.Name = "Tip"
 tipBox.AnchorPoint = Vector2.new(0.5, 1)
-tipBox.Position = UDim2.new(0.5, 0, 1, -170)
-tipBox.Size = UDim2.fromOffset(560, 52)
+tipBox.Position = UDim2.new(0.5, 0, 1, -96)
+tipBox.Size = UDim2.fromOffset(600, 62)
 tipBox.Visible = false
-Style.stroke(tipBox, C.blue, 2, 0.2)
-local tipPill = Style.pill(tipBox, "TIP", C.blue)
+local tipEdge = Instance.new("Frame")
+tipEdge.BackgroundColor3 = GOLD
+tipEdge.BorderSizePixel = 0
+tipEdge.AnchorPoint = Vector2.new(0, 1)
+tipEdge.Position = UDim2.fromScale(0, 1)
+tipEdge.Size = UDim2.new(1, 0, 0, 3)
+tipEdge.Parent = tipBox
+local tipPill = Style.pill(tipBox, "TIP", GOLD)
 tipPill.AnchorPoint = Vector2.new(0, 0.5)
 tipPill.Position = UDim2.new(0, 12, 0.5, 0)
-local tip = label(tipBox, "", 16, F.bold, WHITE)
+local tip = label(tipBox, "", 14, F.bold, WHITE)
 tip.Position = UDim2.fromOffset(58, 0)
-tip.Size = UDim2.new(1, -70, 1, 0)
+tip.Size = UDim2.new(1, -70, 1, -3)
 tip.TextWrapped = true
 tip.TextXAlignment = Enum.TextXAlignment.Left
 local tipToken = 0
@@ -125,20 +147,22 @@ cheer.Parent = gui
 
 local function celebrate(title: string, subtitle: string)
 	cheer:Play()
-	local t = label(gui, title, 54, BOLD, GOLD)
+	local t = label(gui, title, 58, BOLD, GOLD)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.fromScale(0.5, 0.36)
-	t.Size = UDim2.fromOffset(700, 64)
+	t.Size = UDim2.fromOffset(760, 68)
+	t.Rotation = -4
 	Style.outline(t, 4)
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
 	scale.Parent = t
-	local s = label(gui, subtitle, 20, BOLD, WHITE)
+	-- the subtitle on a black paint strip
+	local s = label(gui, subtitle, 18, F.heavy, WHITE)
+	s.BackgroundColor3 = INK
+	s.BackgroundTransparency = 0
 	s.AnchorPoint = Vector2.new(0.5, 0.5)
-	s.Position = UDim2.fromScale(0.5, 0.36)
-	s.Size = UDim2.fromOffset(700, 24)
-	s.Position = UDim2.new(0.5, 0, 0.36, 48)
-	Style.outline(s, 2)
+	s.Position = UDim2.new(0.5, 0, 0.36, 54)
+	Style.fitText(s, 16, 5)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	-- confetti from the top of the screen
 	for _ = 1, 70 do
@@ -165,7 +189,7 @@ local function celebrate(title: string, subtitle: string)
 	task.delay(3.2, function()
 		for _, l in { t, s } do
 			TweenService
-				:Create(l, TweenInfo.new(0.5), { TextTransparency = 1, TextStrokeTransparency = 1 })
+				:Create(l, TweenInfo.new(0.5), { TextTransparency = 1, BackgroundTransparency = 1 })
 				:Play()
 		end
 		task.delay(0.6, function()
@@ -279,6 +303,10 @@ local function update()
 	local hud = playerGui:FindFirstChild("Hud")
 	local garageButton = hud and hud:FindFirstChild("GarageButton", true) :: GuiObject?
 	local garage = hud and hud:FindFirstChild("Garage") :: GuiObject?
+	-- the tip sits just above the speedometer when it shows, like the Hud's key hint
+	local dash = hud and hud:FindFirstChild("Speedometer") :: GuiObject?
+	local dashH = if dash and dash.Visible then dash.AbsoluteSize.Y else 0
+	tipBox.Position = UDim2.new(0.5, 0, 1, -(18 + dashH + 14))
 	local stepValue = (player:GetAttribute("Tutorial") or Steps.Done) :: number
 	if not player:GetAttribute("DataReady") then
 		card.Visible = false
@@ -309,6 +337,7 @@ local function update()
 	local tutorial = stepValue == Steps.Spawn or stepValue == Steps.Hits
 	tag.Text = if tutorial then "TUTORIAL" else "NEXT RIDE"
 	tag.BackgroundColor3 = if tutorial then GOLD else MONEY
+	cardStripe.BackgroundColor3 = tag.BackgroundColor3
 	if stepValue == Steps.Spawn then
 		goalText.Text = "Spawn your Hatchback from the GARAGE"
 		barFill.Size = UDim2.fromScale(0, 1)
@@ -316,7 +345,7 @@ local function update()
 		glowCard = Vehicles.Starter
 		stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
 		if stuck then
-			hintText.Text = "Tap GARAGE on the left, then SPAWN"
+			hintText.Text = "Tap GARAGE at the top left, then SPAWN"
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Hits then
@@ -360,6 +389,11 @@ local function update()
 	end
 
 	glow(garageButton, glowGarage and not (garage and garage.Visible))
+	-- the nudge sits where the garage/store sheet opens: keep it out of the way while one is open
+	local store = hud and hud:FindFirstChild("Store") :: GuiObject?
+	if (garage and garage.Visible) or (store and store.Visible) then
+		hintText.Visible = false
+	end
 	if garage then
 		for _, c in garage:GetDescendants() do
 			if c:IsA("TextButton") and c.Name == "Action" then

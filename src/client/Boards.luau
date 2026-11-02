@@ -22,7 +22,7 @@ type View = { gui: SurfaceGui, list: Frame, countdown: TextLabel, board: Config.
 
 local PPS = 14 -- pixels per stud on the board face (52 x 46 studs → 728 x 644 px)
 local LIST_TOP, LIST_BOTTOM = 146, 16
-local MEDALS = { C.gold, Color3.fromRGB(205, 215, 230), Color3.fromRGB(225, 140, 80) }
+local MEDALS = { C.yellow, Color3.fromRGB(225, 230, 240), C.orange }
 local views: { [string]: View } = {}
 local headshots: { [number]: string } = {}
 local endsAt, clockOffset = 0, 0
@@ -72,28 +72,47 @@ local function build(part: BasePart, board: Config.Board): View
 	gui.ResetOnSpawn = false
 	gui.Parent = playerGui
 
+	-- an asphalt board: a band of the board's colour along the top, a dashed yellow lane line inset
+	-- round the edge
 	local bg = Instance.new("Frame")
 	bg.Size = UDim2.fromScale(1, 1)
-	bg.BackgroundColor3 = Color3.new(1, 1, 1)
+	bg.BackgroundColor3 = C.panel
 	bg.BorderSizePixel = 0
 	bg.Parent = gui
-	Style.gradient(bg, C.panelTop, C.ink)
-	Style.corner(bg, 24)
 	local accent = Style.colors[board.color] or C.gold
-	Style.stroke(bg, accent, 8, 0)
+	local band = Instance.new("Frame")
+	band.BackgroundColor3 = accent
+	band.BorderSizePixel = 0
+	band.Size = UDim2.new(1, 0, 0, 14)
+	band.Parent = bg
+	for _, edge in { "top", "bottom", "left", "right" } do
+		local vertical = edge == "left" or edge == "right"
+		local line = Style.dashes(bg, C.yellow, vertical, 6)
+		if edge == "top" then
+			line.Position = UDim2.fromOffset(14, 22)
+			line.Size = UDim2.new(1, -28, 0, 6)
+		elseif edge == "bottom" then
+			line.Position = UDim2.new(0, 14, 1, -14)
+			line.Size = UDim2.new(1, -28, 0, 6)
+		elseif edge == "left" then
+			line.Position = UDim2.fromOffset(8, 22)
+			line.Size = UDim2.new(0, 6, 1, -30)
+		else
+			line.Position = UDim2.new(1, -14, 0, 22)
+			line.Size = UDim2.new(0, 6, 1, -30)
+		end
+	end
 
 	local title = Style.label(bg, board.title, 58, F.display, C.text)
-	title.Position = UDim2.fromOffset(0, 10)
-	title.Size = UDim2.new(1, 0, 0, 64)
-	Style.outline(title, 5)
+	title.Position = UDim2.fromOffset(0, 30)
+	title.Size = UDim2.new(1, 0, 0, 56)
 	local week = Style.pill(bg, "THIS WEEK", accent)
 	week.AnchorPoint = Vector2.new(0.5, 0)
-	week.Position = UDim2.new(0.5, 0, 0, 78)
-	week.TextSize = 20
-	week.Size = UDim2.fromOffset(0, 28)
-	Style.corner(week, 14)
+	week.Position = UDim2.new(0.5, 0, 0, 88)
+	week.TextSize = 18
+	week.Size = UDim2.fromOffset(0, 26)
 	local countdown = Style.label(bg, "", 20, F.bold, C.dim)
-	countdown.Position = UDim2.fromOffset(0, 110)
+	countdown.Position = UDim2.fromOffset(0, 116)
 	countdown.Size = UDim2.new(1, 0, 0, 26)
 
 	local list = Instance.new("Frame")
@@ -116,26 +135,25 @@ local function fill(view: View, entries: { Entry })
 	local face = view.gui.Adornee :: BasePart
 	local rowH = math.floor((face.Size.Y * PPS - LIST_TOP - LIST_BOTTOM) / Config.Top)
 	for i, e in entries do
-		local row = Style.card(view.list, 14)
+		local row = Style.card(view.list)
 		row.Position = UDim2.fromOffset(0, (i - 1) * rowH)
 		row.Size = UDim2.new(1, 0, 0, rowH - 6)
 		if e.userId == player.UserId then
-			Style.stroke(row, C.gold, 4, 0)
+			Style.stroke(row, C.yellow, 4, 0)
 		end
-		local badge = Style.label(row, tostring(i), 26, F.display, if i <= 3 then C.ink else C.text)
+		-- the rank painted big and slanted; the top three in medal colours
+		local badge = Style.label(row, tostring(i), 34, F.display, MEDALS[i] or C.dim)
 		badge.AnchorPoint = Vector2.new(0, 0.5)
-		badge.Position = UDim2.new(0, 10, 0.5, 0)
-		badge.Size = UDim2.fromOffset(rowH - 16, rowH - 16)
-		badge.BackgroundTransparency = if i <= 3 then 0 else 1
-		badge.BackgroundColor3 = MEDALS[i] or C.grey
-		Style.corner(badge, (rowH - 16) // 2)
+		badge.Position = UDim2.new(0, 6, 0.5, 2)
+		badge.Size = UDim2.fromOffset(rowH - 8, rowH - 8)
+		badge.Rotation = -6
 		local avatar = Instance.new("ImageLabel")
 		avatar.AnchorPoint = Vector2.new(0, 0.5)
 		avatar.Position = UDim2.new(0, rowH + 4, 0.5, 0)
 		avatar.Size = UDim2.fromOffset(rowH - 12, rowH - 12)
-		avatar.BackgroundColor3 = C.panelTop
+		avatar.BackgroundColor3 = C.grey
+		avatar.BorderSizePixel = 0
 		avatar.Parent = row
-		Style.corner(avatar, (rowH - 12) // 2)
 		headshot(e.userId, avatar)
 		local name = Style.label(row, e.name, 26, F.heavy, C.text)
 		name.Position = UDim2.fromOffset(rowH * 2, 0)
@@ -153,7 +171,6 @@ local function fill(view: View, entries: { Entry })
 		value.Position = UDim2.new(1, -16, 0, 0)
 		value.Size = UDim2.fromScale(0.38, 1)
 		value.TextXAlignment = Enum.TextXAlignment.Right
-		Style.outline(value, 2)
 	end
 end
 
