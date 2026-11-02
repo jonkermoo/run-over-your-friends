@@ -18,6 +18,7 @@ Net.Messages = table.freeze({
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
+	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
 	-- server -> client
 	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
 	Popup = "Popup", -- (text: string, kind: string)
@@ -25,6 +26,7 @@ Net.Messages = table.freeze({
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom", position: Vector3, a: number, b: number, userId: number)
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
+	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 })
 
 export type MessageName =
@@ -40,12 +42,14 @@ export type MessageName =
 	| "WreckerHit"
 	| "SelfDestruct"
 	| "Feature"
+	| "ClaimDaily"
 	| "Fling"
 	| "Popup"
 	| "Celebrate"
 	| "Goals"
 	| "Fx"
 	| "Boards"
+	| "Daily"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

@@ -20,6 +20,7 @@ export type Profile = {
 	stats: { [string]: any }, -- leaderboard numbers, checked by LeaderboardService
 	receipts: { [string]: boolean }, -- Robux purchase ids already granted
 	bought: { [string]: boolean }, -- one-time products already bought
+	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
 }
 
 local Data = {}
@@ -209,6 +210,13 @@ local function load(player: Player)
 				end
 				if typeof(decoded.bought) == "table" then
 					profile.bought = decoded.bought
+				end
+				local daily = decoded.daily
+				if typeof(daily) == "table" and tonumber(daily.day) and tonumber(daily.streak) then
+					profile.daily = {
+						day = tonumber(daily.day) :: number,
+						streak = tonumber(daily.streak) :: number,
+					}
 				end
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do

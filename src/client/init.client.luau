@@ -11,6 +11,7 @@ local Guide = require(script.Guide)
 local Hud = require(script.Hud)
 local Interiors = require(script.Interiors)
 local Streets = require(script.Streets)
+local Streak = require(script.Streak)
 
 Hud.onGoals = Goals.toggle
 Hud.onMenu = Goals.close
@@ -25,3 +26,4 @@ EventBanner.start()
 Crowd.start()
 Streets.start()
 Interiors.start()
+Streak.start()
