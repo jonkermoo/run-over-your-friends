@@ -48,6 +48,7 @@ return table.freeze({
 			tag = "BEST VALUE",
 		}),
 	}),
+	StarterOfferAfter = 300, -- seconds of play (tutorial done) before the Starter Pack ad pops up, once
 	Starter = p({
 		key = "Starter",
 		id = 0,

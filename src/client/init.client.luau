@@ -12,6 +12,8 @@ local Hud = require(script.Hud)
 local Interiors = require(script.Interiors)
 local Streets = require(script.Streets)
 
+Hud.onGoals = Goals.toggle
+Hud.onMenu = Goals.close
 Drive.start()
 Cockpit.start()
 Hud.start()

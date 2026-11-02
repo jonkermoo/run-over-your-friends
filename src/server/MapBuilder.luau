@@ -84,6 +84,95 @@ local function part(
 	return first :: Part
 end
 
+local PAINT_YELLOW = Color3.fromRGB(255, 208, 0)
+local PAINT_WHITE = Color3.fromRGB(245, 245, 245)
+local PAINT_BLACK = Color3.fromRGB(23, 23, 26)
+
+-- a flat strip of road paint on the plaza: no collisions, no raycasts (cars drive over it as paving)
+local function paint(parent: Instance, size: Vector2, cf: CFrame, color: Color3): Part
+	local p = Instance.new("Part")
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Size = Vector3.new(size.X, 0.05, size.Y)
+	p.CFrame = cf
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.Parent = parent
+	return p
+end
+
+-- the spawn plaza's road paint: dashed yellow lanes out from the fountain, numbered white parking bays
+-- round the four spawn pads, and big white chevrons near each edge pointing out to the streets
+local function paintPlaza(parent: Instance, cx: number, cz: number, inner: number)
+	local folder = Instance.new("Folder")
+	folder.Name = "Paint"
+	folder.Parent = parent
+	local y = 0.12 + World.Look.PaintLift
+	local half = inner / 2
+	for _, dir in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
+		local along = if math.abs(dir.X) > 0 then Vector2.new(4, 0.8) else Vector2.new(0.8, 4)
+		for d = 24, half - 20, 7 do
+			paint(folder, along, CFrame.new(cx + dir.X * d, y, cz + dir.Z * d), PAINT_YELLOW)
+		end
+		-- a chevron of two bars pointing outwards
+		local tip = Vector3.new(cx, y, cz) + dir * (half - 12)
+		local yaw = math.atan2(dir.X, dir.Z) + math.pi -- turned so the point faces the street
+		for _, side in { -1, 1 } do
+			local cf = CFrame.new(tip)
+				* CFrame.Angles(0, yaw, 0)
+				* CFrame.new(side * 3.2, 0, -3.2)
+				* CFrame.Angles(0, side * math.rad(45), 0)
+			paint(folder, Vector2.new(2, 11), cf, PAINT_WHITE)
+		end
+	end
+	for s = 0, 3 do
+		local px = cx + (s % 2 - 0.5) * 60
+		local pz = cz + (math.floor(s / 2) - 0.5) * 60
+		for _, edge in
+			{
+				{ 0, -7.5, 15.6, 0.7 },
+				{ 0, 7.5, 15.6, 0.7 },
+				{ -7.5, 0, 0.7, 15.6 },
+				{ 7.5, 0, 0.7, 15.6 },
+			}
+		do
+			paint(
+				folder,
+				Vector2.new(edge[3], edge[4]),
+				CFrame.new(px + edge[1], y, pz + edge[2]),
+				PAINT_WHITE
+			)
+		end
+		-- the bay number painted just outside the pad, on the side away from the fountain
+		local out = Vector3.new(px - cx, 0, pz - cz).Unit
+		local tag = paint(
+			folder,
+			Vector2.new(9, 6),
+			CFrame.new(px + out.X * 13, y, pz + out.Z * 13),
+			PAINT_WHITE
+		)
+		tag.Transparency = 1
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Top
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 20
+		gui.LightInfluence = 1
+		gui.Parent = tag
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Size = UDim2.fromScale(1, 1)
+		label.Text = string.format("%02d", s + 1)
+		label.TextScaled = true
+		label.TextColor3 = PAINT_WHITE
+		label.FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
+		label.Rotation = math.deg(math.atan2(out.X, out.Z)) + 180 -- reads from the pad
+		label.Parent = gui
+	end
+end
+
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
 local function ramp(
 	parent: Instance,
@@ -253,10 +342,22 @@ function MapBuilder.build(): Result
 				f.CFrame = CFrame.new(cx, 0.05, cz) * CFrame.Angles(0, 0, math.pi / 2)
 				f.Color = COLORS.concrete
 				f.Parent = static
+				paintPlaza(static, cx, cz, inner)
 				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
 				local boards = Instance.new("Folder")
 				boards.Name = "Boards"
 				boards.Parent = static
+				-- a sign gantry over them: a road-yellow beam on two black posts
+				local gz = cz - B / 2 + 5
+				part(boards, Vector3.new(196, 3, 2.4), CFrame.new(cx, 55, gz), PAINT_YELLOW)
+				for _, side in { -1, 1 } do
+					part(
+						boards,
+						Vector3.new(3, 56, 3),
+						CFrame.new(cx + side * 96, 27, gz),
+						PAINT_BLACK
+					)
+				end
 				for k, board in Leaderboards.Boards do
 					local bx = cx + (k - 2) * 62
 					local bz = cz - B / 2 + 6
@@ -641,18 +742,37 @@ function MapBuilder.build(): Result
 
 	-- lighting and look
 	local Lighting = game:GetService("Lighting")
-	Lighting.ClockTime = 14.5
-	Lighting.Brightness = 2.6
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 160)
-	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 0.6
-	if not Lighting:FindFirstChildOfClass("Atmosphere") then
-		local a = Instance.new("Atmosphere")
-		a.Density = 0.28
-		a.Haze = 1.2
-		a.Color = Color3.fromRGB(200, 215, 230)
-		a.Parent = Lighting
-	end
+	local look = World.Look
+	Lighting.ClockTime = look.ClockTime
+	Lighting.Brightness = look.Brightness
+	Lighting.ExposureCompensation = look.Exposure
+	Lighting.Ambient = rgb(look.Ambient)
+	Lighting.OutdoorAmbient = rgb(look.OutdoorAmbient)
+	Lighting.ShadowSoftness = look.ShadowSoftness
+	Lighting.EnvironmentDiffuseScale = look.DiffuseScale
+	Lighting.EnvironmentSpecularScale = look.SpecularScale
+	local air = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	air.Density = look.AirDensity
+	air.Offset = look.AirOffset
+	air.Haze = look.AirHaze
+	air.Glare = look.AirGlare
+	air.Color = rgb(look.AirColor)
+	air.Decay = rgb(look.AirDecay)
+	air.Parent = Lighting
+	local grade = (Lighting:FindFirstChild("Grade") :: ColorCorrectionEffect?)
+		or Instance.new("ColorCorrectionEffect")
+	grade.Name = "Grade"
+	grade.Saturation = look.Saturation
+	grade.Contrast = look.Contrast
+	grade.Brightness = look.GradeBrightness
+	grade.TintColor = rgb(look.Tint)
+	grade.Parent = Lighting
+	local bloom = (Lighting:FindFirstChild("Bloom") :: BloomEffect?) or Instance.new("BloomEffect")
+	bloom.Name = "Bloom"
+	bloom.Intensity = look.BloomIntensity
+	bloom.Size = look.BloomSize
+	bloom.Threshold = look.BloomThreshold
+	bloom.Parent = Lighting
 
 	map.Parent = workspace
 	return {
