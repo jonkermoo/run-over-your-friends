@@ -50,6 +50,8 @@ export type SmashConfig = {
 	MaxRadius: number,
 	Curve: number,
 	MinSpeed: number,
+	WallEnergy: number,
+	MinSpeedKept: number,
 }
 
 -- how far a building hit reaches, studs; 0 when it's too soft to break anything
@@ -76,6 +78,15 @@ function Impact.smashRadius(
 		Impact.breakRadius(Impact.energy(weightKg, speed), config),
 		maxBreak or math.huge
 	)
+end
+
+-- share of its speed a vehicle keeps after breaking a wall: the wall takes WallEnergy joules out of it
+function Impact.wallSpeedKept(weightKg: number, speed: number, config: SmashConfig): number
+	local energy = Impact.energy(weightKg, speed)
+	if energy <= 0 then
+		return 1
+	end
+	return math.max(math.sqrt(math.max(1 - config.WallEnergy / energy, 0)), config.MinSpeedKept)
 end
 
 -- self-destruct blast radius, studs, from weight and speed

@@ -804,7 +804,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 		if now - lastBreakSent > 0.12 then
 			lastBreakSent = now
 			Net.waitFor("BreakAt"):FireServer(at, velocity)
-			speed *= 0.9
+			speed *= Impact.wallSpeedKept(s.stats.weight, metres, Smash) -- the wall pushes back
 		end
 	end
 end

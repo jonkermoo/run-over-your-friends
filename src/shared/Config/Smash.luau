@@ -11,4 +11,8 @@ return table.freeze({
 	FloorsFallFrom = 10, -- studs: smaller breaks leave what stands above them up (a light car makes a hole)
 	MinSpeed = 6.7, -- m/s (15 mph): slower bumps break nothing, however heavy (matches Economy.MinHitSpeed)
 	Curve = 2, -- above 1 keeps light and mid hits small and saves the big radii for heavy, fast ones
+	-- walls push back: each break takes this many joules out of the car, so light or slow cars lose most of
+	-- their speed and heavy, fast ones plough on
+	WallEnergy = 2000000,
+	MinSpeedKept = 0.2, -- share of its speed a car always keeps after a break, so it rolls into the hole
 })

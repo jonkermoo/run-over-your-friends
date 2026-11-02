@@ -260,6 +260,25 @@ check(
 )
 check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
 check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
+-- walls push back: early cars lose most of their speed, big fast ones plough on
+local function keptAtTop(id: string): number
+	local v = Vehicles.ById[id]
+	return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
+end
+for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
+	check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.3)
+end
+check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
+check("a car always keeps some speed", keptAtTop("Cart") == Smash.MinSpeedKept)
+check(
+	"faster keeps more",
+	Impact.wallSpeedKept(15000, 35, Smash) > Impact.wallSpeedKept(15000, 18, Smash)
+)
+check(
+	"heavier keeps more",
+	Impact.wallSpeedKept(9000, 30, Smash) > Impact.wallSpeedKept(1700, 30, Smash)
+)
+check("standing still keeps everything", Impact.wallSpeedKept(1500, 0, Smash) == 1)
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
 check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)
