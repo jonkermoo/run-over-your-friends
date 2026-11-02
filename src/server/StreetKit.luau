@@ -1,6 +1,7 @@
 --!strict
 -- The street kit: road paint (double yellows, lane dashes, zebra crossings, stop lines, manholes) and street
--- furniture (lamps, traffic lights, benches, bins, hydrants, parked cars, planter trees, bus shelters),
+-- furniture (lamps, traffic lights, benches, bins, hydrants, parked cars, planter trees, bus shelters, news
+-- boxes, mailboxes, planters, A-boards),
 -- styled by district. Paint is flat and never collides. Furniture goes in the Props folder: each piece is a
 -- Model that any vehicle knocks flying (BuildingService puts it back later).
 
@@ -202,6 +203,49 @@ local function hydrant(folder: Instance, at: Vector3)
 	)
 end
 
+local function newsBox(folder: Instance, at: Vector3, out: Vector3, color: Color3)
+	local m = prop(folder, "NewsBox")
+	block(m, Vector3.new(2, 3.4, 1.8), CFrame.lookAt(at, at + out) + Vector3.new(0, 1.7, 0), color)
+end
+
+local function mailbox(folder: Instance, at: Vector3, out: Vector3)
+	local m = prop(folder, "Mailbox")
+	local cf = CFrame.lookAt(at, at + out)
+	block(m, Vector3.new(2.2, 3, 1.8), cf + Vector3.new(0, 2.6, 0), Color3.fromRGB(40, 70, 150))
+	block(m, Vector3.new(1.2, 1.1, 1.2), cf + Vector3.new(0, 0.55, 0), DARK)
+end
+
+local function planter(folder: Instance, at: Vector3, out: Vector3)
+	local m = prop(folder, "Planter")
+	local cf = CFrame.lookAt(at, at + out)
+	block(
+		m,
+		Vector3.new(5, 1.6, 2.2),
+		cf + Vector3.new(0, 0.8, 0),
+		Color3.fromRGB(150, 140, 128),
+		Enum.Material.Concrete
+	)
+	block(
+		m,
+		Vector3.new(4.4, 1.4, 1.8),
+		cf + Vector3.new(0, 2.1, 0),
+		Color3.fromRGB(80, 150, 70),
+		Enum.Material.Grass
+	)
+end
+
+-- a sandwich board outside a shop or cafe
+local function aBoard(folder: Instance, at: Vector3, out: Vector3, color: Color3)
+	local m = prop(folder, "ABoard")
+	local w = Instance.new("WedgePart")
+	w.Anchored = true
+	w.Size = Vector3.new(2.4, 3.4, 1.6)
+	w.CFrame = CFrame.lookAt(at, at - out) + Vector3.new(0, 1.7, 0)
+	w.Color = color
+	w.Material = Enum.Material.WoodPlanks
+	w.Parent = m
+end
+
 local function parkedCar(folder: Instance, at: Vector3, along: Vector3, color: Color3)
 	local m = prop(folder, "ParkedCar")
 	local cf = CFrame.lookAt(at, at + along)
@@ -373,6 +417,61 @@ function StreetKit.build(
 					local at = edge - out * S.BenchInset + along * (-B * 0.18)
 					bench(props, at, out)
 					bin(props, at + along * 5)
+				end
+				-- clutter in free slots along the side, between the kerb and the buildings
+				local slots = table.clone(S.ClutterSlots)
+				for _ = 1, S.ClutterPerSide do
+					local slot = table.remove(slots, random:NextInteger(1, #slots)) :: number
+					local inset = random:NextNumber(S.KerbInset + 1, grid.sidewalk - 1.5)
+					local at = edge - out * inset + along * (slot * B)
+					local pick = random:NextInteger(1, if busy then 5 else 3)
+					if pick == 1 then
+						bin(props, at)
+					elseif pick == 2 then
+						mailbox(props, at, out)
+					elseif pick == 3 then
+						planter(props, at, out)
+					elseif pick == 4 then
+						newsBox(props, at, out, rgb(d.accent))
+					else
+						aBoard(props, at, out, rgb(d.accent):Lerp(Color3.new(0, 0, 0), 0.3))
+					end
+				end
+			end
+			local inner = B - grid.sidewalk * 2
+			if kind == "plaza" then
+				-- a fountain in the middle, planters in a ring round it, benches between them facing in
+				local F = S.PlazaFountain
+				local stone = Color3.fromRGB(200, 196, 188)
+				cylinder(static, F.rim, F.size, centre + Vector3.new(0, F.rim / 2, 0), stone).Material =
+					Enum.Material.Concrete
+				local water = cylinder(
+					static,
+					0.4,
+					F.size - 3,
+					centre + Vector3.new(0, F.rim - 0.1, 0),
+					Color3.fromRGB(60, 170, 210)
+				)
+				water.Material = Enum.Material.Glass
+				water.Transparency = 0.15
+				cylinder(static, F.column, 4, centre + Vector3.new(0, F.column / 2, 0), stone)
+				cylinder(static, 1, 12, centre + Vector3.new(0, F.column, 0), stone)
+				for k = 0, S.PlazaPlanters - 1 do
+					local a = k / S.PlazaPlanters * math.pi * 2
+					local out = Vector3.new(math.cos(a), 0, math.sin(a))
+					planter(props, centre + out * (inner * 0.3), out)
+				end
+				for k = 0, S.PlazaBenches - 1 do
+					local a = (k + 0.5) / S.PlazaBenches * math.pi * 2
+					local out = Vector3.new(math.cos(a), 0, math.sin(a))
+					bench(props, centre + out * (inner * 0.22), -out)
+				end
+			elseif kind == "parking" then
+				-- a row of parked cars nosed into the back edge, east of the long ramp
+				for k = 0, S.LotCars - 1 do
+					local at = centre + Vector3.new(-inner / 2 + 60 + k * 10, 0, -inner / 2 + 9)
+					local colour = S.CarColours[random:NextInteger(1, #S.CarColours)]
+					parkedCar(props, at, Vector3.new(0, 0, -1), rgb(colour))
 				end
 			end
 			-- parked cars along the kerb, away from the crossings

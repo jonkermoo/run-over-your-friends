@@ -22,6 +22,8 @@ local Products = require("../src/shared/Config/Products")
 local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
+local OutskirtsConfig = require("../src/shared/Config/Outskirts")
+local OutskirtsRules = require("../src/shared/Rules/Outskirts")
 local Routes = require("../src/shared/Rules/Routes")
 local Smash = require("../src/shared/Config/Smash")
 local Tiles = require("../src/shared/Rules/Tiles")
@@ -876,6 +878,10 @@ check(
 	Streets.DashLength > 0 and Streets.DashGap > 0 and Streets.ZebraStripes >= 3
 )
 check("billboards are parodies", #Streets.Billboards >= 4)
+check(
+	"the plaza fountain fits inside its ring of benches",
+	Streets.PlazaFountain.size / 2 + 4 < (World.Map.BlockSize - World.Map.SidewalkWidth * 2) * 0.22
+)
 check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
 
 -- house kit
@@ -1299,6 +1305,115 @@ check(
 		and CrowdConfig.ShopSpotChance > 0.5
 		and #CrowdConfig.Shop.Aprons >= 2
 )
+
+-- outskirts: zones round the ring, terrain hills that never touch a road or zone
+do
+	local MW = World.Map
+	local mpitch = MW.BlockSize + MW.RoadWidth
+	local span = math.max(MW.BlocksX, MW.BlocksZ) * mpitch + MW.RoadWidth
+	local ringOuter = span / 2 + OutskirtsConfig.Ring.Gap + OutskirtsConfig.Ring.Width / 2
+	local half = MW.GroundSize / 2
+	local z = OutskirtsRules.zones(
+		ringOuter,
+		OutskirtsConfig.Stunt,
+		OutskirtsConfig.Port,
+		OutskirtsConfig.Desert,
+		OutskirtsConfig.Site
+	)
+	local ring = { x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 }
+	local list = { z.stunt, z.port, z.desert, z.site }
+	local apart, inside = true, true
+	for ia = 1, #list do
+		if OutskirtsRules.overlaps(list[ia], ring) then
+			apart = false
+		end
+		for ib = ia + 1, #list do
+			if OutskirtsRules.overlaps(list[ia], list[ib]) then
+				apart = false
+			end
+		end
+		local r = list[ia]
+		if math.abs(r.x) + r.w / 2 > half or math.abs(r.z) + r.d / 2 > half then
+			inside = false
+		end
+	end
+	check("outskirts zones never overlap each other or the ring", apart)
+	check("outskirts zones lie on the ground", inside)
+	local S = OutskirtsConfig.Stunt
+	check(
+		"stunt lanes and the bowl fit the park",
+		S.MegaZ - S.Mega.width / 2 > -S.Depth / 2
+			and S.BowlZ + S.BowlHalf + S.BowlLength < S.Depth / 2
+			and S.WallRide.foot + S.WallRide.length < S.Width / 2
+			and S.Mega.foot + S.Mega.length < S.Landing.foot - S.Landing.length - S.Landing.back
+	)
+	local seed = 7
+	local rng = function()
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		return seed / 2147483648
+	end
+	local H = OutskirtsConfig.Hills
+	local hills = OutskirtsRules.hills(half, { ring, z.stunt, z.port, z.desert, z.site }, H, rng)
+	local clear = true
+	for _, h in hills do
+		local f = OutskirtsRules.footprint(h.r, H.Bury)
+		for _, r in { ring, z.stunt, z.port, z.desert, z.site } do
+			if OutskirtsRules.distance(r, h.x, h.z) < f + H.Margin - 0.01 then
+				clear = false
+			end
+		end
+		if
+			h.r < H.RadiusMin
+			or h.r > H.RadiusMax
+			or math.abs(h.x) > half
+			or math.abs(h.z) > half
+		then
+			clear = false
+		end
+	end
+	check("hills fill the empty ground", #hills > 100)
+	check("no hill reaches a road or a zone", clear)
+	local function checkGroves()
+		local Wl = OutskirtsConfig.Wilds
+		local rects = { ring, z.stunt, z.port, z.desert, z.site }
+		local groves = OutskirtsRules.clearSpots(
+			half,
+			rects,
+			hills,
+			H.Bury,
+			Wl.Groves,
+			Wl.GroveRadius,
+			Wl.Margin,
+			rng
+		)
+		local groveClear = #groves > Wl.Groves / 2
+		for ia, g in groves do
+			for _, r in rects do
+				if OutskirtsRules.distance(r, g.x, g.z) < Wl.GroveRadius + Wl.Margin - 0.01 then
+					groveClear = false
+				end
+			end
+			for _, h in hills do
+				local d = math.sqrt((g.x - h.x) ^ 2 + (g.z - h.z) ^ 2)
+				if d < OutskirtsRules.footprint(h.r, H.Bury) + Wl.GroveRadius then
+					groveClear = false
+				end
+			end
+			for ib = ia + 1, #groves do
+				local o = groves[ib]
+				if math.sqrt((g.x - o.x) ^ 2 + (g.z - o.z) ^ 2) < Wl.GroveRadius * 2 then
+					groveClear = false
+				end
+			end
+		end
+		check("groves land on the open grass, apart, clear of roads, zones and hills", groveClear)
+	end
+	checkGroves()
+	check(
+		"a narrow sidewalk still fits benches and clutter",
+		Streets.BenchInset + 1 < MW.SidewalkWidth and Streets.KerbInset + 1 < MW.SidewalkWidth - 1.5
+	)
+end
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

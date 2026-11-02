@@ -10,7 +10,7 @@ export type HouseType = { width: number, depth: number, floors: number, perLot: 
 
 return table.freeze({
 	PerSide = 3, -- lots along each of the north and south sidewalks of a home block
-	Yard = 9, -- front garden between the sidewalk and the house
+	Yard = 4, -- front garden between the sidewalk and the house
 	FloorHeight = 12,
 	Wall = 1,
 	Overhang = 1.5, -- roofs reach this far past the walls
