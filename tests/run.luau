@@ -226,76 +226,78 @@ check(
 local semi = Impact.energy(15000, 40 / 2.237)
 local supercar = Impact.energy(1500, 120 / 2.237)
 check("semi at 40 ~ supercar at 120", semi / supercar > 0.8 and semi / supercar < 1.4)
--- building smashing: every vehicle breaks pieces once it's fast enough; light ones break little
-local function smashAt(id: string, mph: number): number
-	local v = Vehicles.ById[id]
-	return Impact.smashRadius(v.weight, mph / 2.237, Smash, v.maxBreak)
-end
-local function smashTop(id: string): number
-	return smashAt(id, Vehicles.ById[id].topSpeed)
-end
-check("parking the Bulldozer against a wall breaks nothing", smashAt("Bulldozer", 3) == 0)
-check("Roadster at full speed breaks a lot", smashTop("Roadster") > 20)
-check("radius stays in range", Impact.breakRadius(1e12, Smash) == Smash.MaxRadius)
-check(
-	"just over the line chips a little",
-	Impact.breakRadius(Smash.EnergyLow, Smash) == Smash.MinRadius
-)
-for _, v in Vehicles.List do
-	check(v.id .. " breaks something at top speed", smashTop(v.id) > 0)
-end
-check("Cart at 20 mph only bumps", smashAt("Cart", 20) == 0)
-check("Cart at top speed breaks little", smashTop("Cart") <= 5)
-check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
-for _, id in { "Hatchback", "Scooter", "Cart", "Sedan", "Taxi" } do
+do
+	-- building smashing: every vehicle breaks pieces once it's fast enough; light ones break little
+	local function smashAt(id: string, mph: number): number
+		local v = Vehicles.ById[id]
+		return Impact.smashRadius(v.weight, mph / 2.237, Smash, v.maxBreak)
+	end
+	local function smashTop(id: string): number
+		return smashAt(id, Vehicles.ById[id].topSpeed)
+	end
+	check("parking the Bulldozer against a wall breaks nothing", smashAt("Bulldozer", 3) == 0)
+	check("Roadster at full speed breaks a lot", smashTop("Roadster") > 20)
+	check("radius stays in range", Impact.breakRadius(1e12, Smash) == Smash.MaxRadius)
 	check(
-		id .. " at top speed knocks out one wall piece",
-		smashTop(id) > 0 and smashTop(id) <= Smash.MinRadius
+		"just over the line chips a little",
+		Impact.breakRadius(Smash.EnergyLow, Smash) == Smash.MinRadius
 	)
-end
-check("Muscle breaks more than the Sedan", smashTop("Muscle") > smashTop("Sedan") + 5)
-check("Semi breaks more than the Sedan", smashTop("Semi") > smashTop("Sedan") + 5)
-check("Semi breaks at 15 mph", smashAt("Semi", 15) > Smash.MinRadius)
-check(
-	"Cart and Scooter never drop the floors above",
-	math.max(smashTop("Cart"), smashTop("Scooter")) < Smash.FloorsFallFrom
-)
-check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
-check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
--- walls push back: early cars lose most of their speed, big fast ones plough on
-local function keptAtTop(id: string): number
-	local v = Vehicles.ById[id]
-	return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
-end
-for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
-	check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.35)
-end
-check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
-check("a car always keeps some speed", keptAtTop("Cart") == Smash.KeptLight)
-for _, id in { "Semi", "Bulldozer" } do
-	local v = Vehicles.ById[id]
+	for _, v in Vehicles.List do
+		check(v.id .. " breaks something at top speed", smashTop(v.id) > 0)
+	end
+	check("Cart at 20 mph only bumps", smashAt("Cart", 20) == 0)
+	check("Cart at top speed breaks little", smashTop("Cart") <= 5)
+	check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
+	for _, id in { "Hatchback", "Scooter", "Cart", "Sedan", "Taxi" } do
+		check(
+			id .. " at top speed knocks out one wall piece",
+			smashTop(id) > 0 and smashTop(id) <= Smash.MinRadius
+		)
+	end
+	check("Muscle breaks more than the Sedan", smashTop("Muscle") > smashTop("Sedan") + 5)
+	check("Semi breaks more than the Sedan", smashTop("Semi") > smashTop("Sedan") + 5)
+	check("Semi breaks at 15 mph", smashAt("Semi", 15) > Smash.MinRadius)
 	check(
-		id .. " keeps over 80% per piece even when slow",
-		Impact.wallSpeedKept(v.weight, 7, Smash) > 0.8
+		"Cart and Scooter never drop the floors above",
+		math.max(smashTop("Cart"), smashTop("Scooter")) < Smash.FloorsFallFrom
 	)
+	check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
+	check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
+	-- walls push back: early cars lose most of their speed, big fast ones plough on
+	local function keptAtTop(id: string): number
+		local v = Vehicles.ById[id]
+		return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
+	end
+	for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
+		check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.35)
+	end
+	check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
+	check("a car always keeps some speed", keptAtTop("Cart") == Smash.KeptLight)
+	for _, id in { "Semi", "Bulldozer" } do
+		local v = Vehicles.ById[id]
+		check(
+			id .. " keeps over 80% per piece even when slow",
+			Impact.wallSpeedKept(v.weight, 7, Smash) > 0.8
+		)
+	end
+	check(
+		"the heaviest keeps KeptHeavy",
+		near(Impact.wallSpeedKept(1e6, 1, Smash), Smash.KeptHeavy, 1e-9)
+	)
+	check(
+		"heavier keeps more when slow",
+		Impact.wallSpeedKept(9000, 10, Smash) > Impact.wallSpeedKept(3500, 10, Smash)
+	)
+	check(
+		"faster keeps more",
+		Impact.wallSpeedKept(15000, 35, Smash) > Impact.wallSpeedKept(15000, 18, Smash)
+	)
+	check(
+		"heavier keeps more",
+		Impact.wallSpeedKept(9000, 30, Smash) > Impact.wallSpeedKept(1700, 30, Smash)
+	)
+	check("standing still keeps everything", Impact.wallSpeedKept(1500, 0, Smash) == 1)
 end
-check(
-	"the heaviest keeps KeptHeavy",
-	near(Impact.wallSpeedKept(1e6, 1, Smash), Smash.KeptHeavy, 1e-9)
-)
-check(
-	"heavier keeps more when slow",
-	Impact.wallSpeedKept(9000, 10, Smash) > Impact.wallSpeedKept(3500, 10, Smash)
-)
-check(
-	"faster keeps more",
-	Impact.wallSpeedKept(15000, 35, Smash) > Impact.wallSpeedKept(15000, 18, Smash)
-)
-check(
-	"heavier keeps more",
-	Impact.wallSpeedKept(9000, 30, Smash) > Impact.wallSpeedKept(1700, 30, Smash)
-)
-check("standing still keeps everything", Impact.wallSpeedKept(1500, 0, Smash) == 1)
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
 check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)
