@@ -1,6 +1,7 @@
 --!strict
 -- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
+-- Under it, a slim strip shows the shared server goal's progress (finishing it brings the next event).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -8,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -53,6 +55,37 @@ timer.AnchorPoint = Vector2.new(1, 0)
 timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
+
+-- the server goal strip hangs under the sign, clear of its shadow
+local strip = Style.panel(banner)
+strip.Name = "ServerGoalStrip"
+strip.Position = UDim2.new(0, 0, 1, 9)
+strip.Size = UDim2.new(1, 0, 0, 24)
+strip.Visible = false
+local stripTag = Style.pill(strip, "SERVER GOAL", C.yellow)
+stripTag.Position = UDim2.fromOffset(4, 3)
+local stripBack, stripFill = Style.bar(strip, C.yellow)
+stripBack.BackgroundColor3 = C.card
+stripBack.BackgroundTransparency = 0
+stripBack.AnchorPoint = Vector2.new(0, 0.5)
+stripBack.Position = UDim2.new(0, 104, 0.5, 0)
+stripBack.Size = UDim2.new(1, -176, 0, 6)
+Style.laneGaps(stripBack, C.panel)
+local stripAmount = Style.label(strip, "", 13, F.display, C.yellow)
+stripAmount.AnchorPoint = Vector2.new(1, 0)
+stripAmount.Position = UDim2.new(1, -8, 0, 3)
+stripAmount.Size = UDim2.fromOffset(62, 18)
+stripAmount.TextXAlignment = Enum.TextXAlignment.Right
+local serverGoal: { text: string, progress: number, target: number, done: boolean }? = nil
+
+local function drawStrip()
+	local g = serverGoal
+	strip.Visible = g ~= nil and not g.done
+	if g then
+		stripFill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
+		stripAmount.Text = `{g.progress}/{g.target}`
+	end
+end
 
 -- the player can shrink the sign to a small chip with just a colour dot and the timer (X beside the
 -- sign), and tap the chip to bring it back. Kept for the session; big event titles still show.
@@ -233,6 +266,11 @@ local function update()
 end
 
 function EventBanner.start()
+	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set)
+		local g = typeof(set) == "table" and typeof(set.goals) == "table" and set.goals[1]
+		serverGoal = if typeof(g) == "table" then g else nil
+		drawStrip()
+	end)
 	RunService.RenderStepped:Connect(update)
 end
 

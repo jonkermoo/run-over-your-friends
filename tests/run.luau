@@ -1726,6 +1726,50 @@ do
 	checkSocial()
 end
 
+do
+	local function checkServerGoals()
+		local SgConfig = require("../src/shared/Config/ServerGoals")
+		local Sg = require("../src/shared/Rules/ServerGoals")
+		check(
+			"a server goal grows with players, sized for at least the minimum",
+			Sg.target(20, 1, 2, 5) == 40 and Sg.target(20, 6, 2, 5) == 120
+		)
+		check("a server goal target rounds up to its step", Sg.target(7, 3, 1, 5) == 25)
+		check("a server goal target is never zero", Sg.target(0, 0, 0, 5) == 5)
+		local def = SgConfig.Kinds[2]
+		local goal = Sg.make(def, 1, SgConfig.MinPlayers, 1000, SgConfig.Seconds)
+		check(
+			"a server goal's text shows its target",
+			goal.target == def.perPlayer * SgConfig.MinPlayers
+				and string.find(goal.text, tostring(goal.target), 1, true) ~= nil
+		)
+		check(
+			"other kinds don't count",
+			not Sg.add(goal, "Other", 5, 1, 1001) and goal.progress == 0
+		)
+		check(
+			"progress after the time is up doesn't count",
+			not Sg.add(goal, def.kind, 5, 1, 1000 + SgConfig.Seconds) and goal.progress == 0
+		)
+		local finishedEarly = Sg.add(goal, def.kind, goal.target - 1, 1, 1001)
+		local finished = Sg.add(goal, def.kind, 5, 2, 1002)
+		check(
+			"the add that reaches the target finishes it, once",
+			not finishedEarly
+				and finished
+				and goal.done
+				and goal.progress == goal.target
+				and not Sg.add(goal, def.kind, 5, 3, 1003)
+		)
+		check(
+			"everyone who added is a helper",
+			goal.helpers[1] and goal.helpers[2] and not goal.helpers[3]
+		)
+		check("server goal kinds take turns", Sg.nextIndex(1, 2) == 2 and Sg.nextIndex(2, 2) == 1)
+	end
+	checkServerGoals()
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
