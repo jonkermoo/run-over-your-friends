@@ -10,13 +10,18 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
+local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
+local SocialConfig = require(ReplicatedStorage.Shared.Config.Social)
+local SocialRules = require(ReplicatedStorage.Shared.Rules.Social)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
+local PaintPicker = require(script.Parent.PaintPicker)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -67,6 +72,22 @@ feed.Position = UDim2.new(1, -14, 0, 76)
 feed.Size = UDim2.fromOffset(320, 260)
 feed.Parent = gui
 local feedItems: { GuiObject } = {}
+
+-- under the money: the friend bonus chip while Roblox friends are in the server (the feed moves down for it)
+local friendChip = Style.pill(gui, "", C.pink)
+friendChip.Name = "FriendChip"
+friendChip.TextColor3 = C.text
+friendChip.AnchorPoint = Vector2.new(1, 0)
+friendChip.Position = UDim2.new(1, -14, 0, 70)
+friendChip.Visible = false
+local function refreshFriends()
+	local n = (player:GetAttribute("Friends") or 0) :: number
+	local pct =
+		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
+	friendChip.Text = `{n} FRIEND{if n == 1 then "" else "S"} HERE  +{pct}% MONEY`
+	friendChip.Visible = n > 0
+	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 98 else 76)
+end
 
 local function fadeOut(obj: GuiObject, seconds: number)
 	local info = TweenInfo.new(seconds)
@@ -129,6 +150,9 @@ local function popup(text: string, kind: string)
 	elseif kind == "big" then
 		item = plate(text, C.yellow, C.ink, 26, F.display)
 		hold = 2.4
+	elseif kind == "social" then
+		item = plate(text, C.pink, C.text, 18, F.display)
+		hold = 2.6
 	elseif kind == "info" then
 		item = plate(text, C.panel, C.text, 15, F.heavy)
 		hold = 2.4
@@ -365,9 +389,34 @@ grid.CellPadding = UDim2.fromOffset(14, 14)
 grid.SortOrder = Enum.SortOrder.LayoutOrder
 grid.Parent = garageList
 
-type Card = { stats: Vehicles.Vehicle, action: TextButton, price: TextLabel, frame: Frame }
+type Card = {
+	stats: Vehicles.Vehicle,
+	action: TextButton,
+	price: TextLabel,
+	frame: Frame,
+	picker: PaintPicker.Picker,
+	sale: TextLabel,
+	was: TextLabel,
+}
+
+-- the car of the day (Config/Daily) is cheaper; the server charges the same price from the same UTC day
+local saleIds = DailyRules.saleIds(Vehicles.List, DailyConfig.DiscountSkip)
+local function onSaleToday(): string?
+	local day = DailyRules.day(workspace:GetServerTimeNow(), DailyConfig.DaySeconds)
+	return DailyRules.carOfDay(saleIds, day, DailyConfig.DiscountSalt)
+end
+local function priceOf(stats: Vehicles.Vehicle): number
+	return DailyRules.price(
+		stats.id,
+		stats.price,
+		onSaleToday(),
+		DailyConfig.DiscountShare,
+		DailyConfig.DiscountRound
+	)
+end
 local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
 local cards: { Card } = {}
+local refreshCards: () -> ()
 
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
 	local l = Style.label(parent, name, 10, F.heavy, C.dim)
@@ -383,7 +432,7 @@ local function statBar(parent: Instance, y: number, name: string, value: number,
 	Style.laneGaps(back, C.card)
 end
 
-local function preview(parent: Instance, id: string)
+local function preview(parent: Instance, id: string): Model?
 	local vf = Instance.new("ViewportFrame")
 	vf.Position = UDim2.fromOffset(6, 6)
 	vf.Size = UDim2.new(1, -12, 0, 122)
@@ -398,7 +447,7 @@ local function preview(parent: Instance, id: string)
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(id) :: Model?
 	if not template then
-		return
+		return nil
 	end
 	local m = template:Clone()
 	m.Parent = vf
@@ -410,13 +459,14 @@ local function preview(parent: Instance, id: string)
 		CFrame.lookAt(cf.Position + Vector3.new(-0.75, 0.45, -0.75).Unit * dist, cf.Position)
 	cam.Parent = vf
 	vf.CurrentCamera = cam
+	return m
 end
 
 for _, stats in Vehicles.List do
 	local card = Style.card(garageList, 16)
 	card.LayoutOrder = stats.order
 	card.Name = stats.id
-	preview(card, stats.id)
+	local shown = preview(card, stats.id)
 	-- painted bay number in the corner of the preview
 	local bay = Style.label(card, string.format("%02d", stats.order), 30, F.display, C.yellow)
 	bay.Position = UDim2.fromOffset(14, 10)
@@ -429,16 +479,22 @@ for _, stats in Vehicles.List do
 	name.Position = UDim2.fromOffset(14, 132)
 	name.Size = UDim2.new(1, -28, 0, 26)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = Style.label(card, stats.blurb, 12, F.bold, C.dim)
+	-- the blurb and stat bars, covered by the paint swatches while the PAINT side is open
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.fromScale(1, 1)
+	info.Parent = card
+	local blurb = Style.label(info, stats.blurb, 12, F.bold, C.dim)
 	blurb.Position = UDim2.fromOffset(14, 158)
 	blurb.Size = UDim2.new(1, -28, 0, 30)
 	blurb.TextWrapped = true
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(card, 192, "SPEED", stats.topSpeed / 250, C.orange)
-	statBar(card, 208, "ACCEL", stats.launch / 15, C.blue)
-	statBar(card, 224, "HANDLING", stats.grip / 22, C.green)
-	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	statBar(info, 192, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(info, 208, "ACCEL", stats.launch / 15, C.blue)
+	statBar(info, 224, "HANDLING", stats.grip / 22, C.green)
+	statBar(info, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
 	local price = Style.label(
 		card,
 		if stats.price == 0 then "FREE" else money(stats.price),
@@ -449,12 +505,44 @@ for _, stats in Vehicles.List do
 	price.Position = UDim2.fromOffset(14, 272)
 	price.Size = UDim2.fromOffset(110, 32)
 	price.TextXAlignment = Enum.TextXAlignment.Left
+	-- car of the day: a paint tag on the preview and the old price struck through above the new one
+	local sale = Style.pill(
+		card,
+		`CAR OF THE DAY  -{math.floor(DailyConfig.DiscountShare * 100 + 0.5)}%`,
+		C.pink
+	)
+	sale.Name = "Sale"
+	sale.TextColor3 = C.text
+	sale.AnchorPoint = Vector2.new(1, 0)
+	sale.Position = UDim2.new(1, -12, 0, 14)
+	sale.ZIndex = 2
+	sale.Visible = false
+	local was = Style.label(card, "", 13, F.heavy, C.dim)
+	was.Name = "Was"
+	was.AutomaticSize = Enum.AutomaticSize.X
+	was.Position = UDim2.fromOffset(14, 260)
+	was.Size = UDim2.fromOffset(0, 14)
+	was.TextXAlignment = Enum.TextXAlignment.Left
+	was.Visible = false
+	local strike = Instance.new("Frame")
+	strike.BackgroundColor3 = C.pink
+	strike.BorderSizePixel = 0
+	strike.AnchorPoint = Vector2.new(0, 0.5)
+	strike.Position = UDim2.fromScale(0, 0.5)
+	strike.Size = UDim2.new(1, 0, 0, 2)
+	strike.Parent = was
 	local action = Style.button(card, "SPAWN", "green", 18)
 	action.Name = "Action"
 	action.AnchorPoint = Vector2.new(1, 0)
 	action.Position = UDim2.new(1, -12, 0, 268)
 	action.Size = UDim2.fromOffset(112, 38)
+	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
+		refreshCards()
+	end)
 	action.Activated:Connect(function()
+		if picker.action() then
+			return -- buying the paint colour shown
+		end
 		local owned = string.find(
 			"," .. ((player:GetAttribute("Owned") or "") :: string) .. ",",
 			"," .. stats.id .. ",",
@@ -466,31 +554,45 @@ for _, stats in Vehicles.List do
 			garage.Visible = false
 		elseif
 			stats.id == "Roadster"
-			and ((player:GetAttribute("Money") or 0) :: number) < stats.price
+			and ((player:GetAttribute("Money") or 0) :: number) < priceOf(stats)
 		then
 			Net.waitFor("BuyPass"):FireServer("Roadster")
-		elseif ((player:GetAttribute("Money") or 0) :: number) < stats.price and offerFor then
+		elseif ((player:GetAttribute("Money") or 0) :: number) < priceOf(stats) and offerFor then
 			offerFor(stats) -- not enough yet: offer the pack that covers it
 		else
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
-	table.insert(cards, { stats = stats, action = action, price = price, frame = card })
+	table.insert(cards, {
+		stats = stats,
+		action = action,
+		price = price,
+		frame = card,
+		picker = picker,
+		sale = sale,
+		was = was,
+	})
 end
 
-local function refreshCards()
+function refreshCards()
 	local owned = "," .. ((player:GetAttribute("Owned") or "") :: string) .. ","
 	local cash = (player:GetAttribute("Money") or 0) :: number
 	for _, c in cards do
+		local price = priceOf(c.stats)
 		if string.find(owned, "," .. c.stats.id .. ",", 1, true) then
 			c.action.Text = "SPAWN"
 			Style.setKind(c.action, "green")
 			c.price.Text = "OWNED"
 			c.price.TextColor3 = C.dim
+			c.sale.Visible = false
+			c.was.Visible = false
 		else
-			c.price.Text = if c.stats.price == 0 then "FREE" else money(c.stats.price)
+			c.price.Text = if price == 0 then "FREE" else money(price)
 			c.price.TextColor3 = C.money
-			if cash >= c.stats.price then
+			c.sale.Visible = price < c.stats.price
+			c.was.Visible = price < c.stats.price
+			c.was.Text = money(c.stats.price)
+			if cash >= price then
 				c.action.Text = "BUY"
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
@@ -501,6 +603,7 @@ local function refreshCards()
 				Style.setKind(c.action, "dark")
 			end
 		end
+		c.picker.refresh()
 	end
 end
 
@@ -788,7 +891,7 @@ end
 -- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
 offerFor = function(stats: Vehicles.Vehicle)
 	local cash = (player:GetAttribute("Money") or 0) :: number
-	local gap = stats.price - cash
+	local gap = priceOf(stats) - cash
 	local pick = Products.MoneyPacks[#Products.MoneyPacks]
 	for _, pack in Products.MoneyPacks do
 		if pack.money >= gap then
@@ -1069,6 +1172,10 @@ function Hud.start()
 		refreshCards()
 	end)
 	player:GetAttributeChangedSignal("Owned"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("Friends"):Connect(refreshFriends)
+	refreshFriends()
+	player:GetAttributeChangedSignal("Paint"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("Paints"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("LikeClaimed"):Connect(refreshStore)
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
 	local function tutorialStep()
@@ -1089,6 +1196,17 @@ function Hud.start()
 	refreshMoney()
 	refreshCards()
 	refreshStore()
+	-- a new car of the day at UTC midnight
+	task.spawn(function()
+		local shown = onSaleToday()
+		while true do
+			task.wait(15)
+			if onSaleToday() ~= shown then
+				shown = onSaleToday()
+				refreshCards()
+			end
+		end
+	end)
 	-- first visit: open the garage so the starter car is one click away
 	task.delay(2, function()
 		while not player:GetAttribute("DataReady") do

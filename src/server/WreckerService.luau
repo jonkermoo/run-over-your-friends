@@ -16,6 +16,7 @@ local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
 local NpcService = require(script.Parent.NpcService)
 local Passes = require(script.Parent.Passes)
+local SocialService = require(script.Parent.SocialService)
 local VehicleService = require(script.Parent.VehicleService)
 
 local WreckerService = {}
@@ -40,14 +41,15 @@ local function spin(): Vector3
 	return Vector3.new(random:NextNumber(-6, 6), random:NextNumber(-6, 6), random:NextNumber(-6, 6))
 end
 
--- send a player on foot flying (they get up after a moment)
-function WreckerService.flingCharacter(victim: Player, velocity: Vector3)
+-- send a player on foot flying (they get up after a moment); `by` is who did it, for the launch toast
+function WreckerService.flingCharacter(victim: Player, velocity: Vector3, by: Player?)
 	local character = victim.Character
 	if not character then
 		return
 	end
 	protect(victim)
 	Ragdoll.enable(character)
+	SocialService.launched(by, victim, character:FindFirstChild("HumanoidRootPart") :: BasePart?)
 	Net.remote("Fling"):FireClient(victim, "Character", velocity, spin())
 	task.delay(2.6, function()
 		if character.Parent then
@@ -57,7 +59,7 @@ function WreckerService.flingCharacter(victim: Player, velocity: Vector3)
 end
 
 -- fling a vehicle: its driver's client applies it, or the server when it's parked
-function WreckerService.flingVehicle(model: Model, velocity: Vector3)
+function WreckerService.flingVehicle(model: Model, velocity: Vector3, by: Player?)
 	local chassis = model.PrimaryPart
 	if not chassis then
 		return
@@ -68,6 +70,7 @@ function WreckerService.flingVehicle(model: Model, velocity: Vector3)
 	end
 	local seat = model:FindFirstChild("DriverSeat") :: VehicleSeat?
 	local driver = seat and seat.Occupant and Players:GetPlayerFromCharacter(seat.Occupant.Parent)
+	SocialService.launched(by, driver, chassis) -- only a driven car counts as launching someone
 	if driver then
 		Net.remote("Fling"):FireClient(driver, "Vehicle", velocity, spin() * 0.6)
 	else
@@ -133,7 +136,8 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 		end
 		WreckerService.flingCharacter(
 			victim,
-			(dir + Vector3.new(0, 0.7, 0)).Unit * Impact.launchSpeed(energy)
+			(dir + Vector3.new(0, 0.7, 0)).Unit * Impact.launchSpeed(energy),
+			player
 		)
 	elseif target.Parent == workspace:FindFirstChild("Vehicles") then
 		local owner = VehicleService.ownerOf(target)
@@ -145,7 +149,7 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 		local ratio = math.clamp(stats.weight / (if other then other.weight else 1500), 0.25, 4)
 			^ 0.5
 		local launch = math.min(Impact.launchSpeed(energy) * ratio, 320)
-		WreckerService.flingVehicle(target, (dir + Vector3.new(0, 0.55, 0)).Unit * launch)
+		WreckerService.flingVehicle(target, (dir + Vector3.new(0, 0.55, 0)).Unit * launch, player)
 	end
 end
 
@@ -241,7 +245,8 @@ local function onSelfDestruct(player: Player)
 			if (root.Position - pos).Magnitude <= radius then
 				WreckerService.flingCharacter(
 					other,
-					outward(root.Position, Impact.launchSpeed(energy))
+					outward(root.Position, Impact.launchSpeed(energy)),
+					player
 				)
 			end
 		end
@@ -253,7 +258,7 @@ local function onSelfDestruct(player: Player)
 				local owner = VehicleService.ownerOf(m)
 				local at = m:GetPivot().Position
 				if (at - pos).Magnitude <= radius * 1.2 and not (owner and protected(owner)) then
-					WreckerService.flingVehicle(m, outward(at, 150))
+					WreckerService.flingVehicle(m, outward(at, 150), player)
 				end
 			end
 		end

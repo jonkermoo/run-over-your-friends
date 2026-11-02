@@ -1509,6 +1509,250 @@ do
 	)
 end
 
+-- car paint
+do
+	local PaintConfig = require("../src/shared/Config/Paints")
+	local PaintRules = require("../src/shared/Rules/Paints")
+	local paintIds, knownIds, pricesOk, freeCount = {}, true, true, 0
+	for _, p in PaintConfig.List do
+		if paintIds[p.id] or not string.match(p.id, "^%w+$") then
+			knownIds = false
+		end
+		paintIds[p.id] = true
+		if p.price < 0 then
+			pricesOk = false
+		end
+		if p.price == 0 then
+			freeCount += 1
+		end
+		if p.id ~= PaintConfig.FactoryId then
+			local rgb = p.rgb or {}
+			if
+				#rgb ~= 3
+				or math.min(rgb[1], rgb[2], rgb[3]) < 0
+				or math.max(rgb[1], rgb[2], rgb[3]) > 255
+			then
+				pricesOk = false
+			end
+		end
+	end
+	check("paint ids are unique words (they go in a comma list)", knownIds)
+	check("paint colours are 0-255 and prices not negative", pricesOk and freeCount >= 2)
+	check("Factory paint is free", PaintRules.isOpen({}, PaintConfig.FactoryId))
+	local everyCar = true
+	for _, v in Vehicles.List do
+		if not PaintConfig.Factory[v.id] then
+			everyCar = false
+		end
+	end
+	check("every vehicle has a factory paint colour", everyCar)
+
+	local owned = { Sedan = true }
+	check(
+		"a free colour opens on an owned car",
+		PaintRules.setProblem(owned, {}, "Sedan", "Red") == nil
+	)
+	check(
+		"a paid colour stays locked until bought",
+		PaintRules.setProblem(owned, {}, "Sedan", "Pink") == "locked"
+	)
+	check(
+		"a bought colour opens",
+		PaintRules.setProblem(owned, { Pink = true }, "Sedan", "Pink") == nil
+	)
+	check(
+		"a car you don't own can't be painted",
+		PaintRules.setProblem(owned, {}, "Taxi", "Red") == "vehicle"
+	)
+	check(
+		"unknown colours are refused",
+		PaintRules.setProblem(owned, {}, "Sedan", "Rainbow") == "locked"
+	)
+	check(
+		"non-string remote arguments are refused",
+		PaintRules.setProblem(owned, {}, "Sedan", 5) == "bad"
+	)
+
+	check("buying needs the money", PaintRules.buyProblem(100, {}, "Pink") == "money")
+	check("buying with enough money works", PaintRules.buyProblem(1e6, {}, "Pink") == nil)
+	check(
+		"a bought or free colour can't be bought again",
+		PaintRules.buyProblem(1e6, { Pink = true }, "Pink") == "owned"
+			and PaintRules.buyProblem(1e6, {}, "Red") == "owned"
+	)
+	check("buying an unknown colour is refused", PaintRules.buyProblem(1e6, {}, {}) == "unknown")
+
+	check(
+		"Factory shows the car's own colour",
+		PaintRules.colour("Taxi", "Factory") == PaintConfig.Factory.Taxi
+	)
+	check(
+		"an unknown saved colour falls back to factory",
+		PaintRules.colour("Taxi", "Nope") == PaintConfig.Factory.Taxi
+	)
+	check("a chosen colour shows", PaintRules.colour("Taxi", "Red") == PaintConfig.ById.Red.rgb)
+
+	local chosen, paid = PaintRules.clean({
+		Sedan = "Pink",
+		Taxi = "Red",
+		Hatchback = "Factory",
+		Ghost = "Red",
+		Muscle = "Gold",
+		Cart = 3,
+	}, { Pink = true, Red = true, Bogus = true, Gold = false })
+	check(
+		"saved paid colours keep only real paid ones",
+		paid.Pink == true and paid.Red == nil and paid.Bogus == nil and paid.Gold == nil
+	)
+	check(
+		"saved choices keep known cars with open colours, Factory not stored",
+		chosen.Sedan == "Pink"
+			and chosen.Taxi == "Red"
+			and chosen.Hatchback == nil
+			and chosen.Ghost == nil
+			and chosen.Muscle == nil
+			and chosen.Cart == nil
+	)
+	local none, noneBought = PaintRules.clean(nil, "junk")
+	check("saves from before paint load empty", next(none) == nil and next(noneBought) == nil)
+	local back = PaintRules.decode(PaintRules.encode({ Sedan = "Pink", Taxi = "Red" }))
+	check("the paint attribute round-trips", back.Sedan == "Pink" and back.Taxi == "Red")
+	check(
+		"the paint attribute is sorted",
+		PaintRules.encode({ Taxi = "Red", Sedan = "Pink" }) == "Sedan=Pink,Taxi=Red"
+	)
+end
+
+do
+	local function checkDaily()
+		local DailyConfig = require("../src/shared/Config/Daily")
+		local Daily = require("../src/shared/Rules/Daily")
+		local rewards = DailyConfig.StreakRewards
+		check(
+			"a UTC day starts at midnight",
+			Daily.day(86399, 86400) == 0 and Daily.day(86400, 86400) == 1
+		)
+		check("a first login starts the streak at 1", Daily.next(nil, 500) == 1)
+		check(
+			"collecting the day after grows the streak",
+			Daily.next({ day = 499, streak = 3 }, 500) == 4
+		)
+		check("a missed day resets the streak", Daily.next({ day = 497, streak = 6 }, 500) == 1)
+		check(
+			"today can't be collected twice",
+			Daily.next({ day = 500, streak = 2 }, 500) == nil
+				and Daily.next({ day = 501, streak = 2 }, 500) == nil
+		)
+		check(
+			"streak rewards climb, then stay at the last",
+			Daily.reward(1, rewards) == rewards[1]
+				and Daily.reward(7, rewards) == rewards[#rewards]
+				and Daily.reward(40, rewards) == rewards[#rewards]
+				and Daily.reward(0, rewards) == rewards[1]
+		)
+		local climbs = true
+		for i = 2, #rewards do
+			climbs = climbs and rewards[i] > rewards[i - 1]
+		end
+		check("each streak day pays more than the one before", climbs)
+
+		local saleIds = Daily.saleIds(Vehicles.List, DailyConfig.DiscountSkip)
+		local skipsFree, skipsRoadster = true, true
+		for _, id in saleIds do
+			skipsFree = skipsFree and Vehicles.ById[id].price > 0
+			skipsRoadster = skipsRoadster and id ~= "Roadster"
+		end
+		check(
+			"free cars and the Roadster are never on sale",
+			#saleIds > 2 and skipsFree and skipsRoadster
+		)
+		local salt = DailyConfig.DiscountSalt
+		local repeats, steady, everyCar = false, true, true
+		local first = 20000
+		for d = first, first + #saleIds * 30 do
+			local today = Daily.carOfDay(saleIds, d, salt)
+			repeats = repeats or today == Daily.carOfDay(saleIds, d - 1, salt)
+			steady = steady and today == Daily.carOfDay(saleIds, d, salt)
+		end
+		for blockNo = 0, 5 do
+			local seen = {}
+			local start = (math.floor(first / #saleIds) + blockNo) * #saleIds
+			for d = start, start + #saleIds - 1 do
+				seen[Daily.carOfDay(saleIds, d, salt) :: string] = true
+			end
+			for _, id in saleIds do
+				everyCar = everyCar and seen[id] == true
+			end
+		end
+		check("the car of the day is the same all day", steady)
+		check("the car of the day never repeats yesterday's", not repeats)
+		check("every buyable car gets a day before any repeats", everyCar)
+		local differs = false
+		for d = first, first + 6 do
+			differs = differs
+				or Daily.carOfDay(saleIds, d, salt)
+					~= Daily.carOfDay(saleIds, d + #saleIds * 3, salt)
+		end
+		check("blocks are shuffled differently", differs)
+		local share, round = DailyConfig.DiscountShare, DailyConfig.DiscountRound
+		check(
+			"the sale price is a quarter off, rounded",
+			Daily.salePrice(200, share, round) == 150
+				and Daily.salePrice(3000, share, round) == 2250
+				and Daily.salePrice(25000, share, round) == 18750
+		)
+		check(
+			"only the car of the day is cheaper",
+			Daily.price("Sedan", 3000, "Sedan", share, round) == 2250
+				and Daily.price("Taxi", 6000, "Sedan", share, round) == 6000
+				and Daily.price("Taxi", 6000, nil, share, round) == 6000
+		)
+	end
+	checkDaily()
+	local function checkSocial()
+		local SocialConfig = require("../src/shared/Config/Social")
+		local Social = require("../src/shared/Rules/Social")
+		local per, max = SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax
+		check(
+			"friends boost money, capped",
+			Social.friendMultiplier(0, per, max) == 1
+				and math.abs(Social.friendMultiplier(2, per, max) - 1.2) < 1e-9
+				and math.abs(Social.friendMultiplier(9, per, max) - (1 + max)) < 1e-9
+		)
+		check(
+			"the friend chip shows a whole percent",
+			Social.friendPercent(1, per, max) == 10 and Social.friendPercent(5, per, max) == 30
+		)
+		local toastState = Social.newToasts()
+		local cfg = SocialConfig
+		check("a short flight gets no toast", not Social.allowToast(toastState, 1, 2, 10, 0, cfg))
+		check("you can't toast yourself", not Social.allowToast(toastState, 1, 1, 300, 0, cfg))
+		check("a long flight gets a toast", Social.allowToast(toastState, 1, 2, 300, 0, cfg))
+		check(
+			"the launcher waits between toasts",
+			not Social.allowToast(toastState, 1, 3, 300, cfg.ToastHitterGap - 0.1, cfg)
+				and Social.allowToast(toastState, 1, 3, 300, cfg.ToastHitterGap, cfg)
+		)
+		check(
+			"the same two players wait longer, either way round",
+			not Social.allowToast(toastState, 2, 1, 300, cfg.ToastPairGap - 0.1, cfg)
+				and Social.allowToast(toastState, 2, 1, 300, cfg.ToastPairGap, cfg)
+		)
+		Social.forget(toastState, 1)
+		local cleared = toastState.hitter[1] == nil
+		for key in toastState.pair do
+			cleared = cleared and not string.find(key, "^1:") and not string.find(key, ":1$")
+		end
+		check("a player who leaves is forgotten", cleared)
+		local mine, theirs = Social.toastText("Sam", "Alex", 312.4)
+		check(
+			"both players get a line",
+			mine == "You launched Alex 312 studs!" and theirs == "Sam launched you 312 studs!"
+		)
+	end
+	checkSocial()
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

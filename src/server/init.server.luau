@@ -39,10 +39,13 @@ local WreckerService = require(script.WreckerService)
 local MapBuilder = require(script.MapBuilder)
 local OnboardingService = require(script.Onboarding)
 local QuestService = require(script.QuestService)
+local DailyService = require(script.DailyService)
+local SocialService = require(script.SocialService)
 local LeaderboardService = require(script.LeaderboardService)
 local ProductService = require(script.ProductService)
 local EventService = require(script.EventService)
 local Analytics = require(script.Analytics)
+local PaintService = require(script.PaintService)
 local RateLimit = require(script.RateLimit)
 
 local world = MapBuilder.build()
@@ -67,10 +70,13 @@ BuildingService.start()
 WreckerService.start()
 OnboardingService.start()
 QuestService.start()
+DailyService.start()
+SocialService.start()
 LeaderboardService.start()
 ProductService.start()
 EventService.setGiantSpots(downtown)
 EventService.start()
+PaintService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)
@@ -97,14 +103,15 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 	if not (stats and profile) or profile.owned[stats.id] then
 		return
 	end
-	if profile.money < stats.price then
+	local price = DailyService.price(stats)
+	if profile.money < price then
 		Net.remote("Popup"):FireClient(player, "Not enough money yet", "info")
 		return
 	end
-	profile.money -= stats.price
+	profile.money -= price
 	profile.owned[stats.id] = true
 	Data.changed(player)
-	Analytics.spent(player, stats.price, stats.id)
+	Analytics.spent(player, price, stats.id)
 	Analytics.step(player, Analytics.Steps.FirstPurchase)
 	OnboardingService.purchased(player, stats)
 end)
