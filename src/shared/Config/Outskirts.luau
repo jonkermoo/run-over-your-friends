@@ -105,10 +105,10 @@ return table.freeze({
 
 	-- terrain hills fill the ground the zones leave empty; they grow toward the map edge
 	Hills = table.freeze({
-		Spacing = 230,
+		Spacing = 250,
 		Jitter = 70,
-		RadiusMin = 50,
-		RadiusMax = 210,
+		RadiusMin = 40,
+		RadiusMax = 150,
 		Bury = 0.6, -- share of each hill's radius under the ground
 		Margin = 30, -- kept clear around roads and zones
 		RockChance = 0.25,
