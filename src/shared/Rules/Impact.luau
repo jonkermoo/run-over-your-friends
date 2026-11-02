@@ -51,7 +51,10 @@ export type SmashConfig = {
 	Curve: number,
 	MinSpeed: number,
 	WallEnergy: number,
-	MinSpeedKept: number,
+	KeptLight: number,
+	KeptLightWeight: number,
+	KeptHeavy: number,
+	KeptHeavyWeight: number,
 }
 
 -- how far a building hit reaches, studs; 0 when it's too soft to break anything
@@ -80,13 +83,16 @@ function Impact.smashRadius(
 	)
 end
 
--- share of its speed a vehicle keeps after breaking a wall: the wall takes WallEnergy joules out of it
+-- share of its speed a vehicle keeps after breaking a wall: the wall takes WallEnergy joules out of it, but
+-- it always keeps a floor that grows with its weight, so heavy vehicles plough through
 function Impact.wallSpeedKept(weightKg: number, speed: number, config: SmashConfig): number
 	local energy = Impact.energy(weightKg, speed)
 	if energy <= 0 then
 		return 1
 	end
-	return math.max(math.sqrt(math.max(1 - config.WallEnergy / energy, 0)), config.MinSpeedKept)
+	local heft = Impact.strength(weightKg, config.KeptLightWeight, config.KeptHeavyWeight)
+	local floor = config.KeptLight + (config.KeptHeavy - config.KeptLight) * heft
+	return math.max(math.sqrt(math.max(1 - config.WallEnergy / energy, 0)), floor)
 end
 
 -- self-destruct blast radius, studs, from weight and speed

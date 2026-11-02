@@ -266,10 +266,25 @@ local function keptAtTop(id: string): number
 	return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
 end
 for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
-	check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.3)
+	check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.35)
 end
 check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
-check("a car always keeps some speed", keptAtTop("Cart") == Smash.MinSpeedKept)
+check("a car always keeps some speed", keptAtTop("Cart") == Smash.KeptLight)
+for _, id in { "Semi", "Bulldozer" } do
+	local v = Vehicles.ById[id]
+	check(
+		id .. " keeps over 80% per piece even when slow",
+		Impact.wallSpeedKept(v.weight, 7, Smash) > 0.8
+	)
+end
+check(
+	"the heaviest keeps KeptHeavy",
+	near(Impact.wallSpeedKept(1e6, 1, Smash), Smash.KeptHeavy, 1e-9)
+)
+check(
+	"heavier keeps more when slow",
+	Impact.wallSpeedKept(9000, 10, Smash) > Impact.wallSpeedKept(3500, 10, Smash)
+)
 check(
 	"faster keeps more",
 	Impact.wallSpeedKept(15000, 35, Smash) > Impact.wallSpeedKept(15000, 18, Smash)

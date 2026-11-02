@@ -14,5 +14,10 @@ return table.freeze({
 	-- walls push back: each break takes this many joules out of the car, so light or slow cars lose most of
 	-- their speed and heavy, fast ones plough on
 	WallEnergy = 2000000,
-	MinSpeedKept = 0.2, -- share of its speed a car always keeps after a break, so it rolls into the hole
+	-- share of its speed a car always keeps after a break, growing with weight (log scale) so heavy vehicles
+	-- plough through: a light car rolls into the hole, a bulldozer barely notices
+	KeptLight = 0.2,
+	KeptLightWeight = 1000, -- kg: this light or lighter keeps KeptLight
+	KeptHeavy = 0.92,
+	KeptHeavyWeight = 20000, -- kg: this heavy or heavier keeps KeptHeavy
 })
