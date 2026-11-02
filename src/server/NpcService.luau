@@ -14,6 +14,7 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
 local Analytics = require(script.Parent.Analytics)
 local CrowdService = require(script.Parent.CrowdService)
 local Data = require(script.Parent.Data)
@@ -376,8 +377,19 @@ local function setJingle(chassis: BasePart, on: boolean)
 	end
 	task.spawn(function()
 		while jingleToken[chassis] == token and chassis.Parent do
+			-- each person heads for the edge of the truck on their side, so a crowd forms round it
+			local cf = chassis.CFrame
+			local vehicle = chassis.Parent :: Model
+			local size = vehicle:GetExtentsSize()
 			for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
-				walkTo(npc, chassis.Position, CFG.JingleEvery + 0.4, false)
+				local l = cf:PointToObjectSpace(npc:GetPivot().Position)
+				local x, z = CrowdRules.besideBox(l.X, l.Z, size.X / 2, size.Z / 2, CFG.JingleGap)
+				walkTo(
+					npc,
+					cf:PointToWorldSpace(Vector3.new(x, 0, z)),
+					CFG.JingleEvery + 0.4,
+					false
+				)
 			end
 			task.wait(CFG.JingleEvery)
 		end

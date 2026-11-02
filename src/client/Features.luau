@@ -51,21 +51,21 @@ local function buildTurret(car: Model, chassis: BasePart, n: { number })
 	local base = Instance.new("Part")
 	base.Name = "CannonBase"
 	base.Shape = Enum.PartType.Cylinder
-	base.Size = Vector3.new(1, 3.4, 3.4)
+	base.Size = Vector3.new(1.3, 4.6, 4.6)
 	base.Color = Color3.fromRGB(70, 72, 78)
 	base.Material = Enum.Material.Metal
 	cosmetic(base)
 	local barrel = Instance.new("Part")
 	barrel.Name = "CannonBarrel"
 	barrel.Shape = Enum.PartType.Cylinder
-	barrel.Size = Vector3.new(5, 1, 1)
+	barrel.Size = Vector3.new(7, 1.5, 1.5)
 	barrel.Color = Color3.fromRGB(205, 205, 210)
 	barrel.Material = Enum.Material.Metal
 	cosmetic(barrel)
 	local tip = Instance.new("Part")
 	tip.Name = "CannonTip"
 	tip.Shape = Enum.PartType.Cylinder
-	tip.Size = Vector3.new(0.8, 1.3, 1.3)
+	tip.Size = Vector3.new(1, 2, 2)
 	tip.Color = C.yellow
 	tip.Material = Enum.Material.SmoothPlastic
 	cosmetic(tip)
@@ -82,11 +82,11 @@ local function buildTurret(car: Model, chassis: BasePart, n: { number })
 	local tw = Instance.new("Weld")
 	tw.Part0 = barrel
 	tw.Part1 = tip
-	tw.C0 = CFrame.new(-2.7, 0, 0)
+	tw.C0 = CFrame.new(-3.8, 0, 0)
 	tw.Parent = tip
 	-- the spray leaves the tip along the barrel (cylinders run along X, so -X is the muzzle)
 	local a = Instance.new("Attachment")
-	a.CFrame = CFrame.new(-0.4, 0, 0) * CFrame.Angles(0, math.pi / 2, 0)
+	a.CFrame = CFrame.new(-0.5, 0, 0) * CFrame.Angles(0, math.pi / 2, 0)
 	a.Parent = tip
 	local water = Instance.new("ParticleEmitter")
 	water.Name = "Water"
@@ -124,7 +124,7 @@ local function buildSign(car: Model, chassis: BasePart)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "IceCreamSign"
 	gui.Size = UDim2.fromOffset(190, 70)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + 3, 0)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + 8, 0)
 	gui.MaxDistance = 300
 	gui.LightInfluence = 0
 	gui.Enabled = false
@@ -159,7 +159,7 @@ local function buildSign(car: Model, chassis: BasePart)
 	sub.Size = UDim2.new(1, -60, 0, 16)
 	sub.Position = UDim2.fromOffset(57, 40)
 	gui.Parent = car
-	signs[car] = { car = car, gui = gui, scale = scale, base = size.Y / 2 + 3 }
+	signs[car] = { car = car, gui = gui, scale = scale, base = size.Y / 2 + 8 }
 end
 
 local function track(car: Instance)
@@ -232,7 +232,7 @@ local function step(dt: number)
 		local baseFrame = CFrame.Angles(0, t.yaw, 0) * CFrame.Angles(0, 0, math.pi / 2)
 		local barrelFrame = CFrame.Angles(0, t.yaw, 0)
 			* CFrame.Angles(t.pitch, 0, 0)
-			* CFrame.new(0, 0.9, -2.2)
+			* CFrame.new(0, 1.3, -2.6)
 			* CFrame.Angles(0, -math.pi / 2, 0)
 		t.weld.C0 = CFrame.new(t.offset) * baseFrame
 		t.barrel.C0 = baseFrame:Inverse() * barrelFrame

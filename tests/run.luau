@@ -1515,6 +1515,20 @@ do
 			nozzlesOk = false
 		end
 	end
+	-- people lured to the truck stop just outside it on their own side, never inside it
+	local bx, bz = CrowdRules.besideBox(0.5, -0.2, 4, 10, 2)
+	local cx, cz = CrowdRules.besideBox(0, 0, 4, 10, 2)
+	local fx, fz = CrowdRules.besideBox(30, 80, 4, 10, 2)
+	check(
+		"lured people stand just outside the vehicle on their side",
+		math.abs(bx - 6) < 1e-6
+			and bz < 0
+			and cx == 6
+			and cz == 0
+			and math.abs(fz - 12) < 1e-6
+			and fx > 0
+			and fx < 6
+	)
 	local N = World.Npc
 	check(
 		"cannon vehicles have a roof turret and the aim arc holds",
