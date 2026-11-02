@@ -28,7 +28,8 @@ return table.freeze({
 		-- north lane: the mega ramp, a gap, a landing slope and a wall ride at the end
 		MegaZ = -330,
 		Mega = table.freeze({ width = 60, height = 70, length = 260, foot = -380 }),
-		Landing = table.freeze({ height = 40, length = 200, foot = 220 }),
+		-- back = a slope up the landing's gap side, so a short jump rolls up it instead of hitting a wall
+		Landing = table.freeze({ height = 40, length = 200, foot = 220, back = 60 }),
 		WallRide = table.freeze({ width = 150, height = 60, length = 30, foot = 395 }),
 		-- tabletops that grow along the second lane
 		TableZ = -130,

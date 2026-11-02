@@ -1284,7 +1284,7 @@ do
 		S.MegaZ - S.Mega.width / 2 > -S.Depth / 2
 			and S.BowlZ + S.BowlHalf + S.BowlLength < S.Depth / 2
 			and S.WallRide.foot + S.WallRide.length < S.Width / 2
-			and S.Mega.foot + S.Mega.length < S.Landing.foot - S.Landing.length
+			and S.Mega.foot + S.Mega.length < S.Landing.foot - S.Landing.length - S.Landing.back
 	)
 	local seed = 7
 	local rng = function()

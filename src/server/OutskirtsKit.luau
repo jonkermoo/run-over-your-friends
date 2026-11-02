@@ -500,6 +500,16 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			S.Landing.length,
 			COLORS.concrete
 		)
+		local landTop = S.Landing.foot - S.Landing.length
+		ramp(
+			folder,
+			at(landTop - S.Landing.back, mz),
+			E,
+			S.Mega.width,
+			S.Landing.height,
+			S.Landing.back,
+			COLORS.concrete
+		)
 		stripes(landing, 3)
 		local wall = ramp(
 			folder,
