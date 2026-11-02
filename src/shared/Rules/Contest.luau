@@ -83,4 +83,13 @@ function Contest.ordinal(n: number): string
 	return tostring(n) .. suffix
 end
 
+-- "1 piece", "12 pieces": a score rounded, with its unit (units are plural words ending in s)
+function Contest.amount(n: number, unit: string): string
+	local whole = math.floor(n + 0.5)
+	if whole == 1 and string.sub(unit, -1) == "s" then
+		unit = string.sub(unit, 1, -2)
+	end
+	return `{whole} {unit}`
+end
+
 return Contest

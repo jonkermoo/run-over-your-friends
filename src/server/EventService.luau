@@ -123,7 +123,7 @@ local function finishContest()
 		local p = st[i]
 		table.insert(
 			lines,
-			`{Contest.ordinal(i)} {c.names[p.id] or "?"} ({math.floor(p.score + 0.5)} {unit})`
+			`{Contest.ordinal(i)} {c.names[p.id] or "?"} ({Contest.amount(p.score, unit)})`
 		)
 	end
 	for _, everyone in Players:GetPlayers() do

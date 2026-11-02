@@ -1791,6 +1791,12 @@ do
 				and Contest.ordinal(13) == "13TH"
 				and Contest.ordinal(22) == "22ND"
 		)
+		check(
+			"amounts: one piece, many pieces",
+			Contest.amount(1, "pieces") == "1 piece"
+				and Contest.amount(12.4, "pieces") == "12 pieces"
+				and Contest.amount(0.6, "studs") == "1 stud"
+		)
 		local ok, contests = true, 0
 		local stats = { Breaks = true, Launch = true, Hits = true }
 		for i, e in EventConfig.List do

@@ -217,7 +217,7 @@ local function fillStandings(event: Config.Event, ink: Color3): number
 	end
 	showRows(true)
 	local function amount(n: number): string
-		return `{math.floor(n + 0.5)} {c.unit}`
+		return Contest.amount(n, c.unit)
 	end
 	for i, r in rows do
 		local e = s.top[i]
