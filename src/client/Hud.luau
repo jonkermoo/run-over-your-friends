@@ -805,29 +805,42 @@ offerFor = function(stats: Vehicles.Vehicle)
 	)
 end
 
+-- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds
+-- of play, the tutorial done, nothing else open. Once per session, never once bought.
+local joinedAt = os.clock()
 local starterOffered = false
 local function maybeOfferStarter()
+	if starterOffered then
+		return
+	end
 	local bought = string.find(
 		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
 		",Starter,",
 		1,
 		true
 	) ~= nil
-	if starterOffered or bought then
+	local step = (player:GetAttribute("Tutorial") or 0) :: number
+	if bought then
+		starterOffered = true
+		return
+	end
+	if
+		os.clock() - joinedAt < Products.StarterOfferAfter
+		or step < Onboarding.Steps.Save
+		or offer.Visible
+		or garage.Visible
+		or store.Visible
+	then
 		return
 	end
 	starterOffered = true
-	task.delay(8, function()
-		if not offer.Visible then
-			showOffer(
-				"STARTER PACK",
-				`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
-				starter,
-				"GET IT",
-				"NO THANKS"
-			)
-		end
-	end)
+	showOffer(
+		"STARTER PACK",
+		`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
+		starter,
+		"GET IT",
+		"NO THANKS"
+	)
 end
 
 garageButton.Activated:Connect(function()
@@ -1057,12 +1070,15 @@ function Hud.start()
 	local function tutorialStep()
 		local step = (player:GetAttribute("Tutorial") or 0) :: number
 		goalsButton.Visible = step >= Onboarding.Steps.Save
-		if step == 3 then
-			maybeOfferStarter()
-		end
 	end
 	player:GetAttributeChangedSignal("Tutorial"):Connect(tutorialStep)
 	tutorialStep()
+	task.spawn(function()
+		while not starterOffered do
+			task.wait(2)
+			maybeOfferStarter()
+		end
+	end)
 	for _, p in PASSES do
 		player:GetAttributeChangedSignal("Pass" .. p.name):Connect(refreshStore)
 	end

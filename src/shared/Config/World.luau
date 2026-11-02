@@ -2,16 +2,30 @@
 -- Map layout, NPCs and destruction budgets. Studs and seconds.
 
 return table.freeze({
-	-- the world's look: late-afternoon sun, punchy saturated grade, a light bloom
+	-- the world's look, "soft clean": early-afternoon neutral daylight, soft bright shadows, clear air,
+	-- true colours (a light grade) and bloom only on the brightest spots. Colours are { r, g, b }.
 	Look = table.freeze({
-		ClockTime = 16.4,
-		Brightness = 3,
-		Saturation = 0.28,
-		Contrast = 0.12,
-		Tint = table.freeze({ 250, 248, 255 }), -- r, g, b: a touch cool
-		BloomIntensity = 0.35,
+		ClockTime = 14,
+		Brightness = 2.6,
+		Exposure = 0.1,
+		Ambient = table.freeze({ 125, 125, 135 }), -- indoor / no-sky fill
+		OutdoorAmbient = table.freeze({ 165, 165, 175 }), -- shade colour outdoors
+		ShadowSoftness = 0.6,
+		DiffuseScale = 1, -- sky light on surfaces
+		SpecularScale = 1, -- sky reflections on smooth parts (glass, paint)
+		AirDensity = 0.2,
+		AirOffset = 0.1,
+		AirHaze = 0,
+		AirGlare = 0,
+		AirColor = table.freeze({ 215, 230, 245 }),
+		AirDecay = table.freeze({ 190, 210, 235 }),
+		Saturation = 0.08,
+		Contrast = 0.04,
+		GradeBrightness = 0.02,
+		Tint = table.freeze({ 255, 255, 255 }),
+		BloomIntensity = 0.3,
 		BloomSize = 24,
-		BloomThreshold = 1.4,
+		BloomThreshold = 1.8,
 		PaintLift = 0.03, -- plaza paint sits this far above the paving
 	}),
 	Map = table.freeze({

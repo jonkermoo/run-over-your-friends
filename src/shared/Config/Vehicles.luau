@@ -429,5 +429,13 @@ return table.freeze({
 	Engines = table.freeze(engines),
 	Starter = "Hatchback",
 	StudsPerMetre = 4.32, -- every model is built to this scale
+	-- on the ground the body tilts to the road under it (ramps, hills); in the air it levels to world up
+	Ground = table.freeze({
+		follow = 10, -- how fast the wanted tilt eases toward the measured ground, per second
+		maxTilt = 40, -- degrees from flat it will ever tilt to (steepest ramp on the map is ~31)
+		reach = 0.8, -- metres below the chassis bottom the corner probes look for ground
+		inset = 0.8, -- probes sit this share of the way out to the chassis corners
+		parkedEvery = 0.2, -- seconds between ground checks for a parked car (server)
+	}),
 	has = has,
 })

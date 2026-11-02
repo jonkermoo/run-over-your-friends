@@ -54,6 +54,37 @@ timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
 
+-- the player can shrink the sign to a small chip with just a colour dot and the timer (X beside the
+-- sign), and tap the chip to bring it back. Kept for the session; big event titles still show.
+local shrunk = false
+local hide = Style.button(gui, "X", "dark", 18)
+hide.Name = "HideEvent"
+hide.BackgroundColor3 = C.panel
+hide.Size = UDim2.fromOffset(40, 40)
+hide.Visible = false
+local chip = Style.button(gui, "", "dark", 18)
+chip.Name = "EventChip"
+chip.BackgroundColor3 = C.panel
+chip.AnchorPoint = Vector2.new(0.5, 0)
+chip.Position = UDim2.new(0.5, 0, 0, 8)
+chip.Size = UDim2.fromOffset(104, 44)
+chip.Visible = false
+local chipDot = Instance.new("Frame")
+chipDot.BorderSizePixel = 0
+chipDot.AnchorPoint = Vector2.new(0, 0.5)
+chipDot.Position = UDim2.new(0, 10, 0.5, 0)
+chipDot.Size = UDim2.fromOffset(16, 16)
+chipDot.Parent = chip
+local chipTimer = Style.label(chip, "", 18, F.display, C.yellow)
+chipTimer.Position = UDim2.fromOffset(32, 3)
+chipTimer.Size = UDim2.new(1, -38, 1, 0)
+hide.Activated:Connect(function()
+	shrunk = true
+end)
+chip.Activated:Connect(function()
+	shrunk = false
+end)
+
 -- dark text on bright paint, white on dark paint
 local function inkOn(color: Color3): Color3
 	local lum = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
@@ -136,21 +167,32 @@ local function update()
 	local key = workspace:GetAttribute("EventKey")
 	local endsAt = workspace:GetAttribute("EventEndsAt")
 	if typeof(phase) ~= "string" or typeof(key) ~= "string" or typeof(endsAt) ~= "number" then
-		banner.Visible = false
+		banner.Visible, hide.Visible, chip.Visible = false, false, false
 		return
 	end
 	local event = byKey[key]
 	if not event then
-		banner.Visible = false
+		banner.Visible, hide.Visible, chip.Visible = false, false, false
 		return
 	end
-	banner.Visible = true
+	banner.Visible = not shrunk
+	hide.Visible = not shrunk
+	chip.Visible = shrunk
 	local color = Style.colors[event.color] or C.gold
 	local left = endsAt - workspace:GetServerTimeNow()
 	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) then
 		bigTitle(event)
 	end
 	lastPhase, lastKey = phase, key
+	if shrunk then
+		chipDot.BackgroundColor3 = if phase == "quiet" then C.grey else color
+		chipTimer.Text = fmt(if phase == "quiet" then left + Config.WarnSeconds else left)
+		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
+		Style.setShadow(chip, if blink then C.text else C.ink)
+		return
+	end
+	-- the X sits just right of the sign
+	hide.Position = UDim2.new(0.5, banner.AbsoluteSize.X / 2 + 10, 0, 8)
 
 	if phase == "quiet" then
 		-- a slim asphalt sign: what's coming and when

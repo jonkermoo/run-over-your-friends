@@ -16,6 +16,7 @@ local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Flight = require(ReplicatedStorage.Shared.Config.Flight)
 local FlightRules = require(ReplicatedStorage.Shared.Rules.Flight)
+local Ground = require(ReplicatedStorage.Shared.Ground)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
@@ -84,6 +85,9 @@ local STEER_WHEEL_RATIO = 4 -- steering wheel turns per road-wheel turn
 local wheelParams = RaycastParams.new()
 wheelParams.FilterType = Enum.RaycastFilterType.Exclude
 wheelParams.CollisionGroup = "Vehicles"
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+groundParams.CollisionGroup = "Vehicles"
 -- cold-gas thruster sounds (Pro Sound Effects, see ASSETS_LICENSES.md): a steady stretch of an air
 -- release for the big jets, a short spray burst when a steering nozzle opens
 local GAS_LOOP, GAS_LOOP_REGION = "rbxassetid://9116496074", NumberRange.new(1, 3.1)
@@ -175,6 +179,8 @@ type CarState = {
 	travelled: number,
 	surface: Surface,
 	surfaceAt: number,
+	groundUp: Vector3, -- the smoothed road normal the body tilts to (see Shared/Ground)
+	probedAt: number, -- when the driver's corner probes last touched ground
 	airborne: boolean,
 	frontSlide: number,
 	rearSlide: number,
@@ -519,6 +525,8 @@ local function track(car: Instance)
 		travelled = 0,
 		surface = HARD,
 		surfaceAt = 0,
+		groundUp = Vector3.yAxis,
+		probedAt = 0,
 		airborne = false,
 		frontSlide = 0,
 		rearSlide = 0,
@@ -985,14 +993,34 @@ local function step(dt: number)
 		if look.Magnitude > 0.1 then
 			look = look.Unit
 		end
+		local flatLook = look
 		local right = Vector3.new(-look.Z, 0, look.X)
+		-- the road's up: on the ground the body tilts to it and drives along it; in the air it tracks the
+		-- body's own up, so a landing eases from the pose it lands in
+		local n
+		if not flying then
+			groundParams.FilterDescendantsInstances =
+				{ s.car, workspace:FindFirstChild("Npcs") :: Instance, character :: Instance }
+			n = Ground.normal(chassis, groundParams)
+		end
+		if n then
+			s.probedAt = now
+			s.groundUp = (s.groundUp + (n - s.groundUp) * math.min(1, dt * Vehicles.Ground.follow)).Unit
+			look = (look - s.groundUp * look:Dot(s.groundUp)).Unit
+			right = look:Cross(s.groundUp)
+		else
+			s.groundUp = chassis.CFrame.UpVector
+		end
 		local actual = chassis.AssemblyLinearVelocity / spm
 		local actualForward, actualLeft = actual:Dot(look), -actual:Dot(right)
 		if math.abs(actualForward - speed) > 2 or math.abs(actualLeft - lateral) > 2 then
 			speed, lateral = actualForward, actualLeft
 		end
-		if math.abs(chassis.AssemblyAngularVelocity.Y - yawRate) > 0.6 then
-			yawRate = chassis.AssemblyAngularVelocity.Y
+		local spinNow = if n
+			then chassis.AssemblyAngularVelocity:Dot(s.groundUp)
+			else chassis.AssemblyAngularVelocity.Y
+		if math.abs(spinNow - yawRate) > 0.6 then
+			yawRate = spinNow
 		end
 
 		-- flight meter (Roadster): the lift jet and the rear jet burn it, it fills back up on the ground
@@ -1184,8 +1212,9 @@ local function step(dt: number)
 			speed = math.clamp(speed, -REVERSE_TOP, cap)
 			drive.Enabled = true
 			drive.VectorVelocity = (look * speed - right * lateral) * spm
-			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * LEVEL_RATE
-			turn.AngularVelocity = Vector3.new(level.X, yawRate, level.Z)
+			-- tilt to the road and yaw about its up
+			turn.AngularVelocity = chassis.CFrame.UpVector:Cross(s.groundUp) * LEVEL_RATE
+				+ s.groundUp * yawRate
 		elseif not flung then
 			-- in the air momentum carries the car; the thruster pushes along the nose
 			drive.Enabled = false
@@ -1213,7 +1242,9 @@ local function step(dt: number)
 			if stuckFor > 1.2 then
 				stuckFor = 0
 				local at = chassis.Position + Vector3.new(0, s.height + 2, 0)
-				s.car:PivotTo(CFrame.lookAt(at, at + look) * CFrame.new(0, -chassis.Size.Y / 2, 0))
+				s.car:PivotTo(
+					CFrame.lookAt(at, at + flatLook) * CFrame.new(0, -chassis.Size.Y / 2, 0)
+				)
 				chassis.AssemblyLinearVelocity = Vector3.zero
 				chassis.AssemblyAngularVelocity = Vector3.zero
 			end
@@ -1425,7 +1456,8 @@ local function step(dt: number)
 			local hit =
 				workspace:Raycast(chassis.Position, -chassis.CFrame.UpVector * reach, params)
 			local was = s.airborne
-			s.airborne = hit == nil
+			-- the driver's corner probes count too: a level car nosing onto a ramp has its middle off the road
+			s.airborne = hit == nil and now - s.probedAt > 0.2
 			if hit then
 				s.surface = SURFACES[hit.Material] or HARD
 			end
