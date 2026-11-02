@@ -97,17 +97,25 @@ chip.Name = "EventChip"
 chip.BackgroundColor3 = C.panel
 chip.AnchorPoint = Vector2.new(0.5, 0)
 chip.Position = UDim2.new(0.5, 0, 0, 8)
-chip.Size = UDim2.fromOffset(104, 44)
+chip.Size = UDim2.fromOffset(112, 44)
 chip.Visible = false
+-- the chip's icon: a diamond road sign in the event's colour with a "!" on it
 local chipDot = Instance.new("Frame")
 chipDot.BorderSizePixel = 0
-chipDot.AnchorPoint = Vector2.new(0, 0.5)
-chipDot.Position = UDim2.new(0, 10, 0.5, 0)
-chipDot.Size = UDim2.fromOffset(16, 16)
+chipDot.AnchorPoint = Vector2.new(0.5, 0.5)
+chipDot.Position = UDim2.new(0, 22, 0.5, 0)
+chipDot.Size = UDim2.fromOffset(18, 18)
+chipDot.Rotation = 45
+chipDot.ZIndex = 2
 chipDot.Parent = chip
+local chipMark = Style.label(chip, "!", 18, F.display, C.ink)
+chipMark.AnchorPoint = Vector2.new(0.5, 0.5)
+chipMark.Position = UDim2.new(0, 22, 0.5, 1)
+chipMark.Size = UDim2.fromOffset(18, 22)
+chipMark.ZIndex = 3
 local chipTimer = Style.label(chip, "", 18, F.display, C.yellow)
-chipTimer.Position = UDim2.fromOffset(32, 3)
-chipTimer.Size = UDim2.new(1, -38, 1, 0)
+chipTimer.Position = UDim2.fromOffset(40, 3)
+chipTimer.Size = UDim2.new(1, -46, 1, 0)
 hide.Activated:Connect(function()
 	shrunk = true
 end)
@@ -249,6 +257,7 @@ local function update()
 	lastPhase, lastKey = phase, key
 	if shrunk then
 		chipDot.BackgroundColor3 = if phase == "quiet" then C.grey else color
+		chipMark.TextColor3 = inkOn(chipDot.BackgroundColor3)
 		chipTimer.Text = fmt(if phase == "quiet" then left + Config.WarnSeconds else left)
 		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
 		Style.setShadow(chip, if blink then C.text else C.ink)
