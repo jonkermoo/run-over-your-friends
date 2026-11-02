@@ -20,6 +20,8 @@ return table.freeze({
 		CorniceEvery = 3, -- floors between cornice bands (pilasters run between them)
 		PilasterEvery = 2, -- panels between pilasters
 		Parapet = 3,
+		Footprint = { 0.52, 0.75 }, -- tower width and depth, as a share of the block inside its sidewalks
+		Setback = 6, -- the tower's front stands this far in from its sidewalk; its car park fills the rest
 		Glass = { 96, 140, 170 } :: RGB,
 		StoneMaterial = "Limestone", -- the lobby floor
 		-- trim, lobby stone and roof per district; the accent is the district's accent
@@ -60,7 +62,7 @@ return table.freeze({
 	Shops = table.freeze({
 		PerBlock = 4, -- shop fronts in the row
 		Depth = 60,
-		Setback = 14, -- forecourt between the sidewalk and the shop fronts
+		Setback = 4, -- forecourt between the sidewalk and the shop fronts
 		GroundHeight = 14, -- the shop floor; flats above use the house floor height
 		Floors = { 2, 3 }, -- fewest, most
 		Door = 5,

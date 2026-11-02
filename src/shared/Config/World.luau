@@ -11,7 +11,7 @@ return table.freeze({
 		FloorHeight = 14,
 		PanelWidth = 12,
 		WallThickness = 1.5,
-		SidewalkWidth = 14,
+		SidewalkWidth = 8, -- narrow, so the buildings stand close to the road
 		SidewalkHeight = 0.6,
 		Seed = 20261030,
 	}),

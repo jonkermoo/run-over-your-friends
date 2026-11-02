@@ -2,7 +2,7 @@
 -- Builds the world from World.Map at server start (same seed, same city every time):
 -- an 8x8 city grid with wide roads; blocks from the city plan (offices, homes, the burger place, the parcel
 -- warehouse, shops, parks, plazas) with destructible chunked buildings and places for the crowd,
--- parking lots with kickers, a highway ring, a stunt park (east), a container port (west) and desert dunes (south).
+-- parking lots with kickers; the ground, the highway ring and the zones beyond it come from OutskirtsKit.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,6 +18,7 @@ local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local HouseKit = require(script.Parent.HouseKit)
+local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
@@ -47,13 +48,6 @@ local COLORS = {
 	rampStripe = Color3.fromRGB(40, 40, 44),
 	trunk = Color3.fromRGB(110, 78, 52),
 	leaves = Color3.fromRGB(70, 140, 70),
-}
-local CONTAINERS = {
-	Color3.fromRGB(190, 60, 50),
-	Color3.fromRGB(40, 100, 170),
-	Color3.fromRGB(230, 160, 40),
-	Color3.fromRGB(60, 140, 90),
-	Color3.fromRGB(150, 150, 155),
 }
 
 local random = Random.new(M.Seed)
@@ -149,19 +143,6 @@ function MapBuilder.build(): Result
 		end
 	end
 
-	local G = M.GroundSize
-	part(static, Vector3.new(G, 20, G), CFrame.new(0, -10, 0), COLORS.grass, Enum.Material.Grass)
-	for _, s in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
-		part(
-			static,
-			Vector3.new(if s[1] ~= 0 then 10 else G, 60, if s[2] ~= 0 then 10 else G),
-			CFrame.new(s[1] * G / 2, 30, s[2] * G / 2),
-			COLORS.concrete,
-			nil,
-			0.6
-		)
-	end
-
 	-- city grid
 	local B, R = M.BlockSize, M.RoadWidth
 	local pitch = B + R
@@ -189,62 +170,6 @@ function MapBuilder.build(): Result
 		for i = 0, M.BlocksX do
 			table.insert(spawnPoints, Vector3.new(x0 + R / 2 + i * pitch, 0.2, z))
 		end
-	end
-
-	-- highway ring around the city, joined to every grid road
-	local ring = math.max(spanX, spanZ) / 2 + 220
-	local RW = 90
-	for _, s in { 1, -1 } do
-		part(
-			static,
-			Vector3.new(RW, 1, ring * 2 + RW),
-			CFrame.new(s * ring, -0.4, 0),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
-		part(
-			static,
-			Vector3.new(ring * 2 + RW, 1, RW),
-			CFrame.new(0, -0.38, s * ring),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
-	end
-	for i = 0, M.BlocksX do
-		local x = x0 + R / 2 + i * pitch
-		local len = ring - spanZ / 2
-		part(
-			static,
-			Vector3.new(R, 1, len),
-			CFrame.new(x, -0.4, spanZ / 2 + len / 2),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
-		part(
-			static,
-			Vector3.new(R, 1, len),
-			CFrame.new(x, -0.4, -spanZ / 2 - len / 2),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
-	end
-	for j = 0, M.BlocksZ do
-		local z = z0 + R / 2 + j * pitch
-		local len = ring - spanX / 2
-		part(
-			static,
-			Vector3.new(len, 1, R),
-			CFrame.new(spanX / 2 + len / 2, -0.38, z),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
-		part(
-			static,
-			Vector3.new(len, 1, R),
-			CFrame.new(-spanX / 2 - len / 2, -0.38, z),
-			COLORS.road,
-			Enum.Material.Asphalt
-		)
 	end
 
 	-- blocks: what stands where comes from the city plan
@@ -365,11 +290,26 @@ function MapBuilder.build(): Result
 				local floors = if distFromCentre < 2.5
 					then random:NextInteger(5, 9)
 					else random:NextInteger(3, 5)
-				local w = random:NextNumber(0.55, 0.8) * inner
-				local d = random:NextNumber(0.55, 0.8) * inner
+				local fp = BuildingConfig.Office.Footprint
+				local w = random:NextNumber(fp[1], fp[2]) * inner
+				local d = random:NextNumber(fp[1], fp[2]) * inner
 				count += 1
 				offices += 1
 				local out = SIDES[random:NextInteger(1, 4)]
+				-- the tower stands up to its front sidewalk, its car park behind it
+				local deep = math.abs(out:Dot(Vector3.new(w, 0, d)))
+				local tower = centre + out * (inner / 2 - BuildingConfig.Office.Setback - deep / 2)
+				local lot = inner - BuildingConfig.Office.Setback - deep - 4
+				if lot > 10 then
+					local across = Vector3.new(math.abs(out.Z), 0, math.abs(out.X)) * inner
+					part(
+						static,
+						across + Vector3.new(math.abs(out.X) * lot, 1, math.abs(out.Z) * lot),
+						CFrame.new(centre - out * (inner / 2 - lot / 2) + Vector3.new(0, -0.39, 0)),
+						COLORS.road,
+						Enum.Material.Asphalt
+					)
+				end
 				local wall = wallColour()
 				local look = (BuildingConfig.Office.Looks :: any)[district] :: BuildingConfig.OfficeLook
 				local colours = {
@@ -380,13 +320,13 @@ function MapBuilder.build(): Result
 					stone = rgb(look.stone),
 				}
 				local model, door =
-					TownKit.office(buildings, centre, w, d, floors, colours, "Office" .. count, out)
+					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
 				-- the company name and a parody billboard stand on the roof, behind the parapet
 				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
 				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
 				local width = math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
 				addPlace(Places.office(model, door, out, width, top, name), i, j)
-				local boardAt = centre - out * 10 + Vector3.new(0, top + 14, 0)
+				local boardAt = tower - out * 10 + Vector3.new(0, top + 14, 0)
 				local ad = Streets.Billboards[random:NextInteger(1, #Streets.Billboards)]
 				Places.sign(
 					model,
@@ -402,7 +342,7 @@ function MapBuilder.build(): Result
 					part(
 						model,
 						Vector3.new(1, 9, 1),
-						CFrame.new(centre - out * 10 + along * e + Vector3.new(0, top + 4.5, 0)),
+						CFrame.new(tower - out * 10 + along * e + Vector3.new(0, top + 4.5, 0)),
 						COLORS.concrete
 					)
 				end
@@ -676,117 +616,27 @@ function MapBuilder.build(): Result
 		table.insert(places, stop)
 	end
 
-	-- stunt park (east)
-	local sx = ring + RW / 2 + 520
-	local park = Vector3.new(sx, 0, 0)
-	part(
-		static,
-		Vector3.new(900, 1, 1100),
-		CFrame.new(sx, -0.42, 0),
-		COLORS.concrete,
-		Enum.Material.Concrete
-	)
-	part(
-		static,
-		Vector3.new(sx - ring, 1, 80),
-		CFrame.new((ring + sx) / 2 - 200, -0.4, 0),
-		COLORS.road,
-		Enum.Material.Asphalt
-	)
-	-- mega ramp: a long climb, a gap, a landing slope
-	ramp(static, park + Vector3.new(-380, 0, -300), Vector3.new(1, 0, 0), 60, 70, 260)
-	local landing =
-		ramp(static, park + Vector3.new(220, 0, -300), Vector3.new(-1, 0, 0), 60, 40, 200)
-	landing.Color = COLORS.concrete
-	-- kickers in a row
-	for k = 0, 5 do
-		ramp(
-			static,
-			park + Vector3.new(-350 + k * 120, 0, 0),
-			Vector3.new(1, 0, 0),
-			28,
-			6 + k * 2,
-			26 + k * 4
-		)
-	end
-	-- a bowl of quarter ramps
-	for _, d in
-		{ Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) }
-	do
-		ramp(static, park + Vector3.new(0, 0, 330) - d * 180, -d, 160, 30, 50)
-	end
-	local stuntSpots = {}
-	for _ = 1, 40 do
-		local p = park + Vector3.new(random:NextNumber(-400, 400), 0.5, random:NextNumber(120, 220))
+	-- the ground, the ring and everything beyond it
+	local outskirts = OutskirtsKit.build({
+		static = static,
+		buildings = buildings,
+		props = props,
+		random = random,
+		half = M.GroundSize / 2,
+		spanX = spanX,
+		spanZ = spanZ,
+		x0 = x0,
+		z0 = z0,
+		road = R,
+		pitch = pitch,
+		blocksX = M.BlocksX,
+		blocksZ = M.BlocksZ,
+	})
+	for _, p in outskirts.walkPoints do
 		table.insert(walkPoints, p)
-		table.insert(stuntSpots, p)
 	end
-	table.insert(places, Places.open("stunt", stuntSpots[1], stuntSpots))
-
-	-- container port (west): stacks are destructible
-	local px = -(ring + RW / 2 + 420)
-	part(
-		static,
-		Vector3.new(700, 1, 1000),
-		CFrame.new(px, -0.42, 0),
-		COLORS.concrete,
-		Enum.Material.Concrete
-	)
-	part(
-		static,
-		Vector3.new(px + ring, 1, 80),
-		CFrame.new((px - ring) / 2 + 150, -0.4, 0),
-		COLORS.road,
-		Enum.Material.Asphalt
-	)
-	for row = 0, 5 do
-		for col = 0, 3 do
-			local stack = Instance.new("Model")
-			stack.Name = "Containers"
-			local base = Vector3.new(px - 250 + col * 150, 0, -400 + row * 150)
-			for h = 0, random:NextInteger(1, 3) do
-				for k = 0, 1 do
-					part(
-						stack,
-						Vector3.new(16, 16, 56),
-						CFrame.new(base + Vector3.new(k * 18, 8 + h * 16.2, 0)),
-						CONTAINERS[random:NextInteger(1, #CONTAINERS)],
-						Enum.Material.CorrodedMetal
-					)
-				end
-			end
-			stack.Parent = buildings
-		end
-	end
-	for _ = 1, 20 do
-		table.insert(
-			walkPoints,
-			Vector3.new(px + random:NextNumber(-300, 300), 0.5, random:NextNumber(-450, 450))
-		)
-	end
-
-	-- desert dunes (south)
-	local dz = ring + RW / 2 + 500
-	part(
-		static,
-		Vector3.new(1800, 1, 800),
-		CFrame.new(0, -0.43, dz),
-		COLORS.sand,
-		Enum.Material.Sand
-	)
-	for _ = 1, 26 do
-		local at = Vector3.new(random:NextNumber(-800, 800), 0, dz + random:NextNumber(-330, 330))
-		local dir = if random:NextNumber() < 0.5 then Vector3.new(1, 0, 0) else Vector3.new(0, 0, 1)
-		local up = ramp(
-			static,
-			at,
-			dir,
-			random:NextNumber(40, 90),
-			random:NextNumber(8, 22),
-			random:NextNumber(50, 90)
-		)
-		up.Color = COLORS.sand
-		up.Material = Enum.Material.Sand
+	for _, place in outskirts.places do
+		table.insert(places, place)
 	end
 
 	-- lighting and look
