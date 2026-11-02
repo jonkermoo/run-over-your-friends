@@ -441,6 +441,25 @@ function VehicleBuilder.build(id: string): Model
 		end
 		s.Parent = chassis
 	end
+	-- one-shots made once here so they play on time: the horn (each client plays it) and the jingle (server)
+	local hornDef = Vehicles.Horns[stats.horn]
+	local horn = Instance.new("Sound")
+	horn.Name = "Horn"
+	horn.SoundId = hornDef.sound
+	horn.Volume = hornDef.volume
+	horn.PlaybackSpeed = stats.hornPitch or 1
+	horn.RollOffMinDistance = 25
+	horn.RollOffMaxDistance = 400
+	horn.Parent = chassis
+	if Vehicles.has(stats, "Jingle") then
+		local jingle = Instance.new("Sound")
+		jingle.Name = "Jingle"
+		jingle.SoundId = Vehicles.Jingle.sound
+		jingle.Volume = Vehicles.Jingle.volume
+		jingle.RollOffMinDistance = 30
+		jingle.RollOffMaxDistance = 300
+		jingle.Parent = chassis
+	end
 
 	if stats.trailer then
 		buildTrailer(model, chassis, stats.trailer)

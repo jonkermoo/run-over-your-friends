@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
@@ -29,6 +30,7 @@ local combos: { [Player]: { count: number, last: number } } = {}
 local lastCall: { [Player]: { [string]: number } } = {}
 local random = Random.new()
 local friendsAdded: { [Player]: boolean } = {}
+local jingleToken: { [Sound]: number } = {}
 
 local function rateOk(player: Player, key: string, interval: number): boolean
 	local t = lastCall[player]
@@ -365,7 +367,31 @@ local function onFeature(player: Player, feature: unknown)
 		bubble(chassis, "♪ ♫ ♪")
 		local s = chassis:FindFirstChild("Jingle") :: Sound?
 		if s then
+			-- the tune's first JingleSeconds, then a fade (a press while it plays starts it over)
+			local token = (jingleToken[s] or 0) + 1
+			jingleToken[s] = token
+			s.Volume = Vehicles.Jingle.volume
+			s.TimePosition = 0
 			s:Play()
+			local fade = Vehicles.Jingle.fade
+			task.delay(CFG.JingleSeconds - fade, function()
+				if jingleToken[s] ~= token or not s.Parent then
+					return
+				end
+				TweenService
+					:Create(s, TweenInfo.new(fade, Enum.EasingStyle.Exponential), { Volume = 0 })
+					:Play()
+				task.delay(fade, function()
+					if jingleToken[s] == token and s.Parent then
+						s:Stop()
+					end
+				end)
+			end)
+			if token == 1 then
+				s.Destroying:Once(function()
+					jingleToken[s] = nil
+				end)
+			end
 		end
 		for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
 			for i = 0, math.floor(CFG.JingleSeconds / 0.8) do

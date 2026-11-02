@@ -18,6 +18,7 @@ Net.Messages = table.freeze({
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
+	Horn = "Horn", -- client -> server: () honk; server -> other clients: (vehicle: Model)
 	-- server -> client
 	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
 	Popup = "Popup", -- (text: string, kind: string)
@@ -40,6 +41,7 @@ export type MessageName =
 	| "WreckerHit"
 	| "SelfDestruct"
 	| "Feature"
+	| "Horn"
 	| "Fling"
 	| "Popup"
 	| "Celebrate"

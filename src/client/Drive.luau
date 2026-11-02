@@ -576,6 +576,7 @@ local flyYaw = 0
 local bombHeld = 0
 local pivotSpin = 0 -- crawler: rad/s of on-the-spot turn being asked for
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
+local hornAt = 0
 
 local function stopDriving()
 	if driving then
@@ -846,6 +847,12 @@ local function bind()
 		Drive.input.bomb = state == Enum.UserInputState.Begin
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.X, Enum.KeyCode.DPadDown)
+	ContextActionService:BindAction("RoyfHorn", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			Drive.horn()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.H, Enum.KeyCode.DPadUp)
 	ContextActionService:BindAction("RoyfRoll", function(_, state, input)
 		local dir = if input.KeyCode == Enum.KeyCode.Q
 				or input.KeyCode == Enum.KeyCode.ButtonL1
@@ -874,6 +881,28 @@ function Drive.thruster()
 		thrustReadyAt = now + THRUST_COOLDOWN
 		thrustLeft = THRUST_TIME
 	end
+end
+
+-- a vehicle's horn (built on the chassis by the server), played from its head
+local function honk(car: Model)
+	local chassis = car.PrimaryPart
+	local horn = chassis and chassis:FindFirstChild("Horn") :: Sound?
+	local stats = Vehicles.ById[car:GetAttribute("VehicleId") :: any]
+	if horn then
+		horn.TimePosition = if stats then Vehicles.Horns[stats.horn].start or 0 else 0
+		horn:Play()
+	end
+end
+
+-- H / pad D-pad up / the phone's HONK button: heard here at once, the server tells everyone else
+function Drive.horn()
+	local now = os.clock()
+	if not driving or now < hornAt + Vehicles.HornCooldown then
+		return
+	end
+	hornAt = now
+	honk(driving.car)
+	Net.waitFor("Horn"):FireServer()
 end
 
 ---------------------------------------------------------------- flings from the server
@@ -1640,6 +1669,11 @@ function Drive.start()
 	end)
 	bind()
 	Net.waitFor("Fling").OnClientEvent:Connect(onFling)
+	Net.waitFor("Horn").OnClientEvent:Connect(function(car)
+		if typeof(car) == "Instance" and car:IsA("Model") then
+			honk(car)
+		end
+	end)
 	RunService.Heartbeat:Connect(step)
 end
 

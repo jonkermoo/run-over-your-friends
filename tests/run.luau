@@ -1482,6 +1482,33 @@ do
 	)
 end
 
+do
+	-- every vehicle has a horn that exists, played at a sane pitch; the jingle fits inside its lure time
+	local hornsOk = true
+	for _, v in Vehicles.List do
+		local h = Vehicles.Horns[v.horn]
+		local hornPitch = v.hornPitch or 1
+		if
+			not h
+			or not string.match(h.sound, "^rbxassetid://%d+$")
+			or hornPitch < 0.7
+			or hornPitch > 1.4
+		then
+			hornsOk = false
+		end
+		if h and (h.volume <= 0 or h.volume > 2 or (h.start or 0) < 0) then
+			hornsOk = false
+		end
+	end
+	check("every vehicle has a known horn at a sane pitch and volume", hornsOk)
+	check(
+		"the jingle fades out inside the lure time",
+		Vehicles.Jingle.fade > 0
+			and Vehicles.Jingle.fade < World.Npc.JingleSeconds
+			and string.match(Vehicles.Jingle.sound, "^rbxassetid://%d+$") ~= nil
+	)
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
