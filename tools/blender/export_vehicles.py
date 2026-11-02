@@ -1189,19 +1189,24 @@ def car_cabin(vid, f, glass, sp):
             for i in range(2):
                 k.box((0.14, 0.04, 0.16), (xd - side * 0.4, sy + 1.37, sz - 0.9 + i * 0.22), C["black"], 0.02)
 
-    # headliner strips under the roof wherever it is solid, sun visors, dome light and the mirror
+    # headliner strips under the roof wherever it is solid, kept dark and inside the shell (pale strips showed
+    # through the glass and poked out of the thin roof's curved edges), sun visors and a dome light
     zr0 = f.screen(0, ey + 0.4)
     zr = zr0
+    half = w / 2 - 0.35
     while zr < sz + 3.5:
-        y, kind = f.roof(0, zr + 0.25, ey)
-        if kind == "body" and y - ey < 4:
-            k.box((w + 0.1, 0.12, 0.55), (0, y - 0.08, zr + 0.25), C["light"], 0)
+        z = zr + 0.25
+        hits = [f.roof(x, z, ey) for x in (0, -half, half)]
+        if all(kind == "body" for _, kind in hits) and hits[0][0] - ey < 4:
+            y = min(h for h, _ in hits)
+            k.box((2 * half, 0.1, 0.55), (0, y - 0.2, z), C["char"], 0)
         zr += 0.5
     ry, _ = f.roof(0, zr0 + 1.2, ey)
+    ry = min(ry, f.roof(-half, zr0 + 1.2, ey)[0], f.roof(half, zr0 + 1.2, ey)[0])
     if sp["wheel"] not in ("sport", "yoke"):
         for vx in (sx, -sx):
-            k.box((1.3, 0.08, 0.5), (vx, ry - 0.14, zr0 + 0.55), C["light"], 0.03, rot(-6))
-    k.box((0.5, 0.06, 0.3), (0, f.roof(0, sz, ey)[0] - 0.15, sz), C["white"], 0.02)
+            k.box((1.2, 0.08, 0.45), (vx, ry - 0.3, zr0 + 0.65), C["dark"], 0.03, rot(-6))
+    k.box((0.45, 0.05, 0.25), (0, f.roof(0, sz, ey)[0] - 0.28, sz), C["grey"], 0.02)
     mz = f.screen(0, ry - 0.5) + 0.35
     k.box((0.08, 0.35, 0.08), (0, ry - 0.3, mz), C["black"])
     k.box((1.3, 0.4, 0.16), (0, ry - 0.55, mz + 0.05), C["black"], 0.05)
