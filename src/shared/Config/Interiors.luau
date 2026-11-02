@@ -55,8 +55,15 @@ return table.freeze({
 	-- offices, shops, the burger place and the warehouse (layouts in Rules/Interiors, from each one's size)
 	Town = table.freeze({
 		Radius = 240, -- clients furnish town buildings this close to the camera...
-		MaxFurnished = 6, -- ...at most this many at once, nearest first (an office is about 500 parts)
-		OfficeFloors = 3, -- office floors above the lobby with desks (and people at them)
+		MaxFurnished = 6, -- ...at most this many at once, nearest first
+		-- every office floor above the lobby has desks along its windows (and people at them); its middle follows
+		-- these plans in turn up the tower: desk pods, pods behind cubicle screens, a break room
+		FloorPlans = { "Open", "Cubicles", "Break" },
+		-- full detail only near the camera: the lobby, the camera's own floor and this many above and below,
+		-- while the camera is within FullRadius studs of the tower's walls; other floors get one-block
+		-- furniture and glow-only lights (a phone keeps a few hundred parts a tower, not thousands)
+		FullFloors = 1,
+		FullRadius = 60,
 		DeskEvery = 16, -- desks along each window, at most this far apart
 		LightRange = 18, -- ceiling panels: a surface light shining down
 		LightBrightness = 1.3,

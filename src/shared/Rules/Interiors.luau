@@ -142,15 +142,21 @@ end
 
 export type OfficeConfig = {
 	FloorHeight: number,
-	Floors: number,
+	Plans: { string },
 	DeskEvery: number,
 	OfficeWall: number?,
 	Sill: number?,
 }
 
+-- which plan the middle of office floor `f` (1 = the first above the lobby) follows: they take turns up the
+-- tower, starting with the first in the list
+function Interiors.plan(f: number, plans: { string }): string
+	return plans[(f - 1) % #plans + 1]
+end
+
 -- an office tower `w` across its front, `d` deep (its walls stand on those edges, half in, half out): a
--- lobby (reception, two waiting corners, a coffee corner, the lift core) and desks along the front and back
--- windows of the first few floors above; floors higher up are carpeted and lit but empty
+-- lobby (reception, two waiting corners, a coffee corner, the lift core) and every floor above furnished:
+-- desks along the front and back windows, a desk by the lift, a meeting table, and a middle by its plan
 function Interiors.office(
 	w: number,
 	d: number,
@@ -216,35 +222,30 @@ function Interiors.office(
 	local liftG = v(doorX - 4, 0, liftZ + 7)
 	local toLift = { v(doorX - 12, 0, deskZ + 2), liftG }
 	-- upper floors: carpet, linings under the window bands with a ledge, a ceiling; desks along the front and
-	-- back windows of the first few, people facing out past their screens
+	-- back windows, people facing out past their screens, a desk by the lift and a meeting table; the open
+	-- middle of each floor takes its turn of the plans (open desk pods, cubicles, a break room)
 	for f = 1, floors - 1 do
 		local y = f * FH
-		local furnished = f <= cfg.Floors
+		local plan = Interiors.plan(f, cfg.Plans)
 		piece(l, "Carpet", 0, 0, 0, 1, y, 2 * ix, 2 * iz)
 		piece(l, "CeilingPlain", 0, 0, 0, 1, y + FH - SLAB, 2 * ix, 2 * iz)
-		piece(
-			l,
-			if furnished then "LiftCore" else "LiftShaft",
-			doorX,
-			liftZ,
-			0,
-			1,
-			y,
-			nil,
-			nil,
-			FH - UNDER
-		)
-		if not furnished then
-			continue
-		end
+		piece(l, "LiftCore", doorX, liftZ, 0, 1, y, nil, nil, FH - UNDER)
 		linings(l, "Sill", -ix, ix, -iz, iz, y, sill, "bflr")
 		local liftF = v(liftG.x, y, liftG.z)
-		-- the first floor, the one seen best from the street, has desk pods in its open middle, clear of
-		-- the walks from the lift (straight out to the front aisle, and down the corridor beside the core)
-		if f == 1 then
-			for _, z0 in { zf - 20, -hd + 20 } do
-				for _, x in across(w, 24, 20) do
-					if x < doorX - 26 or x > doorX + 6 then
+		-- the middle, clear of the walks from the lift (straight out to the front aisle, and down the corridor
+		-- beside the core): desk pods (behind screens on cubicle floors) or café tables
+		for _, z0 in { zf - 20, -hd + 20 } do
+			for _, x in across(w, 24, 20) do
+				if x < doorX - 26 or x > doorX + 6 then
+					if plan == "Break" then
+						for _, e in { -1, 1 } do
+							local tx = x + e * 5
+							piece(l, "CafeTable", tx, z0, 0, 1, y)
+							for _, s in { -1, 1 } do
+								piece(l, "Chair", tx + s * 2.6, z0, -s, 0, y)
+							end
+						end
+					else
 						for _, e in { -1, 1 } do
 							for _, side in { -1, 1 } do
 								piece(l, "Desk", x + e * 3.2, z0 + side * 1.4, 0, -side, y)
@@ -252,10 +253,28 @@ function Interiors.office(
 							end
 						end
 						piece(l, "Divider", x, z0, 0, 1, y, 12.8)
+						if plan == "Cubicles" then
+							for _, e in { -1, 1 } do
+								piece(l, "Screen", x + e * 7, z0, -e, 0, y, 7)
+							end
+						end
 					end
 				end
 			end
 		end
+		-- a break room's kitchen against the left wall
+		if plan == "Break" then
+			local kx = -ix + 1.2
+			piece(l, "Fridge", -ix + 1.3, -20.5, 1, 0, y)
+			piece(l, "Counter", kx, -14, 1, 0, y)
+			piece(l, "Counter", kx, -6, 1, 0, y)
+			piece(l, "WaterCooler", -ix + 1.2, 6, 1, 0, y)
+		end
+		-- a desk by the lift, facing the front, its chair behind it, a plant beside it
+		local rx, rz = doorX + 18, liftZ + 14
+		piece(l, "Reception", rx, rz, 0, 1, y)
+		piece(l, "Chair", rx, rz - 2.6, 0, 1, y)
+		piece(l, "Plant", rx + 8.5, rz + 2, 0, 1, y)
 		for _, e in { -1, 1 } do
 			piece(l, "Plant", e * (hw - 4), 0, 0, 1, y)
 		end
@@ -484,7 +503,7 @@ end
 
 export type Config = {
 	FloorHeight: number,
-	Floors: number,
+	Plans: { string },
 	DeskEvery: number,
 	Tables: { number },
 	TableZ: number,
@@ -501,7 +520,7 @@ export type Config = {
 function Interiors.config(world: any, buildings: any, houses: any, interiors: any): Config
 	return table.freeze({
 		FloorHeight = world.Map.FloorHeight,
-		Floors = interiors.Town.OfficeFloors,
+		Plans = interiors.Town.FloorPlans,
 		DeskEvery = interiors.Town.DeskEvery,
 		Tables = buildings.Restaurant.Tables,
 		TableZ = buildings.Restaurant.TableZ,

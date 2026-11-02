@@ -758,7 +758,13 @@ local function detectHits(s: CarState, velocity: Vector3)
 				Net.waitFor("KnockProp"):FireServer(prop, velocity)
 			end
 		elseif buildings and p:IsDescendantOf(buildings) then
-			if p.Anchored and p.CanCollide and not p:GetAttribute("Broken") then
+			-- floor slabs and roofs (Fixed) are structure: the car meets them like the ground
+			if
+				p.Anchored
+				and p.CanCollide
+				and not p:GetAttribute("Broken")
+				and not p:GetAttribute("Fixed")
+			then
 				table.insert(pieces, p)
 			end
 		elseif wrecker then

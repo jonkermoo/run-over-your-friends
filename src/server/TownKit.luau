@@ -2,7 +2,7 @@
 -- Office towers and shop rows in the town style (Config/Buildings).
 -- Office: a pale stone lobby with a glass front and a canopied door, window bands above (spandrel, glass,
 -- a trim sill band), pilasters and a cornice every few floors, a parapet on the flat roof. Every wall panel
--- and floor slab is its own chunk, as before, so BuildingService smashes and rebuilds the tower.
+-- is its own chunk, so BuildingService smashes and rebuilds the tower; floor slabs and the roof are Fixed.
 -- Shop: a townhouse front with a big shop window, an accent door, a striped awning and a hanging sign;
 -- flats above with house windows.
 
@@ -272,12 +272,14 @@ function TownKit.office(
 			for j = 0, tz - 1 do
 				local cx = centre.X - hw + (i + 0.5) * w / tx
 				local cz = centre.Z - hd + (j + 0.5) * d / tz
-				part(
+				local slab = part(
 					model,
 					Vector3.new(w / tx, 1.2, d / tz),
 					CFrame.new(cx, y, cz),
 					if f == floors then c.roof else Color3.fromRGB(190, 190, 195)
 				)
+				-- floors are the tower's structure: never broken, so what stands on them stays
+				slab:SetAttribute("Fixed", true)
 			end
 		end
 	end

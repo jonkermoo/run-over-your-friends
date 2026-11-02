@@ -1209,11 +1209,16 @@ for _, size in { { 106, 106 }, { 154, 120 }, { 120, 154 } } do
 				and layoutInside(l, size[1] / 2 - wallIn, size[2] / 2 - wallIn, floors * FH)
 			officeSeats = officeSeats and seated(l)
 			officeLifts = officeLifts and liftsOk(l)
-			local top = 0
+			-- every floor above the lobby has people sitting at it
+			local seatedOn = {}
 			for _, sp in l.spots do
-				top = math.max(top, sp.y)
+				if sp.sit then
+					seatedOn[math.floor(sp.y / FH + 0.5)] = true
+				end
 			end
-			desksUp = desksUp and top == math.min(floors - 1, layoutCfg.Floors) * FH
+			for f = 1, floors - 1 do
+				desksUp = desksUp and seatedOn[f] == true
+			end
 			staffAtDesk = staffAtDesk and #l.staff >= 1 and l.hub ~= nil and #l.staffIn >= 1
 		end
 	end
@@ -1221,8 +1226,68 @@ end
 check("office furniture and people stay inside the tower", officeIn)
 check("office sitters sit on a chair or a sofa", officeSeats)
 check("office workers change floors only in the lift", officeLifts)
-check("desks fill the first few floors above the lobby", desksUp)
+check("people sit at desks on every floor above the lobby", desksUp)
 check("each office lobby has a receptionist's desk", staffAtDesk)
+-- every office floor is furnished by its plan, and the walks from the lift stay clear
+local function checkOfficeFloors()
+	local plans = layoutCfg.Plans
+	local planOk = #plans >= 1 and InteriorRules.plan(1, plans) == plans[1]
+	for f = 1, 9 do
+		planOk = planOk and InteriorRules.plan(f, plans) == plans[(f - 1) % #plans + 1]
+	end
+	local furnished, walksClear = true, true
+	local blocking = {
+		Desk = true,
+		Chair = true,
+		CafeTable = true,
+		Screen = true,
+		Divider = true,
+		Counter = true,
+		Fridge = true,
+		WaterCooler = true,
+		Reception = true,
+		Plant = true,
+		DiningTable = true,
+	}
+	for _, size in { { 106, 106 }, { 154, 120 }, { 120, 154 } } do
+		for _, officeDoor in { -8, 0, 8 } do
+			local floors = 9
+			local l = InteriorRules.office(size[1], size[2], floors, officeDoor, layoutCfg)
+			local hd = size[2] / 2
+			local floorKinds: { [number]: { [string]: number } } = {}
+			for _, pc in l.pieces do
+				local f = math.floor(pc.y / FH + 0.01)
+				floorKinds[f] = floorKinds[f] or {}
+				floorKinds[f][pc.kind] = (floorKinds[f][pc.kind] or 0) + 1
+				if f >= 1 and blocking[pc.kind] then
+					-- straight out of the lift to the front aisle, and down the corridor beside the core
+					local front = math.abs(pc.x - (officeDoor - 4)) < 2.5
+						and pc.z > 1
+						and pc.z < hd - 11
+					local back = math.abs(pc.x - (officeDoor - 16)) < 2.5
+						and pc.z < 1
+						and pc.z > -hd + 11
+					walksClear = walksClear and not front and not back
+				end
+			end
+			for f = 1, floors - 1 do
+				local k = floorKinds[f] or {}
+				local floorPlan = InteriorRules.plan(f, plans)
+				furnished = furnished
+					and (k.Desk or 0) >= 4
+					and (k.Reception or 0) == 1
+					and (k.Plant or 0) >= 3
+					and (k.DiningTable or 0) == 1
+					and (floorPlan ~= "Cubicles" or (k.Screen or 0) >= 2)
+					and (floorPlan ~= "Break" or ((k.Fridge or 0) == 1 and (k.CafeTable or 0) >= 2))
+			end
+		end
+	end
+	check("office floor plans take turns up the tower", planOk)
+	check("every office floor has desks, a lift desk, plants and its plan's furniture", furnished)
+	check("office walks from the lift stay clear of furniture", walksClear)
+end
+checkOfficeFloors()
 
 local SHC = BuildingConfig.Shops
 local themesOk, islandKinds = true, {}

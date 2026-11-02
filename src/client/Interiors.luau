@@ -87,6 +87,7 @@ for _, k in
 		"CafeTable",
 		"Desk",
 		"Partition",
+		"Screen",
 		"Shelf",
 		"ShopCounter",
 		"Table",
@@ -1047,6 +1048,17 @@ local PIECES: { [string]: Build } = {
 		)
 		block(f, Vector3.new(look.w, 0.15, 0.4), at * CFrame.new(0, 4.95, 0), DARK)
 	end,
+	-- a cubicle's side screen, standing on the floor
+	Screen = function(f, at, look)
+		block(
+			f,
+			Vector3.new(look.w, 4.6, 0.3),
+			at * CFrame.new(0, 2.4, 0),
+			look.fabric,
+			Enum.Material.Fabric
+		)
+		block(f, Vector3.new(look.w, 0.15, 0.4), at * CFrame.new(0, 4.75, 0), DARK)
+	end,
 	-- a beam under the ceiling, across the room
 	Beam = function(f, at, look)
 		block(
@@ -1116,15 +1128,6 @@ local function hash(s: string): number
 	return h
 end
 
-local function broken(model: Model): boolean
-	for _, p in model:GetChildren() do
-		if p:GetAttribute("Broken") then
-			return true
-		end
-	end
-	return false
-end
-
 local function rgbList(list: { { number } }): { Color3 }
 	local out = {}
 	for _, c in list do
@@ -1165,30 +1168,94 @@ local function piecesOf(model: Model): { AnyPiece }?
 	return list
 end
 
-local function furnish(model: Model, into: Folder): Folder?
-	local pieces = piecesOf(model)
-	if not pieces then
-		return nil
+-- office floors far from the camera: each piece as one block, lights that only glow (Config Town.FullFloors)
+local SIMPLE: { [string]: Build } = {
+	Desk = function(f, at)
+		block(f, Vector3.new(6, 3.1, 2.6), at * CFrame.new(0, 1.55, 0), WHITE)
+	end,
+	Chair = function(f, at)
+		block(f, Vector3.new(1.9, 2, 1.9), at * CFrame.new(0, 1, 0), DARK_WOOD, Enum.Material.Wood)
+	end,
+	Divider = function(f, at, look)
+		block(f, Vector3.new(look.w, 1.8, 0.3), at * CFrame.new(0, 4, 0), look.fabric)
+	end,
+	Screen = function(f, at, look)
+		block(f, Vector3.new(look.w, 4.8, 0.3), at * CFrame.new(0, 2.4, 0), look.fabric)
+	end,
+	Plant = function(f, at)
+		local leaves = block(
+			f,
+			Vector3.new(2.6, 2.6, 2.6),
+			at * CFrame.new(0, 2.4, 0),
+			Color3.fromRGB(70, 140, 70)
+		)
+		leaves.Shape = Enum.PartType.Ball
+	end,
+	Reception = function(f, at, look)
+		block(f, Vector3.new(12, 3.9, 2.6), at * CFrame.new(0, 1.95, 0), look.accent)
+	end,
+	Counter = function(f, at)
+		block(f, Vector3.new(8, 4, 2.4), at * CFrame.new(0, 2, 0), WHITE)
+	end,
+	Fridge = function(f, at)
+		block(f, Vector3.new(3, 6.6, 2.4), at * CFrame.new(0, 3.6, 0), STEEL)
+	end,
+	WaterCooler = function(f, at)
+		block(f, Vector3.new(1.4, 4.4, 1.4), at * CFrame.new(0, 2.2, 0), WHITE)
+	end,
+	CafeTable = function(f, at)
+		block(f, Vector3.new(2.4, 3.1, 2.4), at * CFrame.new(0, 1.55, 0), WHITE)
+	end,
+	DiningTable = function(f, at)
+		block(f, Vector3.new(5, 3.3, 3.4), at * CFrame.new(0, 1.65, 0), WOOD)
+	end,
+	LiftCore = function(f, at, look)
+		block(f, Vector3.new(24, look.h, 10), at * CFrame.new(0, look.h / 2, 0), STONE)
+	end,
+	PanelLamp = PIECES.PanelGlow,
+}
+
+-- a furnished building: its pieces by floor (only offices have more than one), each floor's folder built in
+-- full or simple detail
+type Furnished = {
+	folder: Folder,
+	pieces: { [number]: { AnyPiece } },
+	floors: { [number]: Folder },
+	full: { [number]: boolean },
+	look: Look,
+}
+
+-- should floor `f` of `model` be built in full for a camera at `eye`?
+local function fullAt(model: Model, f: number, eye: Vector3): boolean
+	if f == 0 then
+		return true
 	end
-	local m = if model:GetAttribute("Mirror") then -1 else 1
+	local w, d = model:GetAttribute("W"), model:GetAttribute("D")
+	if typeof(w) ~= "number" or typeof(d) ~= "number" then
+		return true
+	end
+	local p = model.WorldPivot:PointToObjectSpace(eye)
+	local dx = math.max(0, math.abs(p.X) - w / 2)
+	local dz = math.max(0, math.abs(p.Z) - d / 2)
+	if dx * dx + dz * dz > TOWN.FullRadius * TOWN.FullRadius then
+		return false
+	end
+	local at = math.floor(p.Y / World.Map.FloorHeight)
+	return math.abs(f - at) <= TOWN.FullFloors
+end
+
+local function buildFloor(model: Model, entry: Furnished, f: number, full: boolean)
+	local old = entry.floors[f]
+	if old then
+		old:Destroy()
+	end
+	local look = entry.look
+	local m = look.m
 	local base = model.WorldPivot
-	local h = hash(model.Name)
-	local theme = (Buildings.Shops.Themes :: any)[model:GetAttribute("Theme") or ""]
-	local accent = model:GetAttribute("Accent")
-	local look: Look = {
-		fabric = FABRICS[h % #FABRICS + 1],
-		rug = RUGS[(h // 7) % #RUGS + 1],
-		goods = if theme then rgbList(theme.goods) else BOOKS,
-		accent = if typeof(accent) == "Color3" then accent else WOOD,
-		w = 8,
-		d = 8,
-		h = 0,
-		m = m,
-	}
 	local folder = Instance.new("Folder")
-	folder.Name = model.Name
-	for _, piece in pieces do
-		local build = PIECES[piece.kind]
+	folder.Name = "Floor" .. f
+	for _, piece in entry.pieces[f] do
+		local build = (if full then nil else SIMPLE[piece.kind]) or PIECES[piece.kind]
 		if build then
 			local pos = (base * CFrame.new(piece.x * m, Y0 + (piece.y or 0), -piece.z)).Position
 			local face = base:VectorToWorldSpace(Vector3.new(piece.fx * m, 0, -piece.fz))
@@ -1200,14 +1267,69 @@ local function furnish(model: Model, into: Folder): Folder?
 			building = false
 		end
 	end
-	folder.Parent = into
-	return folder
+	folder.Parent = entry.folder
+	entry.floors[f] = folder
+	entry.full[f] = full
 end
 
--- keep the nearest `max` of `models` within `radius` of the camera furnished
+-- rebuild the floors whose detail no longer suits where the camera is
+local function refresh(model: Model, entry: Furnished, eye: Vector3)
+	for f in entry.pieces do
+		local full = fullAt(model, f, eye)
+		if entry.full[f] ~= full then
+			buildFloor(model, entry, f, full)
+		end
+	end
+end
+
+local function furnish(model: Model, into: Folder, eye: Vector3): Furnished?
+	local pieces = piecesOf(model)
+	if not pieces then
+		return nil
+	end
+	local h = hash(model.Name)
+	local theme = (Buildings.Shops.Themes :: any)[model:GetAttribute("Theme") or ""]
+	local accent = model:GetAttribute("Accent")
+	local entry: Furnished = {
+		folder = Instance.new("Folder"),
+		pieces = {},
+		floors = {},
+		full = {},
+		look = {
+			fabric = FABRICS[h % #FABRICS + 1],
+			rug = RUGS[(h // 7) % #RUGS + 1],
+			goods = if theme then rgbList(theme.goods) else BOOKS,
+			accent = if typeof(accent) == "Color3" then accent else WOOD,
+			w = 8,
+			d = 8,
+			h = 0,
+			m = if model:GetAttribute("Mirror") then -1 else 1,
+		},
+	}
+	entry.folder.Name = model.Name
+	-- an office's pieces go by floor (a ceiling hangs just under the slab above, so it stays with its floor)
+	local storeys = model:GetAttribute("Interior") == "Office"
+	for _, piece in pieces do
+		local f = if storeys
+			then math.max(0, math.floor((piece.y or 0) / World.Map.FloorHeight + 0.01))
+			else 0
+		local list = entry.pieces[f]
+		if not list then
+			list = {}
+			entry.pieces[f] = list
+		end
+		table.insert(list, piece)
+	end
+	refresh(model, entry, eye)
+	entry.folder.Parent = into
+	return entry
+end
+
+-- keep the nearest `max` of `models` within `radius` of the camera furnished; a smashed building keeps its
+-- interior (its slabs never break, and broken wall pieces come back)
 local function keep(
 	models: { Model },
-	built: { [Model]: Folder },
+	built: { [Model]: Furnished },
 	into: Folder,
 	eye: Vector3,
 	radius: number,
@@ -1225,22 +1347,22 @@ local function keep(
 	end)
 	local want: { [Model]: boolean } = {}
 	for k = 1, math.min(#near, max) do
-		local model = near[k].model
-		if not broken(model) then
-			want[model] = true
-		end
+		want[near[k].model] = true
 	end
-	for model, folder in built do
+	for model, entry in built do
 		if not want[model] then
-			folder:Destroy()
+			entry.folder:Destroy()
 			built[model] = nil
 		end
 	end
 	for model in want do
-		if not built[model] then
-			local folder = furnish(model, into)
-			if folder then
-				built[model] = folder
+		local entry = built[model]
+		if entry then
+			refresh(model, entry, eye)
+		else
+			local made = furnish(model, into, eye)
+			if made then
+				built[model] = made
 			end
 		end
 	end
@@ -1293,7 +1415,7 @@ local function holds(model: Model, eye: Vector3): boolean
 end
 
 -- indoors the shade warms and lifts (the sky can't reach in), eased so walking through a door is smooth
-local function easeIndoors(built: { [Model]: Folder })
+local function easeIndoors(built: { [Model]: Furnished })
 	local outAmbient, outExposure = Lighting.Ambient, Lighting.ExposureCompensation
 	local c = TOWN.IndoorAmbient
 	local inAmbient = Color3.fromRGB(c[1], c[2], c[3])
@@ -1332,8 +1454,8 @@ function Interiors.start()
 		into.Parent = workspace
 		local houses: { Model } = {}
 		local town: { Model } = {}
-		local builtHouses: { [Model]: Folder } = {}
-		local builtTown: { [Model]: Folder } = {}
+		local builtHouses: { [Model]: Furnished } = {}
+		local builtTown: { [Model]: Furnished } = {}
 		task.wait(1)
 		for _, m in buildings:GetChildren() do
 			if m:IsA("Model") then

@@ -1,7 +1,8 @@
 --!strict
 -- Destructible buildings: every building is anchored chunks (wall panels, windows, slabs, columns).
--- A hit or a blast unanchors the chunks in a radius and drops the floors above them; debris fades and
--- the building puts itself back together later.
+-- A hit or a blast unanchors the chunks in a radius and drops what stood on them, up to the next floor slab;
+-- parts marked Fixed (office floor slabs and roofs) are structure and never break. Debris fades and the
+-- building puts itself back together later.
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,7 +30,7 @@ local random = Random.new()
 function BuildingService.register(folder: Folder)
 	buildingsFolder = folder
 	for _, p in folder:GetDescendants() do
-		if p:IsA("BasePart") then
+		if p:IsA("BasePart") and not p:GetAttribute("Fixed") then
 			chunks[p] = {
 				cf = p.CFrame,
 				transparency = p.Transparency,
@@ -152,7 +153,8 @@ function BuildingService.breakAt(
 	if count == 0 then
 		return 0
 	end
-	-- whatever stood on the broken part falls too, unless the break is only a small hole
+	-- whatever stood on the broken part falls too, unless the break is only a small hole; a floor slab above
+	-- holds up everything over it
 	local reach = radius * CFG.ChunkFallReach
 	local above = if radius >= Smash.FloorsFallFrom
 		then workspace:GetPartBoundsInBox(
@@ -161,6 +163,12 @@ function BuildingService.breakAt(
 			params
 		)
 		else {}
+	local ceiling = math.huge
+	for _, p in above do
+		if p:GetAttribute("Fixed") and p.Position.Y > pos.Y + 2 then
+			ceiling = math.min(ceiling, p.Position.Y)
+		end
+	end
 	local dropped = 0
 	for _, p in above do
 		if dropped > 260 then
@@ -171,6 +179,7 @@ function BuildingService.breakAt(
 			and chunks[p]
 			and not p:GetAttribute("Broken")
 			and p.Position.Y > pos.Y + 2
+			and p.Position.Y < ceiling
 		then
 			loosen(p, Vector3.new(random:NextNumber(-4, 4), 0, random:NextNumber(-4, 4)))
 			dropped += 1
