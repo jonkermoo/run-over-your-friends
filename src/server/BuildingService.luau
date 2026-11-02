@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
@@ -200,7 +201,7 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	local vehicle = VehicleService.of(player)
 	local stats = vehicle and VehicleService.stats(vehicle)
 	local chassis = vehicle and vehicle.PrimaryPart
-	if not (stats and chassis and stats.breaksBuildings) then
+	if not (stats and chassis) then
 		return
 	end
 	local spm = Vehicles.StudsPerMetre
@@ -214,8 +215,8 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	if (pos - body.Position).Magnitude > body.Size.Magnitude / 2 + 16 + speed * 0.3 then
 		return
 	end
-	local energy = Impact.energy(stats.weight, speed / spm)
-	BuildingService.breakAt(pos, Impact.breakRadius(energy), velocity.Unit * speed, player)
+	local radius = Impact.smashRadius(stats.weight, speed / spm, Smash)
+	BuildingService.breakAt(pos, radius, velocity.Unit * speed, player)
 end
 
 local function spray(at: Vector3)

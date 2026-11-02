@@ -27,19 +27,8 @@ local function now(): number
 	return os.time()
 end
 
-local function hasAbility(player: Player, needs: string): boolean
-	local profile = Data.get(player)
-	if not profile then
-		return false
-	end
-	if needs == "Breaker" then
-		for id in profile.owned do
-			local v = Vehicles.ById[id]
-			if v and v.breaksBuildings then
-				return true
-			end
-		end
-	end
+-- no goal needs a special vehicle today (every vehicle smashes buildings), so a `needs` goal is never offered
+local function hasAbility(_player: Player, _needs: string): boolean
 	return false
 end
 

@@ -439,12 +439,6 @@ for _, stats in Vehicles.List do
 	statBar(card, 208, "ACCEL", stats.launch / 15, C.blue)
 	statBar(card, 224, "HANDLING", stats.grip / 22, C.green)
 	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
-	if stats.breaksBuildings then
-		local tag = Style.pill(card, "BREAKS BUILDINGS", C.orange)
-		tag.AnchorPoint = Vector2.new(1, 0)
-		tag.Position = UDim2.new(1, -12, 0, 12)
-		tag.ZIndex = 3
-	end
 	local price = Style.label(
 		card,
 		if stats.price == 0 then "FREE" else money(stats.price),

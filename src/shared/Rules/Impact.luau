@@ -43,12 +43,30 @@ function Impact.launchSpeed(energy: number): number
 	return 45 + 210 * s
 end
 
+export type SmashConfig = {
+	EnergyLow: number,
+	EnergyHigh: number,
+	MinRadius: number,
+	MaxRadius: number,
+	Curve: number,
+	MinSpeed: number,
+}
+
 -- how far a building hit reaches, studs; 0 when it's too soft to break anything
-function Impact.breakRadius(energy: number): number
-	if energy < 150000 then
+function Impact.breakRadius(energy: number, config: SmashConfig): number
+	if energy < config.EnergyLow then
 		return 0
 	end
-	return 6 + 22 * Impact.strength(energy, 150000, 30000000)
+	local s = Impact.strength(energy, config.EnergyLow, config.EnergyHigh) ^ config.Curve
+	return config.MinRadius + (config.MaxRadius - config.MinRadius) * s
+end
+
+-- break radius for a vehicle of weightKg hitting at speed (m/s); slower than MinSpeed only bumps
+function Impact.smashRadius(weightKg: number, speed: number, config: SmashConfig): number
+	if speed < config.MinSpeed then
+		return 0
+	end
+	return Impact.breakRadius(Impact.energy(weightKg, speed), config)
 end
 
 -- self-destruct blast radius, studs, from weight and speed

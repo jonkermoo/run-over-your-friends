@@ -16,7 +16,9 @@ local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Flight = require(ReplicatedStorage.Shared.Config.Flight)
 local FlightRules = require(ReplicatedStorage.Shared.Rules.Flight)
+local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -682,7 +684,9 @@ local function detectHits(s: CarState, velocity: Vector3)
 	if npcFolder then
 		table.insert(include, npcFolder)
 	end
-	if buildings and s.stats.breaksBuildings then
+	-- the same rule the server uses: soft hits only bump, light vehicles break a small patch
+	local breakRadius = Impact.smashRadius(s.stats.weight, metres, Smash)
+	if buildings and breakRadius > 0 then
 		table.insert(include, buildings)
 	end
 	if props then
@@ -721,7 +725,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 		end
 	end
 	local now = os.clock()
-	local breakSum, breakCount = Vector3.zero, 0
+	local pieces: { BasePart } = {}
 	for _, p in parts do
 		if npcFolder and p:IsDescendantOf(npcFolder) then
 			local npc = npcOf(p, npcFolder)
@@ -747,11 +751,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 			end
 		elseif buildings and p:IsDescendantOf(buildings) then
 			if p.Anchored and p.CanCollide and not p:GetAttribute("Broken") then
-				-- let the car through at once; the server breaks it for everyone
-				p.CanCollide = false
-				table.insert(loosened, { part = p, at = now })
-				breakSum += p.Position
-				breakCount += 1
+				table.insert(pieces, p)
 			end
 		elseif wrecker then
 			local target: Model? = nil
@@ -778,10 +778,26 @@ local function detectHits(s: CarState, velocity: Vector3)
 			end
 		end
 	end
-	if breakCount > 0 and now - lastBreakSent > 0.12 then
-		lastBreakSent = now
-		Net.waitFor("BreakAt"):FireServer(breakSum / breakCount, velocity)
-		speed *= 0.9
+	if #pieces > 0 then
+		-- the break centres on the piece nearest the car; only the pieces it reaches let the car through
+		local at = pieces[1].Position
+		for _, p in pieces do
+			if (p.Position - chassis.Position).Magnitude < (at - chassis.Position).Magnitude then
+				at = p.Position
+			end
+		end
+		for _, p in pieces do
+			if (p.Position - at).Magnitude <= breakRadius + p.Size.Magnitude / 2 then
+				-- let the car through at once; the server breaks it for everyone
+				p.CanCollide = false
+				table.insert(loosened, { part = p, at = now })
+			end
+		end
+		if now - lastBreakSent > 0.12 then
+			lastBreakSent = now
+			Net.waitFor("BreakAt"):FireServer(at, velocity)
+			speed *= 0.9
+		end
 	end
 end
 

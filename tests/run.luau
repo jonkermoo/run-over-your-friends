@@ -23,6 +23,7 @@ local LbConfig = require("../src/shared/Config/Leaderboards")
 local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
 local Routes = require("../src/shared/Rules/Routes")
+local Smash = require("../src/shared/Config/Smash")
 local Tiles = require("../src/shared/Rules/Tiles")
 local Tracks = require("../src/shared/Rules/Tracks")
 local CockpitConfig = require("../src/shared/Config/Cockpit")
@@ -128,18 +129,6 @@ end
 check("the semi pulls a trailer", Vehicles.ById.Semi.trailer ~= nil and trailers == 1)
 check("trailer settings sane", trailersOk)
 check(
-	"early cars don't break buildings",
-	not (
-			Vehicles.ById.Hatchback.breaksBuildings
-			or Vehicles.ById.Sedan.breaksBuildings
-			or Vehicles.ById.Muscle.breaksBuildings
-		)
-)
-check(
-	"big and fast vehicles break buildings",
-	Vehicles.ById.Semi.breaksBuildings and Vehicles.ById.Supercar.breaksBuildings
-)
-check(
 	"only Roadster has the jet",
 	Vehicles.has(Vehicles.ById.Roadster, "Jet") and not Vehicles.has(Vehicles.ById.Supercar, "Jet")
 )
@@ -235,8 +224,30 @@ check(
 local semi = Impact.energy(15000, 40 / 2.237)
 local supercar = Impact.energy(1500, 120 / 2.237)
 check("semi at 40 ~ supercar at 120", semi / supercar > 0.8 and semi / supercar < 1.4)
-check("parking against a wall breaks nothing", Impact.breakRadius(Impact.energy(20000, 1)) == 0)
-check("Roadster at full speed breaks a lot", Impact.breakRadius(Impact.energy(2000, 112)) > 20)
+-- building smashing: every vehicle breaks pieces once it's fast enough; light ones break little
+local function smashAt(id: string, mph: number): number
+	return Impact.smashRadius(Vehicles.ById[id].weight, mph / 2.237, Smash)
+end
+local function smashTop(id: string): number
+	return smashAt(id, Vehicles.ById[id].topSpeed)
+end
+check("parking the Bulldozer against a wall breaks nothing", smashAt("Bulldozer", 3) == 0)
+check("Roadster at full speed breaks a lot", smashTop("Roadster") > 20)
+check("radius stays in range", Impact.breakRadius(1e12, Smash) == Smash.MaxRadius)
+check(
+	"just over the line chips a little",
+	Impact.breakRadius(Smash.EnergyLow, Smash) == Smash.MinRadius
+)
+for _, v in Vehicles.List do
+	check(v.id .. " breaks something at top speed", smashTop(v.id) > 0)
+end
+check("Cart at 20 mph only bumps", smashAt("Cart", 20) == 0)
+check("Cart at top speed breaks little", smashTop("Cart") <= 5)
+check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
+check("Sedan breaks more than the Scooter", smashTop("Sedan") > smashTop("Scooter") + 5)
+check("Semi breaks more than the Sedan", smashTop("Semi") > smashTop("Sedan") + 5)
+check("Semi breaks at 15 mph", smashAt("Semi", 15) > Smash.MinRadius)
+check("faster breaks more", smashAt("Sedan", 100) > smashAt("Sedan", 40))
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
 check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)
@@ -290,7 +301,7 @@ for seed = 1, 40 do
 		end
 	end
 end
-check("no building goal without a breaker vehicle", not breaksOffered)
+check("building goals are offered to everyone", breaksOffered)
 local inRange = true
 for seed = 1, 40 do
 	for _, set in { QuestConfig.Hourly, QuestConfig.Daily } do

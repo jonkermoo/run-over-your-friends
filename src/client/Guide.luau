@@ -291,9 +291,6 @@ local function vehicleTips(id: string)
 			then "Hold WATER to blast people off their feet."
 			else "Hold G to blast people off their feet with the water cannon."
 	end
-	if v.breaksBuildings then
-		text = (if text then text .. "  " else "") .. "This one smashes through buildings!"
-	end
 	if text then
 		showTip(text)
 	end
