@@ -24,6 +24,8 @@ local Lb = require("../src/shared/Rules/Leaderboards")
 local QuestConfig = require("../src/shared/Config/Quests")
 local Routes = require("../src/shared/Rules/Routes")
 local Tiles = require("../src/shared/Rules/Tiles")
+local Tracks = require("../src/shared/Rules/Tracks")
+local CockpitConfig = require("../src/shared/Config/Cockpit")
 local Quests = require("../src/shared/Rules/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
 local World = require("../src/shared/Config/World")
@@ -146,6 +148,65 @@ check(
 	Vehicles.has(Vehicles.ById.Supercar, "Thruster")
 		and Vehicles.has(Vehicles.ById.Roadster, "Thruster")
 )
+
+-- cabins, first person and crawler tracks
+check(
+	"only the bulldozer runs on tracks, and its driver shows",
+	Vehicles.ById.Bulldozer.tracks ~= nil
+		and Vehicles.ById.Bulldozer.showDriver
+		and Vehicles.ById.Hatchback.tracks == nil
+)
+do
+	local okAll = true
+	for _, v in Vehicles.List do
+		okAll = okAll
+			and v.showDriver
+			and #v.seat == 3
+			and (v.steerRatio == nil or v.steerRatio > 0)
+	end
+	check("every vehicle has a seat to sit in", okAll)
+end
+check(
+	"first-person numbers are sane",
+	CockpitConfig.fov > 40
+		and CockpitConfig.fov < 100
+		and CockpitConfig.shake > 0
+		and CockpitConfig.shake <= 1
+		and CockpitConfig.fovPunch <= 1
+		and CockpitConfig.glass < 1
+		and #CockpitConfig.keys >= 1
+		and CockpitConfig.needleSweep > 0
+)
+do
+	local loop: Tracks.Loop = { y = 2, front = -8, back = 10, radius = 2.2 }
+	local len = Tracks.length(loop)
+	check("track loop length", math.abs(len - (36 + 2 * math.pi * 2.2)) < 1e-6)
+	local count = Tracks.count(loop, 1.1)
+	check("track plates about 1.1 apart", math.abs(len / count - 1.1) < 0.05)
+	-- the loop is closed and smooth: neighbouring points stay close all the way round
+	local gaps = 0
+	local py, pz = Tracks.at(loop, 0)
+	for i = 1, 400 do
+		local y, z = Tracks.at(loop, i * len / 400)
+		local d = math.sqrt((y - py) ^ 2 + (z - pz) ^ 2)
+		if d > len / 400 * 1.01 then
+			gaps += 1
+		end
+		py, pz = y, z
+	end
+	check("track loop has no jumps", gaps == 0)
+	local y0, z0, a0 = Tracks.at(loop, 0)
+	check("plates start on the ground run under the idler", y0 == 2 - 2.2 and z0 == -8 and a0 == 0)
+	local yt, _, at = Tracks.at(loop, len / 2)
+	check(
+		"halfway round is the top run, upside down",
+		math.abs(yt - 4.2) < 1e-6 and math.abs(at + math.pi) < 1e-6
+	)
+	local l, r = Tracks.speeds(10, 0.5, 4)
+	check("turning left runs the right track faster", r > l and math.abs((l + r) / 2 - 10) < 1e-9)
+	local pl, pr = Tracks.speeds(0, 1, 4)
+	check("on the spot the tracks run opposite ways", pl == -pr and pl < 0)
+end
 
 -- impact
 check("energy formula", near(Impact.energy(2000, 10), 100000, 0.001))

@@ -9,7 +9,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -102,13 +104,18 @@ RunService:BindToRenderStep("RoyfShake", Enum.RenderPriority.Camera.Value + 1, f
 		return
 	end
 	local t = os.clock() * 28
-	local k = trauma * trauma
+	-- softer in first person, with little sideways sway so it can't push the camera through the glass
+	local inside = Drive.view.firstPerson
+	local k = trauma * trauma * (if inside then Cockpit.shake else 1)
 	local angle = math.rad(3.2) * k
 	camera.CFrame *= CFrame.Angles(
 		angle * math.noise(t, 1.3),
 		angle * math.noise(t, 7.1),
 		angle * 0.6 * math.noise(t, 13.7)
-	) + camera.CFrame.RightVector * (0.6 * k * math.noise(t, 21.1))
+	) + camera.CFrame.RightVector * ((if inside then Cockpit.shakeSway else 0.6) * k * math.noise(
+		t,
+		21.1
+	))
 	trauma = math.max(0, trauma - dt * 1.6)
 end)
 

@@ -1,6 +1,7 @@
 --!strict
 -- Client entry.
 local Boards = require(script.Boards)
+local Cockpit = require(script.Cockpit)
 local Crowd = require(script.Crowd)
 local Drive = require(script.Drive)
 local EventBanner = require(script.EventBanner)
@@ -12,6 +13,7 @@ local Interiors = require(script.Interiors)
 local Streets = require(script.Streets)
 
 Drive.start()
+Cockpit.start()
 Hud.start()
 Guide.start()
 Goals.start()

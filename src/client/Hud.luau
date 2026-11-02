@@ -14,6 +14,7 @@ local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
 
@@ -794,6 +795,10 @@ local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), "dark", function()
 end, function()
 	Drive.input.roll = 0
 end)
+-- first-person view: a tap toggles it
+local viewB = holdButton("VIEW", UDim2.fromOffset(0, -80), "dark", function()
+	Cockpit.toggle()
+end, function() end)
 local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
 	Drive.input.roll = 1
 end, function()
@@ -832,7 +837,7 @@ RunService.RenderStepped:Connect(function()
 	jetFill.Size = UDim2.fromScale(s.boost / 100, 1)
 	thrustBar.Visible = hasThruster and not hasJet -- the Roadster's rear jet runs on the flight meter
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
-	local keys = { "WASD drive", "SPACE get out" }
+	local keys = { "WASD drive", "SPACE get out", "V view" }
 	if feature then
 		table.insert(keys, "G " .. string.lower(feature))
 	end
@@ -855,6 +860,8 @@ RunService.RenderStepped:Connect(function()
 	featureB.Text = feature or ""
 	thrustB.Visible = hasThruster
 	bombB.Visible = wrecker
+	viewB.Visible = true
+	viewB.Text = if Cockpit.isOn() then "OUT" else "VIEW"
 	rollL.Visible = hasJet and s.airborne
 	rollR.Visible = hasJet and s.airborne
 	bombLabel.Visible = s.bombHold > 0.05

@@ -1,6 +1,8 @@
 --!strict
 -- Turn the uploaded vehicle model (one flat model, every part named <Id>_Body or <Id>_Wheel_<Corner><n>)
 -- into assets/Vehicles.rbxm: one Model per vehicle, true size in studs, centred on X/Z, wheels' bottom at Y = 0.
+-- The centre comes from the Body and wheels alone (as tools/blender/export_vehicles.py places them), so cabin
+-- parts that reach out (untilted handlebars, track plates) don't shift the seat spots in Config/Vehicles.
 -- lune run tools/lune/import_vehicles <raw.rbxm> <out.rbxm> <studsInBlender> <paletteImageId>
 -- <studsInBlender>: how big the importer made one Blender unit (measured: 47.344, from the export spacing).
 local fs = require("@lune/fs")
@@ -31,6 +33,10 @@ for id, parts in groups do
 	local lo = Vector3.new(math.huge, math.huge, math.huge)
 	local hi = -lo
 	for _, p in parts do
+		local name = string.sub(p.Name, #id + 2)
+		if name ~= "Body" and string.sub(name, 1, 6) ~= "Wheel_" then
+			continue
+		end
 		local half = p.Size * factor / 2
 		local c = p.CFrame.Position * factor
 		lo = Vector3.new(math.min(lo.X, c.X - half.X), math.min(lo.Y, c.Y - half.Y), math.min(lo.Z, c.Z - half.Z))

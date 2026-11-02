@@ -1,6 +1,8 @@
 --!strict
--- Builds a drivable rig from a vehicle model (Body + Wheel_<Corner><n> meshes, plus Glass, Interior and Steer
--- for cars you can see into; base centre at the origin, front facing -Z): an invisible box Chassis that collides and carries the Drive/Turn constraints,
+-- Builds a drivable rig from a vehicle model (Body + Wheel_<Corner><n> meshes, plus the cabin: Glass, Interior,
+-- Mirror, Steer, NeedleSpeed/NeedleRev, bulldozer StickL/StickR, and tiny marker parts SteerPivot, StickLPivot,
+-- StickRPivot, GripL, GripR that are read and removed; crawler vehicles add RollerL<n>/RollerR<n> and one
+-- TrackShoe copied round each loop; base centre at the origin, front facing -Z): an invisible box Chassis that collides and carries the Drive/Turn constraints,
 -- a Sprung part the body hangs from (the client animates its weld for suspension), wheel welds
 -- tagged with Corner and Spin, a VehicleSeat and the sound loops. A vehicle with a trailer row also gets the
 -- trailer model as a child Model "Trailer": its own collider on a ball-joint hitch, with tyres that resist sliding.
@@ -8,6 +10,8 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
+local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 local VehicleBuilder = {}
@@ -19,6 +23,7 @@ local SOUNDS = {
 }
 local BIG = 1e8
 local GLASS_SEE_THROUGH = 0.45
+local MIRROR_SHINE = 0.25 -- any more and the sky turns it into a white slab
 local STEER_TILT = 22 -- degrees the cabin steering wheel leans back towards the driver, unless the row says
 
 local function weld(name: string, part0: BasePart, part1: BasePart): Weld
@@ -29,6 +34,42 @@ local function weld(name: string, part0: BasePart, part1: BasePart): Weld
 	w.C0 = part0.CFrame:ToObjectSpace(part1.CFrame)
 	w.Parent = part0
 	return w
+end
+
+-- a weld that turns `part` about `pivot` (world point): C1 carries the offset, so rotating C0 turns it in place
+local function pivotWeld(
+	name: string,
+	part0: BasePart,
+	part: BasePart,
+	pivot: Vector3,
+	lean: CFrame
+): Weld
+	local w = Instance.new("Weld")
+	w.Name = name
+	w.Part0 = part0
+	w.Part1 = part
+	w.C0 = part0.CFrame:ToObjectSpace(CFrame.new(pivot)) * lean
+	w.C1 = part.CFrame:ToObjectSpace(CFrame.new(pivot))
+	w.Parent = part0
+	return w
+end
+
+-- a marker part's position, and the marker gone
+local function takeMark(model: Model, name: string): Vector3?
+	local m = model:FindFirstChild(name)
+	if m and m:IsA("BasePart") then
+		local at = m.Position
+		m:Destroy()
+		return at
+	end
+	return nil
+end
+
+local function addGrip(part: BasePart, name: string, at: Vector3)
+	local a = Instance.new("Attachment")
+	a.Name = name
+	a.CFrame = part.CFrame:ToObjectSpace(CFrame.new(at))
+	a.Parent = part
 end
 
 local function skidBall(model: Instance, chassis: BasePart, at: Vector3, radius: number)
@@ -139,6 +180,58 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 	grip.MaxAxesForce = Vector3.new(mass * spec.sideGrip * Vehicles.StudsPerMetre, 0, 0)
 end
 
+-- crawler tracks: rollers spin on the chassis; one TrackShoe template is copied round each side's loop (front
+-- idler Wheel_FL1/FR1 to rear sprocket Wheel_RL1/RR1), each copy on a weld the client slides along the loop
+local function buildTracks(model: Model, chassis: BasePart)
+	for _, p in model:GetChildren() do
+		local side = string.match(p.Name, "^Roller([LR])%d+$")
+		if side and p:IsA("BasePart") then
+			local rw = weld(p.Name .. "Weld", chassis, p)
+			rw:SetAttribute("Track", side)
+			rw:SetAttribute("Roller", true)
+		end
+	end
+	local shoe = model:FindFirstChild("TrackShoe") :: BasePart?
+	if not shoe then
+		return
+	end
+	shoe.Parent = nil
+	for _, side in { "L", "R" } do
+		local idler = model:FindFirstChild("Wheel_F" .. side .. "1") :: BasePart?
+		local sprocket = model:FindFirstChild("Wheel_R" .. side .. "1") :: BasePart?
+		if idler and sprocket then
+			-- the loop in the chassis's frame (it isn't turned at build time), as the shoe welds' C0 are
+			local base = chassis.Position
+			local x, y = idler.Position.X - base.X, idler.Position.Y - base.Y
+			local loop: Tracks.Loop = {
+				y = y,
+				front = idler.Position.Z - base.Z,
+				back = sprocket.Position.Z - base.Z,
+				radius = idler.Size.Y / 2 + shoe.Size.Y / 2,
+			}
+			local count = Tracks.count(loop, Cockpit.shoePitch)
+			local length = Tracks.length(loop)
+			for i = 0, count - 1 do
+				local copy = shoe:Clone()
+				copy.Name = "Shoe" .. side .. i
+				local py, pz, angle = Tracks.at(loop, i * length / count)
+				copy.CFrame = CFrame.new(base + Vector3.new(x, py, pz)) * CFrame.Angles(angle, 0, 0)
+				copy.Parent = model
+				local sw = weld(copy.Name .. "Weld", chassis, copy)
+				sw:SetAttribute("Track", side)
+				sw:SetAttribute("Shoe", i)
+				sw:SetAttribute("Shoes", count)
+				sw:SetAttribute("LoopX", x)
+				sw:SetAttribute("LoopY", y)
+				sw:SetAttribute("LoopFront", loop.front)
+				sw:SetAttribute("LoopBack", loop.back)
+				sw:SetAttribute("LoopRadius", loop.radius)
+			end
+		end
+	end
+	shoe:Destroy()
+end
+
 function VehicleBuilder.build(id: string): Model
 	local stats = assert(Vehicles.ById[id], "unknown vehicle " .. id)
 	local template = ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(id) :: Model
@@ -215,17 +308,64 @@ function VehicleBuilder.build(id: string): Model
 	if interior then
 		weld("InteriorWeld", sprung, interior)
 	end
+	local mirror = model:FindFirstChild("Mirror") :: BasePart?
+	if mirror then
+		mirror.Reflectance = MIRROR_SHINE
+		mirror.CastShadow = false
+		weld("MirrorWeld", sprung, mirror)
+	end
+	-- the steering wheel (or handlebars) is modelled upright and leaned back by its weld, about its middle or
+	-- the SteerPivot marker; hands go on the GripL/GripR markers (given in its leaned pose) or the rim's sides
+	local gripL, gripR = takeMark(model, "GripL"), takeMark(model, "GripR")
+	local steerPivot = takeMark(model, "SteerPivot")
 	local steerPart = model:FindFirstChild("Steer") :: BasePart?
 	if steerPart then
-		local sw = weld("SteerWeld", sprung, steerPart)
-		sw.C0 *= CFrame.Angles(-math.rad(stats.steerTilt or STEER_TILT), 0, 0)
+		local tilt = math.rad(stats.steerTilt or STEER_TILT)
+		local pivot = steerPivot or steerPart.Position
+		local sw = pivotWeld("SteerWeld", sprung, steerPart, pivot, CFrame.Angles(-tilt, 0, 0))
 		sw:SetAttribute("Steer", true)
-		local reach = steerPart.Size.X * 0.45
-		for side, x in { GripL = -reach, GripR = reach } do
-			local grip = Instance.new("Attachment")
-			grip.Name = side
-			grip.Position = Vector3.new(x, 0, 0)
-			grip.Parent = steerPart
+		local unlean = CFrame.new(pivot) * CFrame.Angles(tilt, 0, 0) * CFrame.new(-pivot)
+		if gripL and gripR then
+			addGrip(steerPart, "GripL", unlean * gripL)
+			addGrip(steerPart, "GripR", unlean * gripR)
+		else
+			local reach = steerPart.Size.X * 0.45
+			addGrip(steerPart, "GripL", steerPart.CFrame * Vector3.new(-reach, 0, 0))
+			addGrip(steerPart, "GripR", steerPart.CFrame * Vector3.new(reach, 0, 0))
+		end
+	end
+	-- gauge needles are modelled upright and pointing up; their welds lean them onto the dials (the client
+	-- swings them about their Z)
+	for _, kind in { "Speed", "Rev" } do
+		local needle = model:FindFirstChild("Needle" .. kind) :: BasePart?
+		if needle then
+			local nw = pivotWeld(
+				"Needle" .. kind .. "Weld",
+				sprung,
+				needle,
+				needle.Position,
+				CFrame.Angles(-math.rad(Cockpit.gaugeTilt), 0, 0)
+			)
+			nw:SetAttribute("Needle", kind)
+		end
+	end
+	-- joysticks lean about their pivots; the left one drives, the right one works the blade
+	for _, side in { "L", "R" } do
+		local stick = model:FindFirstChild("Stick" .. side) :: BasePart?
+		local pivot = takeMark(model, "Stick" .. side .. "Pivot")
+		if stick then
+			local kw = pivotWeld(
+				"Stick" .. side .. "Weld",
+				sprung,
+				stick,
+				pivot or stick.Position,
+				CFrame.identity
+			)
+			kw:SetAttribute("Stick", side)
+			local hand = if side == "L" then gripL else gripR
+			if hand and not steerPart then
+				addGrip(stick, "Grip" .. side, hand)
+			end
 		end
 	end
 
@@ -234,6 +374,13 @@ function VehicleBuilder.build(id: string): Model
 		local wl = weld("Wheel_" .. string.sub(w.Name, 7), chassis, w)
 		wl:SetAttribute("Corner", corner)
 		wl:SetAttribute("Spin", true)
+		if stats.tracks then
+			-- idlers and sprockets: no steering, no bobbing, spun by their own track
+			wl:SetAttribute("Track", string.sub(corner, 2, 2))
+		end
+	end
+	if stats.tracks then
+		buildTracks(model, chassis)
 	end
 
 	local seatPos = stats.seat
@@ -320,6 +467,14 @@ function VehicleBuilder.build(id: string): Model
 		end
 	end
 	model:SetAttribute("Wheels", wheelCount)
+	-- and this many track link plates
+	local shoeCount = 0
+	for _, w in chassis:GetChildren() do
+		if w:IsA("Weld") and w:GetAttribute("Shoe") then
+			shoeCount += 1
+		end
+	end
+	model:SetAttribute("Shoes", shoeCount)
 	model:SetAttribute("Length", length)
 	model.WorldPivot = CFrame.new()
 	CollectionService:AddTag(model, "Vehicle")

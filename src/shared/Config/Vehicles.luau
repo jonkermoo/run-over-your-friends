@@ -44,6 +44,12 @@ export type Trailer = {
 	sideGrip: number, -- lateral m/s^2 the trailer's tyres hold before its tail slides out
 }
 
+export type Tracks = {
+	pivotRate: number, -- degrees per second it spins on the spot, tracks running opposite ways
+	pivotFade: number, -- m/s at which on-the-spot turning has faded into ordinary steering
+	pivotAccel: number, -- how fast the spin builds and stops (per second)
+}
+
 export type Vehicle = {
 	id: string,
 	name: string,
@@ -58,12 +64,14 @@ export type Vehicle = {
 	rearGrip: number, -- rear axle grip vs front; under 1.1 makes the tail loose
 	maxSteer: number, -- degrees of road-wheel lock
 	features: { Feature },
-	showDriver: boolean, -- false hides the driver (no seat or cabin to sit in, like the bulldozer)
+	showDriver: boolean, -- false hides the driver
 	seat: { number }, -- seat position from the model's centre-bottom, studs (x, y, z); cars with an interior
 	-- seat the driver on the left (-x), matching tools/blender/export_vehicles.py
 	engine: EngineKind,
 	engineTone: number?, -- pitch multiplier on the engine (bigger vehicle = lower), default 1
 	steerTilt: number?, -- degrees the cabin steering wheel leans back towards the driver, default 22 (trucks lie flatter)
+	steerRatio: number?, -- steering wheel turns per road-wheel turn, default 4 (handlebars 1)
+	tracks: Tracks?, -- crawler tracks instead of tyres: turns on the spot when slow
 	trailer: Trailer?,
 	blurb: string,
 }
@@ -108,8 +116,10 @@ local list: { Vehicle } = {
 		maxSteer = 30,
 		features = { "Scooter" },
 		showDriver = true,
-		seat = { 0, 3.9, 1.9 },
+		seat = { 0, 4.3, 0.4 },
 		engine = "Kart",
+		steerTilt = 60,
+		steerRatio = 1,
 		blurb = "Tiny and silly. Barely tips people over.",
 	}),
 	v({
@@ -127,7 +137,7 @@ local list: { Vehicle } = {
 		maxSteer = 33,
 		features = {},
 		showDriver = true,
-		seat = { -1.5, 1.8, 1 },
+		seat = { -1.5, 1.8, 0.4 },
 		engine = "Petrol",
 		blurb = "The all-rounder.",
 	}),
@@ -146,8 +156,9 @@ local list: { Vehicle } = {
 		maxSteer = 40,
 		features = { "Cart" },
 		showDriver = true,
-		seat = { 0, 2.2, 0.3 },
+		seat = { 0, 2.9, 0.3 },
 		engine = "Cart",
+		steerTilt = 35,
 		blurb = "One wobbly wheel. The speedometer swears it does 400.",
 	}),
 	v({
@@ -165,7 +176,7 @@ local list: { Vehicle } = {
 		maxSteer = 33,
 		features = { "Taxi" },
 		showDriver = true,
-		seat = { -1.5, 1.8, 1 },
+		seat = { -1.5, 1.8, 0.4 },
 		engine = "Petrol",
 		blurb = "Yell TAXI! and someone comes running.",
 	}),
@@ -203,7 +214,7 @@ local list: { Vehicle } = {
 		maxSteer = 30,
 		features = { "Jingle" },
 		showDriver = true,
-		seat = { -1.8, 3, -3 },
+		seat = { -1.8, 4.2, -4.3 },
 		engine = "Jalopy",
 		blurb = "Play the jingle and they all come to you.",
 	}),
@@ -222,7 +233,7 @@ local list: { Vehicle } = {
 		maxSteer = 28,
 		features = { "Cannon" },
 		showDriver = true,
-		seat = { -2.4, 4, -12 },
+		seat = { -2.4, 6.4, -14.1 },
 		engine = "Diesel",
 		steerTilt = 50,
 		blurb = "Water cannon knocks people flat. Breaks buildings.",
@@ -242,7 +253,7 @@ local list: { Vehicle } = {
 		maxSteer = 26,
 		features = {},
 		showDriver = true,
-		seat = { -2.1, 7.7, -4.2 },
+		seat = { -2.1, 9.3, -5.9 },
 		engine = "BigRig",
 		trailer = {
 			model = "SemiTrailer",
@@ -269,10 +280,11 @@ local list: { Vehicle } = {
 		rearGrip = 1.12,
 		maxSteer = 40,
 		features = { "Plow" },
-		showDriver = false,
-		seat = { 0, 5, 3 },
+		showDriver = true,
+		seat = { 0, 10.4, 6.5 },
 		engine = "Diesel",
 		engineTone = 0.85,
+		tracks = { pivotRate = 45, pivotFade = 4, pivotAccel = 3 },
 		blurb = "Slow. The blade throws everything aside.",
 	}),
 	v({

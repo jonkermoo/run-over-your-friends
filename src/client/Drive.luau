@@ -3,7 +3,8 @@
 -- visuals every client runs for every vehicle: wheel spin and steer, suspension, skid marks and sound.
 -- Tyres are a bicycle model with a Pacejka-style curve; each vehicle's numbers come from Config/Vehicles.
 -- Also: Roadster hover flight (Config/Flight, Rules/Flight), thruster, hit detection (NPCs, buildings, Wrecker), features,
--- self-destruct, and flings sent by the server.
+-- self-destruct, and flings sent by the server. The cabin moves too: steering wheel, gauge needles, joysticks, the
+-- driver's hands, and the bulldozer's crawler tracks (Rules/Tracks), which also let it turn on the spot.
 
 local CollectionService = game:GetService("CollectionService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -11,10 +12,12 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Flight = require(ReplicatedStorage.Shared.Config.Flight)
 local FlightRules = require(ReplicatedStorage.Shared.Rules.Flight)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 local player = Players.LocalPlayer
@@ -31,6 +34,13 @@ Drive.state = {
 	boost = 100, -- Roadster flight meter, 0-100
 	thruster = 1, -- 0 = just used, 1 = ready
 	bombHold = 0, -- 0-1 while holding self-destruct
+}
+-- the first-person view (src/client/Cockpit) says when it's on; the car being driven, for it to follow
+Drive.view = {
+	firstPerson = false,
+	car = nil :: Model?,
+	steer = 0, -- road-wheel angle, radians, positive left
+	accel = Vector3.zero, -- felt acceleration in the car's frame, m/s^2
 }
 -- held inputs; keyboard and gamepad set them here, and so do the phone buttons
 Drive.input = {
@@ -119,8 +129,21 @@ local SURFACES: { [Enum.Material]: Surface } = {
 
 -- lift: how far the tyre sits above (+) or below (-) its rest spot, in studs, so it rides on kerbs and
 -- ramps instead of sinking into them, and hangs down a little in the air
-type Wheel =
-	{ weld: Weld, base: CFrame, front: boolean, spin: boolean, radius: number, lift: number }
+-- track: "L"/"R" for a crawler's idlers and sprockets (no steering or bobbing, spun by their own track)
+type Wheel = {
+	weld: Weld,
+	base: CFrame,
+	front: boolean,
+	spin: boolean,
+	radius: number,
+	lift: number,
+	track: string?,
+}
+-- cabin parts the client moves: gauge needles, joysticks, track rollers and link plates
+type Needle = { weld: Weld, base: CFrame, kind: string, at: number }
+type Stick = { weld: Weld, base: CFrame, side: string, fwd: number, sway: number }
+type Roller = { weld: Weld, base: CFrame, side: string, radius: number }
+type Shoe = { weld: Weld, side: string, offset: number, x: number, loop: Tracks.Loop }
 type CarState = {
 	car: Model,
 	stats: Vehicles.Vehicle,
@@ -168,6 +191,15 @@ type CarState = {
 	ik: { IKControl }, -- the driver's hands on that wheel
 	ikFor: Humanoid?,
 	tucked: { [BasePart]: number }, -- the driver's hats and hair hidden under the roof, with their transparency
+	needles: { Needle },
+	sticks: { Stick },
+	rollers: { Roller },
+	shoes: { Shoe },
+	trackHalf: number, -- studs from the middle to each track
+	trackMove: { [string]: number }, -- how far each track's plates have moved round the loop, studs
+	trackSpin: { [string]: number }, -- studs each side has rolled (a wheel turns this over its radius)
+	throttle: number, -- -1..1, what the joysticks show
+	steerIn: number, -- -1..1 (right)
 }
 
 local cars: { [Model]: CarState } = {}
@@ -241,6 +273,7 @@ local function track(car: Instance)
 		if w:IsA("Weld") and typeof(c) == "string" and w.Part0 then
 			local front = string.sub(c, 1, 1) == "F"
 			local onTrailer = w.Part0 ~= chassis
+			local side = w:GetAttribute("Track")
 			table.insert(wheels, {
 				weld = w,
 				base = w.C0,
@@ -248,6 +281,7 @@ local function track(car: Instance)
 				spin = w:GetAttribute("Spin") == true,
 				radius = if w.Part1 then w.Part1.Size.Y / 2 else 1,
 				lift = 0,
+				track = if typeof(side) == "string" then side else nil,
 			})
 			if front then
 				frontZ = math.min(frontZ, w.C0.Position.Z)
@@ -282,6 +316,56 @@ local function track(car: Instance)
 		elseif w:IsA("Weld") and w:GetAttribute("Suspension") then
 			suspension = w
 		end
+	end
+	-- the cabin's moving parts hang off the sprung body; rollers and link plates off the chassis
+	local needles, sticks, rollers, shoes = {}, {}, {}, {}
+	local trackHalf = 0
+	local sprung = car:FindFirstChild("Sprung")
+	local more = if sprung then sprung:GetChildren() else {}
+	table.move(welds, 1, #welds, #more + 1, more)
+	for _, w in more do
+		if not w:IsA("Weld") then
+			continue
+		end
+		local side = w:GetAttribute("Track")
+		local needle, stick = w:GetAttribute("Needle"), w:GetAttribute("Stick")
+		if typeof(needle) == "string" then
+			table.insert(needles, { weld = w, base = w.C0, kind = needle, at = 0 })
+		elseif typeof(stick) == "string" then
+			table.insert(sticks, { weld = w, base = w.C0, side = stick, fwd = 0, sway = 0 })
+		elseif typeof(side) == "string" and w:GetAttribute("Roller") then
+			table.insert(rollers, {
+				weld = w,
+				base = w.C0,
+				side = side,
+				radius = if w.Part1 then w.Part1.Size.Y / 2 else 1,
+			})
+		elseif typeof(side) == "string" and w:GetAttribute("Shoe") then
+			local count = (w:GetAttribute("Shoes") or 1) :: number
+			local loop: Tracks.Loop = {
+				y = (w:GetAttribute("LoopY") or 0) :: number,
+				front = (w:GetAttribute("LoopFront") or 0) :: number,
+				back = (w:GetAttribute("LoopBack") or 1) :: number,
+				radius = (w:GetAttribute("LoopRadius") or 1) :: number,
+			}
+			local x = (w:GetAttribute("LoopX") or 0) :: number
+			trackHalf = math.max(trackHalf, math.abs(x))
+			table.insert(shoes, {
+				weld = w,
+				side = side,
+				offset = (w:GetAttribute("Shoe") :: number) * Tracks.length(loop) / count,
+				x = x,
+				loop = loop,
+			})
+		end
+	end
+	if #shoes < ((car:GetAttribute("Shoes") or 0) :: number) then
+		task.delay(0.2, function()
+			if car.Parent then
+				track(car)
+			end
+		end)
+		return
 	end
 	local _, size = car:GetBoundingBox()
 	-- cold-gas nozzles on the Roadster, by job: Lift (four under the floor), Rear (four across the tail),
@@ -452,6 +536,15 @@ local function track(car: Instance)
 		ik = {},
 		ikFor = nil,
 		tucked = {},
+		needles = needles,
+		sticks = sticks,
+		rollers = rollers,
+		shoes = shoes,
+		trackHalf = trackHalf,
+		trackMove = { L = 0, R = 0 },
+		trackSpin = { L = 0, R = 0 },
+		throttle = 0,
+		steerIn = 0,
 	}
 end
 
@@ -473,6 +566,7 @@ local reversing = false -- its nose jets are pushing it backwards in the air rig
 local liftedAt = 0
 local flyYaw = 0
 local bombHeld = 0
+local pivotSpin = 0 -- crawler: rad/s of on-the-spot turn being asked for
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
 
 local function stopDriving()
@@ -489,8 +583,9 @@ local function stopDriving()
 	end
 	driving = nil
 	flying, jetOn, rearOn, reversing = false, false, false, false
-	speed, lateral, yawRate, steer = 0, 0, 0, 0
+	speed, lateral, yawRate, steer, pivotSpin = 0, 0, 0, 0, 0
 	Drive.state.driving = false
+	Drive.view.car = nil
 	camera.FieldOfView = baseFov
 	player.CameraMinZoomDistance = savedZoom.min
 	player.CameraMaxZoomDistance = savedZoom.max
@@ -1055,6 +1150,16 @@ local function step(dt: number)
 			if throttle == 0 and not thrusting and math.sign(speed) ~= math.sign(before) then
 				speed, lateral, yawRate = 0, 0, 0
 			end
+			local crawler = stats.tracks
+			if crawler then
+				-- slow down and the tracks take over the turning: they run opposite ways and it spins on the spot,
+				-- fading into ordinary steering as it picks up speed
+				local fade = math.clamp(1 - math.abs(speed) / crawler.pivotFade, 0, 1)
+				local want = -seat.SteerFloat * math.rad(crawler.pivotRate)
+				pivotSpin += (want - pivotSpin) * math.min(1, dt * crawler.pivotAccel)
+				yawRate = yawRate * (1 - fade) + pivotSpin * fade
+				lateral *= 1 - fade
+			end
 			if thrustLeft > 0 then
 				speed += THRUST_DV / THRUST_TIME * math.min(dt, thrustLeft)
 				thrustLeft -= dt
@@ -1109,11 +1214,17 @@ local function step(dt: number)
 		Drive.state.speedMph = math.floor(shown + 0.5)
 		Drive.state.reverse = speed < -0.1 or (throttle < 0 and v < 0.3)
 		Drive.state.airborne = s.airborne
-		local fov = baseFov
-			+ 14 * math.clamp(v / 110, 0, 1) ^ 0.75
-			+ 5 * math.clamp(a / 15, 0, 1)
-			+ (if flying then 6 else 0)
+		local inside = Drive.view.firstPerson
+		local fov = (if inside then Cockpit.fov else baseFov)
+			+ (if inside then Cockpit.fovPunch else 1)
+				* (14 * math.clamp(v / 110, 0, 1) ^ 0.75 + 5 * math.clamp(a / 15, 0, 1) + (if flying
+					then 6
+					else 0))
 		camera.FieldOfView += (fov - camera.FieldOfView) * math.min(1, dt * 4)
+		s.throttle, s.steerIn = throttle, seat.SteerFloat
+		Drive.view.car = s.car
+		Drive.view.steer = steer
+		Drive.view.accel = s.accel
 	end
 
 	-- give back walls this client walked through, once the server has had its say
@@ -1140,6 +1251,15 @@ local function step(dt: number)
 		local maxSteer = math.rad(s.stats.maxSteer)
 
 		s.spin = (s.spin - forward / s.radius * dt) % (math.pi * 2)
+		local crawling = #s.shoes > 0 or s.stats.tracks ~= nil
+		if crawling then
+			local left, right =
+				Tracks.speeds(forward, chassis.AssemblyAngularVelocity.Y, s.trackHalf)
+			for side, run in { L = left, R = right } do
+				s.trackMove[side] += run * dt
+				s.trackSpin[side] -= run * dt
+			end
+		end
 		local target = s.steer
 		if s == driving then
 			target = steer
@@ -1163,7 +1283,7 @@ local function step(dt: number)
 		for _, w in s.wheels do
 			local settle = 0
 			local part0 = w.weld.Part0
-			if near and part0 then
+			if near and part0 and not w.track then
 				local rise, droop = w.radius * WHEEL_TRAVEL, w.radius * WHEEL_DROOP
 				local upward = part0.CFrame.UpVector
 				local hub = part0.CFrame:PointToWorldSpace(w.base.Position)
@@ -1181,13 +1301,56 @@ local function step(dt: number)
 				then settle
 				else w.lift + (settle - w.lift) * math.min(1, dt * 14)
 			local cf = CFrame.new(0, w.lift, 0) * w.base
-			if w.front then
-				cf *= steerCF
-			end
-			if w.spin then
-				cf *= spinCF
+			if w.track then
+				cf *= CFrame.Angles(s.trackSpin[w.track] / w.radius, 0, 0)
+			else
+				if w.front then
+					cf *= steerCF
+				end
+				if w.spin then
+					cf *= spinCF
+				end
 			end
 			w.weld.C0 = cf
+		end
+		if crawling and near then
+			for _, r in s.rollers do
+				r.weld.C0 = r.base * CFrame.Angles(s.trackSpin[r.side] / r.radius, 0, 0)
+			end
+			for _, sh in s.shoes do
+				local y, z, angle = Tracks.at(sh.loop, sh.offset + s.trackMove[sh.side])
+				sh.weld.C0 = CFrame.new(sh.x, y, z) * CFrame.Angles(angle, 0, 0)
+			end
+		end
+
+		-- gauges: the speedo follows speed, the rev needle the engine (idling while someone's in)
+		if #s.needles > 0 and near then
+			local top = s.stats.topSpeed / MPH * Cockpit.speedoTop
+			local occupied = s.seat ~= nil and s.seat.Occupant ~= nil
+			local revs = if occupied
+				then Cockpit.idleRev + (1 - Cockpit.idleRev) * math.clamp(
+					math.abs(v) / (s.stats.topSpeed / MPH) * 0.8 + 0.2 * s.load,
+					0,
+					1
+				)
+				else 0
+			for _, n in s.needles do
+				local want = if n.kind == "Speed" then math.clamp(math.abs(v) / top, 0, 1) else revs
+				n.at += (want - n.at) * math.min(1, dt * Cockpit.needleRate)
+				n.weld.C0 = n.base
+					* CFrame.Angles(0, 0, math.rad(Cockpit.needleZero - Cockpit.needleSweep * n.at))
+			end
+		end
+		-- joysticks lean with the driver's hands: forward with the throttle, sideways with the steering
+		for _, k in s.sticks do
+			local driven = s == driving
+			local fwd = if k.side == "L" and driven then s.throttle else 0
+			local sideways = if k.side == "L" and driven then s.steerIn else 0
+			local rate = math.min(1, dt * Cockpit.stickRate)
+			k.fwd += (fwd - k.fwd) * rate
+			k.sway += (sideways - k.sway) * rate
+			local lean = math.rad(Cockpit.stickLean)
+			k.weld.C0 = k.base * CFrame.Angles(-k.fwd * lean, 0, -k.sway * lean)
 		end
 
 		-- the cabin steering wheel turns with the front wheels, and the driver's hands stay on it
@@ -1199,7 +1362,8 @@ local function step(dt: number)
 			end
 		end
 		if s.steerWeld then
-			s.steerWeld.C0 = s.steerBase * CFrame.Angles(0, 0, s.steer * STEER_WHEEL_RATIO)
+			s.steerWeld.C0 = s.steerBase
+				* CFrame.Angles(0, 0, s.steer * (s.stats.steerRatio or STEER_WHEEL_RATIO))
 		end
 		local occupant = s.seat and s.seat.Occupant
 		if occupant ~= s.ikFor then
@@ -1212,10 +1376,16 @@ local function step(dt: number)
 			end
 			table.clear(s.tucked)
 			s.ikFor = occupant
-			local wheelPart = s.steerWeld and s.steerWeld.Part1
+			-- the hands' targets: GripL/GripR attachments on the wheel, handlebars or joysticks
+			local grips: { [string]: Attachment } = {}
+			for _, a in s.car:GetDescendants() do
+				if a:IsA("Attachment") and (a.Name == "GripL" or a.Name == "GripR") then
+					grips[a.Name] = a
+				end
+			end
 			local body = occupant and occupant.Parent
 			local shell = s.car:FindFirstChild("Body")
-			if wheelPart and body and shell and shell:IsA("BasePart") and s.stats.showDriver then
+			if next(grips) and body and shell and shell:IsA("BasePart") and s.stats.showDriver then
 				-- tall hats and hair would poke out through the roof: once they've sat down, hide those
 				task.delay(0.4, function()
 					if s.ikFor ~= occupant or not shell.Parent then
@@ -1237,8 +1407,8 @@ local function step(dt: number)
 				for side, gripName in { Left = "GripL", Right = "GripR" } do
 					local hand = body:FindFirstChild(side .. "Hand")
 					local upper = body:FindFirstChild(side .. "UpperArm")
-					local grip = wheelPart:FindFirstChild(gripName)
-					if hand and upper and grip and grip:IsA("Attachment") then
+					local grip = grips[gripName]
+					if hand and upper and grip then
 						local k = Instance.new("IKControl")
 						k.Name = "RoyfGrip" .. side
 						k.Type = Enum.IKControlType.Position
