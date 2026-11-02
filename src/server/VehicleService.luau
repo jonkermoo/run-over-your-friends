@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Ground = require(ReplicatedStorage.Shared.Ground)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Data = require(script.Parent.Data)
@@ -258,7 +259,11 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		end
 	end)
 
-	-- parked: hold still and stay level (the driver's client does this while driving)
+	-- parked: hold still and rest on the ground (the driver's client does this while driving)
+	local groundUp, groundAt = Vector3.yAxis, 0
+	local groundParams = RaycastParams.new()
+	groundParams.FilterType = Enum.RaycastFilterType.Exclude
+	groundParams.CollisionGroup = "Vehicles"
 	local conn
 	conn = RunService.Heartbeat:Connect(function()
 		if not model.Parent then
@@ -293,8 +298,14 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			end)
 		end
 		if seat.Occupant == nil and turn.Enabled then
-			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * LEVEL_RATE
-			turn.AngularVelocity = Vector3.new(level.X, 0, level.Z)
+			-- rest on the slope under it; nothing under it, level to world up
+			local now = os.clock()
+			if now - groundAt > Vehicles.Ground.parkedEvery then
+				groundAt = now
+				groundParams.FilterDescendantsInstances = { model }
+				groundUp = Ground.normal(chassis, groundParams) or Vector3.yAxis
+			end
+			turn.AngularVelocity = chassis.CFrame.UpVector:Cross(groundUp) * LEVEL_RATE
 		end
 	end)
 
