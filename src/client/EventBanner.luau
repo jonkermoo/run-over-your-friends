@@ -56,11 +56,13 @@ timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
 
--- the server goal strip hangs under the sign, clear of its shadow
-local strip = Style.panel(banner)
+-- the server goal strip hangs under the sign (or its chip), clear of its shadow. Like the sign, an X beside
+-- it shrinks it to a small chip with the progress, and tapping the chip brings it back.
+local STRIP_W, STRIP_H = 250, 24
+local strip = Style.panel(gui)
 strip.Name = "ServerGoalStrip"
-strip.Position = UDim2.new(0, 0, 1, 9)
-strip.Size = UDim2.new(1, 0, 0, 24)
+strip.AnchorPoint = Vector2.new(0.5, 0)
+strip.Size = UDim2.fromOffset(STRIP_W, STRIP_H)
 strip.Visible = false
 local stripTag = Style.pill(strip, "SERVER GOAL", C.yellow)
 stripTag.Position = UDim2.fromOffset(4, 3)
@@ -76,14 +78,42 @@ stripAmount.AnchorPoint = Vector2.new(1, 0)
 stripAmount.Position = UDim2.new(1, -8, 0, 3)
 stripAmount.Size = UDim2.fromOffset(62, 18)
 stripAmount.TextXAlignment = Enum.TextXAlignment.Right
+local stripShrunk = false
+local stripHide = Style.button(gui, "X", "dark", 14)
+stripHide.Name = "HideServerGoal"
+stripHide.BackgroundColor3 = C.panel
+stripHide.Size = UDim2.fromOffset(STRIP_H, STRIP_H)
+stripHide.Visible = false
+local stripChip = Style.button(gui, "", "dark", 14)
+stripChip.Name = "ServerGoalChip"
+stripChip.BackgroundColor3 = C.panel
+stripChip.AnchorPoint = Vector2.new(0.5, 0)
+stripChip.Size = UDim2.fromOffset(104, STRIP_H)
+stripChip.Visible = false
+local stripChipDot = Instance.new("Frame")
+stripChipDot.BorderSizePixel = 0
+stripChipDot.BackgroundColor3 = C.yellow
+stripChipDot.AnchorPoint = Vector2.new(0, 0.5)
+stripChipDot.Position = UDim2.new(0, 8, 0.5, 0)
+stripChipDot.Size = UDim2.fromOffset(10, 10)
+stripChipDot.Parent = stripChip
+local stripChipText = Style.label(stripChip, "", 14, F.display, C.yellow)
+stripChipText.Position = UDim2.fromOffset(22, 0)
+stripChipText.Size = UDim2.new(1, -26, 1, 0)
+stripHide.Activated:Connect(function()
+	stripShrunk = true
+end)
+stripChip.Activated:Connect(function()
+	stripShrunk = false
+end)
 local serverGoal: { text: string, progress: number, target: number, done: boolean }? = nil
 
 local function drawStrip()
 	local g = serverGoal
-	strip.Visible = g ~= nil and not g.done
 	if g then
 		stripFill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
 		stripAmount.Text = `{g.progress}/{g.target}`
+		stripChipText.Text = `{g.progress}/{g.target}`
 	end
 end
 
@@ -265,13 +295,30 @@ local function update()
 	Style.setShadow(banner, if blink then C.text else C.ink)
 end
 
+-- the strip (or its chip) sits under whatever of the event sign is showing
+local function placeStrip()
+	local g = serverGoal
+	local show = g ~= nil and not g.done
+	local above: GuiObject? = if banner.Visible then banner elseif chip.Visible then chip else nil
+	local y = if above then above.AbsolutePosition.Y + above.AbsoluteSize.Y + 9 else 8
+	strip.Visible = show and not stripShrunk
+	stripHide.Visible = show and not stripShrunk
+	stripChip.Visible = show and stripShrunk
+	strip.Position = UDim2.new(0.5, 0, 0, y)
+	stripChip.Position = UDim2.new(0.5, 0, 0, y)
+	stripHide.Position = UDim2.new(0.5, STRIP_W / 2 + 10, 0, y)
+end
+
 function EventBanner.start()
 	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set)
 		local g = typeof(set) == "table" and typeof(set.goals) == "table" and set.goals[1]
 		serverGoal = if typeof(g) == "table" then g else nil
 		drawStrip()
 	end)
-	RunService.RenderStepped:Connect(update)
+	RunService.RenderStepped:Connect(function()
+		update()
+		placeStrip()
+	end)
 end
 
 return EventBanner
