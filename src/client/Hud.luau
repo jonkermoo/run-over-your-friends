@@ -160,36 +160,72 @@ end
 
 ---------------------------------------------------------------- speedometer
 
-local dash = Style.panel(gui, 20)
+-- bottom centre: a gear chip, the big number and a yellow MPH tab on one asphalt plate; flight and
+-- thruster meters run under it as dashed lane bars
+local DASH_W, DASH_H, METER_H = 214, 64, 12
+local dash = Style.panel(gui)
+dash.Name = "Speedometer"
 dash.AnchorPoint = Vector2.new(0.5, 1)
-dash.Position = UDim2.new(0.5, 0, 1, -16)
-dash.Size = UDim2.fromOffset(210, 104)
+dash.Position = UDim2.new(0.5, 0, 1, -18)
+dash.Size = UDim2.fromOffset(DASH_W, DASH_H)
 dash.Visible = false
-local speedLabel = Style.label(dash, "0", 54, F.display, C.text)
-speedLabel.Position = UDim2.fromOffset(0, 2)
-speedLabel.Size = UDim2.new(1, 0, 0, 56)
-Style.outline(speedLabel)
-local unitLabel = Style.label(dash, "MPH", 13, F.heavy, C.dim)
-unitLabel.Position = UDim2.fromOffset(0, 56)
-unitLabel.Size = UDim2.new(1, 0, 0, 14)
-local gearLabel = Style.pill(dash, "D", C.money)
-gearLabel.Position = UDim2.fromOffset(12, 12)
-local function meter(y: number, color: Color3): (Frame, Frame)
+local gearLabel = Style.label(dash, "D", 26, F.display, C.text)
+gearLabel.BackgroundColor3 = C.blue
+gearLabel.BackgroundTransparency = 0
+gearLabel.Size = UDim2.fromOffset(40, DASH_H)
+local speedLabel = Style.label(dash, "0", 52, F.display, C.text)
+speedLabel.Position = UDim2.fromOffset(40, 6)
+speedLabel.Size = UDim2.new(1, -40 - 30, 0, DASH_H - 6)
+local unitLabel = Style.label(dash, "MPH", 13, F.heavy, C.ink)
+unitLabel.BackgroundColor3 = C.yellow
+unitLabel.BackgroundTransparency = 0
+unitLabel.AnchorPoint = Vector2.new(1, 0)
+unitLabel.Position = UDim2.fromScale(1, 0)
+unitLabel.Size = UDim2.fromOffset(DASH_H, 30)
+unitLabel.Rotation = -90
+-- a rotated label turns about its centre: shift it so it fills the 30 px strip on the right edge
+unitLabel.Position = UDim2.new(1, (DASH_H - 30) / 2, 0, (DASH_H - 30) / 2)
+
+local function meter(color: Color3): (Frame, Frame)
 	local back, fill = Style.bar(dash, color)
-	back.Position = UDim2.fromOffset(20, y)
-	back.Size = UDim2.new(1, -40, 0, 7)
+	back.BackgroundColor3 = C.card
+	back.BackgroundTransparency = 0
+	back.Size = UDim2.new(1, -16, 0, 6)
 	back.Visible = false
+	-- gaps every 14 px make it a painted lane line
+	for x = 10, DASH_W, 14 do
+		local gap = Instance.new("Frame")
+		gap.BackgroundColor3 = C.panel
+		gap.BorderSizePixel = 0
+		gap.Position = UDim2.fromOffset(x, 0)
+		gap.Size = UDim2.new(0, 4, 1, 0)
+		gap.ZIndex = 2
+		gap.Parent = back
+	end
+	back.ClipsDescendants = true
 	return back, fill
 end
-local jetBar, jetFill = meter(76, C.blue)
-local thrustBar, thrustFill = meter(88, C.orange)
+local jetBar, jetFill = meter(C.blue)
+local thrustBar, thrustFill = meter(C.orange)
+
+-- lay the meters out under the number and grow the plate to fit them
+local function layoutMeters()
+	local y = DASH_H + 2
+	for _, bar in { jetBar, thrustBar } do
+		if bar.Visible then
+			bar.Position = UDim2.fromOffset(8, y)
+			y += METER_H
+		end
+	end
+	dash.Size = UDim2.fromOffset(DASH_W, if y > DASH_H + 2 then y + 4 else DASH_H)
+end
 
 -- the hint line above the speedometer: an asphalt strip with a yellow edge line under it
 local hint = Style.label(gui, "", 14, F.bold, C.text)
 hint.BackgroundColor3 = C.panel
 hint.BackgroundTransparency = 0
 hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -132)
+hint.Position = UDim2.new(0.5, 0, 1, -104)
 hint.Visible = false
 Style.fitText(hint, 14, 6)
 local hintEdge = Instance.new("Frame")
@@ -201,7 +237,8 @@ hintEdge.Size = UDim2.new(1, 0, 0, 3)
 hintEdge.Parent = hint
 local hintBox = hint
 
-local bombLabel = Style.label(gui, "SELF-DESTRUCT", 52, F.display, C.red)
+local bombLabel = Style.label(gui, "SELF-DESTRUCT", 56, F.display, C.red)
+bombLabel.Rotation = -4
 bombLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 bombLabel.Position = UDim2.fromScale(0.5, 0.4)
 bombLabel.Size = UDim2.fromOffset(600, 60)
@@ -809,6 +846,7 @@ touch.Size = UDim2.fromOffset(240, 200)
 touch.Visible = false
 touch.Parent = gui
 
+local BAND = { blue = C.blue, gold = C.yellow, orange = C.orange, red = C.red, dark = C.pink }
 local function holdButton(
 	text: string,
 	pos: UDim2,
@@ -816,9 +854,38 @@ local function holdButton(
 	down: () -> (),
 	up: () -> ()
 ): TextButton
-	local b = Style.button(touch, text, kind, 15)
+	-- an asphalt plate with a yellow painted edge; a band of the button's own colour along the top tells
+	-- them apart at a glance. The touch area is the same 74 px square in the same spot as before; the
+	-- plate is drawn a little inside it so neighbours keep a clear gap.
+	local b = Style.button(touch, text, "dark", 16)
+	b.BackgroundTransparency = 1
+	b.TextTransparency = 1 -- the label below shows the text; code keeps setting b.Text
 	b.Size = UDim2.fromOffset(74, 74)
 	b.Position = pos
+	for _, extra in { b:FindFirstChild("Edge"), b:FindFirstChild("Shadow") } do
+		extra:Destroy()
+	end
+	local face = Instance.new("Frame")
+	face.Name = "Face"
+	face.BackgroundColor3 = C.panel
+	face.BorderSizePixel = 0
+	face.AnchorPoint = Vector2.new(0.5, 0.5)
+	face.Position = UDim2.fromScale(0.5, 0.5)
+	face.Size = UDim2.new(1, -10, 1, -10)
+	face.Parent = b
+	Style.stroke(face, C.yellow, 2, 0)
+	Style.shadow(face, C.ink, 3)
+	local band = Instance.new("Frame")
+	band.BackgroundColor3 = BAND[kind] or C.grey
+	band.BorderSizePixel = 0
+	band.Size = UDim2.new(1, 0, 0, 8)
+	band.Parent = face
+	local caption = Style.label(face, text, 15, F.display, C.text)
+	caption.Position = UDim2.fromOffset(0, 8)
+	caption.Size = UDim2.new(1, 0, 1, -8)
+	b:GetPropertyChangedSignal("Text"):Connect(function()
+		caption.Text = b.Text
+	end)
 	b.InputBegan:Connect(function(input)
 		if
 			input.UserInputType == Enum.UserInputType.Touch
@@ -880,7 +947,11 @@ local FEATURE_NAMES = { Taxi = "TAXI!", Jingle = "JINGLE", Cannon = "WATER" }
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
 	dash.Visible = s.driving
-	hintBox.Visible = s.driving and not UserInputService.TouchEnabled
+	local guide = playerGui:FindFirstChild("Guide")
+	local tipShown = guide ~= nil
+		and (guide:FindFirstChild("Tip") :: GuiObject?) ~= nil
+		and (guide:FindFirstChild("Tip") :: GuiObject).Visible
+	hintBox.Visible = s.driving and not UserInputService.TouchEnabled and not tipShown
 	touch.Visible = s.driving and UserInputService.TouchEnabled
 	if not s.driving then
 		bombLabel.Visible = false
@@ -889,7 +960,7 @@ RunService.RenderStepped:Connect(function()
 	local stats = Vehicles.ById[s.vehicleId]
 	speedLabel.Text = tostring(s.speedMph)
 	gearLabel.Text = if s.reverse then "R" else "D"
-	gearLabel.BackgroundColor3 = if s.reverse then C.red else C.money
+	gearLabel.BackgroundColor3 = if s.reverse then C.red else C.blue
 	local hasJet = stats ~= nil and Vehicles.has(stats, "Jet")
 	local hasThruster = stats ~= nil and Vehicles.has(stats, "Thruster")
 	local wrecker = player:GetAttribute("PassWrecker") == true
@@ -904,6 +975,8 @@ RunService.RenderStepped:Connect(function()
 	jetBar.Visible = hasJet
 	jetFill.Size = UDim2.fromScale(s.boost / 100, 1)
 	thrustBar.Visible = hasThruster and not hasJet -- the Roadster's rear jet runs on the flight meter
+	layoutMeters()
+	hint.Position = UDim2.new(0.5, 0, 1, -(18 + dash.Size.Y.Offset + 14))
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
 	local keys = { "WASD drive", "SPACE get out", "V view" }
 	if feature then

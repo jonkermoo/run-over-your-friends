@@ -89,18 +89,27 @@ end
 
 ---------------------------------------------------------------- tips and celebrations
 
-local tipBox = Style.panel(gui, 14)
+-- tips share the hint line above the speedometer (the Hud hides its key hint while a tip shows):
+-- an asphalt strip with a yellow edge line and a yellow TIP tag
+local tipBox = Style.panel(gui)
+tipBox.Name = "Tip"
 tipBox.AnchorPoint = Vector2.new(0.5, 1)
-tipBox.Position = UDim2.new(0.5, 0, 1, -170)
-tipBox.Size = UDim2.fromOffset(560, 52)
+tipBox.Position = UDim2.new(0.5, 0, 1, -96)
+tipBox.Size = UDim2.fromOffset(600, 62)
 tipBox.Visible = false
-Style.stroke(tipBox, C.blue, 2, 0.2)
-local tipPill = Style.pill(tipBox, "TIP", C.blue)
+local tipEdge = Instance.new("Frame")
+tipEdge.BackgroundColor3 = GOLD
+tipEdge.BorderSizePixel = 0
+tipEdge.AnchorPoint = Vector2.new(0, 1)
+tipEdge.Position = UDim2.fromScale(0, 1)
+tipEdge.Size = UDim2.new(1, 0, 0, 3)
+tipEdge.Parent = tipBox
+local tipPill = Style.pill(tipBox, "TIP", GOLD)
 tipPill.AnchorPoint = Vector2.new(0, 0.5)
 tipPill.Position = UDim2.new(0, 12, 0.5, 0)
-local tip = label(tipBox, "", 16, F.bold, WHITE)
+local tip = label(tipBox, "", 14, F.bold, WHITE)
 tip.Position = UDim2.fromOffset(58, 0)
-tip.Size = UDim2.new(1, -70, 1, 0)
+tip.Size = UDim2.new(1, -70, 1, -3)
 tip.TextWrapped = true
 tip.TextXAlignment = Enum.TextXAlignment.Left
 local tipToken = 0
@@ -278,6 +287,10 @@ local function update()
 	local hud = playerGui:FindFirstChild("Hud")
 	local garageButton = hud and hud:FindFirstChild("GarageButton", true) :: GuiObject?
 	local garage = hud and hud:FindFirstChild("Garage") :: GuiObject?
+	-- the tip sits just above the speedometer when it shows, like the Hud's key hint
+	local dash = hud and hud:FindFirstChild("Speedometer") :: GuiObject?
+	local dashH = if dash and dash.Visible then dash.AbsoluteSize.Y else 0
+	tipBox.Position = UDim2.new(0.5, 0, 1, -(18 + dashH + 14))
 	local stepValue = (player:GetAttribute("Tutorial") or Steps.Done) :: number
 	if not player:GetAttribute("DataReady") then
 		card.Visible = false
