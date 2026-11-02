@@ -311,6 +311,7 @@ local function placeStrip()
 	local card = guide and guide:FindFirstChild("JobCard") :: GuiObject?
 	if card and card.Visible and card.AbsolutePosition.Y < y + STRIP_H then
 		x = math.max(x, card.AbsolutePosition.X + card.AbsoluteSize.X + 12 + width / 2)
+		y = math.max(y, 72) -- slid right, it also clears the cash box (top right, 62 px tall + shadow)
 	end
 	strip.Position = UDim2.fromOffset(x, y)
 	stripChip.Position = UDim2.fromOffset(x, y)
