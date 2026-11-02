@@ -196,10 +196,12 @@ local function rebuild()
 	):Play()
 end
 
-header.Activated:Connect(function()
+function Goals.toggle()
 	open = not open
 	rebuild()
-end)
+end
+
+header.Activated:Connect(Goals.toggle)
 
 function Goals.start()
 	Net.waitFor("Goals").OnClientEvent:Connect(function(newState, serverNow)

@@ -1,5 +1,5 @@
 --!strict
--- First-session guidance and goals: the goal card under the money (spawn → run over 3 → next ride),
+-- First-session guidance and goals: the goal card under the menu strip (spawn → run over 3 → next ride),
 -- a bouncing arrow over the nearest pedestrian, glowing GARAGE button, timed hints for stuck players,
 -- one-time tips when you first drive a vehicle with a feature, and the confetti moment.
 
@@ -38,8 +38,7 @@ gui.Parent = playerGui
 ---------------------------------------------------------------- goal card
 
 local card = Style.panel(gui, 16)
-card.AnchorPoint = Vector2.new(0.5, 0)
-card.Position = UDim2.new(0.5, 0, 0, 64)
+card.Position = UDim2.fromOffset(14, 68)
 card.Size = UDim2.fromOffset(440, 64)
 card.Visible = false
 local stroke = Style.stroke(card, GOLD, 2.5, 1)
@@ -316,7 +315,7 @@ local function update()
 		glowCard = Vehicles.Starter
 		stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
 		if stuck then
-			hintText.Text = "Tap GARAGE on the left, then SPAWN"
+			hintText.Text = "Tap GARAGE at the top left, then SPAWN"
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Hits then
