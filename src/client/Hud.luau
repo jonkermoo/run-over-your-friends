@@ -10,6 +10,8 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
+local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -372,7 +374,25 @@ type Card = {
 	price: TextLabel,
 	frame: Frame,
 	picker: PaintPicker.Picker,
+	sale: TextLabel,
+	was: TextLabel,
 }
+
+-- the car of the day (Config/Daily) is cheaper; the server charges the same price from the same UTC day
+local saleIds = DailyRules.saleIds(Vehicles.List, DailyConfig.DiscountSkip)
+local function onSaleToday(): string?
+	local day = DailyRules.day(workspace:GetServerTimeNow(), DailyConfig.DaySeconds)
+	return DailyRules.carOfDay(saleIds, day, DailyConfig.DiscountSalt)
+end
+local function priceOf(stats: Vehicles.Vehicle): number
+	return DailyRules.price(
+		stats.id,
+		stats.price,
+		onSaleToday(),
+		DailyConfig.DiscountShare,
+		DailyConfig.DiscountRound
+	)
+end
 local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
 local cards: { Card } = {}
 local refreshCards: () -> ()
@@ -464,6 +484,32 @@ for _, stats in Vehicles.List do
 	price.Position = UDim2.fromOffset(14, 272)
 	price.Size = UDim2.fromOffset(110, 32)
 	price.TextXAlignment = Enum.TextXAlignment.Left
+	-- car of the day: a paint tag on the preview and the old price struck through above the new one
+	local sale = Style.pill(
+		card,
+		`CAR OF THE DAY  -{math.floor(DailyConfig.DiscountShare * 100 + 0.5)}%`,
+		C.pink
+	)
+	sale.Name = "Sale"
+	sale.TextColor3 = C.text
+	sale.AnchorPoint = Vector2.new(1, 0)
+	sale.Position = UDim2.new(1, -12, 0, 14)
+	sale.ZIndex = 2
+	sale.Visible = false
+	local was = Style.label(card, "", 13, F.heavy, C.dim)
+	was.Name = "Was"
+	was.AutomaticSize = Enum.AutomaticSize.X
+	was.Position = UDim2.fromOffset(14, 260)
+	was.Size = UDim2.fromOffset(0, 14)
+	was.TextXAlignment = Enum.TextXAlignment.Left
+	was.Visible = false
+	local strike = Instance.new("Frame")
+	strike.BackgroundColor3 = C.pink
+	strike.BorderSizePixel = 0
+	strike.AnchorPoint = Vector2.new(0, 0.5)
+	strike.Position = UDim2.fromScale(0, 0.5)
+	strike.Size = UDim2.new(1, 0, 0, 2)
+	strike.Parent = was
 	local action = Style.button(card, "SPAWN", "green", 18)
 	action.Name = "Action"
 	action.AnchorPoint = Vector2.new(1, 0)
@@ -487,34 +533,45 @@ for _, stats in Vehicles.List do
 			garage.Visible = false
 		elseif
 			stats.id == "Roadster"
-			and ((player:GetAttribute("Money") or 0) :: number) < stats.price
+			and ((player:GetAttribute("Money") or 0) :: number) < priceOf(stats)
 		then
 			Net.waitFor("BuyPass"):FireServer("Roadster")
-		elseif ((player:GetAttribute("Money") or 0) :: number) < stats.price and offerFor then
+		elseif ((player:GetAttribute("Money") or 0) :: number) < priceOf(stats) and offerFor then
 			offerFor(stats) -- not enough yet: offer the pack that covers it
 		else
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
-	table.insert(
-		cards,
-		{ stats = stats, action = action, price = price, frame = card, picker = picker }
-	)
+	table.insert(cards, {
+		stats = stats,
+		action = action,
+		price = price,
+		frame = card,
+		picker = picker,
+		sale = sale,
+		was = was,
+	})
 end
 
 function refreshCards()
 	local owned = "," .. ((player:GetAttribute("Owned") or "") :: string) .. ","
 	local cash = (player:GetAttribute("Money") or 0) :: number
 	for _, c in cards do
+		local price = priceOf(c.stats)
 		if string.find(owned, "," .. c.stats.id .. ",", 1, true) then
 			c.action.Text = "SPAWN"
 			Style.setKind(c.action, "green")
 			c.price.Text = "OWNED"
 			c.price.TextColor3 = C.dim
+			c.sale.Visible = false
+			c.was.Visible = false
 		else
-			c.price.Text = if c.stats.price == 0 then "FREE" else money(c.stats.price)
+			c.price.Text = if price == 0 then "FREE" else money(price)
 			c.price.TextColor3 = C.money
-			if cash >= c.stats.price then
+			c.sale.Visible = price < c.stats.price
+			c.was.Visible = price < c.stats.price
+			c.was.Text = money(c.stats.price)
+			if cash >= price then
 				c.action.Text = "BUY"
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
@@ -813,7 +870,7 @@ end
 -- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
 offerFor = function(stats: Vehicles.Vehicle)
 	local cash = (player:GetAttribute("Money") or 0) :: number
-	local gap = stats.price - cash
+	local gap = priceOf(stats) - cash
 	local pick = Products.MoneyPacks[#Products.MoneyPacks]
 	for _, pack in Products.MoneyPacks do
 		if pack.money >= gap then
@@ -1112,6 +1169,17 @@ function Hud.start()
 	refreshMoney()
 	refreshCards()
 	refreshStore()
+	-- a new car of the day at UTC midnight
+	task.spawn(function()
+		local shown = onSaleToday()
+		while true do
+			task.wait(15)
+			if onSaleToday() ~= shown then
+				shown = onSaleToday()
+				refreshCards()
+			end
+		end
+	end)
 	-- first visit: open the garage so the starter car is one click away
 	task.delay(2, function()
 		while not player:GetAttribute("DataReady") do

@@ -1596,6 +1596,94 @@ do
 	)
 end
 
+do
+	local function checkDaily()
+		local DailyConfig = require("../src/shared/Config/Daily")
+		local Daily = require("../src/shared/Rules/Daily")
+		local rewards = DailyConfig.StreakRewards
+		check(
+			"a UTC day starts at midnight",
+			Daily.day(86399, 86400) == 0 and Daily.day(86400, 86400) == 1
+		)
+		check("a first login starts the streak at 1", Daily.next(nil, 500) == 1)
+		check(
+			"collecting the day after grows the streak",
+			Daily.next({ day = 499, streak = 3 }, 500) == 4
+		)
+		check("a missed day resets the streak", Daily.next({ day = 497, streak = 6 }, 500) == 1)
+		check(
+			"today can't be collected twice",
+			Daily.next({ day = 500, streak = 2 }, 500) == nil
+				and Daily.next({ day = 501, streak = 2 }, 500) == nil
+		)
+		check(
+			"streak rewards climb, then stay at the last",
+			Daily.reward(1, rewards) == rewards[1]
+				and Daily.reward(7, rewards) == rewards[#rewards]
+				and Daily.reward(40, rewards) == rewards[#rewards]
+				and Daily.reward(0, rewards) == rewards[1]
+		)
+		local climbs = true
+		for i = 2, #rewards do
+			climbs = climbs and rewards[i] > rewards[i - 1]
+		end
+		check("each streak day pays more than the one before", climbs)
+
+		local saleIds = Daily.saleIds(Vehicles.List, DailyConfig.DiscountSkip)
+		local skipsFree, skipsRoadster = true, true
+		for _, id in saleIds do
+			skipsFree = skipsFree and Vehicles.ById[id].price > 0
+			skipsRoadster = skipsRoadster and id ~= "Roadster"
+		end
+		check(
+			"free cars and the Roadster are never on sale",
+			#saleIds > 2 and skipsFree and skipsRoadster
+		)
+		local salt = DailyConfig.DiscountSalt
+		local repeats, steady, everyCar = false, true, true
+		local first = 20000
+		for d = first, first + #saleIds * 30 do
+			local today = Daily.carOfDay(saleIds, d, salt)
+			repeats = repeats or today == Daily.carOfDay(saleIds, d - 1, salt)
+			steady = steady and today == Daily.carOfDay(saleIds, d, salt)
+		end
+		for blockNo = 0, 5 do
+			local seen = {}
+			local start = (math.floor(first / #saleIds) + blockNo) * #saleIds
+			for d = start, start + #saleIds - 1 do
+				seen[Daily.carOfDay(saleIds, d, salt) :: string] = true
+			end
+			for _, id in saleIds do
+				everyCar = everyCar and seen[id] == true
+			end
+		end
+		check("the car of the day is the same all day", steady)
+		check("the car of the day never repeats yesterday's", not repeats)
+		check("every buyable car gets a day before any repeats", everyCar)
+		local differs = false
+		for d = first, first + 6 do
+			differs = differs
+				or Daily.carOfDay(saleIds, d, salt)
+					~= Daily.carOfDay(saleIds, d + #saleIds * 3, salt)
+		end
+		check("blocks are shuffled differently", differs)
+		local share, round = DailyConfig.DiscountShare, DailyConfig.DiscountRound
+		check(
+			"the sale price is a quarter off, rounded",
+			Daily.salePrice(200, share, round) == 150
+				and Daily.salePrice(3000, share, round) == 2250
+				and Daily.salePrice(25000, share, round) == 18750
+		)
+		check(
+			"only the car of the day is cheaper",
+			Daily.price("Sedan", 3000, "Sedan", share, round) == 2250
+				and Daily.price("Taxi", 6000, "Sedan", share, round) == 6000
+				and Daily.price("Taxi", 6000, nil, share, round) == 6000
+		)
+	end
+	checkDaily()
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

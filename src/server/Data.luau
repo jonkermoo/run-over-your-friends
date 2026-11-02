@@ -23,6 +23,7 @@ export type Profile = {
 	bought: { [string]: boolean }, -- one-time products already bought
 	paint: { [string]: string }, -- vehicle id -> paint id (Config/Paints); missing = Factory
 	paints: { [string]: boolean }, -- paid paint colours
+	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
 }
 
 local Data = {}
@@ -223,6 +224,13 @@ local function load(player: Player)
 					profile.bought = decoded.bought
 				end
 				profile.paint, profile.paints = PaintRules.clean(decoded.paint, decoded.paints)
+				local daily = decoded.daily
+				if typeof(daily) == "table" and tonumber(daily.day) and tonumber(daily.streak) then
+					profile.daily = {
+						day = tonumber(daily.day) :: number,
+						streak = tonumber(daily.streak) :: number,
+					}
+				end
 				if typeof(decoded.owned) == "table" then
 					for id, yes in decoded.owned do
 						if yes == true and Vehicles.ById[id] then
