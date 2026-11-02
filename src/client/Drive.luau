@@ -190,7 +190,6 @@ type CarState = {
 	steerBase: CFrame,
 	ik: { IKControl }, -- the driver's hands on that wheel
 	ikFor: Humanoid?,
-	tucked: { [BasePart]: number }, -- the driver's hats and hair hidden under the roof, with their transparency
 	needles: { Needle },
 	sticks: { Stick },
 	rollers: { Roller },
@@ -535,7 +534,6 @@ local function track(car: Instance)
 		steerBase = CFrame.identity,
 		ik = {},
 		ikFor = nil,
-		tucked = {},
 		needles = needles,
 		sticks = sticks,
 		rollers = rollers,
@@ -1371,10 +1369,6 @@ local function step(dt: number)
 				k:Destroy()
 			end
 			table.clear(s.ik)
-			for part, t in s.tucked do
-				part.Transparency = t
-			end
-			table.clear(s.tucked)
 			s.ikFor = occupant
 			-- the hands' targets: GripL/GripR attachments on the wheel, handlebars or joysticks
 			local grips: { [string]: Attachment } = {}
@@ -1386,24 +1380,6 @@ local function step(dt: number)
 			local body = occupant and occupant.Parent
 			local shell = s.car:FindFirstChild("Body")
 			if next(grips) and body and shell and shell:IsA("BasePart") and s.stats.showDriver then
-				-- tall hats and hair would poke out through the roof: once they've sat down, hide those
-				task.delay(0.4, function()
-					if s.ikFor ~= occupant or not shell.Parent then
-						return
-					end
-					local roof = shell.Position.Y + shell.Size.Y / 2 - 0.15
-					for _, acc in body:GetChildren() do
-						local handle = acc:IsA("Accessory") and acc:FindFirstChild("Handle")
-						if
-							handle
-							and handle:IsA("BasePart")
-							and handle.Position.Y + handle.Size.Y / 2 > roof
-						then
-							s.tucked[handle] = handle.Transparency
-							handle.Transparency = 1
-						end
-					end
-				end)
 				for side, gripName in { Left = "GripL", Right = "GripR" } do
 					local hand = body:FindFirstChild(side .. "Hand")
 					local upper = body:FindFirstChild(side .. "UpperArm")
