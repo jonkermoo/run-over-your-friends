@@ -217,7 +217,7 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	if (pos - body.Position).Magnitude > body.Size.Magnitude / 2 + 16 + speed * 0.3 then
 		return
 	end
-	local radius = Impact.smashRadius(stats.weight, speed / spm, Smash)
+	local radius = Impact.smashRadius(stats.weight, speed / spm, Smash, stats.maxBreak)
 	BuildingService.breakAt(pos, radius, velocity.Unit * speed, player)
 end
 

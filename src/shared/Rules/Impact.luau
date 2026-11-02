@@ -61,12 +61,21 @@ function Impact.breakRadius(energy: number, config: SmashConfig): number
 	return config.MinRadius + (config.MaxRadius - config.MinRadius) * s
 end
 
--- break radius for a vehicle of weightKg hitting at speed (m/s); slower than MinSpeed only bumps
-function Impact.smashRadius(weightKg: number, speed: number, config: SmashConfig): number
+-- break radius for a vehicle of weightKg hitting at speed (m/s); slower than MinSpeed only bumps;
+-- maxBreak (studs) caps it for vehicles that only ever knock out a piece
+function Impact.smashRadius(
+	weightKg: number,
+	speed: number,
+	config: SmashConfig,
+	maxBreak: number?
+): number
 	if speed < config.MinSpeed then
 		return 0
 	end
-	return Impact.breakRadius(Impact.energy(weightKg, speed), config)
+	return math.min(
+		Impact.breakRadius(Impact.energy(weightKg, speed), config),
+		maxBreak or math.huge
+	)
 end
 
 -- self-destruct blast radius, studs, from weight and speed

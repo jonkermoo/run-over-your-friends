@@ -56,6 +56,7 @@ export type Vehicle = {
 	order: number,
 	price: number, -- in-game money; 0 = free starter
 	weight: number, -- kg, sets how hard it hits (not its physics mass)
+	maxBreak: number?, -- studs: caps how far its building hits reach (early cars: one wall piece); nil = no cap
 	topSpeed: number, -- mph
 	launch: number, -- m/s^2 off the line
 	power: number, -- acceleration = power / speed once traction stops limiting it
@@ -86,6 +87,7 @@ local list: { Vehicle } = {
 		order = 1,
 		price = 0,
 		weight = 1100,
+		maxBreak = 3,
 		topSpeed = 95,
 		launch = 5.5,
 		power = 70,
@@ -105,6 +107,7 @@ local list: { Vehicle } = {
 		order = 2,
 		price = 200,
 		weight = 150,
+		maxBreak = 3,
 		topSpeed = 55,
 		launch = 4.5,
 		power = 40,
@@ -125,6 +128,7 @@ local list: { Vehicle } = {
 		order = 4,
 		price = 3000,
 		weight = 1500,
+		maxBreak = 3,
 		topSpeed = 110,
 		launch = 6,
 		power = 85,
@@ -143,6 +147,7 @@ local list: { Vehicle } = {
 		order = 3,
 		price = 400,
 		weight = 80,
+		maxBreak = 3,
 		topSpeed = 40,
 		launch = 4,
 		power = 30,
@@ -162,6 +167,7 @@ local list: { Vehicle } = {
 		order = 5,
 		price = 6000,
 		weight = 1600,
+		maxBreak = 3,
 		topSpeed = 105,
 		launch = 6,
 		power = 85,

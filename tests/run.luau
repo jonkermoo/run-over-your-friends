@@ -226,7 +226,8 @@ local supercar = Impact.energy(1500, 120 / 2.237)
 check("semi at 40 ~ supercar at 120", semi / supercar > 0.8 and semi / supercar < 1.4)
 -- building smashing: every vehicle breaks pieces once it's fast enough; light ones break little
 local function smashAt(id: string, mph: number): number
-	return Impact.smashRadius(Vehicles.ById[id].weight, mph / 2.237, Smash)
+	local v = Vehicles.ById[id]
+	return Impact.smashRadius(v.weight, mph / 2.237, Smash, v.maxBreak)
 end
 local function smashTop(id: string): number
 	return smashAt(id, Vehicles.ById[id].topSpeed)
@@ -244,7 +245,13 @@ end
 check("Cart at 20 mph only bumps", smashAt("Cart", 20) == 0)
 check("Cart at top speed breaks little", smashTop("Cart") <= 5)
 check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
-check("Sedan breaks more than the Scooter", smashTop("Sedan") > smashTop("Scooter") + 5)
+for _, id in { "Hatchback", "Scooter", "Cart", "Sedan", "Taxi" } do
+	check(
+		id .. " at top speed knocks out one wall piece",
+		smashTop(id) > 0 and smashTop(id) <= Smash.MinRadius
+	)
+end
+check("Muscle breaks more than the Sedan", smashTop("Muscle") > smashTop("Sedan") + 5)
 check("Semi breaks more than the Sedan", smashTop("Semi") > smashTop("Sedan") + 5)
 check("Semi breaks at 15 mph", smashAt("Semi", 15) > Smash.MinRadius)
 check(
@@ -252,7 +259,7 @@ check(
 	math.max(smashTop("Cart"), smashTop("Scooter")) < Smash.FloorsFallFrom
 )
 check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
-check("faster breaks more", smashAt("Sedan", 100) > smashAt("Sedan", 40))
+check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
 check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)

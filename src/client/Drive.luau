@@ -685,7 +685,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 		table.insert(include, npcFolder)
 	end
 	-- the same rule the server uses: soft hits only bump, light vehicles break a small patch
-	local breakRadius = Impact.smashRadius(s.stats.weight, metres, Smash)
+	local breakRadius = Impact.smashRadius(s.stats.weight, metres, Smash, s.stats.maxBreak)
 	if buildings and breakRadius > 0 then
 		table.insert(include, buildings)
 	end
