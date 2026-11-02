@@ -1,7 +1,8 @@
 --!strict
 -- First-person driving view. V, the right-stick click or the phone VIEW button puts the camera at the driver's
--- eyes (measured off their head once seated, riding with the body on its suspension), hides the driver's own
--- head, face and head accessories on this screen only, and clears the car's glass a little. Hold the right
+-- eyes (a fixed spot above the seat, riding with the body on its suspension, so every avatar gets the same
+-- view), hides whatever of the driver is near the eye on this screen only (head, hair, hats, however they're
+-- worn; the arms and hands stay), and clears the car's glass a little. Hold the right
 -- mouse button, push the right stick or drag on a phone to look around; it eases back to the road. The choice
 -- is kept for the next vehicle. Numbers in Config/Cockpit; nothing here is sent to the server.
 
@@ -26,8 +27,7 @@ local PITCH = math.rad(-6) -- resting look, a touch down at the road
 local wanted = false -- the player asked for first person
 local active = false
 local car: Model? = nil
-local eye: Vector3? = nil -- in the sprung body's frame
-local satAt = 0
+local eye = Vector3.zero -- in the sprung body's frame
 local yaw, pitch = 0, 0 -- look offsets, radians
 local lookedAt = 0
 local looking = false -- right mouse held
@@ -35,36 +35,52 @@ local stick = Vector2.zero
 local hidden: { [Instance]: boolean } = {}
 local glass: BasePart? = nil
 
-local function headOf(): BasePart?
-	local character = player.Character
-	local head = character and character:FindFirstChild("Head")
-	return if head and head:IsA("BasePart") then head else nil
-end
+-- arms and hands stay in view (they hold the wheel), even when they come near the eye
+local KEEP = { "Hand", "LowerArm", "UpperArm", "Left Arm", "Right Arm" }
 
--- the driver's own head, face and anything worn on the head: hidden on this screen while inside
-local function hideHead(on: boolean)
-	local character = player.Character
-	local head = headOf()
-	if not character or not head then
-		return
+local function kept(part: BasePart): boolean
+	if part.Parent and part.Parent:IsA("Accessory") then
+		return false
 	end
-	local function set(inst: Instance)
-		if inst:IsA("BasePart") or inst:IsA("Decal") then
-			inst.LocalTransparencyModifier = if on then 1 else 0
-			hidden[inst] = on or nil
+	for _, k in KEEP do
+		if string.find(part.Name, k, 1, true) then
+			return true
 		end
 	end
-	set(head)
-	for _, d in head:GetDescendants() do
-		set(d)
+	return false
+end
+
+-- how far a point is from a part's box
+local function gap(part: BasePart, at: Vector3): number
+	local p = part.CFrame:PointToObjectSpace(at)
+	local h = part.Size / 2
+	local q = Vector3.new(
+		math.clamp(p.X, -h.X, h.X),
+		math.clamp(p.Y, -h.Y, h.Y),
+		math.clamp(p.Z, -h.Z, h.Z)
+	)
+	return (p - q).Magnitude
+end
+
+-- every frame: hide what of the driver is near the eye, show the rest (Roblox's own camera fades a character
+-- whose camera comes close; this runs after it and sets every part)
+local function hideNear(at: Vector3)
+	local character = player.Character
+	if not character then
+		return
 	end
-	for _, acc in character:GetChildren() do
-		local handle = acc:IsA("Accessory") and acc:FindFirstChild("Handle")
-		local weld = handle and handle:FindFirstChild("AccessoryWeld")
-		if handle and weld and weld:IsA("Weld") and (weld.Part0 == head or weld.Part1 == head) then
-			set(handle)
-			for _, d in handle:GetDescendants() do
-				set(d)
+	for _, part in character:GetDescendants() do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			local near = part.Name == "Head"
+				or (not kept(part) and gap(part, at) < Config.hideRadius)
+			local m = if near then 1 else 0
+			part.LocalTransparencyModifier = m
+			hidden[part] = true
+			for _, d in part:GetChildren() do
+				if d:IsA("Decal") then
+					d.LocalTransparencyModifier = m
+					hidden[d] = true
+				end
 			end
 		end
 	end
@@ -88,19 +104,10 @@ local function exit()
 	end
 	active = false
 	restore()
-	car, eye, glass = nil, nil, nil
+	car, glass = nil, nil
 	camera.CameraType = Enum.CameraType.Custom
 	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 	Drive.view.firstPerson = false
-end
-
--- the eye in the sprung body's frame, just ahead of the head (the cabins keep their roofs clear of it:
--- tools/blender/export_vehicles.py reports the closest surface to each driver's eye)
-local function measure(head: BasePart, body: BasePart): Vector3
-	local cf = body.CFrame
-	return cf:PointToObjectSpace(
-		head.Position + cf.UpVector * Config.eyeUp + cf.LookVector * Config.eyeForward
-	)
 end
 
 function Cockpit.toggle()
@@ -114,10 +121,14 @@ function Cockpit.isOn(): boolean
 	return wanted
 end
 
-local function enter(model: Model)
+-- the eye sits over the seat, in the sprung body's frame (the cabins keep their roofs clear of it:
+-- tools/blender/export_vehicles.py reports the closest surface to each driver's eye)
+local function enter(model: Model, body: BasePart, seat: BasePart)
 	active = true
-	car, eye = model, nil
-	satAt = os.clock()
+	car = model
+	eye = body.CFrame:PointToObjectSpace(
+		seat.CFrame * Vector3.new(0, Config.eyeAboveSeat, -Config.eyeAhead)
+	)
 	yaw, pitch = 0, 0
 	local g = model:FindFirstChild("Glass")
 	glass = if g and g:IsA("BasePart") then g else nil
@@ -132,28 +143,25 @@ end
 
 local function step(dt: number)
 	local model = Drive.view.car
-	local head = headOf()
 	local body = model and model:FindFirstChild("Sprung")
+	local seat = model and model:FindFirstChild("DriverSeat")
 	if
 		not wanted
 		or not Drive.state.driving
 		or not model
-		or not head
 		or not body
 		or not body:IsA("BasePart")
+		or not seat
+		or not seat:IsA("BasePart")
 	then
 		exit()
 		return
 	end
 	if not active or model ~= car then
 		exit()
-		enter(model)
+		enter(model, body, seat)
 	end
 	local now = os.clock()
-	if not eye and now - satAt > Config.settle then
-		eye = measure(head, body)
-	end
-	hideHead(true)
 
 	-- look around: mouse while the right button is held, the right stick, or a drag (all set yaw/pitch)
 	if stick.Magnitude > 0.15 then
@@ -183,9 +191,8 @@ local function step(dt: number)
 		0,
 		math.clamp(a.Z, -Config.gSwayMax, Config.gSwayMax)
 	)
-	local at = if eye
-		then cf:PointToWorldSpace(eye + sway)
-		else head.Position + cf.UpVector * Config.eyeUp + cf.LookVector * Config.eyeForward
+	local at = cf:PointToWorldSpace(eye + sway)
+	hideNear(cf:PointToWorldSpace(eye))
 	camera.CFrame = CFrame.new(at)
 		* cf.Rotation
 		* CFrame.Angles(0, yaw + turn, 0)
@@ -250,8 +257,8 @@ function Cockpit.start()
 			end
 		end
 	end)
-	-- after the default camera, before the shake (Fx, Camera + 1)
-	RunService:BindToRenderStep("RoyfCockpit", Enum.RenderPriority.Camera.Value, step)
+	-- after the default camera (and its character fading), before the shake (Fx, Camera + 2)
+	RunService:BindToRenderStep("RoyfCockpit", Enum.RenderPriority.Camera.Value + 1, step)
 end
 
 return Cockpit
