@@ -895,30 +895,34 @@ function MapBuilder.build(): Result
 	local look = World.Look
 	Lighting.ClockTime = look.ClockTime
 	Lighting.Brightness = look.Brightness
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 160)
-	Lighting.EnvironmentDiffuseScale = 1
-	Lighting.EnvironmentSpecularScale = 0.6
-	if not Lighting:FindFirstChildOfClass("Atmosphere") then
-		local a = Instance.new("Atmosphere")
-		a.Density = 0.28
-		a.Haze = 1.2
-		a.Color = Color3.fromRGB(200, 215, 230)
-		a.Parent = Lighting
-	end
-	if not Lighting:FindFirstChild("Grade") then
-		local grade = Instance.new("ColorCorrectionEffect")
-		grade.Name = "Grade"
-		grade.Saturation = look.Saturation
-		grade.Contrast = look.Contrast
-		grade.TintColor = Color3.fromRGB(look.Tint[1], look.Tint[2], look.Tint[3])
-		grade.Parent = Lighting
-		local bloom = Instance.new("BloomEffect")
-		bloom.Name = "Bloom"
-		bloom.Intensity = look.BloomIntensity
-		bloom.Size = look.BloomSize
-		bloom.Threshold = look.BloomThreshold
-		bloom.Parent = Lighting
-	end
+	Lighting.ExposureCompensation = look.Exposure
+	Lighting.Ambient = rgb(look.Ambient)
+	Lighting.OutdoorAmbient = rgb(look.OutdoorAmbient)
+	Lighting.ShadowSoftness = look.ShadowSoftness
+	Lighting.EnvironmentDiffuseScale = look.DiffuseScale
+	Lighting.EnvironmentSpecularScale = look.SpecularScale
+	local air = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+	air.Density = look.AirDensity
+	air.Offset = look.AirOffset
+	air.Haze = look.AirHaze
+	air.Glare = look.AirGlare
+	air.Color = rgb(look.AirColor)
+	air.Decay = rgb(look.AirDecay)
+	air.Parent = Lighting
+	local grade = (Lighting:FindFirstChild("Grade") :: ColorCorrectionEffect?)
+		or Instance.new("ColorCorrectionEffect")
+	grade.Name = "Grade"
+	grade.Saturation = look.Saturation
+	grade.Contrast = look.Contrast
+	grade.Brightness = look.GradeBrightness
+	grade.TintColor = rgb(look.Tint)
+	grade.Parent = Lighting
+	local bloom = (Lighting:FindFirstChild("Bloom") :: BloomEffect?) or Instance.new("BloomEffect")
+	bloom.Name = "Bloom"
+	bloom.Intensity = look.BloomIntensity
+	bloom.Size = look.BloomSize
+	bloom.Threshold = look.BloomThreshold
+	bloom.Parent = Lighting
 
 	map.Parent = workspace
 	return {
