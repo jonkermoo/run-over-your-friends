@@ -1,6 +1,7 @@
 --!strict
 -- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
+-- During a contest event the sign also lists the top 3 and your own place (the Contest remote, once a second).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -8,6 +9,8 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
+local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -53,6 +56,33 @@ timer.AnchorPoint = Vector2.new(1, 0)
 timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
+
+-- contest standings: one row per leader, then your own place
+local ROW = 18
+local rows: { TextLabel } = {}
+for i = 1, Config.ContestShown do
+	local r = Style.label(banner, "", 14, F.heavy, C.text)
+	r.Position = UDim2.fromOffset(14, 74 + (i - 1) * ROW)
+	r.Size = UDim2.new(1, -28, 0, ROW)
+	r.TextXAlignment = Enum.TextXAlignment.Left
+	r.TextTruncate = Enum.TextTruncate.AtEnd
+	r.Visible = false
+	rows[i] = r
+end
+local you = Style.label(banner, "", 14, F.display, C.text)
+you.Position = UDim2.fromOffset(14, 78 + Config.ContestShown * ROW)
+you.Size = UDim2.new(1, -28, 0, ROW)
+you.TextXAlignment = Enum.TextXAlignment.Left
+you.Visible = false
+
+type Standings = {
+	key: string,
+	top: { { name: string, score: number } },
+	place: number,
+	score: number,
+	count: number,
+}
+local standings: Standings? = nil
 
 -- the player can shrink the sign to a small chip with just a colour dot and the timer (X beside the
 -- sign), and tap the chip to bring it back. Kept for the session; big event titles still show.
@@ -162,6 +192,39 @@ end
 
 local lastPhase, lastKey = "", ""
 
+local function showRows(on: boolean)
+	for _, r in rows do
+		r.Visible = on
+	end
+	you.Visible = on
+end
+
+-- fills the standings rows; returns the extra height they need
+local function fillStandings(event: Config.Event, ink: Color3): number
+	local c = event.contest
+	local s = standings
+	if not c or not s or s.key ~= event.key then
+		showRows(false)
+		return 0
+	end
+	showRows(true)
+	local function amount(n: number): string
+		return `{math.floor(n + 0.5)} {c.unit}`
+	end
+	for i, r in rows do
+		local e = s.top[i]
+		r.TextColor3 = ink
+		r.Text = if e
+			then `{Contest.ordinal(i)}   {e.name}   {amount(e.score)}`
+			else `{Contest.ordinal(i)}   -`
+	end
+	you.TextColor3 = ink
+	you.Text = if s.place > 0
+		then `YOU: {Contest.ordinal(s.place)} OF {s.count}   {amount(s.score)}`
+		else "YOU: NOT SCORED YET"
+	return Config.ContestShown * ROW + ROW + 12
+end
+
 local function update()
 	local phase = workspace:GetAttribute("EventPhase")
 	local key = workspace:GetAttribute("EventKey")
@@ -201,6 +264,7 @@ local function update()
 		paintLines(C.yellow)
 		pill.Visible = false
 		text.Visible = false
+		showRows(false)
 		title.Text = "NEXT EVENT"
 		title.TextColor3 = C.text
 		title.Position = UDim2.fromOffset(14, 10)
@@ -211,7 +275,11 @@ local function update()
 	end
 	-- warn or live: the sign is painted the event's colour
 	local ink = inkOn(color)
-	banner.Size = UDim2.fromOffset(380, 80)
+	local extra = if phase == "live" then fillStandings(event, ink) else 0
+	if phase ~= "live" then
+		showRows(false)
+	end
+	banner.Size = UDim2.fromOffset(380, 80 + extra)
 	banner.BackgroundColor3 = color
 	paintLines(ink)
 	pill.Visible = true
@@ -233,6 +301,9 @@ local function update()
 end
 
 function EventBanner.start()
+	Net.waitFor("Contest").OnClientEvent:Connect(function(state: Standings)
+		standings = state
+	end)
 	RunService.RenderStepped:Connect(update)
 end
 
