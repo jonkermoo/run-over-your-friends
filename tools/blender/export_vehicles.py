@@ -1641,6 +1641,47 @@ for vid in vehicles:
         EYES[vid] = (sx, sy + EYE_UP, sz - EYE_FWD)
 
 
+# ---- paint: each body's painted panels become <Id>_Paint, an untextured mesh the game colours (Config/Paints).
+# PAINT lists the palette colours (sRGB 0-1, as face_colour reads them) that count as paint on each vehicle;
+# lights, trim, grilles, stripes and liveries are other colours and stay on the textured Body.
+PAINT = {
+    "Hatchback": [(0.34, 0.49, 0.28)],
+    "Sedan": [(0.22, 0.44, 0.69)],
+    "Taxi": [(0.91, 0.64, 0.22)],
+    "Muscle": [(0.76, 0.27, 0.19)],
+    "Supercar": [(0.91, 0.64, 0.22)],
+    "IceCream": [(0.8, 0.8, 0.78)],
+    "FireTruck": [(0.68, 0.24, 0.16)],
+    "Semi": [(0.8, 0.8, 0.78)],
+    "Monster": [(0.34, 0.49, 0.28)],
+    "Bulldozer": [(0.92, 0.64, 0.21)],
+    "Scooter": [(0.76, 0.27, 0.19)],
+    "Cart": [(0.72, 0.72, 0.71)],
+    "Roadster": [(0.8, 0.06, 0.07)],
+}
+
+
+def survey(obj):
+    """Face area per palette colour, biggest first (to choose PAINT colours)."""
+    me = obj.data
+    area = {}
+    for p in me.polygons:
+        col = face_colour(me, p)
+        area[col] = area.get(col, 0) + p.area
+    return sorted(area.items(), key=lambda kv: -kv[1])
+
+
+for vid in vehicles:
+    body = bpy.data.objects[vid + "_Body"]
+    total = sum(a for _, a in survey(body)) or 1
+    print("SURVEY", vid, " ".join(f"{c}:{a / total:.2f}" for c, a in survey(body)[:8]))
+    cols = PAINT.get(vid)
+    if cols:
+        shell = split_off(body, lambda c, col: any(near(col, k) for k in cols), vid + "_Paint")
+        assert shell, f"{vid}: no faces in its PAINT colours"
+        exported.append(shell)
+        print(f"PAINT {vid} {len(shell.data.polygons)} faces {cols[0]}")
+
 # ---- export
 tri = 0
 for o in exported:
@@ -1937,6 +1978,11 @@ if preview:
     scene.display.shading.show_shadows = True
     scene.render.resolution_x = 2800
     scene.render.resolution_y = 1100
+    if os.environ.get("PAINT_PREVIEW"):
+        # check which faces became paint: they show purple
+        for o in exported:
+            if o.name.endswith("_Paint"):
+                paint(o, (0.72, 0.45, 0.73))
     scene.render.filepath = preview
     bpy.ops.render.render(write_still=True)
     print("PREVIEW", preview)

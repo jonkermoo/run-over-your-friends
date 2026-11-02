@@ -21,6 +21,7 @@ local SocialRules = require(ReplicatedStorage.Shared.Rules.Social)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
+local PaintPicker = require(script.Parent.PaintPicker)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -393,6 +394,7 @@ type Card = {
 	action: TextButton,
 	price: TextLabel,
 	frame: Frame,
+	picker: PaintPicker.Picker,
 	sale: TextLabel,
 	was: TextLabel,
 }
@@ -414,6 +416,7 @@ local function priceOf(stats: Vehicles.Vehicle): number
 end
 local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
 local cards: { Card } = {}
+local refreshCards: () -> ()
 
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
 	local l = Style.label(parent, name, 10, F.heavy, C.dim)
@@ -429,7 +432,7 @@ local function statBar(parent: Instance, y: number, name: string, value: number,
 	Style.laneGaps(back, C.card)
 end
 
-local function preview(parent: Instance, id: string)
+local function preview(parent: Instance, id: string): Model?
 	local vf = Instance.new("ViewportFrame")
 	vf.Position = UDim2.fromOffset(6, 6)
 	vf.Size = UDim2.new(1, -12, 0, 122)
@@ -444,7 +447,7 @@ local function preview(parent: Instance, id: string)
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(id) :: Model?
 	if not template then
-		return
+		return nil
 	end
 	local m = template:Clone()
 	m.Parent = vf
@@ -456,13 +459,14 @@ local function preview(parent: Instance, id: string)
 		CFrame.lookAt(cf.Position + Vector3.new(-0.75, 0.45, -0.75).Unit * dist, cf.Position)
 	cam.Parent = vf
 	vf.CurrentCamera = cam
+	return m
 end
 
 for _, stats in Vehicles.List do
 	local card = Style.card(garageList, 16)
 	card.LayoutOrder = stats.order
 	card.Name = stats.id
-	preview(card, stats.id)
+	local shown = preview(card, stats.id)
 	-- painted bay number in the corner of the preview
 	local bay = Style.label(card, string.format("%02d", stats.order), 30, F.display, C.yellow)
 	bay.Position = UDim2.fromOffset(14, 10)
@@ -475,16 +479,22 @@ for _, stats in Vehicles.List do
 	name.Position = UDim2.fromOffset(14, 132)
 	name.Size = UDim2.new(1, -28, 0, 26)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	local blurb = Style.label(card, stats.blurb, 12, F.bold, C.dim)
+	-- the blurb and stat bars, covered by the paint swatches while the PAINT side is open
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.fromScale(1, 1)
+	info.Parent = card
+	local blurb = Style.label(info, stats.blurb, 12, F.bold, C.dim)
 	blurb.Position = UDim2.fromOffset(14, 158)
 	blurb.Size = UDim2.new(1, -28, 0, 30)
 	blurb.TextWrapped = true
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(card, 192, "SPEED", stats.topSpeed / 250, C.orange)
-	statBar(card, 208, "ACCEL", stats.launch / 15, C.blue)
-	statBar(card, 224, "HANDLING", stats.grip / 22, C.green)
-	statBar(card, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	statBar(info, 192, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(info, 208, "ACCEL", stats.launch / 15, C.blue)
+	statBar(info, 224, "HANDLING", stats.grip / 22, C.green)
+	statBar(info, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
 	local price = Style.label(
 		card,
 		if stats.price == 0 then "FREE" else money(stats.price),
@@ -526,7 +536,13 @@ for _, stats in Vehicles.List do
 	action.AnchorPoint = Vector2.new(1, 0)
 	action.Position = UDim2.new(1, -12, 0, 268)
 	action.Size = UDim2.fromOffset(112, 38)
+	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
+		refreshCards()
+	end)
 	action.Activated:Connect(function()
+		if picker.action() then
+			return -- buying the paint colour shown
+		end
 		local owned = string.find(
 			"," .. ((player:GetAttribute("Owned") or "") :: string) .. ",",
 			"," .. stats.id .. ",",
@@ -547,13 +563,18 @@ for _, stats in Vehicles.List do
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
-	table.insert(
-		cards,
-		{ stats = stats, action = action, price = price, frame = card, sale = sale, was = was }
-	)
+	table.insert(cards, {
+		stats = stats,
+		action = action,
+		price = price,
+		frame = card,
+		picker = picker,
+		sale = sale,
+		was = was,
+	})
 end
 
-local function refreshCards()
+function refreshCards()
 	local owned = "," .. ((player:GetAttribute("Owned") or "") :: string) .. ","
 	local cash = (player:GetAttribute("Money") or 0) :: number
 	for _, c in cards do
@@ -582,6 +603,7 @@ local function refreshCards()
 				Style.setKind(c.action, "dark")
 			end
 		end
+		c.picker.refresh()
 	end
 end
 
@@ -1148,6 +1170,8 @@ function Hud.start()
 	player:GetAttributeChangedSignal("Owned"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("Friends"):Connect(refreshFriends)
 	refreshFriends()
+	player:GetAttributeChangedSignal("Paint"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("Paints"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("LikeClaimed"):Connect(refreshStore)
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
 	local function tutorialStep()

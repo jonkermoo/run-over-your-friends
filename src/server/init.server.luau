@@ -45,6 +45,7 @@ local LeaderboardService = require(script.LeaderboardService)
 local ProductService = require(script.ProductService)
 local EventService = require(script.EventService)
 local Analytics = require(script.Analytics)
+local PaintService = require(script.PaintService)
 local RateLimit = require(script.RateLimit)
 
 local world = MapBuilder.build()
@@ -75,6 +76,7 @@ LeaderboardService.start()
 ProductService.start()
 EventService.setGiantSpots(downtown)
 EventService.start()
+PaintService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)

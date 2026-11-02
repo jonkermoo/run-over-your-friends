@@ -18,6 +18,8 @@ Net.Messages = table.freeze({
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
+	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
+	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
 	-- server -> client
 	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
@@ -42,6 +44,8 @@ export type MessageName =
 	| "WreckerHit"
 	| "SelfDestruct"
 	| "Feature"
+	| "BuyPaint"
+	| "SetPaint"
 	| "ClaimDaily"
 	| "Fling"
 	| "Popup"

@@ -1482,6 +1482,120 @@ do
 	)
 end
 
+-- car paint
+do
+	local PaintConfig = require("../src/shared/Config/Paints")
+	local PaintRules = require("../src/shared/Rules/Paints")
+	local paintIds, knownIds, pricesOk, freeCount = {}, true, true, 0
+	for _, p in PaintConfig.List do
+		if paintIds[p.id] or not string.match(p.id, "^%w+$") then
+			knownIds = false
+		end
+		paintIds[p.id] = true
+		if p.price < 0 then
+			pricesOk = false
+		end
+		if p.price == 0 then
+			freeCount += 1
+		end
+		if p.id ~= PaintConfig.FactoryId then
+			local rgb = p.rgb or {}
+			if
+				#rgb ~= 3
+				or math.min(rgb[1], rgb[2], rgb[3]) < 0
+				or math.max(rgb[1], rgb[2], rgb[3]) > 255
+			then
+				pricesOk = false
+			end
+		end
+	end
+	check("paint ids are unique words (they go in a comma list)", knownIds)
+	check("paint colours are 0-255 and prices not negative", pricesOk and freeCount >= 2)
+	check("Factory paint is free", PaintRules.isOpen({}, PaintConfig.FactoryId))
+	local everyCar = true
+	for _, v in Vehicles.List do
+		if not PaintConfig.Factory[v.id] then
+			everyCar = false
+		end
+	end
+	check("every vehicle has a factory paint colour", everyCar)
+
+	local owned = { Sedan = true }
+	check(
+		"a free colour opens on an owned car",
+		PaintRules.setProblem(owned, {}, "Sedan", "Red") == nil
+	)
+	check(
+		"a paid colour stays locked until bought",
+		PaintRules.setProblem(owned, {}, "Sedan", "Pink") == "locked"
+	)
+	check(
+		"a bought colour opens",
+		PaintRules.setProblem(owned, { Pink = true }, "Sedan", "Pink") == nil
+	)
+	check(
+		"a car you don't own can't be painted",
+		PaintRules.setProblem(owned, {}, "Taxi", "Red") == "vehicle"
+	)
+	check(
+		"unknown colours are refused",
+		PaintRules.setProblem(owned, {}, "Sedan", "Rainbow") == "locked"
+	)
+	check(
+		"non-string remote arguments are refused",
+		PaintRules.setProblem(owned, {}, "Sedan", 5) == "bad"
+	)
+
+	check("buying needs the money", PaintRules.buyProblem(100, {}, "Pink") == "money")
+	check("buying with enough money works", PaintRules.buyProblem(1e6, {}, "Pink") == nil)
+	check(
+		"a bought or free colour can't be bought again",
+		PaintRules.buyProblem(1e6, { Pink = true }, "Pink") == "owned"
+			and PaintRules.buyProblem(1e6, {}, "Red") == "owned"
+	)
+	check("buying an unknown colour is refused", PaintRules.buyProblem(1e6, {}, {}) == "unknown")
+
+	check(
+		"Factory shows the car's own colour",
+		PaintRules.colour("Taxi", "Factory") == PaintConfig.Factory.Taxi
+	)
+	check(
+		"an unknown saved colour falls back to factory",
+		PaintRules.colour("Taxi", "Nope") == PaintConfig.Factory.Taxi
+	)
+	check("a chosen colour shows", PaintRules.colour("Taxi", "Red") == PaintConfig.ById.Red.rgb)
+
+	local chosen, paid = PaintRules.clean({
+		Sedan = "Pink",
+		Taxi = "Red",
+		Hatchback = "Factory",
+		Ghost = "Red",
+		Muscle = "Gold",
+		Cart = 3,
+	}, { Pink = true, Red = true, Bogus = true, Gold = false })
+	check(
+		"saved paid colours keep only real paid ones",
+		paid.Pink == true and paid.Red == nil and paid.Bogus == nil and paid.Gold == nil
+	)
+	check(
+		"saved choices keep known cars with open colours, Factory not stored",
+		chosen.Sedan == "Pink"
+			and chosen.Taxi == "Red"
+			and chosen.Hatchback == nil
+			and chosen.Ghost == nil
+			and chosen.Muscle == nil
+			and chosen.Cart == nil
+	)
+	local none, noneBought = PaintRules.clean(nil, "junk")
+	check("saves from before paint load empty", next(none) == nil and next(noneBought) == nil)
+	local back = PaintRules.decode(PaintRules.encode({ Sedan = "Pink", Taxi = "Red" }))
+	check("the paint attribute round-trips", back.Sedan == "Pink" and back.Taxi == "Red")
+	check(
+		"the paint attribute is sorted",
+		PaintRules.encode({ Taxi = "Red", Sedan = "Pink" }) == "Sedan=Pink,Taxi=Red"
+	)
+end
+
 do
 	local function checkDaily()
 		local DailyConfig = require("../src/shared/Config/Daily")

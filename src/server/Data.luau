@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 export type Profile = {
@@ -20,6 +21,8 @@ export type Profile = {
 	stats: { [string]: any }, -- leaderboard numbers, checked by LeaderboardService
 	receipts: { [string]: boolean }, -- Robux purchase ids already granted
 	bought: { [string]: boolean }, -- one-time products already bought
+	paint: { [string]: string }, -- vehicle id -> paint id (Config/Paints); missing = Factory
+	paints: { [string]: boolean }, -- paid paint colours
 	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
 }
 
@@ -46,6 +49,8 @@ local function default(): Profile
 		stats = {},
 		receipts = {},
 		bought = {},
+		paint = {},
+		paints = {},
 	}
 end
 
@@ -75,6 +80,13 @@ local function publish(player: Player, profile: Profile)
 		end
 	end
 	player:SetAttribute("Bought", table.concat(bought, ","))
+	player:SetAttribute("Paint", PaintRules.encode(profile.paint))
+	local paints = {}
+	for id in profile.paints do
+		table.insert(paints, id)
+	end
+	table.sort(paints)
+	player:SetAttribute("Paints", table.concat(paints, ","))
 end
 
 function Data.get(player: Player): Profile?
@@ -211,6 +223,7 @@ local function load(player: Player)
 				if typeof(decoded.bought) == "table" then
 					profile.bought = decoded.bought
 				end
+				profile.paint, profile.paints = PaintRules.clean(decoded.paint, decoded.paints)
 				local daily = decoded.daily
 				if typeof(daily) == "table" and tonumber(daily.day) and tonumber(daily.streak) then
 					profile.daily = {
