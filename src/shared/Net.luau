@@ -27,7 +27,7 @@ Net.Messages = table.freeze({
 	Popup = "Popup", -- (text: string, kind: string)
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
-	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom", position: Vector3, a: number, b: number, userId: number)
+	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom" | "Dodge", position: Vector3, a: number, b: number, userId: number)
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 })
