@@ -1,6 +1,7 @@
 --!strict
 -- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
+-- Under it, a slim strip shows the shared server goal's progress (finishing it brings the next event).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -8,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -53,6 +55,67 @@ timer.AnchorPoint = Vector2.new(1, 0)
 timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
+
+-- the server goal strip hangs under the sign (or its chip), clear of its shadow. Like the sign, an X beside
+-- it shrinks it to a small chip with the progress, and tapping the chip brings it back.
+local STRIP_W, STRIP_H = 250, 24
+local strip = Style.panel(gui)
+strip.Name = "ServerGoalStrip"
+strip.AnchorPoint = Vector2.new(0.5, 0)
+strip.Size = UDim2.fromOffset(STRIP_W, STRIP_H)
+strip.Visible = false
+local stripTag = Style.pill(strip, "SERVER GOAL", C.yellow)
+stripTag.Position = UDim2.fromOffset(4, 3)
+local stripBack, stripFill = Style.bar(strip, C.yellow)
+stripBack.BackgroundColor3 = C.card
+stripBack.BackgroundTransparency = 0
+stripBack.AnchorPoint = Vector2.new(0, 0.5)
+stripBack.Position = UDim2.new(0, 104, 0.5, 0)
+stripBack.Size = UDim2.new(1, -176, 0, 6)
+Style.laneGaps(stripBack, C.panel)
+local stripAmount = Style.label(strip, "", 13, F.display, C.yellow)
+stripAmount.AnchorPoint = Vector2.new(1, 0)
+stripAmount.Position = UDim2.new(1, -8, 0, 3)
+stripAmount.Size = UDim2.fromOffset(62, 18)
+stripAmount.TextXAlignment = Enum.TextXAlignment.Right
+local stripShrunk = false
+local stripHide = Style.button(gui, "X", "dark", 14)
+stripHide.Name = "HideServerGoal"
+stripHide.BackgroundColor3 = C.panel
+stripHide.Size = UDim2.fromOffset(STRIP_H, STRIP_H)
+stripHide.Visible = false
+local stripChip = Style.button(gui, "", "dark", 14)
+stripChip.Name = "ServerGoalChip"
+stripChip.BackgroundColor3 = C.panel
+stripChip.AnchorPoint = Vector2.new(0.5, 0)
+stripChip.Size = UDim2.fromOffset(104, STRIP_H)
+stripChip.Visible = false
+local stripChipDot = Instance.new("Frame")
+stripChipDot.BorderSizePixel = 0
+stripChipDot.BackgroundColor3 = C.yellow
+stripChipDot.AnchorPoint = Vector2.new(0, 0.5)
+stripChipDot.Position = UDim2.new(0, 8, 0.5, 0)
+stripChipDot.Size = UDim2.fromOffset(10, 10)
+stripChipDot.Parent = stripChip
+local stripChipText = Style.label(stripChip, "", 14, F.display, C.yellow)
+stripChipText.Position = UDim2.fromOffset(22, 0)
+stripChipText.Size = UDim2.new(1, -26, 1, 0)
+stripHide.Activated:Connect(function()
+	stripShrunk = true
+end)
+stripChip.Activated:Connect(function()
+	stripShrunk = false
+end)
+local serverGoal: { text: string, progress: number, target: number, done: boolean }? = nil
+
+local function drawStrip()
+	local g = serverGoal
+	if g then
+		stripFill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
+		stripAmount.Text = `{g.progress}/{g.target}`
+		stripChipText.Text = `{g.progress}/{g.target}`
+	end
+end
 
 -- the player can shrink the sign to a small chip with just a colour dot and the timer (X beside the
 -- sign), and tap the chip to bring it back. Kept for the session; big event titles still show.
@@ -232,8 +295,39 @@ local function update()
 	Style.setShadow(banner, if blink then C.text else C.ink)
 end
 
+-- the strip (or its chip) sits under whatever of the event sign is showing
+local function placeStrip()
+	local g = serverGoal
+	local show = g ~= nil and not g.done
+	local above: GuiObject? = if banner.Visible then banner elseif chip.Visible then chip else nil
+	local y = if above then above.AbsolutePosition.Y + above.AbsoluteSize.Y + 9 else 8
+	strip.Visible = show and not stripShrunk
+	stripHide.Visible = show and not stripShrunk
+	stripChip.Visible = show and stripShrunk
+	-- on a narrow screen the middle runs into the job card (top left, drawn above us): slide right of it
+	local width = if stripShrunk then stripChip.AbsoluteSize.X else STRIP_W
+	local x = gui.AbsoluteSize.X / 2
+	local guide = playerGui:FindFirstChild("Guide")
+	local card = guide and guide:FindFirstChild("JobCard") :: GuiObject?
+	if card and card.Visible and card.AbsolutePosition.Y < y + STRIP_H then
+		x = math.max(x, card.AbsolutePosition.X + card.AbsoluteSize.X + 12 + width / 2)
+		y = math.max(y, 72) -- slid right, it also clears the cash box (top right, 62 px tall + shadow)
+	end
+	strip.Position = UDim2.fromOffset(x, y)
+	stripChip.Position = UDim2.fromOffset(x, y)
+	stripHide.Position = UDim2.fromOffset(x + STRIP_W / 2 + 10, y)
+end
+
 function EventBanner.start()
-	RunService.RenderStepped:Connect(update)
+	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set)
+		local g = typeof(set) == "table" and typeof(set.goals) == "table" and set.goals[1]
+		serverGoal = if typeof(g) == "table" then g else nil
+		drawStrip()
+	end)
+	RunService.RenderStepped:Connect(function()
+		update()
+		placeStrip()
+	end)
 end
 
 return EventBanner

@@ -29,6 +29,7 @@ Net.Messages = table.freeze({
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom" | "Dodge", position: Vector3, a: number, b: number, userId: number)
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
+	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 })
 
@@ -56,6 +57,7 @@ export type MessageName =
 	| "Fx"
 	| "Boards"
 	| "Daily"
+	| "ServerGoal"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

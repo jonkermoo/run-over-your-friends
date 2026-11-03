@@ -16,6 +16,9 @@ local baseGravity = workspace.Gravity
 local giantSpots: { Vector3 } = {}
 local giant: Model? = nil
 local random = Random.new()
+local t0 = os.clock() -- the schedule's start; hurry() moves it to bring the next event forward
+local phase = "quiet"
+local untilWarn = 0
 
 function EventService.setGiantSpots(points: { Vector3 })
 	giantSpots = points
@@ -66,8 +69,18 @@ local function finish(key: string)
 	end
 end
 
+-- start the next event's countdown now (a server goal reward); false when one is already on its way or live
+function EventService.hurry(): boolean
+	if phase ~= "quiet" then
+		return false
+	end
+	t0 -= untilWarn
+	untilWarn = 0
+	return true
+end
+
 function EventService.start()
-	local t0 = os.clock()
+	t0 = os.clock()
 	local offset = random:NextInteger(0, #Config.List - 1)
 	local live: string? = nil
 	task.spawn(function()
@@ -94,6 +107,8 @@ function EventService.start()
 					begin(live)
 				end
 			end
+			phase = ph.phase
+			untilWarn = if ph.phase == "quiet" then ph.endsIn else 0
 			workspace:SetAttribute("EventPhase", ph.phase)
 			workspace:SetAttribute("EventKey", key)
 			workspace:SetAttribute("EventEndsAt", workspace:GetServerTimeNow() + ph.endsIn)
