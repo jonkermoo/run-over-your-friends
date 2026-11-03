@@ -569,24 +569,7 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 			Enum.Material.Cardboard
 		)
 	end
-	-- delivery trucks backed up to two bays, pallets by the third
-	for _, k in { 5, 11 } do
-		local a = -W / 2 + (k - 0.5) * (W / n)
-		local at = base + out * (D / 2 + 14) + along * a
-		part(
-			model,
-			Vector3.new(10, 11, 20),
-			CFrame.lookAt(at + Vector3.new(0, Y0 + 7, 0), at + out + Vector3.new(0, Y0 + 7, 0)),
-			Color3.fromRGB(240, 240, 240)
-		)
-		local cab = at + out * 13.5
-		part(
-			model,
-			Vector3.new(10, 8, 7),
-			CFrame.lookAt(cab + Vector3.new(0, Y0 + 5, 0), cab + out + Vector3.new(0, Y0 + 5, 0)),
-			trim
-		)
-	end
+	-- pallets by the third bay
 	local palletAt = base + out * (D / 2 + 5) + along * (-W / 2 + 7.5 * (W / n))
 	for s = 0, 2 do
 		part(

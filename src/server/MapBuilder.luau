@@ -728,7 +728,7 @@ function MapBuilder.build(): Result
 					j
 				)
 			elseif kind == "warehouse" then
-				-- the parcel warehouse: loading bays toward town, trucks backed up to them
+				-- the parcel warehouse: loading bays toward town and pallets of parcels
 				part(
 					static,
 					Vector3.new(inner, 1, inner),
