@@ -1,6 +1,6 @@
 --!strict
 -- The street kit: road paint (double yellows, lane dashes, zebra crossings, stop lines, manholes) and street
--- furniture (lamps, traffic lights, benches, bins, hydrants, parked cars, planter trees, bus shelters, news
+-- furniture (lamps, traffic lights, benches, bins, hydrants, planter trees, bus shelters, news
 -- boxes, mailboxes, planters, A-boards),
 -- styled by district. Paint is flat and never collides. Furniture goes in the Props folder: each piece is a
 -- Model that any vehicle knocks flying (BuildingService puts it back later).
@@ -246,19 +246,6 @@ local function aBoard(folder: Instance, at: Vector3, out: Vector3, color: Color3
 	w.Parent = m
 end
 
-local function parkedCar(folder: Instance, at: Vector3, along: Vector3, color: Color3)
-	local m = prop(folder, "ParkedCar")
-	local cf = CFrame.lookAt(at, at + along)
-	block(m, Vector3.new(6.2, 1.2, 11), cf + Vector3.new(0, 0.7, 0), DARK)
-	block(m, Vector3.new(6, 2, 13), cf + Vector3.new(0, 2.1, 0), color)
-	block(
-		m,
-		Vector3.new(5.4, 2.2, 6.5),
-		cf * CFrame.new(0, 4.2, 0.8),
-		color:Lerp(Color3.new(0, 0, 0), 0.15)
-	)
-end
-
 local function tree(folder: Instance, at: Vector3)
 	local m = prop(folder, "Tree")
 	block(
@@ -307,6 +294,10 @@ local function shelter(folder: Instance, at: Vector3, out: Vector3, accent: Colo
 		Enum.Material.WoodPlanks
 	)
 end
+
+-- the park uses the same benches and lamps
+StreetKit.bench = bench
+StreetKit.lamp = lamp
 
 export type Result = { places: { Places.Place } }
 
@@ -466,22 +457,6 @@ function StreetKit.build(
 					local out = Vector3.new(math.cos(a), 0, math.sin(a))
 					bench(props, centre + out * (inner * 0.22), -out)
 				end
-			elseif kind == "parking" then
-				-- a row of parked cars nosed into the back edge, east of the long ramp
-				for k = 0, S.LotCars - 1 do
-					local at = centre + Vector3.new(-inner / 2 + 60 + k * 10, 0, -inner / 2 + 9)
-					local colour = S.CarColours[random:NextInteger(1, #S.CarColours)]
-					parkedCar(props, at, Vector3.new(0, 0, -1), rgb(colour))
-				end
-			end
-			-- parked cars along the kerb, away from the crossings
-			for _ = 1, S.ParkedPerBlock do
-				local out = SIDES[random:NextInteger(1, 4)]
-				local along = Vector3.new(-out.Z, 0, out.X)
-				local at = centre
-					+ out * (B / 2 + S.ParkedOffset)
-					+ along * random:NextNumber(-B / 4, B / 4)
-				parkedCar(props, at, along, rgb(S.CarColours[random:NextInteger(1, #S.CarColours)]))
 			end
 			-- a bus shelter and its waiting crowd on busy blocks
 			if busy and random:NextNumber() < S.ShelterChance then

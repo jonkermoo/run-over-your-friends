@@ -855,6 +855,7 @@ local MATERIALS = {
 	Metal = true,
 	Slate = true,
 	Limestone = true,
+	DiamondPlate = true,
 }
 local stylesOk = true
 for key, d in Streets.Districts do
@@ -1373,7 +1374,7 @@ check(
 		and #CrowdConfig.Shop.Aprons >= 2
 )
 
--- outskirts: zones round the ring, terrain hills that never touch a road or zone
+-- outskirts: zones round the ring, and clear spots on the grass that never touch a road or zone
 do
 	local MW = World.Map
 	local mpitch = MW.BlockSize + MW.RoadWidth
@@ -1419,50 +1420,15 @@ do
 		seed = (seed * 1103515245 + 12345) % 2147483648
 		return seed / 2147483648
 	end
-	local H = OutskirtsConfig.Hills
-	local hills = OutskirtsRules.hills(half, { ring, z.stunt, z.port, z.desert, z.site }, H, rng)
-	local clear = true
-	for _, h in hills do
-		local f = OutskirtsRules.footprint(h.r, H.Bury)
-		for _, r in { ring, z.stunt, z.port, z.desert, z.site } do
-			if OutskirtsRules.distance(r, h.x, h.z) < f + H.Margin - 0.01 then
-				clear = false
-			end
-		end
-		if
-			h.r < H.RadiusMin
-			or h.r > H.RadiusMax
-			or math.abs(h.x) > half
-			or math.abs(h.z) > half
-		then
-			clear = false
-		end
-	end
-	check("hills fill the empty ground", #hills > 100)
-	check("no hill reaches a road or a zone", clear)
 	local function checkGroves()
 		local Wl = OutskirtsConfig.Wilds
 		local rects = { ring, z.stunt, z.port, z.desert, z.site }
-		local groves = OutskirtsRules.clearSpots(
-			half,
-			rects,
-			hills,
-			H.Bury,
-			Wl.Groves,
-			Wl.GroveRadius,
-			Wl.Margin,
-			rng
-		)
+		local groves =
+			OutskirtsRules.clearSpots(half, rects, Wl.Groves, Wl.GroveRadius, Wl.Margin, rng)
 		local groveClear = #groves > Wl.Groves / 2
 		for ia, g in groves do
 			for _, r in rects do
 				if OutskirtsRules.distance(r, g.x, g.z) < Wl.GroveRadius + Wl.Margin - 0.01 then
-					groveClear = false
-				end
-			end
-			for _, h in hills do
-				local d = math.sqrt((g.x - h.x) ^ 2 + (g.z - h.z) ^ 2)
-				if d < OutskirtsRules.footprint(h.r, H.Bury) + Wl.GroveRadius then
 					groveClear = false
 				end
 			end
@@ -1473,7 +1439,7 @@ do
 				end
 			end
 		end
-		check("groves land on the open grass, apart, clear of roads, zones and hills", groveClear)
+		check("groves land on the open grass, apart, clear of roads and zones", groveClear)
 	end
 	checkGroves()
 	check(
@@ -1997,6 +1963,18 @@ do
 			goal.helpers[1] and goal.helpers[2] and not goal.helpers[3]
 		)
 		check("server goal kinds take turns", Sg.nextIndex(1, 2) == 2 and Sg.nextIndex(2, 2) == 1)
+		local goalKinds = {}
+		for _, k in SgConfig.Kinds do
+			goalKinds[k.kind] = true
+		end
+		check(
+			"stunt jumps are a server goal too",
+			goalKinds.Breaks and goalKinds.Hits and goalKinds.Jumps and #SgConfig.Kinds == 3
+		)
+		check(
+			"three server goal kinds take turns",
+			Sg.nextIndex(3, 3) == 1 and Sg.nextIndex(2, 3) == 3
+		)
 	end
 	checkServerGoals()
 end
@@ -2181,6 +2159,25 @@ do
 		Balance.supported(at({ { -2, -5 }, { 2, -5 }, { 2, 5 } }), mid, margin)
 	)
 	check("hull drops inner points", #Balance.hull(all) == 4)
+end
+
+do
+	-- parks and ramps: the park's paths and pond fit its block, the ramp deck is a real material
+	local Parks = require("../src/shared/Config/Parks")
+	local Ramps = require("../src/shared/Config/Ramps")
+	local PK = Parks.Park
+	local parkInner = World.Map.BlockSize - World.Map.SidewalkWidth * 2
+	local lawn = (parkInner / 2 - PK.Path / 2) / 2 - 8
+	check(
+		"the park's pond, paths and lawns fit its block",
+		PK.Pond + PK.Rim * 2 + 8 < parkInner / 2
+			and lawn > 24
+			and Parks.Tree.Trunk[1] < Parks.Tree.Trunk[2]
+	)
+	check(
+		"ramp trim fits and the deck is a real material",
+		MATERIALS[Ramps.Deck] == true and Ramps.Lip > 0 and Ramps.ChevronSpan < 0.5
+	)
 end
 
 if failures > 0 then
