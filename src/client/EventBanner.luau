@@ -60,7 +60,10 @@ timer.TextXAlignment = Enum.TextXAlignment.Right
 
 -- contest standings: one row per leader, then your own place
 local ROW = 18
-local NARROW = 1000 -- px: narrower screens show only the leader and you
+-- px: on narrower screens the live sign is slimmer (so its X clears the cash box, top right) and a
+-- contest lists only the leader and you
+local NARROW = 1000
+local SIGN_W, SIGN_W_NARROW = 380, 290
 local rows: { TextLabel } = {}
 for i = 1, Config.ContestShown do
 	local r = Style.label(banner, "", 14, F.heavy, C.text)
@@ -72,6 +75,8 @@ for i = 1, Config.ContestShown do
 	rows[i] = r
 end
 local you = Style.label(banner, "", 14, F.display, C.text)
+you.Size = UDim2.new(1, -28, 0, ROW)
+you.TextXAlignment = Enum.TextXAlignment.Left
 you.TextTruncate = Enum.TextTruncate.AtEnd
 you.Visible = false
 
@@ -280,14 +285,17 @@ local function fillStandings(event: Config.Event, ink: Color3): number
 	local function amount(n: number): string
 		return Contest.amount(n, c.unit)
 	end
-	-- on a narrow screen (Studio, phones) only the leader and you show, side by side on one row, so the
-	-- sign stays short over the job card and leaves room for the server goal strip under it
+	-- on a narrow screen (Studio, phones) only the leader and you show, one row each and right-aligned
+	-- (the tutorial's job card, top left, covers the sign's left end there), so the sign stays short and
+	-- leaves room for the server goal strip under it
 	local narrow = gui.AbsoluteSize.X < NARROW
+	local align = if narrow then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left
+	you.TextXAlignment = align
 	for i, r in rows do
 		local e = s.top[i]
 		r.TextColor3 = ink
+		r.TextXAlignment = align
 		r.Visible = not narrow or i == 1
-		r.Size = if narrow then UDim2.new(0.5, -14, 0, ROW) else UDim2.new(1, -28, 0, ROW)
 		r.Text = if e
 			then `{Contest.ordinal(i)}   {e.name}   {amount(e.score)}`
 			else `{Contest.ordinal(i)}   -`
@@ -297,14 +305,10 @@ local function fillStandings(event: Config.Event, ink: Color3): number
 		then `YOU: {Contest.ordinal(s.place)} OF {s.count}   {amount(s.score)}`
 		else "YOU: NOT SCORED YET"
 	if narrow then
-		you.Position = UDim2.new(0.5, 0, 0, 74)
-		you.Size = UDim2.new(0.5, -14, 0, ROW)
-		you.TextXAlignment = Enum.TextXAlignment.Right
-		return ROW + 8
+		you.Position = UDim2.fromOffset(14, 74 + ROW)
+		return 2 * ROW + 8
 	end
 	you.Position = UDim2.fromOffset(14, 78 + Config.ContestShown * ROW)
-	you.Size = UDim2.new(1, -28, 0, ROW)
-	you.TextXAlignment = Enum.TextXAlignment.Left
 	return Config.ContestShown * ROW + ROW + 12
 end
 
@@ -363,7 +367,8 @@ local function update()
 	if phase ~= "live" then
 		showRows(false)
 	end
-	banner.Size = UDim2.fromOffset(380, 80 + extra)
+	banner.Size =
+		UDim2.fromOffset(if gui.AbsoluteSize.X < NARROW then SIGN_W_NARROW else SIGN_W, 80 + extra)
 	banner.BackgroundColor3 = color
 	paintLines(ink)
 	pill.Visible = true
