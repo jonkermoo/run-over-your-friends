@@ -1,5 +1,6 @@
 --!strict
--- First-session guidance and goals: the goal card under the menu strip (spawn → run over 3 → next ride),
+-- First-session guidance: the tutorial card under the menu strip (spawn → run over 3; after that the
+-- pinned goals sit there, PinnedGoals),
 -- a bouncing arrow over the nearest pedestrian, glowing GARAGE button, timed hints for stuck players,
 -- one-time tips when you first drive a vehicle with a feature, and the confetti moment.
 
@@ -27,7 +28,6 @@ local BOLD = F.display
 local CONFETTI = { C.red, C.gold, C.green, C.blue, C.purple, C.orange }
 local corner = Style.corner
 local label = Style.label
-local money = Style.money
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Guide"
@@ -201,26 +201,6 @@ end
 
 ---------------------------------------------------------------- state
 
-local function owns(id: string): boolean
-	return string.find(
-		"," .. ((player:GetAttribute("Owned") or "") :: string) .. ",",
-		"," .. id .. ",",
-		1,
-		true
-	) ~= nil
-end
-
--- the cheapest vehicle you don't have yet
-local function nextRide(): Vehicles.Vehicle?
-	local best: Vehicles.Vehicle? = nil
-	for _, v in Vehicles.List do
-		if not owns(v.id) and (best == nil or v.price < best.price) then
-			best = v
-		end
-	end
-	return best
-end
-
 local function nearestPedestrian(from: Vector3): BasePart?
 	local npcs = workspace:FindFirstChild("Npcs")
 	if not npcs then
@@ -319,7 +299,6 @@ local function update()
 		stepStarted = os.clock()
 	end
 	local stuck = os.clock() - stepStarted > Onboarding.HintAfter
-	local cash = (player:GetAttribute("Money") or 0) :: number
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local touch = UserInputService.TouchEnabled
@@ -331,10 +310,6 @@ local function update()
 	local glowCard: string? = nil
 	stroke.Transparency = 1
 
-	local tutorial = stepValue == Steps.Spawn or stepValue == Steps.Hits
-	tag.Text = if tutorial then "TUTORIAL" else "NEXT RIDE"
-	tag.BackgroundColor3 = if tutorial then GOLD else MONEY
-	cardStripe.BackgroundColor3 = tag.BackgroundColor3
 	if stepValue == Steps.Spawn then
 		goalText.Text = "Spawn your Hatchback from the GARAGE"
 		barFill.Size = UDim2.fromScale(0, 1)
@@ -368,21 +343,8 @@ local function update()
 			hintText.Visible = true
 		end
 	else
-		local v = nextRide()
-		if v then
-			local ready = cash >= v.price
-			goalText.Text = if ready
-				then `Buy the {v.name} in the GARAGE!`
-				else `{v.name}   {money(cash)} / {money(v.price)}`
-			barFill.Size = UDim2.fromScale(math.clamp(cash / math.max(v.price, 1), 0, 1), 1)
-			if ready then
-				glowGarage = true
-				glowCard = v.id
-				stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
-			end
-		else
-			card.Visible = false
-		end
+		-- the tutorial is over: the pinned goals take this spot
+		card.Visible = false
 	end
 
 	glow(garageButton, glowGarage and not (garage and garage.Visible))

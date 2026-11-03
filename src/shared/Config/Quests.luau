@@ -1,7 +1,7 @@
 --!strict
 -- Hourly and daily goals. Each template rolls a target between min and max (rounded to step);
 -- the reward is target * perUnit, rounded to $10. "add" goals count up, "max" goals keep your best.
--- needs: only offered when the player owns a vehicle with that ability.
+-- needs: only offered when the player owns a vehicle with that ability. Pins: see the bottom.
 
 export type Template = {
 	kind: string,
@@ -138,5 +138,12 @@ return table.freeze({
 				perUnit = 12,
 			}),
 		}),
+	}),
+	-- goals pinned to the left of the screen (client side, for the session): at most Max, Default pinned
+	-- for you when nothing is; a finished pin shows DONE for FlashSeconds, then moves to the set's next goal
+	Pins = table.freeze({
+		Max = 3,
+		Default = 1,
+		FlashSeconds = 2.5,
 	}),
 })
