@@ -97,6 +97,22 @@ function Daily.saleIds(
 	return ids
 end
 
+-- a player's car of the day: the day's pick from the sale cars they don't own yet; nil if they own them all
+function Daily.pickFor(
+	ids: { string },
+	owned: { [string]: boolean },
+	day: number,
+	salt: number
+): string?
+	local left = {}
+	for _, id in ids do
+		if not owned[id] then
+			table.insert(left, id)
+		end
+	end
+	return Daily.carOfDay(left, day, salt)
+end
+
 function Daily.salePrice(price: number, share: number, round: number): number
 	return math.max(0, math.floor(price * (1 - share) / round + 0.5) * round)
 end

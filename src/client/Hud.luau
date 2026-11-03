@@ -399,11 +399,11 @@ type Card = {
 	was: TextLabel,
 }
 
--- the car of the day (Config/Daily) is cheaper; the server charges the same price from the same UTC day
-local saleIds = DailyRules.saleIds(Vehicles.List, DailyConfig.DiscountSkip)
+-- your car of the day (Config/Daily) is cheaper: the server picks it from the cars you don't own and
+-- publishes it, so the card shows the price the server charges
 local function onSaleToday(): string?
-	local day = DailyRules.day(workspace:GetServerTimeNow(), DailyConfig.DaySeconds)
-	return DailyRules.carOfDay(saleIds, day, DailyConfig.DiscountSalt)
+	local id = player:GetAttribute("CarOfDay")
+	return if typeof(id) == "string" and id ~= "" then id else nil
 end
 local function priceOf(stats: Vehicles.Vehicle): number
 	return DailyRules.price(
@@ -1205,16 +1205,7 @@ function Hud.start()
 	refreshCards()
 	refreshStore()
 	-- a new car of the day at UTC midnight
-	task.spawn(function()
-		local shown = onSaleToday()
-		while true do
-			task.wait(15)
-			if onSaleToday() ~= shown then
-				shown = onSaleToday()
-				refreshCards()
-			end
-		end
-	end)
+	player:GetAttributeChangedSignal("CarOfDay"):Connect(refreshCards)
 	-- first visit: open the garage so the starter car is one click away
 	task.delay(2, function()
 		while not player:GetAttribute("DataReady") do
