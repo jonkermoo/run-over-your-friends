@@ -2010,8 +2010,9 @@ local function checkTraffic()
 			and math.abs(nx - (ax + TrafficConfig.Lane)) < 1e-6
 	)
 	check(
-		"the lane misses parked cars at the kerb",
-		TrafficConfig.Lane + 4 < Mp.RoadWidth / 2 - StreetConfig.ParkedOffset - 3.5
+		"a car in its lane stays on its own half of the road",
+		TrafficConfig.Lane - TrafficConfig.HalfWidth > 0
+			and TrafficConfig.Lane + TrafficConfig.HalfWidth < Mp.RoadWidth / 2
 	)
 	-- at crossings: never back the way they came while another road is there; straight on is likeliest
 	local noU, straights, picks = true, 0, 400

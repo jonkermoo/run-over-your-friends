@@ -17,7 +17,7 @@ return table.freeze({
 	FactoryChance = 0.35, -- other cars keep their own colour this often, else a random Config/Paints colour
 
 	-- driving
-	Lane = 11, -- studs right of the road's centre line (the outer lane is where cars park)
+	Lane = 11, -- studs right of the road's centre line
 	Cruise = 48, -- studs/s (about 25 mph)
 	TurnSpeed = 26, -- through a turn
 	Accel = 22, -- studs/s^2
