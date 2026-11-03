@@ -216,8 +216,8 @@ function Roads.stopSpeed(gap: number, brake: number): number
 	return math.sqrt(2 * brake * math.max(0, gap))
 end
 
--- how far ahead (studs, along heading hx, hz) the nearest thing in the way is: points within `half` + their
--- own radius of the car's line, at most `look` ahead; math.huge when the way is clear
+-- how far ahead (studs, along heading hx, hz) the nearest thing in the way is, and which point it is: points
+-- within `half` + their own radius of the car's line, at most `look` ahead; math.huge (and 0) when clear
 function Roads.gapAhead(
 	x: number,
 	z: number,
@@ -228,8 +228,8 @@ function Roads.gapAhead(
 	px: { number },
 	pz: { number },
 	pr: { number }
-): number
-	local best = math.huge
+): (number, number)
+	local best, who = math.huge, 0
 	for k = 1, #px do
 		local dx, dz = px[k] - x, pz[k] - z
 		local along = dx * hx + dz * hz
@@ -238,12 +238,12 @@ function Roads.gapAhead(
 			if side < half + pr[k] then
 				local gap = along - pr[k]
 				if gap < best then
-					best = gap
+					best, who = gap, k
 				end
 			end
 		end
 	end
-	return best
+	return best, who
 end
 
 -- do two boxes on the ground overlap? Each is a centre, a unit forward and half its width and length.

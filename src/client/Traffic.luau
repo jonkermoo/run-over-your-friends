@@ -174,7 +174,7 @@ local function fling(car: Car, push: Vector3)
 	copy.body.CanCollide = true
 	copy.body.AssemblyLinearVelocity = push
 	copy.body.AssemblyAngularVelocity =
-		Vector3.new(math.random() * 6 - 3, math.random() * 8 - 4, math.random() * 6 - 3)
+		Vector3.new(math.random() * 10 - 5, math.random() * 10 - 5, math.random() * 10 - 5)
 	task.delay(Cfg.WreckSeconds, function()
 		for _, e in copy.parts do
 			TweenService:Create(e.part, TweenInfo.new(0.6), { Transparency = 1 }):Play()
@@ -401,7 +401,11 @@ local function step(dt: number)
 		hitAt[car.id] = clock
 		Net.waitFor("HitTraffic"):FireServer(car.id, chassis.AssemblyLinearVelocity)
 		-- show it at once; the server's word (TrafficCrash) then flings it on everyone else's screen
-		fling(car, (vel - carVel) * 0.9 + Vector3.new(0, 25 + closing * 1.5, 0))
+		fling(
+			car,
+			(vel - carVel) * Cfg.FlingAlong
+				+ Vector3.new(0, Cfg.FlingUp + closing * Cfg.FlingUpPerMs, 0)
+		)
 		-- the hit costs speed, less the heavier you are
 		local w = (stats and stats.weight) or 1500
 		local keep = 1 - Cfg.BumpShare * copy.weight / (copy.weight + w)

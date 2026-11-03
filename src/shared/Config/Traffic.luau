@@ -25,8 +25,12 @@ return table.freeze({
 	Gap = 9, -- bumper gap kept to whatever is in front
 	Look = 45, -- how far ahead they watch for people and players in their lane
 	StraightWeight = 3, -- at a crossing, straight on is this many times likelier than each turn
+	Patience = 5, -- seconds stuck behind a player (their vehicle, or them on foot) before honking and passing
+	PassShift = 7, -- studs/s sideways while pulling out into the other lane and back
+	PassSpeed = 22, -- studs/s while out of their lane
 	StopLine = 47, -- studs before a crossing's centre where they wait at a red light
 	CarLength = 18, -- for spacing (studs, the longest kinds)
+	HalfWidth = 5, -- half a car's width plus a little: how wide a path they keep clear ahead
 	Tick = 0.1, -- server step
 
 	-- keeping them near players
@@ -50,5 +54,8 @@ return table.freeze({
 	WreckSeconds = 5, -- the flung car stays this long on screen, then fades
 	Pay = 40, -- money per wreck at CrashSpeed...
 	PayMax = 3, -- ...up to this many times more at speed
+	FlingAlong = 1.2, -- a wreck flies off at this share of the closing velocity...
+	FlingUp = 60, -- ...plus this much straight up (studs/s; Roblox gravity is strong)...
+	FlingUpPerMs = 2.5, -- ...and this much more per m/s of closing speed
 	BumpShare = 0.5, -- the hitting vehicle loses up to this share of its speed (less the heavier it is)
 })

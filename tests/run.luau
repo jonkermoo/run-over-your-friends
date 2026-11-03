@@ -1981,7 +1981,7 @@ local function checkTraffic()
 		"stopping speed falls to zero at the line",
 		Roads.stopSpeed(0, 60) == 0 and Roads.stopSpeed(30, 60) == 60
 	)
-	local gap = Roads.gapAhead(
+	local gap, who = Roads.gapAhead(
 		0,
 		0,
 		0,
@@ -1994,7 +1994,7 @@ local function checkTraffic()
 	)
 	check(
 		"they see the nearest person in their lane ahead, not beside or behind",
-		math.abs(gap - 18.5) < 1e-6
+		math.abs(gap - 18.5) < 1e-6 and who == 1
 	)
 	check(
 		"boxes side by side don't touch, boxes nose to nose do",
