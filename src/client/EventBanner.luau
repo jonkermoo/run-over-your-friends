@@ -1,6 +1,7 @@
 --!strict
 -- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
+-- During a contest event the sign also lists the top 3 and your own place (the Contest remote, once a second).
 -- Under it, a slim strip shows the shared server goal's progress (finishing it brings the next event).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,6 +10,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
+local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
@@ -55,6 +57,37 @@ timer.AnchorPoint = Vector2.new(1, 0)
 timer.Position = UDim2.new(1, -14, 0, 11)
 timer.Size = UDim2.fromOffset(150, 22)
 timer.TextXAlignment = Enum.TextXAlignment.Right
+
+-- contest standings: one row per leader, then your own place
+local ROW = 18
+-- px: on narrower screens the live sign is slimmer (so its X clears the cash box, top right) and a
+-- contest lists only the leader and you
+local NARROW = 1000
+local SIGN_W, SIGN_W_NARROW = 380, 290
+local rows: { TextLabel } = {}
+for i = 1, Config.ContestShown do
+	local r = Style.label(banner, "", 14, F.heavy, C.text)
+	r.Position = UDim2.fromOffset(14, 74 + (i - 1) * ROW)
+	r.Size = UDim2.new(1, -28, 0, ROW)
+	r.TextXAlignment = Enum.TextXAlignment.Left
+	r.TextTruncate = Enum.TextTruncate.AtEnd
+	r.Visible = false
+	rows[i] = r
+end
+local you = Style.label(banner, "", 14, F.display, C.text)
+you.Size = UDim2.new(1, -28, 0, ROW)
+you.TextXAlignment = Enum.TextXAlignment.Left
+you.TextTruncate = Enum.TextTruncate.AtEnd
+you.Visible = false
+
+type Standings = {
+	key: string,
+	top: { { name: string, score: number } },
+	place: number,
+	score: number,
+	count: number,
+}
+local standings: Standings? = nil
 
 -- the server goal strip hangs under the sign (or its chip), clear of its shadow. Like the sign, an X beside
 -- it shrinks it to a small chip with the progress, and tapping the chip brings it back.
@@ -130,17 +163,25 @@ chip.Name = "EventChip"
 chip.BackgroundColor3 = C.panel
 chip.AnchorPoint = Vector2.new(0.5, 0)
 chip.Position = UDim2.new(0.5, 0, 0, 8)
-chip.Size = UDim2.fromOffset(104, 44)
+chip.Size = UDim2.fromOffset(112, 44)
 chip.Visible = false
+-- the chip's icon: a diamond road sign in the event's colour with a "!" on it
 local chipDot = Instance.new("Frame")
 chipDot.BorderSizePixel = 0
-chipDot.AnchorPoint = Vector2.new(0, 0.5)
-chipDot.Position = UDim2.new(0, 10, 0.5, 0)
-chipDot.Size = UDim2.fromOffset(16, 16)
+chipDot.AnchorPoint = Vector2.new(0.5, 0.5)
+chipDot.Position = UDim2.new(0, 22, 0.5, 0)
+chipDot.Size = UDim2.fromOffset(18, 18)
+chipDot.Rotation = 45
+chipDot.ZIndex = 2
 chipDot.Parent = chip
+local chipMark = Style.label(chip, "!", 18, F.display, C.ink)
+chipMark.AnchorPoint = Vector2.new(0.5, 0.5)
+chipMark.Position = UDim2.new(0, 22, 0.5, 1)
+chipMark.Size = UDim2.fromOffset(18, 22)
+chipMark.ZIndex = 3
 local chipTimer = Style.label(chip, "", 18, F.display, C.yellow)
-chipTimer.Position = UDim2.fromOffset(32, 3)
-chipTimer.Size = UDim2.new(1, -38, 1, 0)
+chipTimer.Position = UDim2.fromOffset(40, 3)
+chipTimer.Size = UDim2.new(1, -46, 1, 0)
 hide.Activated:Connect(function()
 	shrunk = true
 end)
@@ -225,6 +266,52 @@ end
 
 local lastPhase, lastKey = "", ""
 
+local function showRows(on: boolean)
+	for _, r in rows do
+		r.Visible = on
+	end
+	you.Visible = on
+end
+
+-- fills the standings rows; returns the extra height they need
+local function fillStandings(event: Config.Event, ink: Color3): number
+	local c = event.contest
+	local s = standings
+	if not c or not s or s.key ~= event.key then
+		showRows(false)
+		return 0
+	end
+	showRows(true)
+	local function amount(n: number): string
+		return Contest.amount(n, c.unit)
+	end
+	-- on a narrow screen (Studio, phones) only the leader and you show, one row each and right-aligned
+	-- (the tutorial's job card, top left, covers the sign's left end there), so the sign stays short and
+	-- leaves room for the server goal strip under it
+	local narrow = gui.AbsoluteSize.X < NARROW
+	local align = if narrow then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left
+	you.TextXAlignment = align
+	for i, r in rows do
+		local e = s.top[i]
+		r.TextColor3 = ink
+		r.TextXAlignment = align
+		r.Visible = not narrow or i == 1
+		r.Text = if e
+			then `{Contest.ordinal(i)}   {e.name}   {amount(e.score)}`
+			else `{Contest.ordinal(i)}   -`
+	end
+	you.TextColor3 = ink
+	you.Text = if s.place > 0
+		then `YOU: {Contest.ordinal(s.place)} OF {s.count}   {amount(s.score)}`
+		else "YOU: NOT SCORED YET"
+	if narrow then
+		you.Position = UDim2.fromOffset(14, 74 + ROW)
+		return 2 * ROW + 8
+	end
+	you.Position = UDim2.fromOffset(14, 78 + Config.ContestShown * ROW)
+	return Config.ContestShown * ROW + ROW + 12
+end
+
 local function update()
 	local phase = workspace:GetAttribute("EventPhase")
 	local key = workspace:GetAttribute("EventKey")
@@ -249,6 +336,7 @@ local function update()
 	lastPhase, lastKey = phase, key
 	if shrunk then
 		chipDot.BackgroundColor3 = if phase == "quiet" then C.grey else color
+		chipMark.TextColor3 = inkOn(chipDot.BackgroundColor3)
 		chipTimer.Text = fmt(if phase == "quiet" then left + Config.WarnSeconds else left)
 		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
 		Style.setShadow(chip, if blink then C.text else C.ink)
@@ -264,6 +352,7 @@ local function update()
 		paintLines(C.yellow)
 		pill.Visible = false
 		text.Visible = false
+		showRows(false)
 		title.Text = "NEXT EVENT"
 		title.TextColor3 = C.text
 		title.Position = UDim2.fromOffset(14, 10)
@@ -274,7 +363,12 @@ local function update()
 	end
 	-- warn or live: the sign is painted the event's colour
 	local ink = inkOn(color)
-	banner.Size = UDim2.fromOffset(380, 80)
+	local extra = if phase == "live" then fillStandings(event, ink) else 0
+	if phase ~= "live" then
+		showRows(false)
+	end
+	banner.Size =
+		UDim2.fromOffset(if gui.AbsoluteSize.X < NARROW then SIGN_W_NARROW else SIGN_W, 80 + extra)
 	banner.BackgroundColor3 = color
 	paintLines(ink)
 	pill.Visible = true
@@ -327,6 +421,9 @@ local function placeStrip()
 end
 
 function EventBanner.start()
+	Net.waitFor("Contest").OnClientEvent:Connect(function(state: Standings)
+		standings = state
+	end)
 	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set)
 		local g = typeof(set) == "table" and typeof(set.goals) == "table" and set.goals[1]
 		serverGoal = if typeof(g) == "table" then g else nil

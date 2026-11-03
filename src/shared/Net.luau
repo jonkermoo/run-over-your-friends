@@ -28,6 +28,7 @@ Net.Messages = table.freeze({
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom" | "Dodge", position: Vector3, a: number, b: number, userId: number)
+	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
@@ -55,6 +56,7 @@ export type MessageName =
 	| "Celebrate"
 	| "Goals"
 	| "Fx"
+	| "Contest"
 	| "Boards"
 	| "Daily"
 	| "ServerGoal"
