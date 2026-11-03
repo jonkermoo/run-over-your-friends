@@ -1875,6 +1875,152 @@ do
 	checkServerGoals()
 end
 
+local function checkTraffic()
+	-- traffic: the road network (Rules/Roads) and its numbers (Config/Traffic)
+	local Roads = require("../src/shared/Rules/Roads")
+	local TrafficConfig = require("../src/shared/Config/Traffic")
+	local StreetConfig = require("../src/shared/Config/Streets")
+	local Mp = World.Map
+	local g = Roads.graph(grid, function(i, j)
+		return i == 1 and j == 1
+	end)
+	local n = (Mp.BlocksX + 1) * (Mp.BlocksZ + 1)
+	local roadsAlong = Mp.BlocksX * (Mp.BlocksZ + 1) + Mp.BlocksZ * (Mp.BlocksX + 1)
+	check(
+		"a node at every crossing and one link each way per road",
+		#g.nodes == n and #g.links == roadsAlong * 2
+	)
+	local ax, az = Roads.crossing(grid, 0, 0)
+	check(
+		"crossings sit in the middle of the roads",
+		math.abs(ax - (grid.x0 + Mp.RoadWidth / 2)) < 1e-6 and az == ax
+	)
+	-- keep right: heading east (+x), the lane is on the +z side; heading north (-z), on the +x side
+	local east = g.between[Roads.nodeId(grid, 0, 0)][Roads.nodeId(grid, 1, 0)]
+	local north = g.between[Roads.nodeId(grid, 0, 1)][Roads.nodeId(grid, 0, 0)]
+	local _, ez = Roads.lanePoint(g, east, 10, TrafficConfig.Lane)
+	local nx = Roads.lanePoint(g, north, 10, TrafficConfig.Lane)
+	check(
+		"cars keep right",
+		math.abs(ez - (az + TrafficConfig.Lane)) < 1e-6
+			and math.abs(nx - (ax + TrafficConfig.Lane)) < 1e-6
+	)
+	check(
+		"the lane misses parked cars at the kerb",
+		TrafficConfig.Lane + 4 < Mp.RoadWidth / 2 - StreetConfig.ParkedOffset - 3.5
+	)
+	-- at crossings: never back the way they came while another road is there; straight on is likeliest
+	local noU, straights, picks = true, 0, 400
+	for k = 1, picks do
+		local from = g.links[(k * 37) % #g.links + 1]
+		local nextId = Roads.nextLink(g, from.id, math.random(), TrafficConfig.StraightWeight)
+		local nl = g.links[nextId]
+		if nl.a ~= from.b then
+			noU = false
+		end
+		if nl.b == from.a and #g.nodes[from.b].out > 1 then
+			noU = false
+		end
+		if math.abs(nl.dx - from.dx) < 1e-6 and math.abs(nl.dz - from.dz) < 1e-6 then
+			straights += 1
+		end
+	end
+	check("no U-turns at crossings, and the next road starts where the last ended", noU)
+	check("straight on is the commonest choice", straights > picks * 0.4)
+	-- a right turn's curve starts on the in-lane, ends on the out-lane, and is shorter than going round the corner
+	local southFrom = g.between[Roads.nodeId(grid, 1, 0)][Roads.nodeId(grid, 1, 1)] -- heading +z
+	local westTo = g.between[Roads.nodeId(grid, 1, 1)][Roads.nodeId(grid, 0, 1)] -- heading -x: a right turn
+	local turn = Roads.turn(g, southFrom, westTo, TrafficConfig.Lane)
+	local tx0, tz0 = Roads.onTurn(turn, 0)
+	local fx, fz = Roads.onTurn(turn, 1)
+	local inX, inZ = Roads.lanePoint(
+		g,
+		southFrom,
+		g.links[southFrom].length - Mp.RoadWidth / 2,
+		TrafficConfig.Lane
+	)
+	local outX, outZ = Roads.lanePoint(g, westTo, Mp.RoadWidth / 2, TrafficConfig.Lane)
+	check(
+		"a turn joins the two lanes",
+		math.abs(tx0 - inX) < 1e-6
+			and math.abs(tz0 - inZ) < 1e-6
+			and math.abs(fx - outX) < 1e-6
+			and math.abs(fz - outZ) < 1e-6
+	)
+	local _, _, hx0, hz0 = Roads.onTurn(turn, 0)
+	local _, _, hx1, hz1 = Roads.onTurn(turn, 1)
+	check(
+		"a turn leaves along the old road and arrives along the new one",
+		math.abs(hz0 - 1) < 1e-3
+			and math.abs(hx1 + 1) < 1e-3
+			and math.abs(hx0) < 1e-3
+			and math.abs(hz1) < 1e-3
+	)
+	check("a turn is a sensible length", turn.length > 5 and turn.length < Mp.RoadWidth * 1.6)
+	-- lights: one way green or amber while the other is red, from server time
+	local okLights = true
+	for t = 0, 60, 0.5 do
+		local ns, ew = Roads.lights(t, StreetConfig)
+		if (ns ~= "red") == (ew ~= "red") then
+			okLights = false
+		end
+	end
+	local ns0 = Roads.lights(0.1, StreetConfig)
+	local ns1 = Roads.lights(StreetConfig.SignalSeconds + 0.1, StreetConfig)
+	check("only one way goes at a time", okLights and ns0 == "green" and ns1 == "amber")
+	check(
+		"unlit crossings never stop anyone",
+		Roads.lightFor(
+			g,
+			east,
+			StreetConfig.SignalSeconds * 1.5 + StreetConfig.AmberSeconds,
+			StreetConfig
+		) == "green"
+	)
+	check(
+		"stopping speed falls to zero at the line",
+		Roads.stopSpeed(0, 60) == 0 and Roads.stopSpeed(30, 60) == 60
+	)
+	local gap = Roads.gapAhead(
+		0,
+		0,
+		0,
+		-1,
+		3.5,
+		45,
+		{ 0.5, 10, 0 },
+		{ -20, -5, 10 },
+		{ 1.5, 1.5, 1.5 }
+	)
+	check(
+		"they see the nearest person in their lane ahead, not beside or behind",
+		math.abs(gap - 18.5) < 1e-6
+	)
+	check(
+		"boxes side by side don't touch, boxes nose to nose do",
+		not Roads.overlap(0, 0, 0, -1, 3, 8, 7, 0, 0, -1, 3, 8)
+			and Roads.overlap(0, 0, 0, -1, 3, 8, 0, -15, 0, 1, 3, 8)
+			and Roads.overlap(0, 0, 0, -1, 3, 8, 5, -9, 1, 0, 3, 8)
+	)
+	check(
+		"headings survive packing",
+		math.abs(Roads.u16ToYaw(Roads.yawToU16(1.234)) - 1.234) < 1e-3
+			and Roads.yawToU16(-0.5) == Roads.yawToU16(2 * math.pi - 0.5)
+	)
+	local kindsOk = true
+	for _, k in TrafficConfig.Kinds do
+		if not Vehicles.ById[k.id] or k.weight <= 0 then
+			kindsOk = false
+		end
+	end
+	check("traffic kinds are real vehicles", kindsOk and TrafficConfig.Count <= 255)
+	check(
+		"traffic waits behind the stop line, out of the crossing",
+		TrafficConfig.StopLine > Mp.RoadWidth / 2 and TrafficConfig.StopLine < Mp.BlockSize / 2
+	)
+end
+checkTraffic()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

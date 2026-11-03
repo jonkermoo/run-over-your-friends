@@ -18,11 +18,14 @@ Net.Messages = table.freeze({
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
+	HitTraffic = "HitTraffic", -- (carId: number, velocity: Vector3): the driver's vehicle ran into a traffic car
 	Horn = "Horn", -- client -> server: () honk; server -> other clients: (vehicle: Model)
 	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
 	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
 	-- server -> client
+	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
+	TrafficCrash = "TrafficCrash", -- (carId, gen, fling: Vector3, hitterUserId): a traffic car is wrecked
 	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
 	Popup = "Popup", -- (text: string, kind: string)
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
@@ -47,6 +50,9 @@ export type MessageName =
 	| "SelfDestruct"
 	| "Feature"
 	| "Horn"
+	| "HitTraffic"
+	| "Traffic"
+	| "TrafficCrash"
 	| "BuyPaint"
 	| "SetPaint"
 	| "ClaimDaily"

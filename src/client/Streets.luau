@@ -1,9 +1,11 @@
 --!strict
 -- Traffic lights: every lamp tagged Signal = "NS" or "EW" cycles green, amber, red on this screen only
--- (all crossings change together, so it costs one colour change per lamp every few seconds).
+-- (all crossings change together, so it costs one colour change per lamp every few seconds), in step with
+-- the server's traffic.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
 
 local Streets = {}
@@ -29,16 +31,20 @@ function Streets.start()
 				l.Color = color
 			end
 		end
-		local nsGo = true
+		-- the phase comes from server time (Rules/Roads), so every screen and the traffic agree
+		local COLOURS = { green = GREEN, amber = AMBER, red = RED }
+		local shownNs, shownEw = "", ""
 		while true do
-			local go, stop =
-				if nsGo then lamps.NS else lamps.EW, if nsGo then lamps.EW else lamps.NS
-			set(go, GREEN)
-			set(stop, RED)
-			task.wait(S.SignalSeconds)
-			set(go, AMBER)
-			task.wait(S.AmberSeconds)
-			nsGo = not nsGo
+			local ns, ew = Roads.lights(workspace:GetServerTimeNow(), S)
+			if ns ~= shownNs then
+				set(lamps.NS, COLOURS[ns])
+				shownNs = ns
+			end
+			if ew ~= shownEw then
+				set(lamps.EW, COLOURS[ew])
+				shownEw = ew
+			end
+			task.wait(0.25)
 		end
 	end)
 end
