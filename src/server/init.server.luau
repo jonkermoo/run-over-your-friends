@@ -107,7 +107,7 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 	if not (stats and profile) or profile.owned[stats.id] then
 		return
 	end
-	local price = DailyService.price(stats)
+	local price = DailyService.price(player, stats)
 	if profile.money < price then
 		Net.remote("Popup"):FireClient(player, "Not enough money yet", "info")
 		return

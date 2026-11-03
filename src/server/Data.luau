@@ -24,6 +24,7 @@ export type Profile = {
 	paint: { [string]: string }, -- vehicle id -> paint id (Config/Paints); missing = Factory
 	paints: { [string]: boolean }, -- paid paint colours
 	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
+	sale: { day: number, id: string? }?, -- this player's car of the day and the UTC day it was picked, by DailyService
 }
 
 local Data = {}
@@ -229,6 +230,13 @@ local function load(player: Player)
 					profile.daily = {
 						day = tonumber(daily.day) :: number,
 						streak = tonumber(daily.streak) :: number,
+					}
+				end
+				local sale = decoded.sale
+				if typeof(sale) == "table" and tonumber(sale.day) then
+					profile.sale = {
+						day = tonumber(sale.day) :: number,
+						id = if typeof(sale.id) == "string" then sale.id else nil,
 					}
 				end
 				if typeof(decoded.owned) == "table" then
