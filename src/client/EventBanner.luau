@@ -398,14 +398,22 @@ local function placeStrip()
 	strip.Visible = show and not stripShrunk
 	stripHide.Visible = show and not stripShrunk
 	stripChip.Visible = show and stripShrunk
-	-- on a narrow screen the middle runs into the job card (top left, drawn above us): slide right of it
+	-- on a narrow screen the middle runs into the job card or the pinned goals (top left, drawn above
+	-- us): slide right of them
 	local width = if stripShrunk then stripChip.AbsoluteSize.X else STRIP_W
 	local x = gui.AbsoluteSize.X / 2
-	local guide = playerGui:FindFirstChild("Guide")
-	local card = guide and guide:FindFirstChild("JobCard") :: GuiObject?
-	if card and card.Visible and card.AbsolutePosition.Y < y + STRIP_H then
-		x = math.max(x, card.AbsolutePosition.X + card.AbsoluteSize.X + 12 + width / 2)
-		y = math.max(y, 72) -- slid right, it also clears the cash box (top right, 62 px tall + shadow)
+	for _, path in { { "Guide", "JobCard" }, { "PinnedGoals", "PinnedStack" } } do
+		local holder = playerGui:FindFirstChild(path[1])
+		local card = holder and holder:FindFirstChild(path[2]) :: GuiObject?
+		if
+			card
+			and card.Visible
+			and card.AbsoluteSize.Y > 0
+			and card.AbsolutePosition.Y < y + STRIP_H
+		then
+			x = math.max(x, card.AbsolutePosition.X + card.AbsoluteSize.X + 12 + width / 2)
+			y = math.max(y, 72) -- slid right, it also clears the cash box (top right, 62 px tall + shadow)
+		end
 	end
 	strip.Position = UDim2.fromOffset(x, y)
 	stripChip.Position = UDim2.fromOffset(x, y)

@@ -2121,6 +2121,81 @@ local function checkTraffic()
 end
 checkTraffic()
 
+do
+	local function checkPins()
+		local Pins = require("../src/shared/Rules/Pins")
+		local cfg = QuestConfig.Pins
+		local function set(endsAt: number, ...: boolean)
+			local list = {}
+			for _, d in { ... } do
+				table.insert(list, { done = d })
+			end
+			return { goals = list, endsAt = endsAt }
+		end
+		local sets =
+			{ Hourly = set(100, true, false, false), Daily = set(500, false, false, false) }
+		local start = Pins.default(sets, cfg.Default)
+		check(
+			"the default pin is the first unfinished hourly goal",
+			#start == 1 and start[1].set == "Hourly" and start[1].index == 2
+		)
+		check("no goals, no default pin", #Pins.default({}, cfg.Default) == 0)
+		local pins, what = start, ""
+		pins, what = Pins.toggle(pins, "Daily", 1, 500, cfg.Max)
+		check("pin a second", what == "pinned" and #pins == 2)
+		pins, what = Pins.toggle(pins, "Daily", 2, 500, cfg.Max)
+		local full
+		full, what = Pins.toggle(pins, "Daily", 3, 500, cfg.Max)
+		check("no more than three pins", #pins == 3 and what == "full" and #full == 3)
+		pins, what = Pins.toggle(pins, "Daily", 1, 500, cfg.Max)
+		check(
+			"tapping a pinned goal unpins it",
+			what == "unpinned" and #pins == 2 and not Pins.isPinned(pins, "Daily", 1)
+		)
+		check("toggle never edits the list it was given", #full == 3)
+		-- the pinned hourly goal (index 2) is finished: the pin moves to index 3
+		sets.Hourly.goals[2].done = true
+		local moved, finished = Pins.advance(pins, sets)
+		check(
+			"a finished pin moves to the set's next unfinished goal",
+			#finished == 1
+				and finished[1].index == 2
+				and Pins.isPinned(moved, "Hourly", 3)
+				and not Pins.isPinned(moved, "Hourly", 2)
+				and Pins.isPinned(moved, "Daily", 2)
+		)
+		sets.Hourly.goals[3].done = true
+		local dropped = Pins.advance(moved, sets)
+		check(
+			"with nothing left in the set, the pin goes",
+			#dropped == 1 and dropped[1].set == "Daily"
+		)
+		local both = {
+			{ set = "Daily", index = 1, endsAt = 500 },
+			{ set = "Daily", index = 2, endsAt = 500 },
+		}
+		sets.Daily.goals[1].done = true
+		local after = Pins.advance(both, sets)
+		check(
+			"a moved pin never lands on a goal already pinned",
+			#after == 2 and Pins.isPinned(after, "Daily", 2) and Pins.isPinned(after, "Daily", 3)
+		)
+		local rolled = Pins.advance({ { set = "Hourly", index = 2, endsAt = 100 } }, {
+			Hourly = set(200, false, false, false),
+		})
+		check(
+			"a new hour keeps the pin's place on the fresh goal",
+			#rolled == 1 and rolled[1].index == 2 and rolled[1].endsAt == 200
+		)
+		check(
+			"a pin whose set is gone is dropped",
+			#Pins.advance({ { set = "Weekly", index = 1, endsAt = 0 } }, sets) == 0
+		)
+		check("pin numbers", cfg.Max == 3 and cfg.Default >= 1 and cfg.Default <= cfg.Max)
+	end
+	checkPins()
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
