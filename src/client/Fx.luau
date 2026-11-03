@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
+local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -42,6 +43,20 @@ local SOUNDS: { [string]: { id: { number }, volume: number, pitch: { number }, p
 	Glass = { id = { 9114592102, 9114591515 }, volume = 0.9, pitch = { 0.9, 1.1 }, pool = 3 },
 	Boom = { id = { 9116973611 }, volume = 2.2, pitch = { 0.8, 0.95 }, pool = 2 },
 	Sting = { id = { 9125648149 }, volume = 0.6, pitch = { 1, 1 }, pool = 2 },
+	-- people: whoever gets hit, someone jumping clear, and the crowd running from a crash
+	Scream = {
+		id = { 9118844102, 9125652432, 9125652466 },
+		volume = 0.8,
+		pitch = { 0.95, 1.15 },
+		pool = 4,
+	},
+	Yelp = { id = { 9114399063, 9125652949 }, volume = 0.8, pitch = { 1, 1.2 }, pool = 3 },
+	Panic = {
+		id = { 9125905087, 9125905538, 9125905515 },
+		volume = 1.1,
+		pitch = { 0.95, 1.1 },
+		pool = 3,
+	},
 }
 local COMBO_WORDS =
 	{ "", "DOUBLE!", "TRIPLE!", "MULTI!", "MEGA!", "ULTRA!", "MONSTER!", "RAMPAGE!" }
@@ -284,6 +299,29 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 			1.2
 		)
 		stars(at + Vector3.new(0, 2, 0))
+		-- the one hit screams; a few people round them scream as they run (the server sends them running)
+		if math.random() < 0.8 then
+			play("Scream", at)
+		end
+		local npcs = workspace:FindFirstChild("Npcs")
+		local voices = 0
+		for _, m in (if npcs then npcs:GetChildren() else {}) do
+			if voices >= CrowdConfig.React.ScreamVoices then
+				break
+			end
+			local r = m:FindFirstChild("HumanoidRootPart") :: BasePart?
+			local d = r and (r.Position - at).Magnitude
+			if
+				r
+				and d
+				and d > 3
+				and d < CrowdConfig.React.FleeRadius
+				and not m:GetAttribute("Down")
+			then
+				voices += 1
+				task.delay(0.15 + math.random() * 0.5, play, "Panic", r.Position)
+			end
+		end
 		if mine then
 			shake(0.25 + 0.5 * strength)
 			impactFlash(strength)
@@ -296,6 +334,8 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		elseif near < 120 then
 			shake(0.1)
 		end
+	elseif kind == "Dodge" then
+		play("Yelp", at)
 	elseif kind == "Land" then
 		local studs = math.floor(a)
 		local word, color = `{studs} STUDS!`, C.text

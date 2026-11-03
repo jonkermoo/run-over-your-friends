@@ -1881,6 +1881,57 @@ do
 end
 
 do
+	-- pedestrians reacting to traffic (Rules/Reactions)
+	local Reactions = require("../src/shared/Rules/Reactions")
+	local RX = CrowdConfig.React
+	-- a car 20 studs south of them heading north at 40 studs/s reaches them in half a second, dead on
+	local t, gap = Reactions.approach(0, 0, 0, 20, 0, -40)
+	check(
+		"a car heading straight at someone arrives on time",
+		math.abs(t - 0.5) < 1e-6 and gap < 1e-6
+	)
+	check("that car is a threat", Reactions.threatened(t, gap, 3, RX))
+	local t2, gap2 = Reactions.approach(0, 0, 0, 20, 0, 40)
+	check("a car driving away is no threat", not Reactions.threatened(t2, gap2, 3, RX))
+	local t3, gap3 = Reactions.approach(15, 0, 0, 20, 0, -40)
+	check("a car passing well to the side is no threat", not Reactions.threatened(t3, gap3, 3, RX))
+	local _, gap4 = Reactions.approach(4, 0, 0, 20, 0, -40)
+	check("a car whose side will clip them is a threat", Reactions.threatened(0.5, gap4, 3, RX))
+	local t5 = Reactions.approach(0, 0, 0, 200, 0, -40)
+	check("a car five seconds off isn't noticed yet", not Reactions.threatened(t5, 0, 3, RX))
+	local slow, fast = Reactions.dodgeChance(5, RX), Reactions.dodgeChance(40, RX)
+	check(
+		"dodging is a slim chance that shrinks with speed (hits stay easy)",
+		math.abs(slow - RX.DodgeSlow) < 1e-9
+			and math.abs(fast - RX.DodgeFast) < 1e-9
+			and slow <= 0.4
+			and fast < slow
+			and Reactions.dodgeChance(19, RX) < slow
+			and Reactions.dodgeChance(19, RX) > fast
+	)
+	-- someone a little to the east of a car heading north jumps east, off its path
+	local dx, dz = Reactions.dodgeDir(1, 0, 0, 20, 0, -40, 0.9)
+	check(
+		"they jump sideways to the side they're on",
+		math.abs(dx - 1) < 1e-6 and math.abs(dz) < 1e-6
+	)
+	local ex = Reactions.dodgeDir(0, 0, 0, 20, 0, -40, 0.1)
+	local wx = Reactions.dodgeDir(0, 0, 0, 20, 0, -40, 0.9)
+	check("dead ahead, the coin picks a side", ex * wx < 0 and math.abs(math.abs(ex) - 1) < 1e-6)
+	local fx, fz = Reactions.fleePoint(10, 0, 0, 0, 50, 0.3)
+	check("people run straight away from a crash", math.abs(fx - 60) < 1e-6 and math.abs(fz) < 1e-6)
+	local cx, cz = Reactions.fleePoint(0, 0, 0, 0, 50, 0.3)
+	check(
+		"someone right on the crash still runs a full distance",
+		math.abs(math.sqrt(cx * cx + cz * cz) - 50) < 1e-6
+	)
+	check(
+		"flee and dodge numbers are sane",
+		RX.FleeChance <= 1 and RX.FleeSeconds > 0 and RX.DodgeStep > 3 and RX.Look > 0.3
+	)
+end
+
+do
 	local function checkServerGoals()
 		local SgConfig = require("../src/shared/Config/ServerGoals")
 		local Sg = require("../src/shared/Rules/ServerGoals")

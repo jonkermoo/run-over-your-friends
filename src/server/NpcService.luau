@@ -14,7 +14,9 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
+local Reactions = require(ReplicatedStorage.Shared.Rules.Reactions)
 local Analytics = require(script.Parent.Analytics)
 local CrowdService = require(script.Parent.CrowdService)
 local Data = require(script.Parent.Data)
@@ -33,6 +35,13 @@ local lastCall: { [Player]: { [string]: number } } = {}
 local random = Random.new()
 local friendsAdded: { [Player]: boolean } = {}
 local jingleToken: { [BasePart]: number } = {}
+local REACT = CrowdConfig.React
+-- reactions: when each person last got a dodge roll against a vehicle, and until when they're too scared
+-- (running from a crash, jumping clear) for the ice-cream jingle to call them back
+local react = {
+	rolled = {} :: { [Model]: { car: Model, at: number } },
+	scaredUntil = {} :: { [Model]: number },
+}
 
 local function rateOk(player: Player, key: string, interval: number): boolean
 	local t = lastCall[player]
@@ -214,6 +223,110 @@ function NpcService.knock(
 		)
 	end
 	task.delay(World.Npc.RespawnSeconds, CrowdService.recycle, npc)
+	-- everyone close by runs away from it (most of them; each screen plays the screams)
+	if root then
+		local now = os.clock()
+		for _, other in NpcService.inRadius(root.Position, REACT.FleeRadius) do
+			if
+				other ~= npc
+				and not other:GetAttribute("GiantHp")
+				and random:NextNumber() < REACT.FleeChance
+			then
+				local p = other:GetPivot().Position
+				local fx, fz = Reactions.fleePoint(
+					p.X,
+					p.Z,
+					root.Position.X,
+					root.Position.Z,
+					REACT.FleeDistance,
+					random:NextNumber()
+				)
+				react.scaredUntil[other] = now + REACT.FleeSeconds
+				CrowdService.hold(other, Vector3.new(fx, p.Y, fz), REACT.FleeSeconds, true)
+			end
+		end
+	end
+end
+
+-- each think tick: anyone a moving vehicle is about to run over gets one roll to jump clear (a slim chance
+-- at speed, so hits stay easy); a dodge is a running hop sideways off its path and a yelp on every screen
+local function dodgeTick()
+	local now = os.clock()
+	local spm = Vehicles.StudsPerMetre
+	local vehiclesFolder = workspace:FindFirstChild("Vehicles")
+	local cars = {}
+	for _, v in (if vehiclesFolder then vehiclesFolder:GetChildren() else {}) do
+		local chassis = v:IsA("Model") and v.PrimaryPart
+		if chassis then
+			local vel = chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
+			if vel.Magnitude / spm >= REACT.MinSpeed then
+				table.insert(cars, {
+					model = v :: Model,
+					at = chassis.Position,
+					vel = vel,
+					half = chassis.Size.X / 2,
+				})
+			end
+		end
+	end
+	for npc, r in react.rolled do
+		if now - r.at > REACT.RollAgain or not npc.Parent then
+			react.rolled[npc] = nil
+		end
+	end
+	for npc, t in react.scaredUntil do
+		if now > t or not npc.Parent then
+			react.scaredUntil[npc] = nil
+		end
+	end
+	if #cars == 0 then
+		return
+	end
+	for _, npc in CrowdService.active() do
+		if
+			npc:GetAttribute("Down")
+			or npc:GetAttribute("GiantHp")
+			or npc:GetAttribute("Golden")
+		then
+			continue
+		end
+		local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if not root or react.rolled[npc] then
+			continue
+		end
+		local p = root.Position
+		for _, car in cars do
+			local t, gap = Reactions.approach(p.X, p.Z, car.at.X, car.at.Z, car.vel.X, car.vel.Z)
+			if not Reactions.threatened(t, gap, car.half, REACT) then
+				continue
+			end
+			react.rolled[npc] = { car = car.model, at = now }
+			if random:NextNumber() < Reactions.dodgeChance(car.vel.Magnitude / spm, REACT) then
+				local dx, dz = Reactions.dodgeDir(
+					p.X,
+					p.Z,
+					car.at.X,
+					car.at.Z,
+					car.vel.X,
+					car.vel.Z,
+					random:NextNumber()
+				)
+				react.scaredUntil[npc] = now + REACT.DodgeSeconds
+				CrowdService.hold(
+					npc,
+					p + Vector3.new(dx, 0, dz) * REACT.DodgeStep,
+					REACT.DodgeSeconds,
+					true
+				)
+				local humanoid = npc:FindFirstChildOfClass("Humanoid")
+				if humanoid then
+					humanoid.Jump = true
+				end
+				Net.remote("Fx"):FireAllClients("Dodge", p, 0, 0, 0)
+			end
+			break
+		end
+	end
 end
 
 function NpcService.inRadius(pos: Vector3, radius: number): { Model }
@@ -382,6 +495,9 @@ local function setJingle(chassis: BasePart, on: boolean)
 			local vehicle = chassis.Parent :: Model
 			local size = vehicle:GetExtentsSize()
 			for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
+				if react.scaredUntil[npc] then
+					continue -- running from a crash first
+				end
 				local l = cf:PointToObjectSpace(npc:GetPivot().Position)
 				local x, z = CrowdRules.besideBox(l.X, l.Z, size.X / 2, size.Z / 2, CFG.JingleGap)
 				walkTo(
@@ -478,6 +594,15 @@ function NpcService.start()
 	Net.remote("Feature").OnServerEvent:Connect(onFeature)
 
 	CrowdService.start()
+	task.spawn(function()
+		while true do
+			task.wait(CrowdConfig.ThinkSeconds)
+			local ok, err = pcall(dodgeTick)
+			if not ok then
+				warn("[Npc] dodge:", err)
+			end
+		end
+	end)
 end
 
 return NpcService

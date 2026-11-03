@@ -54,6 +54,26 @@ return table.freeze({
 	ShopSpotChance = 0.75, -- a shopper browses somewhere you can see (else out of sight)
 	OfficeLunchChance = 0.3, -- an office worker who comes out heads for the restaurant
 
+	-- reacting to traffic (Rules/Reactions): a vehicle coming at someone gets one roll to dodge; a crash
+	-- nearby sends people running. Speeds in m/s, the rest studs and seconds.
+	React = table.freeze({
+		Look = 1.1, -- seconds ahead they notice a vehicle coming
+		Reach = 2.5, -- studs beside its path that still counts as in the way
+		MinSpeed = 4, -- slower vehicles are ignored
+		SlowSpeed = 8, -- at or under this, DodgeSlow...
+		FastSpeed = 30, -- ...falling to DodgeFast at this (75 mph is about 33 m/s)
+		DodgeSlow = 0.35,
+		DodgeFast = 0.08,
+		DodgeStep = 10, -- how far they jump aside
+		DodgeSeconds = 1,
+		RollAgain = 1.5, -- seconds before the same vehicle gets another roll on them
+		FleeRadius = 60, -- after a knock-down, people this close...
+		FleeChance = 0.8, -- ...this often...
+		FleeDistance = 50, -- ...run this far away from it...
+		FleeSeconds = 4, -- ...for this long
+		ScreamVoices = 3, -- client: panicked screams at once round a crash
+	}),
+
 	-- animation (client): ordinary people use the Rthro set, friends their own
 	AnimRadius = 260, -- animate characters this close to the camera; further ones hold still
 	RthroIdle = { 2510196951, 2510197257 },
