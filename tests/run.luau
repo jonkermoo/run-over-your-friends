@@ -1693,6 +1693,11 @@ do
 			"free cars and the Roadster are never on sale",
 			#saleIds > 2 and skipsFree and skipsRoadster
 		)
+		local skipsCheap = true
+		for _, id in saleIds do
+			skipsCheap = skipsCheap and id ~= "Scooter" and id ~= "Sedan" and id ~= "Cart"
+		end
+		check("the Scooter, Sedan and Shopping Cart are never on sale", skipsCheap)
 		local salt = DailyConfig.DiscountSalt
 		local repeats, steady, everyCar = false, true, true
 		local first = 20000
@@ -1721,6 +1726,27 @@ do
 					~= Daily.carOfDay(saleIds, d + #saleIds * 3, salt)
 		end
 		check("blocks are shuffled differently", differs)
+		local ownedHalf, neverOwned = {}, true
+		for i, id in saleIds do
+			ownedHalf[id] = i % 2 == 0
+		end
+		for d = first, first + #saleIds * 4 do
+			local pick = Daily.pickFor(saleIds, ownedHalf, d, salt)
+			neverOwned = neverOwned and pick ~= nil and not ownedHalf[pick]
+		end
+		check("the car of the day is never one you own", neverOwned)
+		check(
+			"no one owns anything: the pick is the day's car",
+			Daily.pickFor(saleIds, {}, first, salt) == Daily.carOfDay(saleIds, first, salt)
+		)
+		local ownsAll = {}
+		for _, id in saleIds do
+			ownsAll[id] = true
+		end
+		check(
+			"owning every sale car means no car of the day",
+			Daily.pickFor(saleIds, ownsAll, first, salt) == nil
+		)
 		local share, round = DailyConfig.DiscountShare, DailyConfig.DiscountRound
 		check(
 			"the sale price is a quarter off, rounded",

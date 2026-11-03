@@ -1,7 +1,7 @@
 --!strict
 -- Daily login streak (Config/Daily, Rules/Daily): once per UTC day a player collects a reward that grows
 -- with the days in a row they've collected; a missed day starts over at 1. Saved in the profile, so the
--- session lock keeps two servers from paying the same day. Also the car of the day's price for the shop.
+-- session lock keeps two servers from paying the same day. Also each player's car of the day and its price for the shop.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,10 +23,33 @@ local function today(): number
 	return Daily.day(os.time(), Config.DaySeconds)
 end
 
--- what a vehicle costs right now (the car of the day is cheaper)
-function DailyService.price(stats: Vehicles.Vehicle): number
-	local onSale = Daily.carOfDay(saleIds, today(), Config.DiscountSalt)
-	return Daily.price(stats.id, stats.price, onSale, Config.DiscountShare, Config.DiscountRound)
+-- this player's car of the day: picked once a day from the cars they didn't own then and kept all day,
+-- so buying a car doesn't reshuffle it. Published as the CarOfDay attribute ("" for none) for the garage.
+local function pick(player: Player): string?
+	local profile = Data.get(player)
+	if not profile then
+		return nil
+	end
+	local day = today()
+	local sale = profile.sale
+	if not sale or sale.day ~= day or (sale.id and not table.find(saleIds, sale.id)) then
+		sale = { day = day, id = Daily.pickFor(saleIds, profile.owned, day, Config.DiscountSalt) }
+		profile.sale = sale
+	end
+	local id = (sale :: { day: number, id: string? }).id
+	player:SetAttribute("CarOfDay", id or "")
+	return id
+end
+
+-- what a vehicle costs this player right now (their car of the day is cheaper)
+function DailyService.price(player: Player, stats: Vehicles.Vehicle): number
+	return Daily.price(
+		stats.id,
+		stats.price,
+		pick(player),
+		Config.DiscountShare,
+		Config.DiscountRound
+	)
 end
 
 local function send(player: Player, force: boolean?)
@@ -76,6 +99,7 @@ function DailyService.start()
 		while player.Parent and not player:GetAttribute("DataReady") do
 			task.wait(0.2)
 		end
+		pick(player)
 		send(player, true)
 	end
 	Players.PlayerAdded:Connect(onReady)
@@ -93,6 +117,7 @@ function DailyService.start()
 			task.wait(20)
 			for _, player in Players:GetPlayers() do
 				if sent[player] then
+					pick(player)
 					send(player)
 				end
 			end
