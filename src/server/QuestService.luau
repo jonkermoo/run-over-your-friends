@@ -14,6 +14,7 @@ local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
+local StuntService = require(script.Parent.StuntService)
 local VehicleService = require(script.Parent.VehicleService)
 
 local QuestService = {}
@@ -138,6 +139,11 @@ function QuestService.start()
 	end)
 	Data.onEarn(function(player, amount)
 		QuestService.event(player, "Earn", amount)
+	end)
+	StuntService.onStunt(function(player, kind, amount)
+		if kind == "Air" or kind == "Jumps" then
+			QuestService.event(player, kind, amount)
+		end
 	end)
 
 	-- distance driven, sampled once a second (capped by what the vehicle could cover)

@@ -1878,7 +1878,7 @@ do
 				and Contest.amount(0.6, "studs") == "1 stud"
 		)
 		local ok, contests = true, 0
-		local stats = { Breaks = true, Launch = true, Hits = true }
+		local stats = { Breaks = true, Launch = true, Hits = true, Stunt = true }
 		for i, e in EventConfig.List do
 			local c = e.contest
 			if c then
@@ -1893,7 +1893,7 @@ do
 			local nextOne = EventConfig.List[i % #EventConfig.List + 1]
 			ok = ok and not (isContest and nextOne.contest ~= nil)
 		end
-		check("three contest events, valid, never two in a row", ok and contests == 3)
+		check("four contest events, valid, never two in a row", ok and contests == 4)
 		local p = EventConfig.ContestPrizes
 		check(
 			"prizes fall by place and beat taking part",
@@ -2220,6 +2220,58 @@ do
 		check("pin numbers", cfg.Max == 3 and cfg.Default >= 1 and cfg.Default <= cfg.Max)
 	end
 	checkPins()
+
+	local function checkStunts()
+		local StuntConfig = require("../src/shared/Config/Stunts")
+		local Stunts = require("../src/shared/Rules/Stunts")
+		local function jump(over: { [string]: any }): any
+			local j =
+				{ air = 2, yaw = 0, upright = true, gravity = 1, topSpeed = 95, inPark = false }
+			for k, v in over do
+				j[k] = v
+			end
+			return Stunts.score(j, StuntConfig)
+		end
+		local plain = jump({})
+		check(
+			"a clean jump pays for its air",
+			plain.counts and plain.clean and plain.pay == 2 * StuntConfig.PerSecond
+		)
+		local hop = jump({ air = StuntConfig.MinAir - 0.1 })
+		check("a bump isn't a jump", not hop.counts and hop.pay == 0 and hop.label == "")
+		local roof = jump({ upright = false })
+		check(
+			"landing on the roof is a wipeout",
+			roof.counts and roof.pay == 0 and roof.label == "WIPEOUT"
+		)
+		check(
+			"spins count with a little slack",
+			Stunts.turns(300, 60) == 1
+				and Stunts.turns(-700, 60) == 2
+				and Stunts.turns(290, 60) == 0
+		)
+		local spun = jump({ yaw = -365 })
+		check(
+			"a 360 pays its bonus",
+			spun.spins == 1 and spun.label == "360" and spun.pay > plain.pay
+		)
+		check("two turns is a 720", jump({ yaw = 700 }).label == "720")
+		check("a long jump is huge air", jump({ air = 3.2 }).label == "HUGE AIR")
+		check("the park pays double", jump({ inPark = true }).pay == plain.pay * StuntConfig.Park)
+		local slow = jump({ topSpeed = 35 })
+		check(
+			"slow vehicles are boosted, up to the cap",
+			slow.pay == math.floor(plain.pay * StuntConfig.MaxBoost / 10 + 0.5) * 10
+				and jump({ topSpeed = 250 }).pay == plain.pay
+		)
+		local floaty = jump({ air = 4, gravity = 0.35 })
+		check("low gravity air is worth less", math.abs(floaty.air - 1.4) < 1e-6)
+		check(
+			"one jump is capped",
+			jump({ air = 30, yaw = 7200, inPark = true }).pay == StuntConfig.MaxPay
+		)
+	end
+	checkStunts()
 end
 
 if failures > 0 then

@@ -15,6 +15,7 @@ local PinnedGoals = require(script.PinnedGoals)
 local Streets = require(script.Streets)
 local Traffic = require(script.Traffic)
 local Streak = require(script.Streak)
+local Stunts = require(script.Stunts)
 
 Hud.onGoals = Goals.toggle
 Hud.onMenu = Goals.close
@@ -33,3 +34,4 @@ Streets.start()
 Traffic.start()
 Interiors.start()
 Streak.start()
+Stunts.start()
