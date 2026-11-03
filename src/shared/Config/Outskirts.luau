@@ -1,7 +1,7 @@
 --!strict
 -- Everything outside the city grid: the highway ring, the stunt park (east), the container port and its sea
 -- (west), the desert (south), the construction site (north), the cells between the city and the ring, and the
--- terrain hills that fill the rest of the ground. Studs; colours are { r, g, b }. Zones are placed `Gap` studs
+-- groves and ponds on the flat grass that fills the rest of the ground. Studs; colours are { r, g, b }. Zones are placed `Gap` studs
 -- beyond the ring's outer edge; `Width` runs east-west, `Depth` north-south.
 
 export type RGB = { number }
@@ -14,9 +14,8 @@ return table.freeze({
 		Connector = 80, -- the roads out to the stunt park and the port
 	}),
 
-	-- low grass mounds, a tree and every other cell a billboard, between the city and the ring
+	-- trees and every other cell a billboard, between the city and the ring
 	RingCells = table.freeze({
-		MoundHeight = 6,
 		BillboardEvery = 2,
 		Trees = 3,
 	}),
@@ -104,18 +103,7 @@ return table.freeze({
 		Workers = 30, -- crowd spots
 	}),
 
-	-- terrain hills fill the ground the zones leave empty; they grow toward the map edge
-	Hills = table.freeze({
-		Spacing = 250,
-		Jitter = 70,
-		RadiusMin = 40,
-		RadiusMax = 150,
-		Bury = 0.6, -- share of each hill's radius under the ground
-		Margin = 30, -- kept clear around roads and zones
-		RockChance = 0.25,
-	}),
-
-	-- the flat grass between the hills: groves of trees, ponds (flat discs) with a sandy bank, boulders (terrain)
+	-- the flat grass: groves of trees (props), ponds (flat discs) with a sandy bank
 	Wilds = table.freeze({
 		Margin = 20,
 		Groves = 22,
@@ -123,8 +111,6 @@ return table.freeze({
 		GroveTrees = table.freeze({ 3, 5 }), -- fewest, most
 		Ponds = 6,
 		PondRadius = 34,
-		Boulders = 40,
-		BoulderRadius = 10,
 	}),
 
 	Colours = table.freeze({

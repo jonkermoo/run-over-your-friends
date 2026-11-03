@@ -32,28 +32,16 @@ return table.freeze({
 	LampHeight = 16,
 	KerbInset = 1.5, -- lamps, lights and hydrants stand this far in from the kerb
 	BenchInset = 5.5, -- benches and shelters sit on the inner side of the sidewalk
-	ParkedPerBlock = 2,
 	ClutterPerSide = 1, -- news boxes, mailboxes, planters, A-boards and bins along each block side
 	ClutterSlots = table.freeze({ -0.42, -0.06, 0.1, 0.42 }), -- along the side, as a share of the block (clear of lamps, trees, benches)
-	ParkedOffset = 4.5, -- parked cars: this far out into the road from the kerb
 	ShelterChance = 0.35, -- busy blocks get a bus shelter (a waiting crowd gathers there)
 	PlazaPlanters = 6, -- in a ring round the plaza's middle, benches between them facing in
 	PlazaBenches = 4,
 	PlazaFountain = table.freeze({ size = 30, rim = 2.5, column = 9 }),
-	LotCars = 8, -- parked in a row along a car park's back edge, clear of its ramps
 	SignalSeconds = 9, -- traffic lights: green this long each way
 	AmberSeconds = 2,
 	PropRebuildSeconds = 45, -- knocked props stand back up after this
 	HydrantSpraySeconds = 5,
-	CarColours = table.freeze({
-		{ 200, 40, 40 },
-		{ 40, 80, 160 },
-		{ 235, 235, 235 },
-		{ 30, 30, 34 },
-		{ 120, 120, 128 },
-		{ 230, 180, 40 },
-		{ 60, 130, 80 },
-	}) :: { RGB },
 	Billboards = table.freeze({
 		"SNAKKO CHIPS",
 		"DRINK FIZZLE",
