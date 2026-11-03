@@ -191,7 +191,6 @@ local function ramp(
 	w.CFrame = CFrame.lookAt(centre, centre - look)
 	w.Color = COLORS.ramp
 	w.Material = Enum.Material.SmoothPlastic
-	w:SetAttribute("Launch", true) -- throws cars up off its lip (client Stunts)
 	w.Parent = parent
 	return w
 end
