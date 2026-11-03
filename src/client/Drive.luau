@@ -189,6 +189,8 @@ type CarState = {
 	surfaceAt: number,
 	groundUp: Vector3, -- the smoothed road normal the body tilts to (see Shared/Ground)
 	probedAt: number, -- when the driver's corner probes last touched ground
+	overSince: number?, -- when its weight went past the wheels on the ground (Rules/Balance), nil while balanced
+	tippedAt: number, -- when it last tipped over an edge
 	airborne: boolean,
 	frontSlide: number,
 	rearSlide: number,
@@ -535,6 +537,8 @@ local function track(car: Instance)
 		surfaceAt = 0,
 		groundUp = Vector3.yAxis,
 		probedAt = 0,
+		overSince = nil,
+		tippedAt = -math.huge,
 		airborne = false,
 		frontSlide = 0,
 		rearSlide = 0,
@@ -1074,11 +1078,22 @@ local function step(dt: number)
 		local right = Vector3.new(-look.Z, 0, look.X)
 		-- the road's up: on the ground the body tilts to it and drives along it; in the air it tracks the
 		-- body's own up, so a landing eases from the pose it lands in
-		local n
+		local n, balanced
 		if not flying then
 			groundParams.FilterDescendantsInstances =
 				{ s.car, workspace:FindFirstChild("Npcs") :: Instance, character :: Instance }
-			n = Ground.normal(chassis, groundParams)
+			n, balanced = Ground.probe(chassis, groundParams)
+		end
+		-- weight past the wheels on the ground (the nose out over a ledge): the levelling lets go and it tips
+		local tipping = false
+		if n and not balanced then
+			s.overSince = s.overSince or now
+			tipping = now - (s.overSince :: number) > Vehicles.Balance.settle
+		else
+			s.overSince = nil
+		end
+		if tipping then
+			s.tippedAt = now
 		end
 		if n then
 			s.probedAt = now
@@ -1306,6 +1321,25 @@ local function step(dt: number)
 			local level = chassis.CFrame.UpVector:Cross(Vector3.yAxis) * (LEVEL_RATE * 0.5)
 			turn.AngularVelocity =
 				Vector3.new(level.X, chassis.AssemblyAngularVelocity.Y * 0.98, level.Z)
+		end
+		-- tipping over an edge, and a moment after as it falls: it keeps its own tumble and only a little of
+		-- the levelling fights gravity (Config/Vehicles Balance)
+		local loose = not flying
+			and not flung
+			and (tipping or (s.airborne and now - s.tippedAt < Vehicles.Balance.airFree))
+		if loose then
+			local w = chassis.AssemblyAngularVelocity
+			local up = s.groundUp
+			turn.AngularVelocity = w
+				- up * w:Dot(up)
+				+ up * (if s.airborne then w:Dot(up) else yawRate)
+			turn.MaxTorque = Vehicles.Balance.hold
+				* chassis.AssemblyMass
+				* workspace.Gravity
+				* chassis.Size.Z
+				/ 2
+		else
+			turn.MaxTorque = BIG
 		end
 		s.frontSlide = math.clamp(math.abs(alphaF) / PEAK_SLIP - 0.8, 0, 1)
 		s.rearSlide = math.max(

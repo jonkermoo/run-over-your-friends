@@ -2128,6 +2128,61 @@ do
 	checkStunts()
 end
 
+-- weight and balance: the centre of mass must sit over the probes that touched ground
+do
+	local Balance = require("../src/shared/Rules/Balance")
+	local margin = Vehicles.Balance.margin * 7
+	local function at(points: { { number } }): { { x: number, z: number } }
+		local out = {}
+		for _, p in points do
+			table.insert(out, { x = p[1], z = p[2] })
+		end
+		return out
+	end
+	local mid = { x = 0, z = 0 }
+	local all = at({ { -2, -5 }, { 2, -5 }, { -2, 0 }, { 2, 0 }, { -2, 5 }, { 2, 5 } })
+	check("all wheels down is balanced", Balance.supported(all, mid, margin))
+	check(
+		"rear wheels on a ledge, nose in the air, tips",
+		not Balance.supported(at({ { -2, 5 }, { 2, 5 } }), mid, margin)
+	)
+	check(
+		"front wheels only tips",
+		not Balance.supported(at({ { -2, -5 }, { 2, -5 } }), mid, margin)
+	)
+	check(
+		"ledge edge past the centre of mass holds",
+		Balance.supported(at({ { -2, 0 }, { 2, 0 }, { -2, 5 }, { 2, 5 } }), mid, margin)
+	)
+	check(
+		"centre of mass a little past the edge holds",
+		Balance.supported(
+			at({ { -2, 0 }, { 2, 0 }, { -2, 5 }, { 2, 5 } }),
+			{ x = 0, z = -0.5 },
+			margin
+		)
+	)
+	check(
+		"centre of mass well past the edge tips",
+		not Balance.supported(
+			at({ { -2, 0 }, { 2, 0 }, { -2, 5 }, { 2, 5 } }),
+			{ x = 0, z = -3 },
+			margin
+		)
+	)
+	check(
+		"one side over a drop tips",
+		not Balance.supported(at({ { -2, -5 }, { -2, 0 }, { -2, 5 } }), mid, margin)
+	)
+	check("one probe tips", not Balance.supported(at({ { 2, 5 } }), mid, margin))
+	check("no ground never counts as balanced", not Balance.supported({}, mid, margin))
+	check(
+		"three corners still hold the middle",
+		Balance.supported(at({ { -2, -5 }, { 2, -5 }, { 2, 5 } }), mid, margin)
+	)
+	check("hull drops inner points", #Balance.hull(all) == 4)
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
