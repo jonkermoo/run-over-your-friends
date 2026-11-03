@@ -1781,6 +1781,106 @@ do
 end
 
 do
+	local function checkContest()
+		local Contest = require("../src/shared/Rules/Contest")
+		local scores = {}
+		Contest.record(scores, 1, "add", 3, 0)
+		Contest.record(scores, 2, "add", 5, 1)
+		Contest.record(scores, 1, "add", 4, 2)
+		check("add contests count up", scores[1].score == 7 and scores[2].score == 5)
+		check(
+			"nothing counts for zero",
+			not Contest.record(scores, 3, "add", 0, 3) and scores[3] == nil
+		)
+		local best = {}
+		Contest.record(best, 1, "max", 120, 0)
+		local changed = Contest.record(best, 1, "max", 80, 1)
+		check(
+			"max contests keep the best",
+			best[1].score == 120 and best[1].at == 0 and not changed
+		)
+		Contest.record(best, 2, "max", 120, 5)
+		Contest.record(best, 3, "max", 200, 6)
+		local standing = Contest.standings(best)
+		check(
+			"standings: best first, a tie goes to who got there first",
+			standing[1].id == 3
+				and standing[2].id == 1
+				and standing[3].id == 2
+				and standing[3].place == 3
+		)
+		Contest.record(best, 4, "max", 15, 7)
+		Contest.record(best, 5, "max", 12, 8)
+		local won = Contest.prizes(
+			Contest.standings(best),
+			EventConfig.ContestPrizes,
+			EventConfig.ContestTakePart
+		)
+		check(
+			"top 3 get the prizes, everyone else who scored gets the take-part pay",
+			won[3] == EventConfig.ContestPrizes[1]
+				and won[1] == EventConfig.ContestPrizes[2]
+				and won[2] == EventConfig.ContestPrizes[3]
+				and won[4] == EventConfig.ContestTakePart
+				and won[5] == EventConfig.ContestTakePart
+				and won[6] == nil
+		)
+		local alone = Contest.prizes(
+			Contest.standings({ [9] = { score = 1, at = 0 } }),
+			EventConfig.ContestPrizes,
+			500
+		)
+		check("a lone player still wins first", alone[9] == EventConfig.ContestPrizes[1])
+		check(
+			"no scores, no prizes",
+			next(Contest.prizes(Contest.standings({}), EventConfig.ContestPrizes, 500)) == nil
+		)
+		check(
+			"ordinals",
+			Contest.ordinal(1) == "1ST"
+				and Contest.ordinal(2) == "2ND"
+				and Contest.ordinal(3) == "3RD"
+				and Contest.ordinal(4) == "4TH"
+				and Contest.ordinal(11) == "11TH"
+				and Contest.ordinal(13) == "13TH"
+				and Contest.ordinal(22) == "22ND"
+		)
+		check(
+			"amounts: one piece, many pieces",
+			Contest.amount(1, "pieces") == "1 piece"
+				and Contest.amount(12.4, "pieces") == "12 pieces"
+				and Contest.amount(0.6, "studs") == "1 stud"
+		)
+		local ok, contests = true, 0
+		local stats = { Breaks = true, Launch = true, Hits = true }
+		for i, e in EventConfig.List do
+			local c = e.contest
+			if c then
+				contests += 1
+				ok = ok
+					and stats[c.stat] == true
+					and (c.mode == "add" or c.mode == "max")
+					and #c.unit > 0
+			end
+			local isContest = c ~= nil
+			-- the list wraps round, so the last and the first are neighbours too
+			local nextOne = EventConfig.List[i % #EventConfig.List + 1]
+			ok = ok and not (isContest and nextOne.contest ~= nil)
+		end
+		check("three contest events, valid, never two in a row", ok and contests == 3)
+		local p = EventConfig.ContestPrizes
+		check(
+			"prizes fall by place and beat taking part",
+			p[1] > p[2]
+				and p[2] > p[3]
+				and p[3] > EventConfig.ContestTakePart
+				and EventConfig.ContestTakePart > 0
+		)
+	end
+	checkContest()
+end
+
+do
 	-- pedestrians reacting to traffic (Rules/Reactions)
 	local Reactions = require("../src/shared/Rules/Reactions")
 	local RX = CrowdConfig.React

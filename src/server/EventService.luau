@@ -1,5 +1,6 @@
 --!strict
--- Server events on a schedule (Config/Events, Rules/Events): low gravity, golden rush, a giant, a stampede.
+-- Server events on a schedule (Config/Events, Rules/Events): low gravity, golden rush, a giant, a stampede,
+-- and contests (Rules/Contest) that score smashing, flinging or hits and pay the top 3 and everyone who took part.
 -- Clients read the workspace attributes EventPhase ("quiet" | "warn" | "live"), EventKey and EventEndsAt
 -- (server time) to draw the banner; Event holds the key only while one is live (NpcService reads it).
 
@@ -8,6 +9,10 @@ local Players = game:GetService("Players")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Rules = require(ReplicatedStorage.Shared.Rules.Events)
+local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
+local Net = require(ReplicatedStorage.Shared.Net)
+local BuildingService = require(script.Parent.BuildingService)
+local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
 
 local EventService = {}
@@ -19,6 +24,10 @@ local random = Random.new()
 local t0 = os.clock() -- the schedule's start; hurry() moves it to bring the next event forward
 local phase = "quiet"
 local untilWarn = 0
+
+-- the contest running now, if any
+type Running = { event: Config.Event, scores: Contest.Scores, names: { [number]: string } }
+local running: Running? = nil
 
 function EventService.setGiantSpots(points: { Vector3 })
 	giantSpots = points
@@ -35,7 +44,102 @@ local function nearPlayers(npc: Model): number
 	return best
 end
 
+local function eventOf(key: string): Config.Event?
+	for _, e in Config.List do
+		if e.key == key then
+			return e
+		end
+	end
+	return nil
+end
+
+-- a score for the running contest, if it counts this stat
+local function score(player: Player, stat: string, amount: number)
+	local c = running
+	if not c or not c.event.contest or c.event.contest.stat ~= stat then
+		return
+	end
+	if Contest.record(c.scores, player.UserId, c.event.contest.mode, amount, os.clock()) then
+		c.names[player.UserId] = player.DisplayName
+	end
+end
+
+-- each player's view: the top few, and their own place and score
+local function sendStandings(c: Running)
+	local st = Contest.standings(c.scores)
+	local top = {}
+	for i = 1, math.min(Config.ContestShown, #st) do
+		table.insert(top, { name = c.names[st[i].id] or "?", score = st[i].score })
+	end
+	local placeOf = {}
+	for _, p in st do
+		placeOf[p.id] = p
+	end
+	for _, player in Players:GetPlayers() do
+		local mine = placeOf[player.UserId]
+		Net.remote("Contest"):FireClient(player, {
+			key = c.event.key,
+			top = top,
+			place = if mine then mine.place else 0,
+			score = if mine then mine.score else 0,
+			count = #st,
+		})
+	end
+end
+
+local function beginContest(event: Config.Event)
+	local c: Running = { event = event, scores = {}, names = {} }
+	running = c
+	task.spawn(function()
+		while running == c do
+			sendStandings(c)
+			task.wait(Config.ContestSendSeconds)
+		end
+	end)
+end
+
+local function finishContest()
+	local c = running
+	running = nil
+	if not c or not c.event.contest then
+		return
+	end
+	local st = Contest.standings(c.scores)
+	local won = Contest.prizes(st, Config.ContestPrizes, Config.ContestTakePart)
+	local unit = c.event.contest.unit
+	for _, p in st do
+		local player = Players:GetPlayerByUserId(p.id)
+		local pay = won[p.id]
+		if player and pay then
+			Data.addMoney(player, pay)
+			local label = if p.place <= #Config.ContestPrizes
+				then `{Contest.ordinal(p.place)} IN {c.event.title}!`
+				else "FOR TAKING PART"
+			Net.remote("Popup"):FireClient(player, `+${pay}  {label}`, "big")
+		end
+	end
+	if #st == 0 then
+		return
+	end
+	local lines = {}
+	for i = 1, math.min(#Config.ContestPrizes, #st) do
+		local p = st[i]
+		table.insert(
+			lines,
+			`{Contest.ordinal(i)} {c.names[p.id] or "?"} ({Contest.amount(p.score, unit)})`
+		)
+	end
+	for _, everyone in Players:GetPlayers() do
+		Net.remote("Celebrate")
+			:FireClient(everyone, c.event.title .. " WINNERS", table.concat(lines, "   "))
+	end
+end
+
 local function begin(key: string)
+	local event = eventOf(key)
+	if event and event.contest then
+		beginContest(event)
+	end
 	if key == "LowGravity" then
 		workspace.Gravity = baseGravity * Config.LowGravityScale
 	elseif key == "GoldenRush" then
@@ -56,6 +160,9 @@ local function begin(key: string)
 end
 
 local function finish(key: string)
+	if running and running.event.key == key then
+		finishContest()
+	end
 	if key == "LowGravity" then
 		workspace.Gravity = baseGravity
 	elseif key == "GoldenRush" then
@@ -80,6 +187,17 @@ function EventService.hurry(): boolean
 end
 
 function EventService.start()
+	BuildingService.onBreak(function(player, count)
+		score(player, "Breaks", count)
+	end)
+	NpcService.onKnock(function(player)
+		score(player, "Hits", 1)
+	end)
+	NpcService.onLaunch(function(player, studs)
+		if studs >= Config.ContestMinLaunch then
+			score(player, "Launch", math.floor(studs + 0.5))
+		end
+	end)
 	t0 = os.clock()
 	local offset = random:NextInteger(0, #Config.List - 1)
 	local live: string? = nil
