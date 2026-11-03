@@ -1,6 +1,6 @@
 --!strict
 -- Server events on a schedule (Config/Events, Rules/Events): low gravity, golden rush, a giant, a stampede,
--- and contests (Rules/Contest) that score smashing, flinging or hits and pay the top 3 and everyone who took part.
+-- and contests (Rules/Contest) that score smashing, flinging, hits or jumps and pay the top 3 and everyone who took part.
 -- Clients read the workspace attributes EventPhase ("quiet" | "warn" | "live"), EventKey and EventEndsAt
 -- (server time) to draw the banner; Event holds the key only while one is live (NpcService reads it).
 
@@ -14,6 +14,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
+local StuntService = require(script.Parent.StuntService)
 
 local EventService = {}
 
@@ -196,6 +197,11 @@ function EventService.start()
 	NpcService.onLaunch(function(player, studs)
 		if studs >= Config.ContestMinLaunch then
 			score(player, "Launch", math.floor(studs + 0.5))
+		end
+	end)
+	StuntService.onStunt(function(player, kind, amount)
+		if kind == "Stunt" then
+			score(player, "Stunt", amount)
 		end
 	end)
 	t0 = os.clock()

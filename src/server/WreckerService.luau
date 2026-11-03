@@ -71,6 +71,7 @@ function WreckerService.flingVehicle(model: Model, velocity: Vector3, by: Player
 	local seat = model:FindFirstChild("DriverSeat") :: VehicleSeat?
 	local driver = seat and seat.Occupant and Players:GetPlayerFromCharacter(seat.Occupant.Parent)
 	SocialService.launched(by, driver, chassis) -- only a driven car counts as launching someone
+	model:SetAttribute("FlungAt", os.clock()) -- StuntService: air from a fling isn't a stunt
 	if driver then
 		Net.remote("Fling"):FireClient(driver, "Vehicle", velocity, spin() * 0.6)
 	else

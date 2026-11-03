@@ -136,6 +136,7 @@ local function ramp(
 	w.CFrame = CFrame.lookAt(centre, centre - look) -- the high end ends up ahead of the driver
 	w.Color = color or COLORS.ramp
 	w.Material = material or Enum.Material.SmoothPlastic
+	w:SetAttribute("Launch", color == nil) -- the yellow ones throw cars up (client Stunts); landings don't
 	w.Parent = parent
 	return w
 end
@@ -399,6 +400,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		end
 		local folder = Instance.new("Folder")
 		folder.Name = "StuntPark"
+		-- the park's ground, for StuntService (jumps over it pay double)
+		folder:SetAttribute("Centre", Vector3.new(st.x, 0, st.z))
+		folder:SetAttribute("Size", Vector3.new(st.w, 0, st.d))
 		folder.Parent = static
 		part(
 			folder,

@@ -48,6 +48,7 @@ local ServerGoalService = require(script.ServerGoalService)
 local Analytics = require(script.Analytics)
 local PaintService = require(script.PaintService)
 local RateLimit = require(script.RateLimit)
+local StuntService = require(script.StuntService)
 
 local world = MapBuilder.build()
 BuildingService.register(world.buildings)
@@ -79,6 +80,7 @@ EventService.setGiantSpots(downtown)
 EventService.start()
 PaintService.start()
 ServerGoalService.start()
+StuntService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)
