@@ -16,6 +16,10 @@ return table.freeze({
 	Settle = 0.3, -- seconds back on the ground before the landing is judged (bounces stay one jump)
 	Upright = 0.5, -- the car's up has to point at least this far up to land clean
 	FlungGrace = 3, -- seconds after a wrecker flings a car that its air doesn't count
+	-- launch ramps: a car leaving a yellow ramp's lip still climbing is thrown up to at least this much air,
+	-- so every vehicle flies (most can't go fast enough to leave a ramp for long under the game's gravity)
+	RampAir = 1.1,
+	RampUp = 2, -- studs/s up it has to be moving at the lip (not driving off the side or the back)
 	-- the AIR ticker on screen while the car is up
 	TickerAfter = 0.4,
 })

@@ -136,6 +136,7 @@ local function ramp(
 	w.CFrame = CFrame.lookAt(centre, centre - look) -- the high end ends up ahead of the driver
 	w.Color = color or COLORS.ramp
 	w.Material = material or Enum.Material.SmoothPlastic
+	w:SetAttribute("Launch", color == nil) -- the yellow ones throw cars up (client Stunts); landings don't
 	w.Parent = parent
 	return w
 end
