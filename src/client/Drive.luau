@@ -1084,9 +1084,11 @@ local function step(dt: number)
 				{ s.car, workspace:FindFirstChild("Npcs") :: Instance, character :: Instance }
 			n, balanced = Ground.probe(chassis, groundParams)
 		end
-		-- weight past the wheels on the ground (the nose out over a ledge): the levelling lets go and it tips
+		-- weight past the wheels on the ground (the nose out over a ledge): the levelling lets go and it tips.
+		-- Fast off a crest or ramp lip it flies level as before.
 		local tipping = false
-		if n and not balanced then
+		local flatSpeed = (chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude / spm
+		if n and not balanced and flatSpeed < Vehicles.Balance.maxSpeed then
 			s.overSince = s.overSince or now
 			tipping = now - (s.overSince :: number) > Vehicles.Balance.settle
 		else
@@ -1326,13 +1328,12 @@ local function step(dt: number)
 		-- the levelling fights gravity (Config/Vehicles Balance)
 		local loose = not flying
 			and not flung
-			and (tipping or (s.airborne and now - s.tippedAt < Vehicles.Balance.airFree))
+			and now - s.tippedAt < Vehicles.Balance.airFree
+			and not (n and balanced)
 		if loose then
 			local w = chassis.AssemblyAngularVelocity
 			local up = s.groundUp
-			turn.AngularVelocity = w
-				- up * w:Dot(up)
-				+ up * (if s.airborne then w:Dot(up) else yawRate)
+			turn.AngularVelocity = w - up * w:Dot(up) + up * (if n then yawRate else w:Dot(up))
 			turn.MaxTorque = Vehicles.Balance.hold
 				* chassis.AssemblyMass
 				* workspace.Gravity
