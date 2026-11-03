@@ -18,6 +18,12 @@ return table.freeze({
 			perPlayer = 20,
 			step = 5,
 		}) :: Kind,
+		table.freeze({
+			kind = "Jumps", -- clean stunt landings (StuntService)
+			text = "Land {n} stunt jumps together",
+			perPlayer = 5,
+			step = 5,
+		}) :: Kind,
 	}),
 	MinPlayers = 2, -- a small server's target is sized as if this many were on
 	Seconds = 600, -- time to finish one goal

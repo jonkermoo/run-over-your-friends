@@ -486,5 +486,15 @@ return table.freeze({
 		inset = 0.8, -- probes sit this share of the way out to the chassis corners
 		parkedEvery = 0.2, -- seconds between ground checks for a parked car (server)
 	}),
+	-- weight and balance: when the centre of mass (from the parts' real physics mass) is past the wheels that
+	-- are on the ground, like the rear wheels on a ledge with the nose in the air, the levelling lets go and
+	-- gravity tips it over the edge (Rules/Balance)
+	Balance = table.freeze({
+		margin = 0.12, -- share of the chassis half-length the centre of mass may sit past the support and stay up
+		settle = 0.08, -- seconds it must be past the support before it lets go, so bumps and seams don't tip it
+		hold = 0.05, -- share of gravity's tipping pull (mass x g x half-length) the levelling still fights
+		airFree = 0.7, -- seconds after tipping off an edge before the air levelling rights it again
+		maxSpeed = 12, -- m/s; faster than this, off a crest or ramp lip, it flies level as before instead of tipping
+	}),
 	has = has,
 })

@@ -12,14 +12,17 @@ local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
+local Parks = require(ReplicatedStorage.Shared.Config.Parks)
 local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
+local RampKit = require(script.Parent.RampKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
 
@@ -46,8 +49,6 @@ local COLORS = {
 	concrete = Color3.fromRGB(190, 190, 195),
 	ramp = Color3.fromRGB(240, 170, 50),
 	rampStripe = Color3.fromRGB(40, 40, 44),
-	trunk = Color3.fromRGB(110, 78, 52),
-	leaves = Color3.fromRGB(70, 140, 70),
 }
 
 local random = Random.new(M.Seed)
@@ -191,23 +192,115 @@ local function ramp(
 	w.CFrame = CFrame.lookAt(centre, centre - look)
 	w.Color = COLORS.ramp
 	w.Material = Enum.Material.SmoothPlastic
-	w:SetAttribute("Launch", true) -- throws cars up off its lip (client Stunts)
 	w.Parent = parent
+	RampKit.dress(w)
 	return w
 end
 
-local function tree(parent: Instance, at: Vector3)
-	local h = random:NextNumber(10, 16)
-	part(parent, Vector3.new(1.6, h, 1.6), CFrame.new(at + Vector3.new(0, h / 2, 0)), COLORS.trunk)
-	local ball = Instance.new("Part")
-	ball.Shape = Enum.PartType.Ball
-	ball.Anchored = true
-	local r = random:NextNumber(10, 15)
-	ball.Size = Vector3.new(r, r, r)
-	ball.CFrame = CFrame.new(at + Vector3.new(0, h + r * 0.3, 0))
-	ball.Color = COLORS.leaves
-	ball.Material = Enum.Material.SmoothPlastic
-	ball.Parent = parent
+-- a flat disc lying on the ground, `height` thick and `dia` across, its top `top` studs up
+local function disc(
+	parent: Instance,
+	height: number,
+	dia: number,
+	at: Vector3,
+	top: number,
+	color: Color3,
+	material: Enum.Material
+): Part
+	local p = part(
+		parent,
+		Vector3.new(height, dia, dia),
+		CFrame.new(at + Vector3.new(0, top - height / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+		color,
+		material
+	)
+	p.Shape = Enum.PartType.Cylinder
+	return p
+end
+
+-- the park: two paths crossing at a round pond; trees and bushes in three lawns, the kicker on the fourth;
+-- a bench, a lamp and flower beds along every path arm
+local function park(
+	static: Instance,
+	props: Instance,
+	centre: Vector3,
+	inner: number,
+	accent: Color3
+)
+	local PK = Parks.Park
+	local pathColour = rgb(PK.PathColour)
+	for _, alongX in { true, false } do
+		local size = if alongX then Vector2.new(inner, PK.Path) else Vector2.new(PK.Path, inner)
+		paint(static, size, CFrame.new(centre + Vector3.new(0, 0.14, 0)), pathColour).Material =
+			Enum.Material.Pavement
+	end
+	local rimDia = PK.Pond + PK.Rim * 2
+	disc(static, 0.05, rimDia + 8, centre, 0.15, pathColour, Enum.Material.Pavement).CanCollide =
+		false
+	disc(static, 0.8, rimDia, centre, 0.8, COLORS.concrete, Enum.Material.Concrete)
+	local water =
+		disc(static, 0.3, PK.Pond, centre, 0.9, Color3.fromRGB(60, 160, 200), Enum.Material.Glass)
+	water.Transparency = 0.15
+	water.Reflectance = 0.1
+	-- along each arm, from the pond out to the sidewalk
+	local lampColour = accent:Lerp(Color3.new(1, 1, 1), 0.5)
+	for _, dir in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
+		local side = Vector3.new(-dir.Z, 0, dir.X)
+		local from, to = rimDia / 2 + 8, inner / 2 - 6
+		for k = 1, PK.Benches do
+			local t = from + (to - from) * k / (PK.Benches + 1)
+			StreetKit.bench(props, centre + dir * t + side * (PK.Path / 2 + 2.5), -side)
+		end
+		for k = 1, PK.Lamps do
+			local t = from + (to - from) * k / (PK.Lamps + 1)
+			StreetKit.lamp(props, centre + dir * t - side * (PK.Path / 2 + 1.5), side, lampColour)
+		end
+		for _, t in { from + 4, to - 4 } do
+			Greenery.flowerBed(props, centre + dir * t - side * (PK.Path / 2 + 3), dir, random)
+		end
+	end
+	-- the four lawns between the paths; the north-west one has the kicker, so its trees keep to its edges
+	local q = (PK.Path / 2 + inner / 2) / 2
+	local room = (inner / 2 - PK.Path / 2) / 2 - 8
+	local rampLane = centre + Vector3.new(-q, 0, -q)
+	ramp(static, rampLane + Vector3.new(-room, 0, 0), Vector3.new(1, 0, 0), 24, 7, 30)
+	local taken: { Vector3 } = {}
+	local function spot(lawn: Vector3, gap: number, keepOffLane: boolean): Vector3?
+		for _ = 1, 20 do
+			local p = lawn
+				+ Vector3.new(random:NextNumber(-room, room), 0, random:NextNumber(-room, room))
+			local ok = not keepOffLane or math.abs(p.Z - rampLane.Z) > 22
+			for _, o in taken do
+				if (o - p).Magnitude < gap then
+					ok = false
+					break
+				end
+			end
+			if ok then
+				table.insert(taken, p)
+				return p
+			end
+		end
+		return nil
+	end
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			local lawn = centre + Vector3.new(sx * q, 0, sz * q)
+			local rampLawn = sx < 0 and sz < 0
+			for _ = 1, if rampLawn then 2 else PK.TreesPerLawn do
+				local p = spot(lawn, 16, rampLawn)
+				if p then
+					Greenery.tree(props, p, random)
+				end
+			end
+			for _ = 1, PK.BushesPerLawn do
+				local p = spot(lawn, 8, rampLawn)
+				if p then
+					Greenery.bush(props, p, random)
+				end
+			end
+		end
+	end
 end
 
 function MapBuilder.build(): Result
@@ -496,7 +589,7 @@ function MapBuilder.build(): Result
 					)
 				end
 			elseif kind == "park" then
-				-- park with trees and a kicker
+				-- park: paths round a pond, lawns of trees, benches, lamps and flower beds, a kicker
 				part(
 					static,
 					Vector3.new(inner, 1, inner),
@@ -504,17 +597,7 @@ function MapBuilder.build(): Result
 					COLORS.grass,
 					Enum.Material.Grass
 				)
-				for _ = 1, 9 do
-					tree(
-						static,
-						centre
-							+ Vector3.new(
-								random:NextNumber(-inner / 2.3, inner / 2.3),
-								0,
-								random:NextNumber(-inner / 2.3, inner / 2.3)
-							)
-					)
-				end
+				park(static, props, centre, inner, rgb(style.accent))
 				local spots = {}
 				for _ = 1, 10 do
 					local p = centre
@@ -526,7 +609,6 @@ function MapBuilder.build(): Result
 					table.insert(walkPoints, p)
 					table.insert(spots, p)
 				end
-				ramp(static, centre + Vector3.new(-30, 0, 20), Vector3.new(1, 0, 0), 24, 7, 30)
 				addPlace(
 					Places.open(
 						"park",
@@ -565,16 +647,10 @@ function MapBuilder.build(): Result
 					i,
 					j
 				)
-				for _ = 1, 4 do
-					tree(
-						static,
-						centre
-							+ Vector3.new(
-								random:NextNumber(-inner / 3, inner / 3),
-								0,
-								random:NextNumber(-inner / 3, inner / 3)
-							)
-					)
+				-- a tree in each corner, clear of the planter ring and the fountain
+				for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+					local at = centre + Vector3.new(c[1], 0, c[2]) * (inner / 2 - 16)
+					Greenery.tree(props, at, random)
 				end
 			elseif kind == "homes" then
 				-- a street of family homes facing the north and south sidewalks, gardens behind
@@ -619,13 +695,13 @@ function MapBuilder.build(): Result
 						end
 					end
 				end
-				for _ = 1, 3 do
+				for _ = 1, Parks.HomeTrees do
 					local at = Vector3.new(
 						random:NextNumber(-inner / 2.4, inner / 2.4),
 						0,
 						random:NextNumber(-20, 20)
 					)
-					tree(static, centre + at)
+					Greenery.tree(props, centre + at, random)
 				end
 			elseif kind == "restaurant" then
 				-- the burger place, facing the middle of town, with a car park behind

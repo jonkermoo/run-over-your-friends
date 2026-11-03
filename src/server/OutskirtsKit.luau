@@ -1,8 +1,8 @@
 --!strict
 -- The world outside the city grid, from Config/Outskirts: the ground and the sea, the highway ring and its
 -- connectors, the cells between the city and the ring, the stunt park (east), the container port (west), the
--- desert (south), the construction site (north), and terrain hills over the ground the zones leave empty.
--- Terrain costs no parts, so hills, dunes, dirt jumps and the sea are terrain; what you smash is parts.
+-- desert (south), the construction site (north), and groves and ponds on the flat grass the zones leave empty.
+-- Terrain costs no parts, so dunes, dirt jumps and the sea are terrain; what you smash is parts.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,7 +10,9 @@ local Cfg = require(ReplicatedStorage.Shared.Config.Outskirts)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
+local Greenery = require(script.Parent.Greenery)
 local Places = require(script.Parent.Places)
+local RampKit = require(script.Parent.RampKit)
 
 local OutskirtsKit = {}
 
@@ -43,8 +45,6 @@ local COLORS = {
 	concrete = Color3.fromRGB(190, 190, 195),
 	ramp = Color3.fromRGB(240, 170, 50),
 	stripe = Color3.fromRGB(40, 40, 44),
-	trunk = Color3.fromRGB(110, 78, 52),
-	leaves = Color3.fromRGB(70, 140, 70),
 	white = Color3.fromRGB(240, 240, 236),
 	yellow = Color3.fromRGB(242, 206, 70),
 	metal = Color3.fromRGB(70, 74, 80),
@@ -136,7 +136,6 @@ local function ramp(
 	w.CFrame = CFrame.lookAt(centre, centre - look) -- the high end ends up ahead of the driver
 	w.Color = color or COLORS.ramp
 	w.Material = material or Enum.Material.SmoothPlastic
-	w:SetAttribute("Launch", color == nil) -- the yellow ones throw cars up (client Stunts); landings don't
 	w.Parent = parent
 	return w
 end
@@ -153,26 +152,6 @@ local function stripes(w: WedgePart, n: number)
 			* CFrame.new(0, 0.12, 0)
 		paint(w.Parent :: Instance, Vector3.new(s.X * 0.9, 0.1, 3), cf, COLORS.stripe)
 	end
-end
-
-local function tree(parent: Instance, at: Vector3, random: Random)
-	local h = random:NextNumber(10, 16)
-	part(
-		parent,
-		Vector3.new(1.6, h, 1.6),
-		CFrame.new(at + Vector3.new(0, h / 2, 0)),
-		COLORS.trunk,
-		Enum.Material.Wood
-	)
-	local r = random:NextNumber(10, 15)
-	local ball = part(
-		parent,
-		Vector3.new(r, r, r),
-		CFrame.new(at + Vector3.new(0, h + r * 0.3, 0)),
-		COLORS.leaves
-	)
-	ball.Shape = Enum.PartType.Ball
-	ball.Material = Enum.Material.Grass
 end
 
 local function prop(folder: Instance, kind: string): Model
@@ -364,17 +343,15 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		)
 	end
 
-	-- the cells between the city and the ring: a grass mound, a tree, a billboard facing the ring every other cell
+	-- the cells between the city and the ring: trees, and a billboard facing the ring every other cell
 	local RC = Cfg.RingCells
 	local inner = ring - RW / 2
 	local cellCount = 0
 	local function cell(x: number, z: number, w: number, d: number, out: Vector3)
 		cellCount += 1
-		local f = math.min(w, d) * 0.2
-		mound(x - out.X * d * 0.1, z - out.Z * d * 0.1, f, RC.MoundHeight, Enum.Material.Grass)
 		for _ = 1, RC.Trees do
-			tree(
-				static,
+			Greenery.tree(
+				props,
 				Vector3.new(
 					x + random:NextNumber(-w, w) * 0.35,
 					0,
@@ -494,7 +471,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		deck(-hw + 30, hw - 10, mz, S.Mega.width + 20, rgb(C.deckRed))
 		local mega =
 			ramp(folder, at(S.Mega.foot, mz), E, S.Mega.width, S.Mega.height, S.Mega.length)
-		stripes(mega, 4)
+		RampKit.dress(mega)
 		local landing = ramp(
 			folder,
 			at(S.Landing.foot, mz),
@@ -532,7 +509,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			local h, up = 6 + 3 * k, 20 + 5 * k
 			local down = up * 1.4
 			local x = -hw + 70 + k * S.TableSpacing
-			stripes(ramp(folder, at(x, tz), E, S.TableWidth, h, up), 1)
+			RampKit.dress(ramp(folder, at(x, tz), E, S.TableWidth, h, up))
 			part(
 				folder,
 				Vector3.new(S.TableDeck, h, S.TableWidth),
@@ -553,7 +530,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		-- lane 3: kicker over smashable containers onto a landing, then dirt rollers and a dirt tabletop
 		local jz, J = S.JumpZ, S.Jump
 		deck(-hw + 30, J.landingFoot + 10, jz, 70, rgb(C.deckOrange))
-		stripes(ramp(folder, at(J.foot, jz), E, 40, J.height, J.length), 2)
+		RampKit.dress(ramp(folder, at(J.foot, jz), E, 40, J.height, J.length))
 		local stack = Instance.new("Model")
 		stack.Name = "Containers"
 		for k = 0, J.containers - 1 do
@@ -1123,7 +1100,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		table.insert(places, Places.open("park", at(0, hd - 10), crew))
 	end
 
-	-- terrain hills over everything the roads and zones leave empty
+	-- what the groves and ponds keep clear of: the city, the ring, its connectors, the zones and the sea
 	local exclude: { Rules.Rect } = {
 		{ x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 },
 		zones.stunt,
@@ -1135,36 +1112,24 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	for _, c in connectors do
 		table.insert(exclude, c)
 	end
-	local HC = Cfg.Hills
 	local function rng(): number
 		return random:NextNumber()
 	end
-	local hills = Rules.hills(half, exclude, HC, rng)
-	for _, h in hills do
-		terrain:FillBall(Vector3.new(h.x, -HC.Bury * h.r, h.z), h.r, Enum.Material.Grass)
-		if random:NextNumber() < HC.RockChance then
-			terrain:FillBall(
-				Vector3.new(h.x, (1 - HC.Bury) * h.r - h.r * 0.15, h.z),
-				h.r * 0.3,
-				Enum.Material.Rock
-			)
-		end
-	end
 
-	-- the flat grass between the hills: groves, ponds with a sandy bank, boulders
+	-- the flat grass: groves of trees, ponds with a sandy bank
 	local W = Cfg.Wilds
-	for _, g in
-		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Groves, W.GroveRadius, W.Margin, rng)
-	do
+	for _, g in Rules.clearSpots(half, exclude, W.Groves, W.GroveRadius, W.Margin, rng) do
 		for _ = 1, random:NextInteger(W.GroveTrees[1], W.GroveTrees[2]) do
 			local a, d = random:NextNumber(0, math.pi * 2), random:NextNumber(0, W.GroveRadius)
-			tree(static, Vector3.new(g.x + math.cos(a) * d, 0, g.z + math.sin(a) * d), random)
+			Greenery.tree(
+				props,
+				Vector3.new(g.x + math.cos(a) * d, 0, g.z + math.sin(a) * d),
+				random
+			)
 		end
 		table.insert(exclude, { x = g.x, z = g.z, w = W.GroveRadius * 2, d = W.GroveRadius * 2 })
 	end
-	for _, p in
-		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Ponds, W.PondRadius, W.Margin, rng)
-	do
+	for _, p in Rules.clearSpots(half, exclude, W.Ponds, W.PondRadius, W.Margin, rng) do
 		-- two flat discs (the ground is a part, so terrain water can't sit below it): a sandy bank, the water
 		local bank = post(static, 0.2, W.PondRadius * 2, Vector3.new(p.x, 0, p.z), COLORS.sand)
 		bank.Material = Enum.Material.Sand
@@ -1175,13 +1140,6 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		water.Reflectance = 0.15
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
 	end
-	for _, b in
-		Rules.clearSpots(half, exclude, hills, HC.Bury, W.Boulders, W.BoulderRadius, W.Margin, rng)
-	do
-		local r = random:NextNumber(0.5, 1) * W.BoulderRadius
-		terrain:FillBall(Vector3.new(b.x, -r * 0.3, b.z), r, Enum.Material.Rock)
-	end
-
 	return { walkPoints = walkPoints, places = places }
 end
 
