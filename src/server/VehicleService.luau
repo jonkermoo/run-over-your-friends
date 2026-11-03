@@ -333,6 +333,18 @@ function VehicleService.start()
 		end
 		VehicleService.despawn(player)
 	end)
+	-- the driver already heard their own horn; everyone else plays it from the vehicle
+	Net.remote("Horn").OnServerEvent:Connect(function(player)
+		local vehicle = VehicleService.of(player)
+		if not vehicle or not RateLimit.allow(player, "horn", Vehicles.HornCooldown * 0.8) then
+			return
+		end
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				Net.remote("Horn"):FireClient(other, vehicle)
+			end
+		end
+	end)
 	Players.PlayerRemoving:Connect(function(player)
 		VehicleService.despawn(player)
 		cooldownUntil[player] = nil

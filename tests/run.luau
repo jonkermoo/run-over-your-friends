@@ -1482,6 +1482,60 @@ do
 	)
 end
 
+do
+	-- every vehicle has a horn that exists, played at a sane pitch
+	local hornsOk = true
+	for _, v in Vehicles.List do
+		local h = Vehicles.Horns[v.horn]
+		local hornPitch = v.hornPitch or 1
+		if
+			not h
+			or not string.match(h.sound, "^rbxassetid://%d+$")
+			or hornPitch < 0.7
+			or hornPitch > 1.4
+		then
+			hornsOk = false
+		end
+		if h and (h.volume <= 0 or h.volume > 2 or (h.start or 0) < 0) then
+			hornsOk = false
+		end
+	end
+	check("every vehicle has a known horn at a sane pitch and volume", hornsOk)
+	check(
+		"the jingle has a tune, a short fade and a lure interval",
+		Vehicles.Jingle.fade > 0
+			and Vehicles.Jingle.fade < 3
+			and World.Npc.JingleEvery > 0.2
+			and string.match(Vehicles.Jingle.sound, "^rbxassetid://%d+$") ~= nil
+	)
+	-- the water cannon: every cannon vehicle has a turret spot on its roof, and the aim arc is sane
+	local nozzlesOk = true
+	for _, v in Vehicles.List do
+		if Vehicles.has(v, "Cannon") and not (v.nozzle and #v.nozzle == 3 and v.nozzle[2] > 0) then
+			nozzlesOk = false
+		end
+	end
+	-- people lured to the truck stop just outside it on their own side, never inside it
+	local bx, bz = CrowdRules.besideBox(0.5, -0.2, 4, 10, 2)
+	local cx, cz = CrowdRules.besideBox(0, 0, 4, 10, 2)
+	local fx, fz = CrowdRules.besideBox(30, 80, 4, 10, 2)
+	check(
+		"lured people stand just outside the vehicle on their side",
+		math.abs(bx - 6) < 1e-6
+			and bz < 0
+			and cx == 6
+			and cz == 0
+			and math.abs(fz - 12) < 1e-6
+			and fx > 0
+			and fx < 6
+	)
+	local N = World.Npc
+	check(
+		"cannon vehicles have a roof turret and the aim arc holds",
+		nozzlesOk and N.CannonDown < 0 and N.CannonUp > 0 and N.CannonUp < 1 and N.CannonSend > 0
+	)
+end
+
 -- car paint
 do
 	local PaintConfig = require("../src/shared/Config/Paints")
@@ -1824,6 +1878,50 @@ do
 		)
 	end
 	checkContest()
+end
+
+do
+	local function checkServerGoals()
+		local SgConfig = require("../src/shared/Config/ServerGoals")
+		local Sg = require("../src/shared/Rules/ServerGoals")
+		check(
+			"a server goal grows with players, sized for at least the minimum",
+			Sg.target(20, 1, 2, 5) == 40 and Sg.target(20, 6, 2, 5) == 120
+		)
+		check("a server goal target rounds up to its step", Sg.target(7, 3, 1, 5) == 25)
+		check("a server goal target is never zero", Sg.target(0, 0, 0, 5) == 5)
+		local def = SgConfig.Kinds[2]
+		local goal = Sg.make(def, 1, SgConfig.MinPlayers, 1000, SgConfig.Seconds)
+		check(
+			"a server goal's text shows its target",
+			goal.target == def.perPlayer * SgConfig.MinPlayers
+				and string.find(goal.text, tostring(goal.target), 1, true) ~= nil
+		)
+		check(
+			"other kinds don't count",
+			not Sg.add(goal, "Other", 5, 1, 1001) and goal.progress == 0
+		)
+		check(
+			"progress after the time is up doesn't count",
+			not Sg.add(goal, def.kind, 5, 1, 1000 + SgConfig.Seconds) and goal.progress == 0
+		)
+		local finishedEarly = Sg.add(goal, def.kind, goal.target - 1, 1, 1001)
+		local finished = Sg.add(goal, def.kind, 5, 2, 1002)
+		check(
+			"the add that reaches the target finishes it, once",
+			not finishedEarly
+				and finished
+				and goal.done
+				and goal.progress == goal.target
+				and not Sg.add(goal, def.kind, 5, 3, 1003)
+		)
+		check(
+			"everyone who added is a helper",
+			goal.helpers[1] and goal.helpers[2] and not goal.helpers[3]
+		)
+		check("server goal kinds take turns", Sg.nextIndex(1, 2) == 2 and Sg.nextIndex(2, 2) == 1)
+	end
+	checkServerGoals()
 end
 
 if failures > 0 then

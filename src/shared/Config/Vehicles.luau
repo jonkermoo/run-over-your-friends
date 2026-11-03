@@ -2,7 +2,8 @@
 -- Every vehicle is one row: shop price, hit weight, driving numbers, features. The model is
 -- ReplicatedStorage.VehicleModels[id] (Body + Wheel_<Corner><n> meshes, front facing -Z).
 -- Driving numbers are metres and seconds; topSpeed in mph.
--- Engine sounds: Roblox audio library loops (Pro Sound Effects) except Electric (own synth); see ASSETS_LICENSES.md.
+-- Engine sounds: Roblox audio library loops (Pro Sound Effects) except Electric (own synth); horns and the jingle
+-- are library sounds too; see ASSETS_LICENSES.md.
 
 export type Feature =
 	"Taxi"
@@ -25,6 +26,15 @@ export type EngineKind =
 	| "Jalopy"
 	| "Diesel"
 	| "BigRig"
+
+export type HornKind = "Car" | "V8" | "Euro" | "Bike" | "AirHorn" | "Siren" | "Buzzer"
+
+-- a one-shot horn recording; volumes even out the recordings (measured RMS) to about the same loudness
+export type Horn = {
+	sound: string,
+	volume: number,
+	start: number?, -- seconds of silence at the head of the file to skip
+}
 
 export type Engine = {
 	sound: string,
@@ -69,8 +79,11 @@ export type Vehicle = {
 	-- seat the driver on the left (-x), matching tools/blender/export_vehicles.py
 	engine: EngineKind,
 	engineTone: number?, -- pitch multiplier on the engine (bigger vehicle = lower), default 1
+	horn: HornKind, -- H / pad D-pad up / the phone's HONK button
+	hornPitch: number?, -- PlaybackSpeed on the horn, default 1
 	steerTilt: number?, -- degrees the cabin steering wheel leans back towards the driver, default 22 (trucks lie flatter)
 	steerRatio: number?, -- steering wheel turns per road-wheel turn, default 4 (handlebars 1)
+	nozzle: { number }?, -- water cannon turret, studs from the chassis centre (x, y, z)
 	tracks: Tracks?, -- crawler tracks instead of tyres: turns on the spot when slow
 	trailer: Trailer?,
 	blurb: string,
@@ -98,6 +111,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.4, 1.6, 1 },
 		engine = "Petrol",
+		horn = "Car",
 		engineTone = 1.15,
 		blurb = "Nippy little starter. Light hits.",
 	}),
@@ -118,6 +132,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { 0, 4.3, 0.4 },
 		engine = "Kart",
+		horn = "Bike",
 		steerTilt = 60,
 		steerRatio = 1,
 		blurb = "Tiny and silly. Barely tips people over.",
@@ -139,6 +154,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.5, 1.8, 0.4 },
 		engine = "Petrol",
+		horn = "Car",
+		hornPitch = 0.95,
 		blurb = "The all-rounder.",
 	}),
 	v({
@@ -158,6 +175,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { 0, 2.9, 0.3 },
 		engine = "Cart",
+		horn = "Bike",
+		hornPitch = 1.25,
 		steerTilt = 35,
 		blurb = "One wobbly wheel. The speedometer swears it does 400.",
 	}),
@@ -178,6 +197,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.5, 1.8, 0.4 },
 		engine = "Petrol",
+		horn = "Car",
+		hornPitch = 0.92,
 		blurb = "Yell TAXI! and someone comes running.",
 	}),
 	v({
@@ -196,6 +217,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.5, 1.8, 1.5 },
 		engine = "V8",
+		horn = "V8",
 		blurb = "Huge launch, loose tail.",
 	}),
 	v({
@@ -214,7 +236,9 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.8, 4.2, -4.3 },
 		engine = "Jalopy",
-		blurb = "Play the jingle and they all come to you.",
+		horn = "Car",
+		hornPitch = 1.12,
+		blurb = "Turn the jingle on and they all come to you.",
 	}),
 	v({
 		id = "FireTruck",
@@ -232,6 +256,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -2.4, 6.4, -14.1 },
 		engine = "Diesel",
+		nozzle = { 0, 12, -6 }, -- on the roof behind the cab
+		horn = "Siren",
 		steerTilt = 50,
 		blurb = "Water cannon knocks people flat. Breaks buildings.",
 	}),
@@ -251,6 +277,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -2.1, 9.3, -5.9 },
 		engine = "BigRig",
+		horn = "AirHorn",
 		trailer = {
 			model = "SemiTrailer",
 			hitch = { 0, 5.7, 7.6 },
@@ -278,6 +305,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { 0, 10.4, 6.5 },
 		engine = "Diesel",
+		horn = "Buzzer",
 		engineTone = 0.85,
 		tracks = { pivotRate = 45, pivotFade = 4, pivotAccel = 3 },
 		blurb = "Slow. The blade throws everything aside.",
@@ -298,6 +326,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.8, 7, -0.9 },
 		engine = "V8",
+		horn = "AirHorn",
+		hornPitch = 1.15,
 		engineTone = 0.8,
 		steerTilt = 30,
 		blurb = "Giant wheels, giant bounces. Breaks buildings.",
@@ -318,6 +348,7 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.7, 1.5, 1 },
 		engine = "Race",
+		horn = "Euro",
 		blurb = "Near-Roadster speed, plus a forward thruster.",
 	}),
 	v({
@@ -336,6 +367,8 @@ local list: { Vehicle } = {
 		showDriver = true,
 		seat = { -1.6, 1.2, 1 },
 		engine = "Electric",
+		horn = "Euro",
+		hornPitch = 1.1,
 		blurb = "The dream car: rear jet, air control, thruster.",
 	}),
 }
@@ -414,6 +447,17 @@ local engines: { [EngineKind]: Engine } = {
 	},
 }
 
+-- Pro Sound Effects library one-shots (see ASSETS_LICENSES.md)
+local horns: { [HornKind]: Horn } = {
+	Car = { sound = "rbxassetid://9120385543", volume = 0.65 }, -- Vehicle Horn Short Long Honks 1
+	V8 = { sound = "rbxassetid://9120382911", volume = 0.67 }, -- Vehicle Horn 4
+	Euro = { sound = "rbxassetid://9120383812", volume = 0.66 }, -- Vehicle Horn Honk European Buzzing Whine 5
+	Bike = { sound = "rbxassetid://9113438365", volume = 0.9 }, -- Bike Horn Squeeze 2
+	AirHorn = { sound = "rbxassetid://9114075665", volume = 0.35, start = 0.45 }, -- Diesel Truck Air Horn 1
+	Siren = { sound = "rbxassetid://9119162409", volume = 1.6 }, -- Siren Blat 2
+	Buzzer = { sound = "rbxassetid://9126157673", volume = 0.7 }, -- Vehicle Horn Short Honking Blasts Very Buzzy
+}
+
 local byId: { [string]: Vehicle } = {}
 for _, row in list do
 	byId[row.id] = row
@@ -427,6 +471,11 @@ return table.freeze({
 	List = table.freeze(list),
 	ById = table.freeze(byId),
 	Engines = table.freeze(engines),
+	Horns = table.freeze(horns),
+	HornCooldown = 0.35, -- seconds between honks (the server relays no faster)
+	-- the ice-cream truck's G turns its tune on and off: APM Music "Ice Cream Truck OL" (30 s), looped while
+	-- on; it fades out over `fade` seconds when turned off
+	Jingle = table.freeze({ sound = "rbxassetid://1838797774", volume = 0.7, fade = 1.2 }),
 	Starter = "Hatchback",
 	StudsPerMetre = 4.32, -- every model is built to this scale
 	-- on the ground the body tilts to the road under it (ramps, hills); in the air it levels to world up

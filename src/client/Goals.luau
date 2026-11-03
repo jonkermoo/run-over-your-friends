@@ -1,5 +1,5 @@
 --!strict
--- The goals sheet: HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
+-- The goals sheet: the shared SERVER goal, then HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
 -- under the job card (top left) from the GOALS tab and closes from its header or the tab. Not
 -- available until the tutorial is done, so new players see one goal at a time.
 
@@ -20,8 +20,8 @@ local Goals = {}
 type GoalView = { text: string, target: number, reward: number, progress: number, done: boolean }
 type SetView = { goals: { GoalView }, endsAt: number }
 
-local ORDER = { "Hourly", "Daily" }
-local COLORS = { Hourly = C.blue, Daily = C.pink }
+local ORDER = { "Server", "Hourly", "Daily" }
+local COLORS = { Server = C.yellow, Hourly = C.blue, Daily = C.pink }
 local SHEET_W = 330
 local ROW_H, HEAD_H, SECTION_H = 52, 46, 30
 
@@ -64,6 +64,7 @@ body.Size = UDim2.fromScale(1, 0)
 body.Parent = panel
 
 local state: { [string]: SetView } = {}
+local serverSet: SetView? = nil -- from its own remote; kept when the player's sets arrive
 local clockOffset = 0 -- server unix time minus local unix time
 local open = false
 local countdowns: { [string]: TextLabel } = {}
@@ -98,7 +99,11 @@ local function tickCountdowns()
 	for name, cd in countdowns do
 		local set = state[name]
 		if set then
-			cd.Text = "new in " .. fmt(set.endsAt - t)
+			local left = fmt(set.endsAt - t)
+			cd.Text = if name ~= "Server"
+				then "new in " .. left
+				elseif set.goals[1] and set.goals[1].done then "next in " .. left
+				else "ends in " .. left
 		end
 	end
 end
@@ -209,6 +214,30 @@ end
 
 header.Activated:Connect(Goals.toggle)
 
+-- new state from the server: rebuild when the list changed, else just move the bars and numbers
+local function apply()
+	state.Server = serverSet
+	if shape() ~= builtShape then
+		rebuild()
+		return
+	end
+	local i = 0
+	for _, name in ORDER do
+		local set = state[name]
+		if set then
+			for _, g in set.goals do
+				i += 1
+				local view = rowViews[i]
+				if view then
+					view.fill.Size =
+						UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
+					view.amount.Text = `{shortNumber(g.progress)}/{shortNumber(g.target)}`
+				end
+			end
+		end
+	end
+end
+
 function Goals.start()
 	Net.waitFor("Goals").OnClientEvent:Connect(function(newState, serverNow)
 		if typeof(newState) == "table" then
@@ -216,30 +245,15 @@ function Goals.start()
 			if typeof(serverNow) == "number" then
 				clockOffset = serverNow - os.time()
 			end
-			if shape() ~= builtShape then
-				rebuild()
-			else
-				-- same goals: just move the bars and numbers
-				local i = 0
-				for _, name in ORDER do
-					local set = state[name]
-					if set then
-						for _, g in set.goals do
-							i += 1
-							local view = rowViews[i]
-							if view then
-								view.fill.Size = UDim2.fromScale(
-									math.clamp(g.progress / math.max(g.target, 1), 0, 1),
-									1
-								)
-								view.amount.Text =
-									`{shortNumber(g.progress)}/{shortNumber(g.target)}`
-							end
-						end
-					end
-				end
-			end
+			apply()
 		end
+	end)
+	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set, serverNow)
+		serverSet = if typeof(set) == "table" then set else nil
+		if typeof(serverNow) == "number" then
+			clockOffset = serverNow - os.time()
+		end
+		apply()
 	end)
 	local last = 0
 	RunService.RenderStepped:Connect(function()

@@ -11,6 +11,7 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
@@ -22,6 +23,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local CFG = require(ReplicatedStorage.Shared.Config.World)
 
 local player = Players.LocalPlayer
 
@@ -44,6 +46,12 @@ Drive.view = {
 	car = nil :: Model?,
 	steer = 0, -- road-wheel angle, radians, positive left
 	accel = Vector3.zero, -- felt acceleration in the car's frame, m/s^2
+}
+-- the local driver's water cannon, for src/client/Features to draw without waiting for the server
+Drive.cannon = {
+	car = nil :: Model?,
+	firing = false,
+	aim = Vector3.new(0, 0, -1),
 }
 -- held inputs; keyboard and gamepad set them here, and so do the phone buttons
 Drive.input = {
@@ -576,6 +584,9 @@ local flyYaw = 0
 local bombHeld = 0
 local pivotSpin = 0 -- crawler: rad/s of on-the-spot turn being asked for
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
+local hornAt = 0
+local mouseFire = false -- left mouse held (fire truck)
+local cannonSentAt = 0
 
 local function stopDriving()
 	if driving then
@@ -590,6 +601,7 @@ local function stopDriving()
 		end
 	end
 	driving = nil
+	Drive.cannon.car, Drive.cannon.firing, mouseFire = nil, false, false
 	flying, jetOn, rearOn, reversing = false, false, false, false
 	speed, lateral, yawRate, steer, pivotSpin = 0, 0, 0, 0, 0
 	Drive.state.driving = false
@@ -846,6 +858,28 @@ local function bind()
 		Drive.input.bomb = state == Enum.UserInputState.Begin
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.X, Enum.KeyCode.DPadDown)
+	ContextActionService:BindAction("RoyfHorn", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			Drive.horn()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.H, Enum.KeyCode.DPadUp)
+	-- the fire truck's left mouse button (clicks on the HUD don't count)
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			and not processed
+			and driving
+			and Vehicles.has(driving.stats, "Cannon")
+		then
+			mouseFire = true
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			mouseFire = false
+		end
+	end)
 	ContextActionService:BindAction("RoyfRoll", function(_, state, input)
 		local dir = if input.KeyCode == Enum.KeyCode.Q
 				or input.KeyCode == Enum.KeyCode.ButtonL1
@@ -874,6 +908,28 @@ function Drive.thruster()
 		thrustReadyAt = now + THRUST_COOLDOWN
 		thrustLeft = THRUST_TIME
 	end
+end
+
+-- a vehicle's horn (built on the chassis by the server), played from its head
+local function honk(car: Model)
+	local chassis = car.PrimaryPart
+	local horn = chassis and chassis:FindFirstChild("Horn") :: Sound?
+	local stats = Vehicles.ById[car:GetAttribute("VehicleId") :: any]
+	if horn then
+		horn.TimePosition = if stats then Vehicles.Horns[stats.horn].start or 0 else 0
+		horn:Play()
+	end
+end
+
+-- H / pad D-pad up / the phone's HONK button: heard here at once, the server tells everyone else
+function Drive.horn()
+	local now = os.clock()
+	if not driving or now < hornAt + Vehicles.HornCooldown then
+		return
+	end
+	hornAt = now
+	honk(driving.car)
+	Net.waitFor("Horn"):FireServer()
 end
 
 ---------------------------------------------------------------- flings from the server
@@ -912,46 +968,52 @@ end
 
 ---------------------------------------------------------------- the loop
 
+-- where the water cannon points: at whatever the mouse is over, or where the camera looks (phone, pad,
+-- locked mouse in first person)
+local function cannonAim(s: CarState): Vector3
+	local n = s.stats.nozzle or { 0, 0, 0 }
+	local nozzle = s.chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]))
+	local ray
+	if
+		UserInputService.MouseEnabled
+		and not UserInputService.TouchEnabled
+		and UserInputService.MouseBehavior == Enum.MouseBehavior.Default
+	then
+		local m = UserInputService:GetMouseLocation()
+		ray = camera:ViewportPointToRay(m.X, m.Y)
+	else
+		ray = Ray.new(camera.CFrame.Position, camera.CFrame.LookVector)
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { s.car, player.Character :: Instance }
+	local hit = workspace:Raycast(ray.Origin, ray.Direction.Unit * 600, params)
+	local target = if hit then hit.Position else ray.Origin + ray.Direction.Unit * 600
+	local dir = target - nozzle
+	return if dir.Magnitude > 0.1 then dir.Unit else s.chassis.CFrame.LookVector
+end
+
 local function features(s: CarState, dt: number)
 	local now = os.clock()
-	-- vehicle feature (G): taxi yell, jingle once per press; the cannon fires while held
+	-- vehicle feature (G): taxi yell, jingle on/off once per press; the cannon fires while held
 	local feature = if Vehicles.has(s.stats, "Taxi")
 		then "Taxi"
 		elseif Vehicles.has(s.stats, "Jingle") then "Jingle"
 		elseif Vehicles.has(s.stats, "Cannon") then "Cannon"
 		else nil
-	if feature and Drive.input.feature then
-		if feature == "Cannon" then
-			Net.waitFor("Feature"):FireServer("Cannon")
-			local water = s.chassis:FindFirstChild("Water", true) :: ParticleEmitter?
-			if not water then
-				local a = Instance.new("Attachment")
-				a.Position = Vector3.new(0, s.height * 0.6, -s.chassis.Size.Z / 2)
-				a.Parent = s.chassis
-				local p = Instance.new("ParticleEmitter")
-				p.Name = "Water"
-				p.Color = ColorSequence.new(Color3.fromRGB(170, 210, 255))
-				p.Size = NumberSequence.new(1.2, 3)
-				p.Transparency = NumberSequence.new(0.2, 1)
-				p.Speed = NumberRange.new(90, 110)
-				p.Acceleration = Vector3.new(0, -80, 0)
-				p.Lifetime = NumberRange.new(0.6, 0.8)
-				p.SpreadAngle = Vector2.new(4, 4)
-				p.EmissionDirection = Enum.NormalId.Front
-				p.Rate = 160
-				p.Parent = a
-				water = p
-			end
-			(water :: ParticleEmitter).Enabled = true
-		else
-			Net.waitFor("Feature"):FireServer(feature)
-			Drive.input.feature = false
+	if feature == "Cannon" then
+		-- the water cannon sprays while G or the left mouse button is held, where the mouse points
+		local firing = Drive.input.feature or mouseFire
+		Drive.cannon.car = s.car
+		Drive.cannon.firing = firing
+		Drive.cannon.aim = cannonAim(s)
+		if firing and now >= cannonSentAt + CFG.Npc.CannonSend then
+			cannonSentAt = now
+			Net.waitFor("Feature"):FireServer("Cannon", Drive.cannon.aim)
 		end
-	else
-		local water = s.chassis:FindFirstChild("Water", true) :: ParticleEmitter?
-		if water then
-			water.Enabled = false
-		end
+	elseif feature and Drive.input.feature then
+		Net.waitFor("Feature"):FireServer(feature)
+		Drive.input.feature = false
 	end
 	-- self-destruct (Wrecker): hold to arm
 	if Drive.input.bomb and player:GetAttribute("PassWrecker") == true then
@@ -1640,6 +1702,11 @@ function Drive.start()
 	end)
 	bind()
 	Net.waitFor("Fling").OnClientEvent:Connect(onFling)
+	Net.waitFor("Horn").OnClientEvent:Connect(function(car)
+		if typeof(car) == "Instance" and car:IsA("Model") then
+			honk(car)
+		end
+	end)
 	RunService.Heartbeat:Connect(step)
 end
 

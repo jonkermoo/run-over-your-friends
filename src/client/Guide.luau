@@ -284,12 +284,12 @@ local function vehicleTips(id: string)
 			else "Press G to yell TAXI! Someone will come running..."
 	elseif Vehicles.has(v, "Jingle") then
 		text = if touch
-			then "Tap HORN to play the jingle. Everyone wants ice cream."
-			else "Press G to play the jingle. Everyone wants ice cream."
+			then "Tap JINGLE to turn the tune on or off. While it plays, everyone wants ice cream."
+			else "Press G to turn the jingle on or off. While it plays, everyone wants ice cream."
 	elseif Vehicles.has(v, "Cannon") then
 		text = if touch
-			then "Hold WATER to blast people off their feet."
-			else "Hold G to blast people off their feet with the water cannon."
+			then "Hold WATER to blast people off their feet. It sprays where the camera looks."
+			else "Aim with the mouse, hold the left button (or G) to blast people off their feet."
 	end
 	if text then
 		showTip(text)

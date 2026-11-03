@@ -225,4 +225,21 @@ function Crowd.nextGoal(role: Role, atHome: boolean, rng: () -> number, cfg: Goa
 	})
 end
 
+-- where someone heading for a vehicle stops: on their own side of it, `gap` studs outside its footprint
+-- (half-sizes hx, hz). x, z are their position in the vehicle's frame; the answer is in that frame too.
+function Crowd.besideBox(
+	x: number,
+	z: number,
+	hx: number,
+	hz: number,
+	gap: number
+): (number, number)
+	local ax, az = hx + gap, hz + gap
+	if math.abs(x) < 1e-6 and math.abs(z) < 1e-6 then
+		return ax, 0 -- dead centre: step out to the side
+	end
+	local t = 1 / math.max(math.abs(x) / ax, math.abs(z) / az)
+	return x * t, z * t
+end
+
 return Crowd

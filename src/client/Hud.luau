@@ -1078,6 +1078,9 @@ end)
 local viewB = holdButton("VIEW", UDim2.fromOffset(0, -80), "dark", function()
 	Cockpit.toggle()
 end, function() end)
+local hornB = holdButton("HONK", UDim2.fromOffset(80, -80), "gold", function()
+	Drive.horn()
+end, function() end)
 local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
 	Drive.input.roll = 1
 end, function()
@@ -1128,8 +1131,16 @@ RunService.RenderStepped:Connect(function()
 	layoutMeters()
 	hint.Position = UDim2.new(0.5, 0, 1, -(18 + dash.Size.Y.Offset + 14))
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
-	local keys = { "WASD drive", "SPACE get out", "V view" }
-	if feature then
+	local keys = { "WASD drive", "SPACE get out", "V view", "H horn" }
+	local jingleOn = Drive.view.car ~= nil
+		and Drive.view.car.PrimaryPart ~= nil
+		and Drive.view.car.PrimaryPart:GetAttribute("JingleOn") == true
+	if feature == "JINGLE" then
+		table.insert(keys, if jingleOn then "G jingle off" else "G jingle on")
+		feature = if jingleOn then "JINGLE OFF" else "JINGLE ON"
+	elseif feature == "WATER" then
+		table.insert(keys, "aim with the mouse, hold CLICK or G water")
+	elseif feature then
 		table.insert(keys, "G " .. string.lower(feature))
 	end
 	if hasJet then
@@ -1152,6 +1163,7 @@ RunService.RenderStepped:Connect(function()
 	thrustB.Visible = hasThruster
 	bombB.Visible = wrecker
 	viewB.Visible = true
+	hornB.Visible = true
 	viewB.Text = if Cockpit.isOn() then "OUT" else "VIEW"
 	rollL.Visible = hasJet and s.airborne
 	rollR.Visible = hasJet and s.airborne

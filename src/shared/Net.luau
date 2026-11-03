@@ -18,6 +18,7 @@ Net.Messages = table.freeze({
 	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
 	SelfDestruct = "SelfDestruct", -- ()
 	Feature = "Feature", -- (feature: string)
+	Horn = "Horn", -- client -> server: () honk; server -> other clients: (vehicle: Model)
 	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
 	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
@@ -29,6 +30,7 @@ Net.Messages = table.freeze({
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom", position: Vector3, a: number, b: number, userId: number)
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
+	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 })
 
@@ -45,6 +47,7 @@ export type MessageName =
 	| "WreckerHit"
 	| "SelfDestruct"
 	| "Feature"
+	| "Horn"
 	| "BuyPaint"
 	| "SetPaint"
 	| "ClaimDaily"
@@ -56,6 +59,7 @@ export type MessageName =
 	| "Contest"
 	| "Boards"
 	| "Daily"
+	| "ServerGoal"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent
