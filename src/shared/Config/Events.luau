@@ -1,9 +1,14 @@
 --!strict
 -- Server events: one every few minutes, announced ahead, running for a short while.
 -- A contest event keeps a score per player while it runs (Rules/Contest) and pays the top 3 and everyone
--- who took part when it ends. stat: "Breaks" (building pieces), "Launch" (studs, best one) or "Hits".
+-- who took part when it ends. stat: "Breaks" (building pieces), "Launch" (studs, best one), "Hits" or "Stunt" (one jump's
+-- pay, best one).
 
-export type Contest = { stat: "Breaks" | "Launch" | "Hits", mode: "add" | "max", unit: string }
+export type Contest = {
+	stat: "Breaks" | "Launch" | "Hits" | "Stunt",
+	mode: "add" | "max",
+	unit: string,
+}
 export type Event = { key: string, title: string, text: string, color: string, contest: Contest? }
 
 return table.freeze({
@@ -57,6 +62,13 @@ return table.freeze({
 			title = "STAMPEDE",
 			text = "Crowds flood the streets and every hit pays double.",
 			color = "green",
+		}),
+		table.freeze({
+			key = "AirShow",
+			title = "AIR SHOW",
+			text = "Land the best jump. Top 3 win big!",
+			color = "red",
+			contest = table.freeze({ stat = "Stunt", mode = "max", unit = "points" }),
 		}),
 	}),
 	LowGravityScale = 0.35,

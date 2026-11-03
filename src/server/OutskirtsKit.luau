@@ -421,6 +421,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		end
 		local folder = Instance.new("Folder")
 		folder.Name = "StuntPark"
+		-- the park's ground, for StuntService (jumps over it pay double)
+		folder:SetAttribute("Centre", Vector3.new(st.x, 0, st.z))
+		folder:SetAttribute("Size", Vector3.new(st.w, 0, st.d))
 		folder.Parent = static
 		part(
 			folder,
