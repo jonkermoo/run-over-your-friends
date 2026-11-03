@@ -14,6 +14,7 @@ local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
 local EventService = require(script.Parent.EventService)
 local NpcService = require(script.Parent.NpcService)
+local StuntService = require(script.Parent.StuntService)
 
 local ServerGoalService = {}
 
@@ -91,6 +92,11 @@ function ServerGoalService.start()
 	end)
 	BuildingService.onBreak(function(player, count)
 		ServerGoalService.add(player, "Breaks", count)
+	end)
+	StuntService.onStunt(function(player, kind, amount)
+		if kind == "Jumps" then
+			ServerGoalService.add(player, "Jumps", amount)
+		end
 	end)
 	Players.PlayerAdded:Connect(function(player)
 		send(player)

@@ -1963,6 +1963,18 @@ do
 			goal.helpers[1] and goal.helpers[2] and not goal.helpers[3]
 		)
 		check("server goal kinds take turns", Sg.nextIndex(1, 2) == 2 and Sg.nextIndex(2, 2) == 1)
+		local goalKinds = {}
+		for _, k in SgConfig.Kinds do
+			goalKinds[k.kind] = true
+		end
+		check(
+			"stunt jumps are a server goal too",
+			goalKinds.Breaks and goalKinds.Hits and goalKinds.Jumps and #SgConfig.Kinds == 3
+		)
+		check(
+			"three server goal kinds take turns",
+			Sg.nextIndex(3, 3) == 1 and Sg.nextIndex(2, 3) == 3
+		)
 	end
 	checkServerGoals()
 end
