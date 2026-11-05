@@ -13,6 +13,7 @@ local Cfg = require(ReplicatedStorage.Shared.Config.Traffic)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Paints = require(ReplicatedStorage.Shared.Config.Paints)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 
@@ -72,6 +73,8 @@ local function build(kind: number): Copy?
 		return nil
 	end
 	local model = source:Clone() :: Model
+	model.WorldPivot = CFrame.identity
+	model:ScaleTo(Game.VehicleScale) -- as big as the players' own (VehicleBuilder)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") and not KEEP[d.Name] and string.sub(d.Name, 1, 6) ~= "Wheel_" then
 			d:Destroy()

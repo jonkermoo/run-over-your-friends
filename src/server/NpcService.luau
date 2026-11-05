@@ -12,6 +12,7 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
@@ -116,7 +117,7 @@ function NpcService.spawnGiant(at: Vector3): Model?
 	if not npc then
 		return nil
 	end
-	npc:ScaleTo(EventConfig.GiantScale)
+	npc:ScaleTo(EventConfig.GiantScale * Game.BodyScale) -- GiantScale times an ordinary person
 	npc:PivotTo(CFrame.new(at + Vector3.new(0, 4 * EventConfig.GiantScale, 0)))
 	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
@@ -556,7 +557,8 @@ local function onFeature(player: Player, feature: unknown, aim: unknown)
 		local y = math.clamp(dir.Y, CFG.CannonDown, CFG.CannonUp)
 		dir = (flat.Unit * math.sqrt(1 - y * y) + Vector3.new(0, y, 0)).Unit
 		local n = stats.nozzle or { 0, 0, 0 }
-		local nozzle = chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]))
+		local nozzle =
+			chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]) * Game.VehicleScale)
 		-- every client draws the turret and the spray from these
 		chassis:SetAttribute("CannonAim", dir)
 		chassis:SetAttribute("CannonAt", workspace:GetServerTimeNow())

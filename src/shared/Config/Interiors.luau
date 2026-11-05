@@ -47,7 +47,7 @@ end
 return table.freeze({
 	Radius = 170, -- clients furnish houses this close to the camera...
 	MaxFurnished = 24, -- ...at most this many at once, nearest first
-	SitHeight = 2.35, -- a seated person's root above the floor
+	SitHeight = 2.35, -- a seated stock-size person's root above the seat (times Game.BodyScale)
 	SitAnim = 2506281703, -- Roblox's standard R15 sit
 	LampRange = 13,
 	LampBrightness = 1.4,

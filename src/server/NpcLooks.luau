@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local World = require(ReplicatedStorage.Shared.Config.World)
 
 local NpcLooks = {}
@@ -196,6 +197,8 @@ function NpcLooks.init()
 				a:Destroy()
 			end
 		end
+		-- the city's people are as big as the players (Game.BodyScale); so is every copy of this one
+		model:ScaleTo(Game.BodyScale)
 		base = model
 	else
 		warn("[NpcLooks] couldn't build the base character")
@@ -204,6 +207,9 @@ function NpcLooks.init()
 		local hd = Instance.new("HumanoidDescription")
 		hd.HairAccessory = tostring(id)
 		local donor = build(hd)
+		if donor then
+			donor:ScaleTo(Game.BodyScale) -- the hair grows with the head it was made for
+		end
 		local acc = donor and donor:FindFirstChildOfClass("Accessory")
 		if acc then
 			acc.Parent = storage
@@ -412,6 +418,7 @@ function NpcLooks.takeFriend(userId: number, name: string, friendOf: string): Mo
 			local model = build(desc :: HumanoidDescription)
 			if model then
 				prepare(model, `{name}  ·  friend of {friendOf}`, World.Npc.FriendNameRange)
+				model:ScaleTo(Game.BodyScale)
 				model:SetAttribute("FriendId", userId)
 				model.Parent = storage
 				friendSpare[userId] = friendSpare[userId] or {}
@@ -436,6 +443,9 @@ function NpcLooks.give(model: Model)
 	end
 	local root = model:FindFirstChild("HumanoidRootPart") :: BasePart
 	root.Anchored = false -- it may have been sitting
+	if math.abs(model:GetScale() - Game.BodyScale) > 1e-3 then
+		model:ScaleTo(Game.BodyScale) -- a giant back to everyday size
+	end
 	local glow = model:FindFirstChild("GoldenGlow")
 	if glow then
 		glow:Destroy()

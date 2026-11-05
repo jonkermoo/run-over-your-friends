@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Cockpit)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 
@@ -72,7 +73,7 @@ local function hideNear(at: Vector3)
 	for _, part in character:GetDescendants() do
 		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
 			local near = part.Name == "Head"
-				or (not kept(part) and gap(part, at) < Config.hideRadius)
+				or (not kept(part) and gap(part, at) < Config.hideRadius * Game.BodyScale)
 			local m = if near then 1 else 0
 			part.LocalTransparencyModifier = m
 			hidden[part] = true
@@ -127,7 +128,7 @@ local function enter(model: Model, body: BasePart, seat: BasePart)
 	active = true
 	car = model
 	eye = body.CFrame:PointToObjectSpace(
-		seat.CFrame * Vector3.new(0, Config.eyeAboveSeat, -Config.eyeAhead)
+		seat.CFrame * (Vector3.new(0, Config.eyeAboveSeat, -Config.eyeAhead) * Game.BodyScale)
 	)
 	yaw, pitch = 0, 0
 	local g = model:FindFirstChild("Glass")

@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Interiors = require(ReplicatedStorage.Shared.Config.Interiors)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
@@ -143,7 +144,7 @@ local function settle(p: Person)
 	local face = spot.face or root.CFrame.LookVector
 	if spot.sit then
 		local seat = spot.path[#spot.path]
-		local at = Vector3.new(seat.X, seat.Y + Interiors.SitHeight, seat.Z)
+		local at = Vector3.new(seat.X, seat.Y + Interiors.SitHeight * Game.BodyScale, seat.Z)
 		root.Anchored = true
 		root.CFrame = CFrame.lookAt(at, at + face)
 		setGait(p, "sit")

@@ -58,7 +58,7 @@ return table.freeze({
 	-- nearby sends people running. Speeds in m/s, the rest studs and seconds.
 	React = table.freeze({
 		Look = 1.1, -- seconds ahead they notice a vehicle coming
-		Reach = 2.5, -- studs beside its path that still counts as in the way
+		Reach = 3, -- studs beside its path that still counts as in the way (people are Game.BodyScale big)
 		MinSpeed = 4, -- slower vehicles are ignored
 		SlowSpeed = 8, -- at or under this, DodgeSlow...
 		FastSpeed = 30, -- ...falling to DodgeFast at this (75 mph is about 33 m/s)

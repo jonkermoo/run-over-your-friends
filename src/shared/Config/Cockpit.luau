@@ -4,7 +4,8 @@
 
 return table.freeze({
 	-- the camera sits at the driver's eyes, fixed to the seat (every avatar sees the same view, whatever its
-	-- head is like): measured in Studio, a seated avatar's head is 2.87 above the seat part and 0.17 behind it
+	-- head is like): measured in Studio, a seated stock avatar's head is 2.87 above the seat part and 0.17 behind
+	-- it; these and hideRadius are for a stock avatar, and are multiplied by Game.BodyScale
 	eyeAboveSeat = 3.0, -- studs above the seat part's middle
 	eyeAhead = 0.18, -- studs ahead of it
 	hideRadius = 1.3, -- the driver's own parts this close to the eye are hidden (head, hair, hats, face pieces)

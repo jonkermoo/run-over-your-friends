@@ -46,6 +46,7 @@ local ProductService = require(script.ProductService)
 local EventService = require(script.EventService)
 local ServerGoalService = require(script.ServerGoalService)
 local Analytics = require(script.Analytics)
+local Bodies = require(script.Bodies)
 local PaintService = require(script.PaintService)
 local RateLimit = require(script.RateLimit)
 local TrafficService = require(script.TrafficService)
@@ -66,6 +67,7 @@ for _, p in world.spawnPoints do
 end
 
 Analytics.start()
+Bodies.start()
 Data.start()
 Passes.start()
 VehicleService.start()

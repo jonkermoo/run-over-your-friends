@@ -29,8 +29,8 @@ return table.freeze({
 	PassShift = 7, -- studs/s sideways while pulling out into the other lane and back
 	PassSpeed = 22, -- studs/s while out of their lane
 	StopLine = 47, -- studs before a crossing's centre where they wait at a red light
-	CarLength = 18, -- for spacing (studs, the longest kinds)
-	HalfWidth = 5, -- half a car's width plus a little: how wide a path they keep clear ahead
+	CarLength = 23, -- for spacing (studs, the longest kinds, at Game.VehicleScale)
+	HalfWidth = 6.7, -- half a car's width plus a little: how wide a path they keep clear ahead
 	Tick = 0.1, -- server step
 
 	-- keeping them near players
@@ -49,7 +49,7 @@ return table.freeze({
 
 	-- crashing
 	CrashSpeed = 5, -- m/s closing speed for a hit to count
-	CrashReach = 30, -- server check: studs between the player's vehicle and the car, plus their lag
+	CrashReach = 38, -- server check: studs between the player's vehicle and the car (at Game.VehicleScale), plus their lag
 	RespawnSeconds = 8,
 	WreckSeconds = 5, -- the flung car stays this long on screen, then fades
 	Pay = 40, -- money per wreck at CrashSpeed...

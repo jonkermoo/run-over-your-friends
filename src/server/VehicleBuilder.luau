@@ -11,6 +11,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -25,6 +26,7 @@ local BIG = 1e8
 local GLASS_SEE_THROUGH = 0.45
 local MIRROR_SHINE = 0.25 -- any more and the sky turns it into a white slab
 local STEER_TILT = 22 -- degrees the cabin steering wheel leans back towards the driver, unless the row says
+local S = Game.VehicleScale -- every model is built this much bigger than its mesh, to fit the bigger drivers
 
 local function weld(name: string, part0: BasePart, part1: BasePart): Weld
 	local w = Instance.new("Weld")
@@ -90,6 +92,15 @@ local function vec(t: { number }): Vector3
 	return Vector3.new(t[1], t[2], t[3])
 end
 
+-- a fresh copy of a vehicle model at the game's body scale, about its centre-bottom (the origin), so studs
+-- given from the centre-bottom in Config scale by S too
+local function copyOf(template: Model): Model
+	local model = template:Clone()
+	model.WorldPivot = CFrame.identity
+	model:ScaleTo(S)
+	return model
+end
+
 -- The trailer: moved so its kingpin sits on the tractor's hitch, an invisible collider riding on two rear
 -- balls (the hitch carries the front), a ball joint that lets it swing and pitch but not flip, and a capped
 -- sideways hold at the rear axle so it follows the tractor like real tyres until it's flung too hard.
@@ -97,10 +108,10 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 	local template =
 		ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(spec.model) :: Model
 	assert(template, "no trailer model " .. spec.model)
-	local trailer = template:Clone()
+	local trailer = copyOf(template)
 	trailer.Name = "Trailer"
-	local hitch = vec(spec.hitch)
-	local offset = CFrame.new(hitch - vec(spec.kingpin))
+	local hitch = vec(spec.hitch) * S
+	local offset = CFrame.new(hitch - vec(spec.kingpin) * S)
 	local wheels: { BasePart } = {}
 	local wheelRadius, axleZ = 0, 0
 	for _, p in trailer:GetChildren() do
@@ -116,8 +127,8 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 	axleZ /= math.max(#wheels, 1)
 	local body = trailer:FindFirstChild("Body") :: BasePart
 	local cf, size = trailer:GetBoundingBox()
-	local skid = math.clamp(wheelRadius * 0.8, 0.8, 2)
-	local height = math.clamp(body.Size.Y * 0.35, 1.6, 5)
+	local skid = math.clamp(wheelRadius * 0.8, 0.8 * S, 2 * S)
+	local height = math.clamp(body.Size.Y * 0.35, 1.6 * S, 5 * S)
 	local box = Instance.new("Part")
 	box.Name = "TrailerChassis"
 	box.Size = Vector3.new(size.X * 0.82, height, size.Z * 0.9)
@@ -209,7 +220,7 @@ local function buildTracks(model: Model, chassis: BasePart)
 				back = sprocket.Position.Z - base.Z,
 				radius = idler.Size.Y / 2 + shoe.Size.Y / 2,
 			}
-			local count = Tracks.count(loop, Cockpit.shoePitch)
+			local count = Tracks.count(loop, Cockpit.shoePitch * S)
 			local length = Tracks.length(loop)
 			for i = 0, count - 1 do
 				local copy = shoe:Clone()
@@ -244,7 +255,7 @@ function VehicleBuilder.build(id: string): Model
 	local stats = assert(Vehicles.ById[id], "unknown vehicle " .. id)
 	local template = ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(id) :: Model
 	assert(template, "no model for " .. id)
-	local model = template:Clone()
+	local model = copyOf(template)
 	model.Name = id
 
 	local body = model:FindFirstChild("Body") :: BasePart
@@ -264,9 +275,9 @@ function VehicleBuilder.build(id: string): Model
 	-- the chassis: a box up to about the bumpers, a little inside the body's outline but at least as wide
 	-- as the tyres (so they can't push into walls), riding on four invisible balls at its corners so kerbs
 	-- and ramp lips roll under instead of stopping it dead
-	local skid = math.clamp(wheelRadius * 0.8, 0.8, 2)
+	local skid = math.clamp(wheelRadius * 0.8, 0.8 * S, 2 * S)
 	local lift = skid * 0.7
-	local chassisHeight = math.clamp(body.Size.Y * 0.35, 1.6, 5)
+	local chassisHeight = math.clamp(body.Size.Y * 0.35, 1.6 * S, 5 * S)
 	local chassis = Instance.new("Part")
 	chassis.Name = "Chassis"
 	chassis.Size =
@@ -396,15 +407,15 @@ function VehicleBuilder.build(id: string): Model
 		buildTracks(model, chassis)
 	end
 
-	local seatPos = stats.seat
+	local seatPos = vec(stats.seat) * S
 	local seat = Instance.new("VehicleSeat")
 	seat.Name = "DriverSeat"
 	seat.Size = Vector3.new(2, 1, 2)
-	seat.CFrame = CFrame.new(seatPos[1], seatPos[2], seatPos[3])
+	seat.CFrame = CFrame.new(seatPos)
 	if model:FindFirstChild("Interior") then
 		-- a thin seat with its top flush with the cabin cushion, so the driver sits in it rather than on top
 		seat.Size = Vector3.new(2, 0.2, 2)
-		seat.CFrame = CFrame.new(seatPos[1], seatPos[2] + 0.075, seatPos[3])
+		seat.CFrame = CFrame.new(seatPos + Vector3.new(0, 0.075, 0))
 	end
 	seat.Transparency = 1
 	seat.CanCollide = false

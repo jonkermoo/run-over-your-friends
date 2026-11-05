@@ -22,6 +22,7 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local CFG = require(ReplicatedStorage.Shared.Config.World)
 
@@ -222,6 +223,25 @@ type CarState = {
 local cars: { [Model]: CarState } = {}
 local camera = workspace.CurrentCamera
 local baseFov = camera.FieldOfView
+
+-- the driver's hands come off the wheel: their IK goes, so the arms are the avatar's own again
+local function letGo(s: CarState)
+	for _, k in s.ik do
+		k:Destroy()
+	end
+	table.clear(s.ik)
+	s.ikFor = nil
+end
+
+-- a car that goes away (despawned, swapped for another, wrecked) lets go of its driver first: its seat can
+-- empty in the same moment, so the per-frame check never sees the driver leave
+local function forget(car: Model)
+	local s = cars[car]
+	if s then
+		letGo(s)
+		cars[car] = nil
+	end
+end
 
 local function track(car: Instance)
 	if not car:IsA("Model") or cars[car] then
@@ -976,7 +996,8 @@ end
 -- locked mouse in first person)
 local function cannonAim(s: CarState): Vector3
 	local n = s.stats.nozzle or { 0, 0, 0 }
-	local nozzle = s.chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]))
+	local nozzle =
+		s.chassis.CFrame:PointToWorldSpace(Vector3.new(n[1], n[2], n[3]) * Game.VehicleScale)
 	local ray
 	if
 		UserInputService.MouseEnabled
@@ -1398,7 +1419,7 @@ local function step(dt: number)
 
 	for car, s in cars do
 		if not car.Parent then
-			cars[car] = nil
+			forget(car)
 			continue
 		end
 		local chassis = s.chassis
@@ -1524,11 +1545,16 @@ local function step(dt: number)
 		end
 		local occupant = s.seat and s.seat.Occupant
 		if occupant ~= s.ikFor then
-			for _, k in s.ik do
-				k:Destroy()
-			end
-			table.clear(s.ik)
+			letGo(s)
 			s.ikFor = occupant
+			-- grips left on this driver by a car that went away before it let go
+			if occupant then
+				for _, k in occupant:GetChildren() do
+					if k:IsA("IKControl") and string.sub(k.Name, 1, 8) == "RoyfGrip" then
+						k:Destroy()
+					end
+				end
+			end
 			-- the hands' targets: GripL/GripR attachments on the wheel, handlebars or joysticks
 			local grips: { [string]: Attachment } = {}
 			for _, a in s.car:GetDescendants() do
@@ -1733,7 +1759,7 @@ function Drive.start()
 	end
 	CollectionService:GetInstanceAddedSignal("Vehicle"):Connect(track)
 	CollectionService:GetInstanceRemovedSignal("Vehicle"):Connect(function(car)
-		cars[car :: Model] = nil
+		forget(car :: Model)
 	end)
 	bind()
 	Net.waitFor("Fling").OnClientEvent:Connect(onFling)

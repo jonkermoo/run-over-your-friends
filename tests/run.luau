@@ -2360,6 +2360,48 @@ do
 	)
 end
 
+do
+	-- bigger everyone: the scales are sane, and the traffic numbers fit the everyday cars at the vehicle scale
+	local fs = require("@lune/fs")
+	local roblox = require("@lune/roblox")
+	local TrafficConfig = require("../src/shared/Config/Traffic")
+	local S = Game.VehicleScale
+	check(
+		"body scale is a modest growth and cars grow at least as much",
+		Game.BodyScale >= 1
+			and Game.BodyScale <= 1.5
+			and S >= Game.BodyScale
+			and S <= Game.BodyScale * 1.15
+	)
+	local models = roblox.deserializeModel(fs.readFile("assets/Vehicles.rbxm"))[1]
+	local fits = true
+	for _, kind in TrafficConfig.Kinds do
+		local m = models:FindFirstChild(kind.id)
+		local lo, hi = math.huge, -math.huge
+		local wide = 0
+		for _, p in (if m then m:GetChildren() else {}) do
+			if p.Name == "Body" or string.sub(p.Name, 1, 6) == "Wheel_" then
+				local at, size = p.CFrame.Position, p.Size
+				lo = math.min(lo, at.Z - size.Z / 2)
+				hi = math.max(hi, at.Z + size.Z / 2)
+				wide = math.max(wide, math.abs(at.X) + size.X / 2)
+			end
+		end
+		-- queued cars keep CarLength + Gap between centres, so no two bumpers meet; the clear path ahead is a
+		-- little wider than the car (the rare ice cream van is a little wider still)
+		local spare = if kind.id == "IceCream" then -0.5 else 0.2
+		if
+			not m
+			or (hi - lo) * S > TrafficConfig.CarLength + TrafficConfig.Gap
+			or wide * S + spare > TrafficConfig.HalfWidth
+		then
+			print(`  {kind.id}: length {(hi - lo) * S}, half width {wide * S}`)
+			fits = false
+		end
+	end
+	check("traffic spacing and lane width fit the scaled everyday cars", fits)
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

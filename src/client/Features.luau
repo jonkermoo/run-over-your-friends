@@ -8,6 +8,7 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -179,7 +180,8 @@ local function track(car: Instance)
 	end
 	local chassis = car.PrimaryPart :: BasePart
 	if Vehicles.has(stats, "Cannon") and stats.nozzle then
-		buildTurret(car, chassis, stats.nozzle)
+		local n, S = stats.nozzle, Game.VehicleScale
+		buildTurret(car, chassis, { n[1] * S, n[2] * S, n[3] * S })
 	end
 	if Vehicles.has(stats, "Jingle") then
 		buildSign(car, chassis)
