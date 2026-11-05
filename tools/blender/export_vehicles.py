@@ -1398,12 +1398,12 @@ def add_interior(vid):
         width = min(width, ghi.x - glo.x)
     _, sy, sz = SEATS[vid]
     sx = -round(width * 0.2, 1)  # left of centre
-    if glass:
+    if glass and vid not in LOW_CABS:
         # sit high enough to be seen through the side windows (tall cabs)
         sy = max(sy, round(glo.z - lo.z - 2.3, 1))
     f = Fit(vid, (sx, sy, sz), glass)
     sill = f.window(sx, sz, LEFT)
-    if sill and f.eye.y < sill:
+    if sill and f.eye.y < sill and vid not in LOW_CABS:
         # a tall cab: sit up so the eye clears the side window's bottom edge
         sy = round(sy + sill + EYE_SILL - f.eye.y, 1)
         f = Fit(vid, (sx, sy, sz), glass)
@@ -1426,6 +1426,10 @@ def add_interior(vid):
 EYE_UP, EYE_FWD, EYE_FOV, EYE_PITCH, EYE_GLASS = 3.2, 0.1, 65, 8, 0.75
 EYE_ROOM = 0.45  # the eye stays this far under the roof
 EYE_SILL = 1.2  # in a tall cab the eye sits this far above the side window's bottom edge
+# low sports cars: the driver sits down on the floor, below the side windows, so a tall avatar's head and hair
+# stay under the roof (their seat heights in Config/Vehicles win over the two sit-up rules above)
+LOW_CABS = ("Supercar", "Roadster")
+DOZER_LIFT = 2.0  # the bulldozer's seat rides this far above its cab floor's usual height (roomy cab)
 SEAT_ROOM = 2.3  # studs from the seat spot to the cab's back wall that the seat back needs
 SCREEN_GAP = 4.6  # a driver sitting further than this behind the windscreen (vans, trucks) moves up to it
 INTERIOR = tuple(CABIN)
@@ -1449,7 +1453,7 @@ def bulldozer_cab():
     x0, x1, z0, z1 = min(a.x, b.x), max(a.x, b.x), min(a.z, b.z), max(a.z, b.z)
     floor, roof = a.y, b.y
     sill = R(0, 0, 1.31).y
-    sx, sy, sz = 0.0, round(floor + 1.7, 1), round((z0 + z1) / 2 + 0.9, 1)
+    sx, sy, sz = 0.0, round(floor + 1.7 + DOZER_LIFT, 1), round((z0 + z1) / 2 + 0.9, 1)
     SEAT_AT[vid] = (sx, sy, sz)
     EYES[vid] = (sx, sy + EYE_UP, sz - EYE_FWD)
     print(f"SEAT {vid} {{ {sx}, {sy}, {sz} }}")
