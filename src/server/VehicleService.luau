@@ -262,7 +262,8 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	end)
 
 	-- parked: hold still and rest on the ground (the driver's client does this while driving)
-	local groundUp, groundAt = Vector3.yAxis, 0
+	local groundUp, groundAt, tippedAt = Vector3.yAxis, 0, -math.huge
+	local fullTorque = turn.MaxTorque
 	local groundParams = RaycastParams.new()
 	groundParams.FilterType = Enum.RaycastFilterType.Exclude
 	groundParams.CollisionGroup = "Vehicles"
@@ -305,9 +306,25 @@ function VehicleService.spawn(player: Player, id: string): boolean
 			if now - groundAt > Vehicles.Ground.parkedEvery then
 				groundAt = now
 				groundParams.FilterDescendantsInstances = { model }
-				groundUp = Ground.normal(chassis, groundParams) or Vector3.yAxis
+				local n, balanced = Ground.probe(chassis, groundParams)
+				groundUp = n or Vector3.yAxis
+				if n and not balanced then
+					tippedAt = now
+				end
 			end
-			turn.AngularVelocity = chassis.CFrame.UpVector:Cross(groundUp) * LEVEL_RATE
+			if now - tippedAt < Vehicles.Balance.airFree then
+				-- left hanging over an edge: let gravity tip it off, as the driver's client does
+				local w = chassis.AssemblyAngularVelocity
+				turn.AngularVelocity = Vector3.new(w.X, 0, w.Z)
+				turn.MaxTorque = Vehicles.Balance.hold
+					* chassis.AssemblyMass
+					* workspace.Gravity
+					* chassis.Size.Z
+					/ 2
+			else
+				turn.AngularVelocity = chassis.CFrame.UpVector:Cross(groundUp) * LEVEL_RATE
+				turn.MaxTorque = fullTorque
+			end
 		end
 	end)
 

@@ -51,6 +51,7 @@ local SOUNDS: { [string]: { id: { number }, volume: number, pitch: { number }, p
 		pool = 4,
 	},
 	Yelp = { id = { 9114399063, 9125652949 }, volume = 0.8, pitch = { 1, 1.2 }, pool = 3 },
+	Honk = { id = { 9120385543, 9120382911 }, volume = 0.6, pitch = { 0.9, 1.1 }, pool = 3 }, -- traffic getting past you
 	Panic = {
 		id = { 9125905087, 9125905538, 9125905515 },
 		volume = 1.1,
@@ -334,6 +335,8 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		elseif near < 120 then
 			shake(0.1)
 		end
+	elseif kind == "Honk" then
+		play("Honk", at)
 	elseif kind == "Dodge" then
 		play("Yelp", at)
 	elseif kind == "Land" then
