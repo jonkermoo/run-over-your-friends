@@ -2197,6 +2197,39 @@ do
 			#Pins.advance({ { set = "Weekly", index = 1, endsAt = 0 } }, sets) == 0
 		)
 		check("pin numbers", cfg.Max == 3 and cfg.Default >= 1 and cfg.Default <= cfg.Max)
+
+		-- the server goal: one goal after another, with a pause between
+		local server = { { set = "Server", index = 1, endsAt = 600 } }
+		local doneHere, flashed = Pins.advance(server, { Server = set(600, true) })
+		check(
+			"a finished server goal keeps its pin (DONE until the next one)",
+			#doneHere == 1 and doneHere[1].endsAt == 600 and #flashed == 1
+		)
+		local waiting = Pins.advance(server, { Server = set(630) })
+		check(
+			"between server goals the pin waits",
+			#waiting == 1 and waiting[1].set == "Server" and waiting[1].endsAt == 600
+		)
+		local nextGoal = Pins.advance(waiting, { Server = set(1230, false) })
+		check(
+			"the waiting pin moves on to the next server goal",
+			#nextGoal == 1 and nextGoal[1].index == 1 and nextGoal[1].endsAt == 1230
+		)
+		check(
+			"an hourly set without goals still drops its pin",
+			#Pins.advance(
+					{ { set = "Hourly", index = 1, endsAt = 100 } },
+					{ Hourly = set(100) }
+				) == 0
+		)
+		local mixed, why = Pins.toggle(server, "Hourly", 2, 100, cfg.Max)
+		mixed, why = Pins.toggle(mixed, "Daily", 1, 500, cfg.Max)
+		local _, fourth = Pins.toggle(mixed, "Daily", 2, 500, cfg.Max)
+		check(
+			"the server pin counts toward the limit",
+			why == "pinned" and #mixed == 3 and fourth == "full"
+		)
+		check("the server goal is pinned by default", cfg.Server == true)
 	end
 	checkPins()
 

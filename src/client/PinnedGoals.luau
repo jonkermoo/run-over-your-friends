@@ -1,9 +1,11 @@
 --!strict
--- Pinned goals: up to three hourly/daily goals stacked top left under the menu strip, each a small
--- asphalt card with its set's paint stripe, the goal, a lane-line bar, the reward and an X to unpin.
--- Pins are picked in the goals sheet (Goals calls toggle); one is pinned for you until you change them.
--- A finished pin shows DONE for a moment, then moves to its set's next goal (Rules/Pins). Pins last the
--- session. Hidden during the tutorial (its job card sits here) and while the goals sheet is open.
+-- Pinned goals: up to three goals stacked top left under the menu strip, each a small asphalt card with
+-- its set's paint stripe, the goal, a lane-line bar, the reward and an X to unpin. Pins are picked in the
+-- goals sheet (Goals calls toggle); the server goal and one hourly goal are pinned for you until you change
+-- them. A finished hourly/daily pin shows DONE for a moment, then moves to its set's next goal; the server
+-- goal's card counts down to its end, then shows DONE (or a wait) and the time to the next server goal
+-- (Rules/Pins). Pins last the session. Hidden during the tutorial (its job card sits here) and while the
+-- goals sheet is open.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
+local ServerGoals = require(ReplicatedStorage.Shared.Config.ServerGoals)
 local Pins = require(ReplicatedStorage.Shared.Rules.Pins)
 local Style = require(script.Parent.Style)
 
@@ -25,7 +28,7 @@ local PinnedGoals = {}
 type GoalView = { text: string, target: number, reward: number, progress: number, done: boolean }
 type SetView = { goals: { GoalView }, endsAt: number }
 
-PinnedGoals.colors = table.freeze({ Hourly = C.blue, Daily = C.pink })
+PinnedGoals.colors = table.freeze({ Hourly = C.blue, Daily = C.pink, Server = C.yellow })
 
 local TOP, LEFT, GAP = 68, 14, 10
 local CARD_W, CARD_W_NARROW, CARD_H = 300, 250, 58
@@ -46,6 +49,8 @@ stack.Visible = false
 stack.Parent = gui
 
 local sets: { [string]: SetView } = {}
+local serverSet: SetView? = nil -- the shared server goal (its own remote); no goals = between goals
+local clockOffset = 0 -- server unix time minus local unix time
 local pins: { Pins.Pin } = {}
 local touched = false -- the player pinned or unpinned something: no more default pins
 local doneAt: { [string]: number } = {} -- pin key -> when its goal was first seen finished
@@ -118,15 +123,33 @@ type Card = {
 	amount: TextLabel,
 	reward: TextLabel,
 	text: TextLabel,
+	tag: TextLabel,
 	pin: Pins.Pin,
 }
 local cards: { Card } = {}
 local builtShape = ""
 local shown: { [string]: boolean } = {} -- pin keys already on screen (only new ones slide in)
 
+-- what a server pin shows while there's no goal (between one goal and the next)
+local WAITING: GoalView = {
+	text = "Next server goal soon",
+	target = 1,
+	progress = 0,
+	reward = ServerGoals.Reward,
+	done = false,
+}
+
 local function goalOf(p: Pins.Pin): GoalView?
 	local s = sets[p.set]
+	if s and #s.goals == 0 and Pins.Waits[p.set] then
+		return WAITING
+	end
 	return s and s.goals[p.index]
+end
+
+local function fmt(seconds: number): string
+	seconds = math.max(0, math.floor(seconds))
+	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
 local function shape(width: number): string
@@ -147,8 +170,15 @@ local function fillCard(card: Card, g: GoalView)
 		then `DONE +${shortNumber(g.reward)}`
 		else "$" .. shortNumber(g.reward)
 	card.reward.BackgroundColor3 = if g.done then C.green else C.gold
-	card.text.TextColor3 = if g.done then C.dim else C.text
+	card.text.TextColor3 = if g.done or g == WAITING then C.dim else C.text
 	Style.setShadow(card.frame, if g.done then C.green else C.ink)
+	-- the server goal's tag carries its clock: time left, then (done or between goals) time to the next
+	local s = sets[card.pin.set]
+	if card.pin.set == "Server" and s then
+		local left = fmt(s.endsAt - (os.time() + clockOffset))
+		card.tag.Text = if g.done or g == WAITING then `SERVER  NEXT {left}` else `SERVER  {left}`
+		card.amount.Text = if g == WAITING then "" else card.amount.Text
+	end
 end
 
 local function build(width: number)
@@ -174,6 +204,7 @@ local function build(width: number)
 		stripe.Parent = frame
 		local tag = Style.pill(frame, string.upper(p.set), color)
 		tag.TextColor3 = if p.set == "Hourly" then C.text else C.ink
+		tag.Name = "Tag"
 		tag.Position = UDim2.fromOffset(16, 7)
 		local reward = Style.pill(frame, "", C.gold)
 		reward.AnchorPoint = Vector2.new(1, 0)
@@ -209,6 +240,7 @@ local function build(width: number)
 			amount = amount,
 			reward = reward,
 			text = text,
+			tag = tag,
 			pin = p,
 		}
 		fillCard(card, g)
@@ -236,6 +268,7 @@ end
 -- finished pins stay on DONE for a moment before they move on: until then the rules see them unfinished
 local function settle()
 	local now = os.clock()
+	sets.Server = serverSet
 	local view: Pins.Sets = {}
 	for name, s in sets do
 		local goals = {}
@@ -256,8 +289,23 @@ local function settle()
 	end
 	local before = keysOf(pins)
 	pins = Pins.advance(pins, view)
-	if not touched and #pins == 0 then
-		pins = Pins.default(view, CFG.Default)
+	if not touched then
+		-- the defaults: one hourly/daily goal whenever none is pinned, and the server goal on top
+		local own = 0
+		for _, p in pins do
+			if p.set ~= "Server" then
+				own += 1
+			end
+		end
+		if own == 0 then
+			for _, p in Pins.default(view, CFG.Default) do
+				table.insert(pins, p)
+			end
+		end
+		local s = view.Server
+		if CFG.Server and s and not Pins.isPinned(pins, "Server", 1) and #pins < CFG.Max then
+			table.insert(pins, 1, { set = "Server", index = 1, endsAt = s.endsAt })
+		end
 	end
 	if keysOf(pins) ~= before then
 		changed:Fire()
@@ -285,6 +333,15 @@ function PinnedGoals.toggle(set: string, index: number): string
 		changed:Fire()
 	end
 	return what
+end
+
+-- the shared server goal, whenever the server sends it (nil before the first one)
+function PinnedGoals.setServer(set: SetView?, serverNow: number?)
+	serverSet = set
+	if serverNow then
+		clockOffset = serverNow - os.time()
+	end
+	settle()
 end
 
 -- the player's goal sets, whenever the server sends them

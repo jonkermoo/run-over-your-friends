@@ -1,7 +1,6 @@
 --!strict
--- Pinned goals: which hourly/daily goals the player keeps on screen. A pin names a set ("Hourly",
--- "Daily"), a goal's place in it and the set's end time, so a new hour's set is noticed. Pure, so Lune
--- tests it.
+-- Pinned goals: which goals the player keeps on screen. A pin names a set ("Hourly", "Daily", "Server"), a
+-- goal's place in it and the set's end time, so a new hour's set is noticed. Pure, so Lune tests it.
 
 local Pins = {}
 
@@ -12,6 +11,9 @@ export type Sets = { [string]: SetLike }
 
 -- sets a pin may come from, in the order the default pin looks through them
 Pins.Order = table.freeze({ "Hourly", "Daily" })
+-- sets that run one goal after another (the shared server goal): a finished pin stays on it until the
+-- next goal comes, and a pin on the set between goals (no goals) waits for it
+Pins.Waits = table.freeze({ Server = true })
 
 local function find(pins: { Pin }, set: string, index: number): number?
 	for i, p in pins do
@@ -60,14 +62,19 @@ local function nextOpen(a: { Pin }, b: { Pin }, set: string, s: SetLike, index: 
 end
 
 -- keeps pins pointing at live goals: a set that rolled over keeps the pin's place (it's a new goal
--- there); a finished goal's pin moves to the set's next unfinished goal, or is dropped when there is none.
+-- there); a finished goal's pin moves to the set's next unfinished goal, or is dropped when there is none
+-- (a Waits set keeps it where it is instead, and an empty one holds it for the next goal).
 -- Returns the new list and the pins that were on a finished goal (for the DONE flash).
 function Pins.advance(pins: { Pin }, sets: Sets): ({ Pin }, { Pin })
 	local out: { Pin } = {}
 	local finished: { Pin } = {}
 	for _, p in pins do
 		local s = sets[p.set]
-		if s and #s.goals > 0 then
+		if s and #s.goals == 0 and Pins.Waits[p.set] then
+			if not find(out, p.set, p.index) then
+				table.insert(out, p)
+			end
+		elseif s and #s.goals > 0 then
 			local index = math.min(p.index, #s.goals)
 			if s.endsAt ~= p.endsAt then
 				-- a new set: same place, fresh goal
@@ -77,7 +84,9 @@ function Pins.advance(pins: { Pin }, sets: Sets): ({ Pin }, { Pin })
 			elseif s.goals[index].done then
 				table.insert(finished, p)
 				local nextIndex = nextOpen(out, pins, p.set, s, index)
-				if nextIndex then
+				if Pins.Waits[p.set] then
+					table.insert(out, p) -- stays on DONE until the next goal comes
+				elseif nextIndex then
 					table.insert(out, { set = p.set, index = nextIndex, endsAt = s.endsAt })
 				end
 			elseif not find(out, p.set, index) then

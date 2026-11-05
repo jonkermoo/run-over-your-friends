@@ -23,10 +23,11 @@ local index = Random.new():NextInteger(0, #Config.Kinds - 1)
 local nextAt = 0 -- os.time() when the next goal starts, once this one is over
 local dirty = false
 
--- the same shape as an Hourly/Daily set, so the goals sheet draws it like one
+-- the same shape as an Hourly/Daily set, so the goals sheet draws it like one. Between goals (after one
+-- ran out of time) it's a set with no goals that counts down to the next, so a pinned card can wait for it.
 local function view()
 	if not goal then
-		return nil
+		return if nextAt > os.time() then { goals = {}, endsAt = nextAt } else nil
 	end
 	return {
 		goals = {

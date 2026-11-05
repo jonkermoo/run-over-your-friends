@@ -1,8 +1,8 @@
 --!strict
 -- The goals sheet: the shared SERVER goal, then HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
 -- under the menu strip (top left) from the GOALS tab and closes from its header or the tab. Not
--- available until the tutorial is done, so new players see one goal at a time. Each unfinished hourly or
--- daily goal has a pin button that puts it on screen (PinnedGoals, up to three).
+-- available until the tutorial is done, so new players see one goal at a time. Each unfinished goal,
+-- the server goal included, has a pin button that puts it on screen (PinnedGoals, up to three).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -106,7 +106,7 @@ local function tickCountdowns()
 			local left = fmt(set.endsAt - t)
 			cd.Text = if name ~= "Server"
 				then "new in " .. left
-				elseif set.goals[1] and set.goals[1].done then "next in " .. left
+				elseif not set.goals[1] or set.goals[1].done then "next in " .. left
 				else "ends in " .. left
 		end
 	end
@@ -159,7 +159,7 @@ local function rebuild()
 				if g.done then
 					done += 1
 				end
-				-- unfinished hourly and daily goals get a pin button at the right; the rest of the row
+				-- unfinished goals get a pin button at the right; the rest of the row
 				-- moves over for it
 				local pinnable = not g.done and PinnedGoals.colors[name] ~= nil
 				local inset = if pinnable then 32 else 0
@@ -274,10 +274,11 @@ function Goals.start()
 		end
 	end)
 	Net.waitFor("ServerGoal").OnClientEvent:Connect(function(set, serverNow)
-		serverSet = if typeof(set) == "table" then set else nil
+		serverSet = if typeof(set) == "table" and typeof(set.goals) == "table" then set else nil
 		if typeof(serverNow) == "number" then
 			clockOffset = serverNow - os.time()
 		end
+		PinnedGoals.setServer(serverSet, if typeof(serverNow) == "number" then serverNow else nil)
 		apply()
 	end)
 	-- pins changed (here or from a card's X): redraw the pin buttons

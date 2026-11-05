@@ -176,10 +176,13 @@ return table.freeze({
 		}),
 	}),
 	-- goals pinned to the left of the screen (client side, for the session): at most Max, Default pinned
-	-- for you when nothing is; a finished pin shows DONE for FlashSeconds, then moves to the set's next goal
+	-- for you when nothing is; a finished pin shows DONE for FlashSeconds, then moves to the set's next goal.
+	-- The shared server goal can be pinned too (it has no other place on screen): Server pins it for you
+	-- until you change your pins, and its pin stays through the pause to the next server goal.
 	Pins = table.freeze({
 		Max = 3,
 		Default = 1,
+		Server = true,
 		FlashSeconds = 2.5,
 	}),
 })
