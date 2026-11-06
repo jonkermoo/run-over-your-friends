@@ -1645,6 +1645,55 @@ for vid in vehicles:
         EYES[vid] = (sx, sy + EYE_UP, sz - EYE_FWD)
 
 
+# ---- cabins that must not touch their shell: any cabin piece (above the floor) that crosses the body or glass,
+# or sits within CLEAR_GAP of it, is dropped, so nothing shows through the shell from outside (the Roadster's
+# curved doors and glass roof sit close round its low seat)
+CLEAR_SHELL = ("Roadster",)
+CLEAR_GAP = 0.06
+
+
+def clear_shell(vid):
+    hull = [tree_of(bpy.data.objects[vid + "_Body"])]
+    if vid + "_Glass" in bpy.data.objects:
+        hull.append(tree_of(bpy.data.objects[vid + "_Glass"]))
+    for part in ("_Interior", "_Mirror"):
+        o = bpy.data.objects.get(vid + part)
+        if not o or not o.data.vertices:
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.faces.ensure_lookup_table()
+        low = min(v.co.z for v in bm.verts) + 0.4  # the floor and what sits on it, where nobody sees
+        seen, drop = set(), []
+        for f0 in bm.faces:
+            if f0.index in seen:
+                continue
+            group, stack = [], [f0]
+            while stack:
+                f = stack.pop()
+                if f.index in seen:
+                    continue
+                seen.add(f.index)
+                group.append(f)
+                stack.extend(g for e in f.edges for g in e.link_faces if g.index not in seen)
+            verts = list({v.index: v for f in group for v in f.verts}.values())
+            if max(v.co.z for v in verts) < low:
+                continue
+            at = {v.index: i for i, v in enumerate(verts)}
+            t = BVHTree.FromPolygons([v.co.copy() for v in verts], [tuple(at[v.index] for v in f.verts) for f in group])
+            near_ = any(h.find_nearest(v.co, CLEAR_GAP)[0] is not None for h in hull for v in verts)
+            if near_ or any(t.overlap(h) for h in hull):
+                drop += group
+        print(f"CLEAR {vid}{part}: dropped {len(drop)} of {len(bm.faces)} faces")
+        bmesh.ops.delete(bm, geom=drop, context="FACES")
+        bm.to_mesh(o.data)
+        bm.free()
+
+
+for vid in CLEAR_SHELL:
+    clear_shell(vid)
+
+
 # ---- paint: each body's painted panels become <Id>_Paint, an untextured mesh the game colours (Config/Paints).
 # PAINT lists the palette colours (sRGB 0-1, as face_colour reads them) that count as paint on each vehicle;
 # lights, trim, grilles, stripes and liveries are other colours and stay on the textured Body.
