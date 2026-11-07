@@ -24,7 +24,7 @@ local CrowdService = {}
 
 type Place = Places.Place
 type Spot = Places.Spot
-export type Friend = { userId: number, name: string, friendOf: string }
+export type Friend = { userId: number, name: string, friendOf: string, friendOfId: number }
 type Mode = "walk" | "idle" | "inside" | "down" | "held" | "dormant"
 export type Person = {
 	role: Rules.Role,
@@ -70,6 +70,7 @@ local placesOf: { [string]: { Place } } = {}
 local spotTaken: { [Spot]: Person } = {}
 local graph: Routes.Graph? = nil
 local friendIds: { [number]: boolean } = {}
+local friendOwners: { [number]: { number } } = {} -- friend userId -> the players here they are a friend of
 local cast: { Friend } = {}
 local castIds: { [number]: boolean } = {}
 local random = Random.new()
@@ -519,6 +520,12 @@ end
 
 -- a player's friends join the pool; a few of them become the city's familiar faces
 function CrowdService.addFriend(f: Friend)
+	-- everyone in the server they're a friend of (each player's tag says "friend of You" or a name)
+	local owners = friendOwners[f.userId] or {}
+	friendOwners[f.userId] = owners
+	if not table.find(owners, f.friendOfId) then
+		table.insert(owners, f.friendOfId)
+	end
 	if friendIds[f.userId] then
 		return
 	end
@@ -553,6 +560,15 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		end
 		local f = p.friend :: Friend
 		model = NpcLooks.takeFriend(f.userId, f.name, f.friendOf)
+		if model then
+			-- what each client's name tag reads
+			model:SetAttribute("FriendName", f.name)
+			model:SetAttribute(
+				"FriendOf",
+				table.concat(friendOwners[f.userId] or { f.friendOfId }, ",")
+			)
+			model:SetAttribute("FriendOfName", f.friendOf)
+		end
 	end
 	if not model then
 		model = NpcLooks.take()

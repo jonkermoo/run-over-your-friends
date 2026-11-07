@@ -92,6 +92,73 @@ return table.freeze({
 		{ 92, 60, 40 },
 	}) :: { RGB },
 	Hair = table.freeze({ 63690008, 376548738, 451220849, 451221329, 16630147 }),
+	-- everyday people look like basic Roblox avatars: the classic head, a classic face, and free classic
+	-- clothes made by Roblox (catalog ids; each is loaded once at start). Casual.Shirts/Pants colours are the
+	-- fallback if an item doesn't load.
+	Avatar = table.freeze({
+		Head = 86498048, -- "Man Head", shows classic faces
+		Faces = table.freeze({
+			144075659,
+			7074786,
+			7074729,
+			209995366,
+			7075434,
+			141728790,
+			7131886,
+		}),
+		Shirts = table.freeze({
+			144076358, -- Blue and Black Motorcycle Shirt
+			144076436, -- Grey Striped Shirt with Denim Jacket
+			382537085, -- I <3 Pizza Shirt
+			382538295, -- Guitar Tee with Black Jacket
+			382538059, -- Green Jersey
+			382537702, -- Teal Shirt
+			398634295, -- Pastel Starburst Top with Gray Jacket
+			398635081, -- Blue Plaid Shirt
+			398633584, -- Denim Jacket with White Hoodie
+			607785314, -- ROBLOX Jacket
+			855766176, -- Roblox Green Shirt
+			855768342, -- Roblox Orange Shirt
+			855777286, -- Roblox Purple Shirt
+			855779323, -- Roblox Yellow Shirt
+		}),
+		Pants = table.freeze({
+			144076760, -- Dark Green Jeans
+			382537569, -- Black Jeans
+			382538503, -- Black Jeans with Sneakers
+			382537806, -- Jean Shorts
+			382537950, -- Jean Shorts with White Shoes
+			398634487, -- Beautiful You Jeans
+			398633812, -- Black Jeans with White Shoes
+			855781078, -- Roblox Green Shorts
+		}),
+		Hats = table.freeze({ 607702162 }), -- Roblox Baseball Cap
+		HatChance = 0.15,
+	}),
+	-- name tags over friends and giants, drawn on each player's own screen (client/NameTags)
+	Tags = table.freeze({
+		FadeFrom = 30, -- studs from the camera where a tag starts to fade
+		FadeTo = 45, -- gone from here
+		GiantFadeFrom = 120,
+		GiantFadeTo = 170,
+		Lift = 1.3, -- studs above the top of the head
+		Width = 320, -- tag box in pixels (text is centred in it)
+		Height = 80,
+		FadeEvery = 0.1, -- seconds between fade updates
+		Mine = { 255, 208, 0 } :: RGB, -- your own friends: road yellow, big and bold
+		MineSize = 30, -- text height in pixels (name), sub-line is half
+		OtherSize = 21, -- another player's friends: smaller, in one of these colours (fixed per friend)
+		Others = table.freeze({
+			{ 120, 220, 255 },
+			{ 255, 130, 200 },
+			{ 150, 240, 120 },
+			{ 255, 160, 90 },
+			{ 190, 160, 255 },
+			{ 110, 240, 210 },
+		}) :: { RGB },
+		Giant = { 255, 84, 60 } :: RGB,
+		GiantSize = 36,
+	}),
 	Casual = table.freeze({
 		Shirts = table.freeze({
 			{ 52, 120, 200 },

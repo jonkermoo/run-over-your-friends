@@ -817,6 +817,37 @@ function MapBuilder.build(): Result
 		table.insert(places, place)
 	end
 
+	-- subtle materials on the buildings' plain plastic (World.Surfaces); materials only, no new parts
+	local S = World.Surfaces
+	local mats = Enum.Material :: any
+	for _, p in buildings:GetDescendants() do
+		if
+			not (
+				p:IsA("BasePart")
+				and p.Material == Enum.Material.SmoothPlastic
+				and p.Transparency == 0
+			)
+		then
+			continue
+		end
+		local size = p.Size
+		if math.max(size.X, size.Y, size.Z) < S.MinSize then
+			continue
+		end
+		local c = p.Color
+		local light = (c.R + c.G + c.B) / 3
+		local flat = size.Y < S.RoofThickness and size.X >= S.RoofWidth and size.Z >= S.RoofWidth
+		if flat and light >= S.MidFrom then
+			p.Material = mats[S.Roof]
+		elseif light >= S.LightFrom then
+			p.Material = mats[S.Light]
+		elseif light >= S.MidFrom then
+			p.Material = mats[S.Mid]
+		elseif size.Y >= S.MinSize then
+			p.Material = mats[S.Dark]
+		end
+	end
+
 	-- lighting and look
 	local Lighting = game:GetService("Lighting")
 	local look = World.Look

@@ -80,7 +80,7 @@ return table.freeze({
 			},
 			wallMaterial = "Brick",
 			sidewalk = { 150, 132, 116 },
-			sidewalkMaterial = "Cobblestone",
+			sidewalkMaterial = "Pavement", -- paving slabs (was cobblestone: too loud)
 			accent = { 232, 172, 60 },
 			signals = true,
 			trees = 0.3,
@@ -94,7 +94,7 @@ return table.freeze({
 				{ 245, 215, 200 },
 				{ 250, 245, 235 },
 			},
-			wallMaterial = "WoodPlanks",
+			wallMaterial = "Plaster", -- soft plaster (was wood planks: too loud)
 			sidewalk = { 192, 188, 178 },
 			sidewalkMaterial = "Concrete",
 			accent = { 220, 92, 70 },
@@ -104,7 +104,7 @@ return table.freeze({
 		dock = table.freeze({
 			name = "Dockside",
 			walls = { { 120, 126, 134 }, { 90, 100, 110 }, { 160, 150, 130 }, { 70, 90, 110 } },
-			wallMaterial = "CorrodedMetal",
+			wallMaterial = "Metal", -- clean metal (was rusty: too loud)
 			sidewalk = { 140, 140, 142 },
 			sidewalkMaterial = "Concrete",
 			accent = { 255, 140, 20 },
