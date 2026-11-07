@@ -29,7 +29,17 @@ export type Look = {
 	stripe: Color3?,
 	tie: Color3?,
 	shirtFront: Color3?, -- under an open jacket
+	-- picks (0..1) among the classic items, read when dressing: people are rolled before the items load
+	face: number,
+	clothes: { shirt: number, pants: number }?, -- casual people only; uniforms are painted on
+	hat: number?, -- a catalog hat instead of hair
 }
+
+-- the classic clothes, faces and hats from Config/Crowd, loaded once in init
+local shirtTemplates: { string } = {}
+local pantsTemplates: { string } = {}
+local faceTextures: { string } = {}
+local hats: { Accessory } = {}
 
 local storage = Instance.new("Folder")
 storage.Name = "NpcPool"
@@ -68,6 +78,7 @@ function NpcLooks.roll(outfit: string): Look
 			hair = 0,
 			cap = rgb(f.Cap),
 			apron = rgb(f.Apron),
+			face = 0,
 		}
 	elseif outfit == "warehouse" then
 		local w = Crowd.Warehouse
@@ -82,6 +93,7 @@ function NpcLooks.roll(outfit: string): Look
 			hair = random:NextInteger(0, #Crowd.Hair),
 			vest = rgb(w.Vest),
 			stripe = rgb(w.Stripe),
+			face = 0,
 		}
 	elseif outfit == "office" then
 		local o = Crowd.Office
@@ -98,15 +110,20 @@ function NpcLooks.roll(outfit: string): Look
 			hair = random:NextInteger(1, #Crowd.Hair),
 			tie = rgb(pick(o.Ties)),
 			shirtFront = if jacket then shirt else nil,
+			face = 0,
 		}
 	elseif outfit == "shop" then
 		-- casual clothes under the shop's apron
 		look = NpcLooks.roll("casual")
 		look.apron = rgb(pick(Crowd.Shop.Aprons))
 		look.cap = nil
+		look.hat = nil
 	else
 		local c = Crowd.Casual
 		local shirt = rgb(pick(c.Shirts))
+		local hat = if random:NextNumber() < Crowd.Avatar.HatChance
+			then random:NextNumber()
+			else nil
 		look = {
 			skin = skin,
 			shirt = shirt,
@@ -114,10 +131,14 @@ function NpcLooks.roll(outfit: string): Look
 			upperArms = shirt,
 			pants = rgb(pick(c.Pants)),
 			shoes = rgb(pick(c.Shoes)),
-			hair = random:NextInteger(0, #Crowd.Hair),
-			cap = if random:NextNumber() < c.CapChance then rgb(pick(c.Shirts)) else nil,
+			-- a hat sits on the hairline, so hair under it would poke through
+			hair = if hat then 0 else random:NextInteger(0, #Crowd.Hair),
+			face = 0,
+			clothes = { shirt = random:NextNumber(), pants = random:NextNumber() },
+			hat = hat,
 		}
 	end
+	look.face = random:NextNumber()
 	return look
 end
 
@@ -127,9 +148,8 @@ local function prepare(model: Model, displayName: string?, nameRange: number)
 	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
 	humanoid.WalkSpeed = World.Npc.WalkSpeed
 	humanoid.DisplayName = displayName or "Pedestrian"
-	humanoid.DisplayDistanceType = if displayName
-		then Enum.HumanoidDisplayDistanceType.Viewer
-		else Enum.HumanoidDisplayDistanceType.None
+	-- name tags are drawn by each player's client (client/NameTags), so Roblox's own stays off
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	humanoid.NameDisplayDistance = nameRange
 	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
 	humanoid.BreakJointsOnDeath = false
@@ -182,7 +202,55 @@ end
 
 -- the base character and the hair pieces; call once (yields while avatars load)
 function NpcLooks.init()
+	local A = Crowd.Avatar
+	-- the classic head and clothes, read off throwaway characters (one per row of items)
+	for i = 1, math.max(#A.Shirts, #A.Pants, #A.Faces, #A.Hats) do
+		local dd = Instance.new("HumanoidDescription")
+		dd.Head = A.Head
+		dd.Shirt = A.Shirts[i] or 0
+		dd.Pants = A.Pants[i] or 0
+		dd.Face = A.Faces[i] or 0
+		dd.HatAccessory = if A.Hats[i] then tostring(A.Hats[i]) else ""
+		local donor = build(dd)
+		if donor then
+			donor:ScaleTo(Game.BodyScale)
+			local shirt = donor:FindFirstChildOfClass("Shirt")
+			if A.Shirts[i] and shirt and shirt.ShirtTemplate ~= "" then
+				table.insert(shirtTemplates, shirt.ShirtTemplate)
+			end
+			local trousers = donor:FindFirstChildOfClass("Pants")
+			if A.Pants[i] and trousers and trousers.PantsTemplate ~= "" then
+				table.insert(pantsTemplates, trousers.PantsTemplate)
+			end
+			local head = donor:FindFirstChild("Head")
+			local face = head and head:FindFirstChildOfClass("Decal")
+			if A.Faces[i] and face and face.Texture ~= "" then
+				table.insert(faceTextures, face.Texture)
+			end
+			local hat = A.Hats[i] and donor:FindFirstChildOfClass("Accessory")
+			if hat then
+				hat.Parent = storage
+				for _, p in hat:GetDescendants() do
+					if p:IsA("BasePart") then
+						p.CollisionGroup = "Npcs"
+						p.CanQuery = false
+						p.CanTouch = false
+						p.Massless = true
+					end
+				end
+				table.insert(hats, hat)
+			end
+			donor:Destroy()
+		end
+	end
+	if #shirtTemplates < #A.Shirts or #pantsTemplates < #A.Pants or #faceTextures < #A.Faces then
+		warn(
+			`[NpcLooks] classic items loaded: {#shirtTemplates} shirts, {#pantsTemplates} pants, {#faceTextures} faces`
+		)
+	end
+
 	local d = Instance.new("HumanoidDescription")
+	d.Head = A.Head
 	local model = build(d)
 	if model then
 		prepare(model, nil, 0)
@@ -193,7 +261,12 @@ function NpcLooks.init()
 		model:SetAttribute("AnimFall", nil)
 		model:SetAttribute("AnimSit", nil)
 		for _, a in model:GetChildren() do
-			if a:IsA("Accessory") or a:IsA("Shirt") or a:IsA("Pants") or a:IsA("ShirtGraphic") then
+			if
+				a:IsA("Accessory")
+				or a:IsA("Clothing")
+				or a:IsA("ShirtGraphic")
+				or a:IsA("BodyColors")
+			then
 				a:Destroy()
 			end
 		end
@@ -281,6 +354,11 @@ local function gear(
 	p.Parent = model:FindFirstChild("Gear") or model
 end
 
+-- the item a 0..1 pick lands on
+local function chosen<T>(list: { T }, at: number): T
+	return list[math.min(#list, math.floor(at * #list) + 1)]
+end
+
 -- put an outfit on an ordinary character
 function NpcLooks.dress(model: Model, look: Look)
 	local old = model:FindFirstChild("Gear")
@@ -295,18 +373,56 @@ function NpcLooks.dress(model: Model, look: Look)
 	local folder = Instance.new("Folder")
 	folder.Name = "Gear"
 	folder.Parent = model
-	paint(model, { "Head" }, look.skin)
-	paint(model, HANDS, look.skin)
-	paint(model, { "UpperTorso" }, look.shirt)
-	paint(model, ARM_UPPER, look.upperArms)
-	paint(model, ARM_LOWER, look.sleeves)
-	paint(model, LEGS, look.pants)
-	paint(model, FEET, look.shoes)
+	local head = model:FindFirstChild("Head") :: BasePart?
+	if head and #faceTextures > 0 then
+		local faceDecal = head:FindFirstChildOfClass("Decal")
+		if not faceDecal then
+			faceDecal = Instance.new("Decal")
+			faceDecal.Name = "face"
+			faceDecal.Face = Enum.NormalId.Front
+			faceDecal.Parent = head
+		end
+		(faceDecal :: Decal).Texture = chosen(faceTextures, look.face)
+	end
+	-- classic clothes go over skin-coloured limbs; uniforms are painted onto the body parts
+	local clothes = if #shirtTemplates > 0 and #pantsTemplates > 0 then look.clothes else nil
+	local shirt = model:FindFirstChildOfClass("Shirt")
+	local trousers = model:FindFirstChildOfClass("Pants")
+	if clothes then
+		if not shirt then
+			shirt = Instance.new("Shirt")
+			shirt.Parent = model
+		end
+		if not trousers then
+			trousers = Instance.new("Pants")
+			trousers.Parent = model
+		end
+		(shirt :: Shirt).ShirtTemplate = chosen(shirtTemplates, clothes.shirt);
+		(trousers :: Pants).PantsTemplate = chosen(pantsTemplates, clothes.pants)
+		for _, names in { { "Head", "UpperTorso" }, HANDS, ARM_UPPER, ARM_LOWER, LEGS, FEET } do
+			paint(model, names, look.skin)
+		end
+	else
+		if shirt then
+			shirt:Destroy()
+		end
+		if trousers then
+			trousers:Destroy()
+		end
+		paint(model, { "Head" }, look.skin)
+		paint(model, HANDS, look.skin)
+		paint(model, { "UpperTorso" }, look.shirt)
+		paint(model, ARM_UPPER, look.upperArms)
+		paint(model, ARM_LOWER, look.sleeves)
+		paint(model, LEGS, look.pants)
+		paint(model, FEET, look.shoes)
+	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid") :: Humanoid
-	if look.hair > 0 and look.hair <= #hairs and not look.cap then
+	if look.hat and #hats > 0 then
+		humanoid:AddAccessory(chosen(hats, look.hat):Clone())
+	elseif look.hair > 0 and look.hair <= #hairs and not look.cap then
 		humanoid:AddAccessory(hairs[look.hair]:Clone())
 	end
-	local head = model:FindFirstChild("Head") :: BasePart?
 	local torso = model:FindFirstChild("UpperTorso") :: BasePart?
 	local hips = model:FindFirstChild("LowerTorso") :: BasePart?
 	if head and look.cap then

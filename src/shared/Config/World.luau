@@ -28,6 +28,21 @@ return table.freeze({
 		BloomThreshold = 1.8,
 		PaintLift = 0.03, -- plaza paint sits this far above the paving
 	}),
+	-- subtle built-in materials on the buildings' plain plastic (the "quiet" look): light walls get soft
+	-- plaster, mid tones and flat roofs concrete, dark upright trim brushed metal. Small parts, dark floors and
+	-- see-through parts stay plastic.
+	-- Only materials change, so the map's part count doesn't. Lightness is the mean of r, g, b (0..1).
+	Surfaces = table.freeze({
+		MinSize = 4, -- studs: the part's longest side must reach this
+		Light = "Plaster",
+		LightFrom = 0.7,
+		Mid = "Concrete",
+		MidFrom = 0.3,
+		Dark = "Metal", -- upright dark parts only (flat dark ones, like floor tiles, stay plastic)
+		Roof = "Concrete", -- flat, wide, thin parts
+		RoofThickness = 1.6,
+		RoofWidth = 8,
+	}),
 	Map = table.freeze({
 		GroundSize = 6000,
 		BlockSize = 220, -- city block, kerb to kerb

@@ -75,6 +75,7 @@ local function addFriends(player: Player)
 				userId = f.Id,
 				name = f.DisplayName,
 				friendOf = player.DisplayName,
+				friendOfId = player.UserId,
 			})
 		end
 		if (pages :: FriendPages).IsFinished then

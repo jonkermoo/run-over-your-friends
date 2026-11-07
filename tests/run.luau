@@ -856,7 +856,34 @@ local MATERIALS = {
 	Slate = true,
 	Limestone = true,
 	DiamondPlate = true,
+	Plaster = true,
+	Pavement = true,
 }
+do
+	check(
+		"building surface materials are real and ordered",
+		MATERIALS[World.Surfaces.Light] == true
+			and MATERIALS[World.Surfaces.Mid] == true
+			and MATERIALS[World.Surfaces.Dark] == true
+			and MATERIALS[World.Surfaces.Roof] == true
+			and World.Surfaces.MidFrom < World.Surfaces.LightFrom
+	)
+	local A = CrowdConfig.Avatar
+	local T = CrowdConfig.Tags
+	check(
+		"crowd avatars list classic items and tags fade in order",
+		#A.Shirts > 0
+			and #A.Pants > 0
+			and #A.Faces > 0
+			and A.HatChance >= 0
+			and A.HatChance <= 1
+			and T.FadeFrom < T.FadeTo
+			and T.GiantFadeFrom < T.GiantFadeTo
+			and T.MineSize > T.OtherSize
+			and rgbOk(T.Others)
+			and rgbOk({ T.Mine, T.Giant })
+	)
+end
 local stylesOk = true
 for key, d in Streets.Districts do
 	stylesOk = stylesOk
