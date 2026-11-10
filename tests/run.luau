@@ -2260,6 +2260,91 @@ do
 	end
 	checkPins()
 
+	local function checkOnboarding()
+		local Config = require("../src/shared/Config/Onboarding")
+		local Rules = require("../src/shared/Rules/Onboarding")
+		local S = Config.Steps
+		local none = { jumped = false, pieces = 0, ownsExtra = false }
+		check(
+			"tutorial: the retired step and unknown saves count as done, live steps stay",
+			Rules.migrate(3, Config) == S.Done
+				and Rules.migrate(50, Config) == S.Done
+				and Rules.migrate(S.Done, Config) == S.Done
+				and Rules.migrate(S.Hits, Config) == S.Hits
+				and Rules.migrate(S.Event, Config) == S.Event
+		)
+		local order, at = {}, S.Spawn
+		while at ~= S.Done do
+			table.insert(order, at)
+			at = Rules.after(at, Config)
+		end
+		check(
+			"tutorial: the steps run spawn, hits, ramp, smash, goal, buy, event",
+			table.concat(order, ",")
+				== table.concat({ S.Spawn, S.Hits, S.Ramp, S.Smash, S.Goal, S.Buy, S.Event }, ",")
+		)
+		local landing, passed = Rules.landing(S.Ramp, none, Config)
+		check("tutorial: nothing done early, no step passed", landing == S.Ramp and #passed == 0)
+		landing, passed = Rules.landing(
+			S.Ramp,
+			{ jumped = true, pieces = Config.SmashGoal, ownsExtra = false },
+			Config
+		)
+		check(
+			"tutorial: a jump and a smash done early pass both steps, and stop at the goal",
+			landing == S.Goal and #passed == 2
+		)
+		landing = Rules.landing(
+			S.Smash,
+			{ jumped = true, pieces = Config.SmashGoal - 1, ownsExtra = true },
+			Config
+		)
+		check("tutorial: too few pieces don't pass the smash step", landing == S.Smash)
+		landing, passed =
+			Rules.landing(S.Buy, { jumped = false, pieces = 0, ownsExtra = true }, Config)
+		check(
+			"tutorial: a car bought early passes the buy step",
+			landing == S.Event and #passed == 1
+		)
+		local skippable = true
+		for _, s in { S.Ramp, S.Smash, S.Goal, S.Buy, S.Event } do
+			skippable = skippable and Rules.canSkip(s, Config)
+		end
+		check(
+			"tutorial: every new step can be skipped, the first two and Done can't",
+			skippable
+				and not Rules.canSkip(S.Spawn, Config)
+				and not Rules.canSkip(S.Hits, Config)
+				and not Rules.canSkip(S.Done, Config)
+		)
+		check(
+			"tutorial: the event step ends itself only while quiet and after the wait",
+			Rules.eventExpired("quiet", Config.EventWait, Config)
+				and not Rules.eventExpired("quiet", Config.EventWait - 1, Config)
+				and not Rules.eventExpired("warn", 999, Config)
+				and not Rules.eventExpired("live", 999, Config)
+				and not Rules.eventExpired(nil, 999, Config)
+		)
+		for step in Config.Rewards do
+			check(`tutorial: reward {step} has its cheer`, Config.Cheers[step] ~= nil)
+		end
+		local Margins = { left = 70, top = 150, right = 70, bottom = 130 }
+		local ahead = Rules.edgePoint(500, 400, 10, 1000, 800, Margins)
+		local right = Rules.edgePoint(5000, 410, 10, 1000, 800, Margins)
+		local down = Rules.edgePoint(500, 5000, 10, 1000, 800, Margins)
+		local behind = Rules.edgePoint(500, 410, -10, 1000, 800, Margins)
+		check("tutorial pointer: a target on screen is on screen", ahead.onScreen)
+		check(
+			"tutorial pointer: off to the right sits on the right edge and points right",
+			not right.onScreen and math.abs(right.x - 930) < 0.01 and math.abs(right.angle + 90) < 2
+		)
+		check(
+			"tutorial pointer: below sits on the bottom edge and points down",
+			not down.onScreen and math.abs(down.y - 670) < 0.01 and math.abs(down.angle) < 1
+		)
+		check("tutorial pointer: behind the camera is never on screen", not behind.onScreen)
+	end
+
 	local function checkStunts()
 		local StuntConfig = require("../src/shared/Config/Stunts")
 		local Stunts = require("../src/shared/Rules/Stunts")
@@ -2311,6 +2396,7 @@ do
 		)
 	end
 	checkStunts()
+	checkOnboarding()
 end
 
 -- weight and balance: the centre of mass must sit over the probes that touched ground

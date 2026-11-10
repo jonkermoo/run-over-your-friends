@@ -23,6 +23,8 @@ Net.Messages = table.freeze({
 	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
 	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
+	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
+	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	-- server -> client
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
 	TrafficCrash = "TrafficCrash", -- (carId, gen, fling: Vector3, hitterUserId): a traffic car is wrecked
@@ -57,6 +59,8 @@ export type MessageName =
 	| "BuyPaint"
 	| "SetPaint"
 	| "ClaimDaily"
+	| "TutorialClaim"
+	| "TutorialSkip"
 	| "Fling"
 	| "Popup"
 	| "Celebrate"

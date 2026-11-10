@@ -1,7 +1,7 @@
 --!strict
 -- The goals sheet: the shared SERVER goal, then HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
 -- under the menu strip (top left) from the GOALS tab and closes from its header or the tab. Not
--- available until the tutorial is done, so new players see one goal at a time. Each unfinished goal,
+-- available until the tutorial's goal step, which puts a first goal to claim on top. Each unfinished goal,
 -- the server goal included, has a pin button that puts it on screen (PinnedGoals, up to three).
 
 local Players = game:GetService("Players")
@@ -27,6 +27,7 @@ local ORDER = { "Server", "Hourly", "Daily" }
 local COLORS = { Server = C.yellow, Hourly = C.blue, Daily = C.pink }
 local SHEET_W = 330
 local ROW_H, HEAD_H, SECTION_H = 52, 46, 30
+local CLAIM_H = 66
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Goals"
@@ -85,8 +86,13 @@ end
 local rowViews: { { fill: Frame, amount: TextLabel } } = {}
 local builtShape = ""
 
+-- the tutorial's goal step: a first goal to claim sits on top of the sheet
+local function claiming(): boolean
+	return player:GetAttribute("Tutorial") == Onboarding.Steps.Goal
+end
+
 local function shape(): string
-	local parts = { tostring(open) }
+	local parts = { tostring(open), tostring(claiming()) }
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -124,6 +130,9 @@ end
 local function height(): number
 	local h = HEAD_H
 	if open then
+		if claiming() then
+			h += CLAIM_H
+		end
 		for _, name in ORDER do
 			local set = state[name]
 			if set then
@@ -142,6 +151,29 @@ local function rebuild()
 	table.clear(countdowns)
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
+	if claiming() then
+		local row = Style.card(body, 12)
+		row.Name = "TutorialGoal"
+		row.Position = UDim2.fromOffset(10, 8)
+		row.Size = UDim2.new(1, -20, 0, CLAIM_H - 12)
+		Style.stroke(row, C.gold, 2, 0)
+		local text = Style.label(row, "Your first goal: open GOALS!", 15, F.heavy, C.text)
+		text.Position = UDim2.fromOffset(12, 0)
+		text.Size = UDim2.new(1, -130, 1, 0)
+		text.TextWrapped = true
+		text.TextXAlignment = Enum.TextXAlignment.Left
+		local claim =
+			Style.button(row, `CLAIM ${Onboarding.Rewards[Onboarding.Steps.Goal]}`, "green", 15)
+		claim.Name = "TutorialClaim"
+		claim.AnchorPoint = Vector2.new(1, 0.5)
+		claim.Position = UDim2.new(1, -8, 0.5, 0)
+		claim.Size = UDim2.fromOffset(112, 38)
+		claim.Activated:Connect(function()
+			Net.waitFor("TutorialClaim"):FireServer()
+			Goals.close()
+		end)
+		y += CLAIM_H
+	end
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -292,7 +324,7 @@ function Goals.start()
 		local step = (player:GetAttribute("Tutorial") or 99) :: number
 		panel.Visible = open
 			and player:GetAttribute("DataReady") == true
-			and step >= Onboarding.Steps.Save
+			and step >= Onboarding.Steps.Goal
 			and next(state) ~= nil
 		local now = os.clock()
 		if now - last < 0.5 then

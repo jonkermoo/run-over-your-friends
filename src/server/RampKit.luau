@@ -3,6 +3,7 @@
 -- deck, dark side skirts and rails, a hazard band across the lip, a steel strip across the foot and chevrons
 -- up the slope. Everything added is paint: no collisions, no raycasts, no shadows.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local R = require(ReplicatedStorage.Shared.Config.Ramps)
@@ -37,6 +38,7 @@ local function trim(
 end
 
 function RampKit.dress(w: WedgePart)
+	CollectionService:AddTag(w, "JumpRamp") -- the tutorial's marker looks for these
 	local parent = w.Parent :: Instance
 	local s = w.Size
 	w.Material = (Enum.Material :: any)[R.Deck]

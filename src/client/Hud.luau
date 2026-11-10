@@ -324,6 +324,7 @@ local garageButton = tab("GARAGE", 1)
 garageButton.Name = "GarageButton"
 local storeButton = tab("STORE", 2)
 local goalsButton = tab("GOALS", 3)
+goalsButton.Name = "GoalsButton"
 goalsButton.Visible = false
 
 -- the open tab is painted yellow
@@ -929,7 +930,7 @@ local function maybeOfferStarter()
 	end
 	if
 		os.clock() - joinedAt < Products.StarterOfferAfter
-		or step < Onboarding.Steps.Save
+		or step < Onboarding.Steps.Done
 		or offer.Visible
 		or garage.Visible
 		or store.Visible
@@ -1188,7 +1189,7 @@ function Hud.start()
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
 	local function tutorialStep()
 		local step = (player:GetAttribute("Tutorial") or 0) :: number
-		goalsButton.Visible = step >= Onboarding.Steps.Save
+		goalsButton.Visible = step >= Onboarding.Steps.Goal
 	end
 	player:GetAttributeChangedSignal("Tutorial"):Connect(tutorialStep)
 	tutorialStep()

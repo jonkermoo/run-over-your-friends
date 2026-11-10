@@ -8,6 +8,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -211,7 +213,9 @@ local function load(player: Player)
 				profile.money = tonumber(decoded.money) or profile.money
 				profile.likeClaimed = decoded.likeClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
-				profile.tutorial = tonumber(decoded.tutorial) or 99 -- saves from before the tutorial skip it
+				-- saves from before the tutorial skip it, and so do saves past its old end
+				profile.tutorial =
+					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)
 				if typeof(decoded.quests) == "table" then
 					profile.quests = decoded.quests
 				end
