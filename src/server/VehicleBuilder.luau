@@ -499,6 +499,17 @@ function VehicleBuilder.build(id: string): Model
 			end
 		end
 	end
+	-- the collider boxes bump into other players' cars (CarBodies, set up in init); a semi's own cab and
+	-- trailer never push on each other
+	chassis.CollisionGroup = "CarBodies"
+	local trailerBox = model:FindFirstChild("TrailerChassis", true) :: BasePart?
+	if trailerBox then
+		trailerBox.CollisionGroup = "CarBodies"
+		local apart = Instance.new("NoCollisionConstraint")
+		apart.Part0 = chassis
+		apart.Part1 = trailerBox
+		apart.Parent = chassis
+	end
 
 	model:SetAttribute("VehicleId", id)
 	model:SetAttribute("StudsPerMetre", Vehicles.StudsPerMetre)

@@ -121,7 +121,7 @@ local function blocked(cf: CFrame, size: Vector3, ignore: { Instance }): boolean
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = ignore
-	params.CollisionGroup = "Vehicles"
+	params.CollisionGroup = "CarBodies" -- the world and other players' cars, not people
 	local parts = workspace:GetPartBoundsInBox(
 		cf * CFrame.new(0, size.Y / 2 + 1, 0),
 		size * Vector3.new(1.1, 0.9, 1.1),

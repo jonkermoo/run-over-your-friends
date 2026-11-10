@@ -13,9 +13,13 @@ for name in Net.Messages do
 	Net.remote(name :: any)
 end
 
--- Vehicles pass through players, NPCs, debris and each other: NPC and player hits are found by overlap
-for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture" } do
+-- Vehicles pass through players, NPCs, debris and each other: NPC and player hits are found by overlap.
+-- The one exception: player cars' collider boxes (CarBodies) bump into each other and the world.
+for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture", "CarBodies" } do
 	PhysicsService:RegisterCollisionGroup(g)
+end
+for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture" } do
+	PhysicsService:CollisionGroupSetCollidable("CarBodies", g, false)
 end
 -- furniture inside buildings (each client's own) stops people on foot, nothing else
 for _, g in { "Vehicles", "Npcs", "Debris", "Furniture" } do
