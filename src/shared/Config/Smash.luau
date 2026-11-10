@@ -13,13 +13,48 @@ return table.freeze({
 	FloorsFallFrom = 10,
 	MinSpeed = 6.7, -- m/s (15 mph): slower bumps break nothing, however heavy (matches Economy.MinHitSpeed)
 	Curve = 2, -- above 1 keeps light and mid hits small and saves the big radii for heavy, fast ones
-	-- walls push back: each break takes this many joules out of the car, so light or slow cars lose most of
+	-- walls push back: a wall takes this many joules out of the car, so light or slow cars lose a good part of
 	-- their speed and heavy, fast ones plough on
 	WallEnergy = 2000000,
+	PassSeconds = 1, -- seconds: one wall slows a car once, however many pieces it goes through in that time
 	-- share of its speed a car always keeps after a break, growing with weight (log scale) so heavy vehicles
-	-- plough through: a light car rolls into the hole, a bulldozer barely notices
-	KeptLight = 0.2,
+	-- plough through: a light car rolls on through its hole, a bulldozer barely notices
+	KeptLight = 0.55,
 	KeptLightWeight = 1000, -- kg: this light or lighter keeps KeptLight
 	KeptHeavy = 0.92,
 	KeptHeavyWeight = 20000, -- kg: this heavy or heavier keeps KeptHeavy
+	-- joules: a hit this hard brings down the whole building (a Muscle needs about 59 mph, a Semi about 20);
+	-- vehicles with a maxBreak (Config/Vehicles) only ever make a hole
+	CollapseEnergy = 600000,
+	CollapseKept = 0.85, -- share of its speed a car keeps going through a building that is coming down
+	Collapse = table.freeze({
+		StartSeconds = 0.1, -- the lowest storey lets go this long after the hit
+		StaggerSeconds = 1.1, -- ...and the top one this much later
+		Gravity = 120, -- studs/s^2 the pieces fall at
+		BlastRadius = 18, -- studs: pieces this close to the hit are thrown out, the rest drop
+		BlastPush = 0.45, -- share of the car's speed the thrown pieces carry on with
+		BlastOut = { 20, 45 }, -- studs/s away from the hit
+		BlastUp = { 20, 55 }, -- studs/s up
+		BlastSpin = { 1.5, 4 }, -- radians/s
+		DropOut = { 2, 9 }, -- studs/s the dropping walls spread outward
+		DropSpin = { 0.1, 0.5 }, -- radians/s, low so the walls come straight down
+		DriftSeconds = 1.2, -- pieces stop moving sideways after this long
+		DustEvery = 0.55, -- seconds between waves of dust
+		FeelStuds = 500, -- other players closer than this hear and feel it
+		SlowEase = 0.2, -- seconds the slow motion takes to ease back to full speed
+		ShowSeconds = 3, -- how long the fall lasts on screen
+		SinkSpeed = 4, -- studs/s landed pieces sink into the ground, under the dust
+		HideSeconds = 6.5, -- server: the pieces go for good after this (longer than the slowest show)
+		MaxPieces = 900, -- most pieces one show moves; any more just vanish in the dust
+		MaxShows = 5, -- most falling buildings on one screen; any more just vanish
+		FarStuds = 900, -- buildings further from the camera than this just vanish
+		SlowSeconds = 0.9, -- slow motion for whoever brought it down
+		SlowScale = 0.3, -- how fast time runs in it
+		SlowCooldown = 6, -- seconds before the next collapse can slow things down again
+		PaySeconds = 2.4, -- when the money lands, after the hit (once the fall has happened, slow motion and all)
+		PayPerPiece = 4, -- money per piece that came down
+		PayMin = 300,
+		PayMax = 2500,
+		GoalPieces = 260, -- most pieces one collapse counts for goals and events
+	}),
 })
