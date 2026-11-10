@@ -4,9 +4,60 @@
 -- italic Montserrat for small text. Dashed lane lines divide things. No rounded corners, glows or soft
 -- gradients. Everything visual goes through here so the UI stays consistent.
 
+local GuiService = game:GetService("GuiService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 
 local Style = {}
+
+-- Every ScreenGui is laid out at desktop size and drawn at one shared scale (Style.fit): 1 on desktop,
+-- smaller on phones. Offsets in the UI are therefore layout pixels; AbsoluteSize, AbsolutePosition and
+-- camera points are real pixels, so divide those by Style.scale() before using them as offsets.
+local currentScale = 1
+local fitted: { UIScale } = {}
+
+local function refreshScale()
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	local inset = GuiService:GetGuiInset()
+	currentScale = LayoutRules.scale(cam.ViewportSize.X, cam.ViewportSize.Y - inset.Y, LayoutConfig)
+	for _, s in fitted do
+		s.Scale = currentScale
+	end
+end
+
+local cameraWatch: RBXScriptConnection? = nil
+local function watchCamera()
+	if cameraWatch then
+		cameraWatch:Disconnect()
+	end
+	local cam = workspace.CurrentCamera
+	if cam then
+		cameraWatch = cam:GetPropertyChangedSignal("ViewportSize"):Connect(refreshScale)
+	end
+	refreshScale()
+end
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+watchCamera()
+
+function Style.scale(): number
+	return currentScale
+end
+
+-- draw this ScreenGui at the shared scale
+function Style.fit(gui: ScreenGui)
+	local s = Instance.new("UIScale")
+	s.Name = "ScreenFit"
+	s.Scale = currentScale
+	s.Parent = gui
+	table.insert(fitted, s)
+end
 
 Style.colors = table.freeze({
 	ink = Color3.fromRGB(16, 16, 18),
@@ -171,7 +222,8 @@ end
 -- size a label to its text plus padding, and keep it that way when the text changes
 function Style.fitText(l: TextLabel | TextButton, padX: number, padY: number)
 	local function fit()
-		l.Size = UDim2.fromOffset(l.TextBounds.X + padX * 2, l.TextBounds.Y + padY * 2)
+		local s = currentScale
+		l.Size = UDim2.fromOffset(l.TextBounds.X / s + padX * 2, l.TextBounds.Y / s + padY * 2)
 	end
 	l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 	fit()
@@ -245,6 +297,24 @@ function Style.button(parent: Instance, text: string, kind: string?, size: numbe
 	Style.shadow(b, C.ink, 4)
 	press(b)
 	return b
+end
+
+-- run the action when the button is pressed; on touch screens an invisible area around a small button
+-- takes the tap too
+function Style.onTap(button: GuiButton, action: () -> ())
+	button.Activated:Connect(action)
+	if UserInputService.TouchEnabled then
+		local area = Instance.new("TextButton")
+		area.Name = "TapArea"
+		area.Text = ""
+		area.BackgroundTransparency = 1
+		area.AnchorPoint = Vector2.new(0.5, 0.5)
+		area.Position = UDim2.fromScale(0.5, 0.5)
+		area.Size = UDim2.new(1, LayoutConfig.TapPad * 2, 1, LayoutConfig.TapPad * 2)
+		area.ZIndex = button.ZIndex + 1
+		area.Parent = button
+		area.Activated:Connect(action)
+	end
 end
 
 -- recolour a button made by Style.button

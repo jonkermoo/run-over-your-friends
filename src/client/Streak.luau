@@ -28,6 +28,7 @@ gui.Name = "Streak"
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 5
 gui.Parent = playerGui
+Style.fit(gui)
 
 local card = Style.panel(gui)
 card.Name = "StreakCard"
@@ -131,7 +132,7 @@ end
 
 local function fit()
 	local cam = workspace.CurrentCamera
-	local view = if cam then cam.ViewportSize else Vector2.new(1280, 720)
+	local view = (if cam then cam.ViewportSize else Vector2.new(1280, 720)) / Style.scale()
 	scale.Scale = math.min(1, (view.X - 32) / W, (view.Y - 32) / H)
 end
 

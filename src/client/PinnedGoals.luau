@@ -11,7 +11,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local ServerGoals = require(ReplicatedStorage.Shared.Config.ServerGoals)
@@ -32,12 +35,13 @@ PinnedGoals.colors = table.freeze({ Hourly = C.blue, Daily = C.pink, Server = C.
 
 local TOP, LEFT, GAP = 68, 14, 10
 local CARD_W, CARD_W_NARROW, CARD_H = 300, 250, 58
-local NARROW = 1000 -- px: narrower screens get slimmer cards
+local NARROW = 1000 -- real px (not layout px, so phones count): narrower screens get slimmer cards
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "PinnedGoals"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
+Style.fit(gui)
 
 -- the stack's frame is sized to its cards, so other HUD pieces can keep clear of it
 local stack = Instance.new("Frame")
@@ -153,7 +157,8 @@ local function fmt(seconds: number): string
 end
 
 local function shape(width: number): string
-	local parts = { tostring(width) }
+	-- the screen size too: the unpin X's thumb-zone check depends on it
+	local parts = { tostring(width), tostring(gui.AbsoluteSize) }
 	for _, p in pins do
 		local g = goalOf(p)
 		table.insert(parts, `{keyOf(p)}:{g and g.text or ""}:{g and g.done or false}`)
@@ -231,9 +236,19 @@ local function build(width: number)
 		close.Position = UDim2.new(1, -8, 0, 6)
 		close.Size = UDim2.fromOffset(22, 22)
 		local pin = p
-		close.Activated:Connect(function()
+		Style.onTap(close, function()
 			PinnedGoals.toggle(pin.set, pin.index)
 		end)
+		-- a button in the thumbstick's zone would steal its touches; unpin from the goals sheet instead
+		local k = Style.scale()
+		close.Visible = not UserInputService.TouchEnabled
+			or not LayoutRules.inThumbZone(
+				(LEFT + width - 8) * k,
+				(TOP + (i - 1) * (CARD_H + GAP) + 6) * k,
+				gui.AbsoluteSize.X,
+				gui.AbsoluteSize.Y,
+				LayoutConfig
+			)
 		local card: Card = {
 			frame = frame,
 			fill = fill,

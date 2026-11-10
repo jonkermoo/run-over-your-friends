@@ -13,6 +13,8 @@ local UserInputService = game:GetService("UserInputService")
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
@@ -38,6 +40,7 @@ gui.Name = "Hud"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
+Style.fit(gui)
 
 ---------------------------------------------------------------- money and pop-ups
 
@@ -285,7 +288,7 @@ tabRow.Size = UDim2.fromScale(0, 1)
 tabRow.AutomaticSize = Enum.AutomaticSize.X
 tabRow.Parent = strip
 tabRow:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	strip.Size = UDim2.fromOffset(tabRow.AbsoluteSize.X, 46)
+	strip.Size = UDim2.fromOffset(tabRow.AbsoluteSize.X / Style.scale(), 46)
 end)
 local stripList = Instance.new("UIListLayout")
 stripList.FillDirection = Enum.FillDirection.Horizontal
@@ -986,10 +989,24 @@ end
 local touch = Instance.new("Frame")
 touch.BackgroundTransparency = 1
 touch.AnchorPoint = Vector2.new(1, 1)
-touch.Position = UDim2.new(1, -20, 1, -150)
-touch.Size = UDim2.fromOffset(240, 200)
+touch.Position = UDim2.new(1, -20, 1, -LayoutConfig.TouchClearLarge)
+touch.Size = UDim2.fromOffset(240, 154)
 touch.Visible = false
 touch.Parent = gui
+local touchFit = Instance.new("UIScale")
+touchFit.Parent = touch
+
+-- thumb-sized on any screen, and above Roblox's jump button
+local function placeTouch()
+	local cam = workspace.CurrentCamera
+	if not cam then
+		return
+	end
+	local s = Style.scale()
+	touchFit.Scale = LayoutRules.touchBoost(s, LayoutConfig.TouchMinScale)
+	local clear = LayoutRules.touchClear(cam.ViewportSize.X, cam.ViewportSize.Y, LayoutConfig)
+	touch.Position = UDim2.new(1, -20, 1, -clear / s)
+end
 
 local BAND = { blue = C.blue, gold = C.yellow, orange = C.orange, red = C.red, dark = C.pink }
 local function holdButton(
@@ -1107,6 +1124,9 @@ RunService.RenderStepped:Connect(function()
 		and (guide:FindFirstChild("Tip") :: GuiObject).Visible
 	hintBox.Visible = s.driving and not UserInputService.TouchEnabled and not tipShown
 	touch.Visible = s.driving and UserInputService.TouchEnabled
+	if touch.Visible then
+		placeTouch()
+	end
 	if not s.driving then
 		bombLabel.Visible = false
 		return

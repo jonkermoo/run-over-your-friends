@@ -2555,6 +2555,37 @@ do
 	check("traffic spacing and lane width fit the scaled everyday cars", fits)
 end
 
+do
+	local Layout = require("../src/shared/Rules/Layout")
+	local cfg = require("../src/shared/Config/Layout")
+	check("layout: a desktop screen is not scaled", Layout.scale(1920, 1019, cfg) == 1)
+	check("layout: a laptop screen is not scaled", Layout.scale(1280, 640, cfg) == 1)
+	local phone = Layout.scale(848, 395, cfg)
+	check("layout: a phone is scaled by its height", math.abs(phone - 395 / 560) < 1e-6)
+	check("layout: a tiny screen stops at the minimum", Layout.scale(300, 200, cfg) == cfg.MinScale)
+	check("layout: a narrow screen scales by width", Layout.scale(800, 900, cfg) == 0.8)
+	check("layout: garage row fits the phone canvas", 395 / phone - 86 - 84 >= 310)
+	check(
+		"layout: touch buttons keep their minimum size",
+		math.abs(phone * Layout.touchBoost(phone, cfg.TouchMinScale) - cfg.TouchMinScale) < 1e-6
+	)
+	check("layout: no boost at full size", Layout.touchBoost(1, cfg.TouchMinScale) == 1)
+	check(
+		"layout: a phone clears the small jump button",
+		Layout.touchClear(848, 395, cfg) == cfg.TouchClearSmall
+	)
+	check(
+		"layout: a tablet clears the big jump button",
+		Layout.touchClear(1024, 768, cfg) == cfg.TouchClearLarge
+	)
+	check("layout: thumb zone covers lower left", Layout.inThumbZone(100, 200, 848, 395, cfg))
+	check("layout: top left is clear of the thumb", not Layout.inThumbZone(100, 100, 848, 395, cfg))
+	check(
+		"layout: right side is clear of the thumb",
+		not Layout.inThumbZone(600, 300, 848, 395, cfg)
+	)
+end
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

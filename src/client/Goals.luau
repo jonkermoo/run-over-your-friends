@@ -33,10 +33,13 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "Goals"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
+Style.fit(gui)
+
+local TOP, BOTTOM_MARGIN = 68, 18
 
 local panel = Style.panel(gui)
 panel.Name = "GoalsSheet"
-panel.Position = UDim2.fromOffset(14, 68)
+panel.Position = UDim2.fromOffset(14, TOP)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
 Style.setShadow(panel, C.blue)
@@ -61,10 +64,16 @@ chevron.AnchorPoint = Vector2.new(1, 0.5)
 chevron.Position = UDim2.new(1, -12, 0.5, 0)
 chevron.Size = UDim2.fromOffset(24, 24)
 
-local body = Instance.new("Frame")
+-- the rows scroll when the sheet is taller than the screen has room for (phones)
+local body = Instance.new("ScrollingFrame")
 body.BackgroundTransparency = 1
+body.BorderSizePixel = 0
 body.Position = UDim2.fromOffset(0, HEAD_H)
 body.Size = UDim2.fromScale(1, 0)
+body.CanvasSize = UDim2.new()
+body.ScrollBarThickness = 4
+body.ScrollBarImageColor3 = C.yellow
+body.ScrollingDirection = Enum.ScrollingDirection.Y
 body.Parent = panel
 
 local state: { [string]: SetView } = {}
@@ -91,8 +100,13 @@ local function claiming(): boolean
 	return player:GetAttribute("Tutorial") == Onboarding.Steps.Goal
 end
 
+-- layout pixels the whole sheet may take on this screen
+local function maxHeight(): number
+	return math.floor(gui.AbsoluteSize.Y / Style.scale()) - TOP - BOTTOM_MARGIN
+end
+
 local function shape(): string
-	local parts = { tostring(open), tostring(claiming()) }
+	local parts = { tostring(open), tostring(claiming()), tostring(maxHeight()) }
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -145,9 +159,7 @@ end
 
 local function rebuild()
 	builtShape = shape()
-	for _, c in body:GetChildren() do
-		c:Destroy()
-	end
+	body:ClearAllChildren()
 	table.clear(countdowns)
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
@@ -238,7 +250,7 @@ local function rebuild()
 					pinButton.Size = UDim2.fromOffset(26, 26)
 					PinnedGoals.pinIcon(pinButton, 16, if pinned then C.ink else C.dim)
 					local setName, index = name, i
-					pinButton.Activated:Connect(function()
+					Style.onTap(pinButton, function()
 						if PinnedGoals.toggle(setName, index) == "full" then
 							fullUntil = os.clock() + 2
 						end
@@ -252,8 +264,10 @@ local function rebuild()
 	end
 	countPill.Text = `{done} / {total}`
 	tickCountdowns()
-	body.Size = UDim2.new(1, 0, 0, y)
-	panel.Size = UDim2.fromOffset(SHEET_W, height())
+	local sheetH = math.min(height(), maxHeight())
+	body.CanvasSize = UDim2.fromOffset(0, y)
+	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 6)
+	panel.Size = UDim2.fromOffset(SHEET_W, sheetH)
 end
 
 function Goals.toggle()
