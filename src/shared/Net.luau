@@ -23,6 +23,8 @@ Net.Messages = table.freeze({
 	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
 	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
+	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
+	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	-- server -> client
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
 	TrafficCrash = "TrafficCrash", -- (carId, gen, fling: Vector3, hitterUserId): a traffic car is wrecked
@@ -31,6 +33,7 @@ Net.Messages = table.freeze({
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom" | "Dodge" | "Honk", position: Vector3, a: number, b: number, userId: number)
+	Collapse = "Collapse", -- (building: Model, at: Vector3, push: Vector3, pay: number, userId: number): a whole building comes down
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
@@ -57,6 +60,8 @@ export type MessageName =
 	| "BuyPaint"
 	| "SetPaint"
 	| "ClaimDaily"
+	| "TutorialClaim"
+	| "TutorialSkip"
 	| "Fling"
 	| "Popup"
 	| "Celebrate"

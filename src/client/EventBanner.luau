@@ -31,6 +31,7 @@ gui.Parent = playerGui
 
 -- a road sign at the top centre with painted lane lines along its top and bottom edges
 local banner = Style.panel(gui)
+banner.Name = "Sign"
 banner.AnchorPoint = Vector2.new(0.5, 0)
 banner.Position = UDim2.new(0.5, 0, 0, 8)
 banner.Size = UDim2.fromOffset(250, 42)

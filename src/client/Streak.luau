@@ -137,7 +137,7 @@ end
 
 local function update()
 	local step = (player:GetAttribute("Tutorial") or 0) :: number
-	local show = state.ready and step >= Onboarding.Steps.Save
+	local show = state.ready and step >= Onboarding.Steps.Done
 	if show and not card.Visible then
 		draw()
 		fit()

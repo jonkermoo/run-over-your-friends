@@ -250,8 +250,16 @@ do
 	check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
 	for _, id in { "Hatchback", "Scooter", "Cart", "Sedan", "Taxi" } do
 		check(
-			id .. " at top speed knocks out one wall piece",
-			smashTop(id) > 0 and smashTop(id) <= Smash.MinRadius
+			id .. " at top speed makes a hole, not a collapse",
+			smashTop(id) > 0
+				and smashTop(id) <= Vehicles.ById[id].maxBreak
+				and smashTop(id) < Smash.FloorsFallFrom
+				and not Impact.collapses(
+					Vehicles.ById[id].weight,
+					Vehicles.ById[id].topSpeed / 2.237,
+					Smash,
+					Vehicles.ById[id].maxBreak
+				)
 		)
 	end
 	check("Muscle breaks more than the Sedan", smashTop("Muscle") > smashTop("Sedan") + 5)
@@ -263,13 +271,16 @@ do
 	)
 	check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
 	check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
-	-- walls push back: early cars lose most of their speed, big fast ones plough on
+	-- walls push back: early cars lose a good part of their speed, big fast ones plough on
 	local function keptAtTop(id: string): number
 		local v = Vehicles.ById[id]
 		return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
 	end
 	for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
-		check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.35)
+		check(
+			id .. " rolls on through a wall, slower",
+			keptAtTop(id) >= 0.5 and keptAtTop(id) <= 0.7
+		)
 	end
 	check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
 	check("a car always keeps some speed", keptAtTop("Cart") == Smash.KeptLight)
@@ -297,6 +308,35 @@ do
 		Impact.wallSpeedKept(9000, 30, Smash) > Impact.wallSpeedKept(1700, 30, Smash)
 	)
 	check("standing still keeps everything", Impact.wallSpeedKept(1500, 0, Smash) == 1)
+	local function collapsesAt(id: string, mph: number): boolean
+		local v = Vehicles.ById[id]
+		return Impact.collapses(v.weight, mph / 2.237, Smash, v.maxBreak)
+	end
+	check("Muscle at 40 mph doesn't bring a building down", not collapsesAt("Muscle", 40))
+	check("Muscle at 60 mph brings a building down", collapsesAt("Muscle", 60))
+	check("Semi at 25 mph brings a building down", collapsesAt("Semi", 25))
+	check("a parked Bulldozer brings nothing down", not collapsesAt("Bulldozer", 3))
+	for _, v in Vehicles.List do
+		if not v.maxBreak then
+			check(v.id .. " can bring a building down", collapsesAt(v.id, v.topSpeed))
+		end
+	end
+	local Fall = require("../src/shared/Rules/Collapse")
+	local C = Smash.Collapse
+	check("the bottom storey goes first", Fall.startDelay(0, C) < Fall.startDelay(1, C))
+	check("heights past the roof stay in range", Fall.startDelay(2, C) == Fall.startDelay(1, C))
+	check("every piece starts inside the show", Fall.startDelay(1, C) < C.ShowSeconds)
+	check(
+		"the pieces only go after the slowest show",
+		C.HideSeconds > C.ShowSeconds + C.SlowSeconds * (1 / C.SlowScale - 1)
+	)
+	local y, landed = Fall.fallHeight(50, 0, 0.5, 120, 0, 4)
+	check("a piece falls under gravity", near(y, 50 - 15, 1e-6) and not landed)
+	local y2, landed2 = Fall.fallHeight(10, 0, 5, 120, 0, 4)
+	check("a landed piece sinks slowly", landed2 and y2 < 0 and y2 > -30)
+	check("a tiny shop still pays the minimum", Fall.payout(10, C) == C.PayMin)
+	check("a tower pays more than a shop", Fall.payout(200, C) > Fall.payout(80, C))
+	check("the payout has a cap", Fall.payout(100000, C) == C.PayMax)
 end
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
@@ -2260,6 +2300,91 @@ do
 	end
 	checkPins()
 
+	local function checkOnboarding()
+		local Config = require("../src/shared/Config/Onboarding")
+		local Rules = require("../src/shared/Rules/Onboarding")
+		local S = Config.Steps
+		local none = { jumped = false, pieces = 0, ownsExtra = false }
+		check(
+			"tutorial: the retired step and unknown saves count as done, live steps stay",
+			Rules.migrate(3, Config) == S.Done
+				and Rules.migrate(50, Config) == S.Done
+				and Rules.migrate(S.Done, Config) == S.Done
+				and Rules.migrate(S.Hits, Config) == S.Hits
+				and Rules.migrate(S.Event, Config) == S.Event
+		)
+		local order, at = {}, S.Spawn
+		while at ~= S.Done do
+			table.insert(order, at)
+			at = Rules.after(at, Config)
+		end
+		check(
+			"tutorial: the steps run spawn, hits, ramp, smash, goal, buy, event",
+			table.concat(order, ",")
+				== table.concat({ S.Spawn, S.Hits, S.Ramp, S.Smash, S.Goal, S.Buy, S.Event }, ",")
+		)
+		local landing, passed = Rules.landing(S.Ramp, none, Config)
+		check("tutorial: nothing done early, no step passed", landing == S.Ramp and #passed == 0)
+		landing, passed = Rules.landing(
+			S.Ramp,
+			{ jumped = true, pieces = Config.SmashGoal, ownsExtra = false },
+			Config
+		)
+		check(
+			"tutorial: a jump and a smash done early pass both steps, and stop at the goal",
+			landing == S.Goal and #passed == 2
+		)
+		landing = Rules.landing(
+			S.Smash,
+			{ jumped = true, pieces = Config.SmashGoal - 1, ownsExtra = true },
+			Config
+		)
+		check("tutorial: too few pieces don't pass the smash step", landing == S.Smash)
+		landing, passed =
+			Rules.landing(S.Buy, { jumped = false, pieces = 0, ownsExtra = true }, Config)
+		check(
+			"tutorial: a car bought early passes the buy step",
+			landing == S.Event and #passed == 1
+		)
+		local skippable = true
+		for _, s in { S.Ramp, S.Smash, S.Goal, S.Buy, S.Event } do
+			skippable = skippable and Rules.canSkip(s, Config)
+		end
+		check(
+			"tutorial: every new step can be skipped, the first two and Done can't",
+			skippable
+				and not Rules.canSkip(S.Spawn, Config)
+				and not Rules.canSkip(S.Hits, Config)
+				and not Rules.canSkip(S.Done, Config)
+		)
+		check(
+			"tutorial: the event step ends itself only while quiet and after the wait",
+			Rules.eventExpired("quiet", Config.EventWait, Config)
+				and not Rules.eventExpired("quiet", Config.EventWait - 1, Config)
+				and not Rules.eventExpired("warn", 999, Config)
+				and not Rules.eventExpired("live", 999, Config)
+				and not Rules.eventExpired(nil, 999, Config)
+		)
+		for step in Config.Rewards do
+			check(`tutorial: reward {step} has its cheer`, Config.Cheers[step] ~= nil)
+		end
+		local Margins = { left = 70, top = 150, right = 70, bottom = 130 }
+		local ahead = Rules.edgePoint(500, 400, 10, 1000, 800, Margins)
+		local right = Rules.edgePoint(5000, 410, 10, 1000, 800, Margins)
+		local down = Rules.edgePoint(500, 5000, 10, 1000, 800, Margins)
+		local behind = Rules.edgePoint(500, 410, -10, 1000, 800, Margins)
+		check("tutorial pointer: a target on screen is on screen", ahead.onScreen)
+		check(
+			"tutorial pointer: off to the right sits on the right edge and points right",
+			not right.onScreen and math.abs(right.x - 930) < 0.01 and math.abs(right.angle + 90) < 2
+		)
+		check(
+			"tutorial pointer: below sits on the bottom edge and points down",
+			not down.onScreen and math.abs(down.y - 670) < 0.01 and math.abs(down.angle) < 1
+		)
+		check("tutorial pointer: behind the camera is never on screen", not behind.onScreen)
+	end
+
 	local function checkStunts()
 		local StuntConfig = require("../src/shared/Config/Stunts")
 		local Stunts = require("../src/shared/Rules/Stunts")
@@ -2311,6 +2436,7 @@ do
 		)
 	end
 	checkStunts()
+	checkOnboarding()
 end
 
 -- weight and balance: the centre of mass must sit over the probes that touched ground

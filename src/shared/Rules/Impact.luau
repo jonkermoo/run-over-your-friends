@@ -71,6 +71,7 @@ export type SmashConfig = {
 	KeptLightWeight: number,
 	KeptHeavy: number,
 	KeptHeavyWeight: number,
+	CollapseEnergy: number,
 }
 
 -- how far a building hit reaches, studs; 0 when it's too soft to break anything
@@ -109,6 +110,18 @@ function Impact.wallSpeedKept(weightKg: number, speed: number, config: SmashConf
 	local heft = Impact.strength(weightKg, config.KeptLightWeight, config.KeptHeavyWeight)
 	local floor = config.KeptLight + (config.KeptHeavy - config.KeptLight) * heft
 	return math.max(math.sqrt(math.max(1 - config.WallEnergy / energy, 0)), floor)
+end
+
+-- does a vehicle of weightKg hitting at speed (m/s) bring down the whole building? Never for one with a maxBreak
+function Impact.collapses(
+	weightKg: number,
+	speed: number,
+	config: SmashConfig,
+	maxBreak: number?
+): boolean
+	return maxBreak == nil
+		and speed >= config.MinSpeed
+		and Impact.energy(weightKg, speed) >= config.CollapseEnergy
 end
 
 -- self-destruct blast radius, studs, from weight and speed

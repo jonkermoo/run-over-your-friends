@@ -13,11 +13,26 @@ Analytics.Steps = table.freeze({
 	Joined = 1,
 	SpawnedCar = 2,
 	FirstHit = 3,
-	TutorialDone = 4,
-	FirstPurchase = 5,
+	FirstRampage = 4,
+	TookRamp = 5,
+	SmashedBuilding = 6,
+	ClaimedGoal = 7,
+	FirstPurchase = 8,
+	JoinedEvent = 9,
+	TutorialDone = 10,
 })
-local STEP_NAMES =
-	{ "Joined", "Spawned a car", "First hit", "Tutorial done", "First vehicle bought" }
+local STEP_NAMES = {
+	"Joined",
+	"Spawned a car",
+	"First hit",
+	"First rampage",
+	"Took a ramp",
+	"Smashed a building",
+	"Claimed a goal",
+	"First vehicle bought",
+	"Joined an event",
+	"Tutorial done",
+}
 
 local reached: { [Player]: { [number]: boolean } } = {}
 local pendingEarn: { [Player]: number } = {}

@@ -365,7 +365,7 @@ function PinnedGoals.start()
 	RunService.RenderStepped:Connect(function()
 		local step = (player:GetAttribute("Tutorial") or Onboarding.Steps.Done) :: number
 		stack.Visible = player:GetAttribute("DataReady") == true
-			and step >= Onboarding.Steps.Save
+			and step >= Onboarding.Steps.Done
 			and not sheetOpen
 		if not stack.Visible then
 			return
