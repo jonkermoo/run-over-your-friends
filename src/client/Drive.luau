@@ -22,6 +22,8 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
+local Unstuck = require(ReplicatedStorage.Shared.Config.Unstuck)
+local UnstuckRules = require(ReplicatedStorage.Shared.Rules.Unstuck)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local CFG = require(ReplicatedStorage.Shared.Config.World)
@@ -40,6 +42,9 @@ Drive.state = {
 	boost = 100, -- Roadster flight meter, 0-100
 	thruster = 1, -- 0 = just used, 1 = ready
 	bombHold = 0, -- 0-1 while holding self-destruct
+	throttle = 0, -- -1..1, what the driver is asking for
+	stuck = false, -- throttle held but going nowhere (Config/Unstuck)
+	unstuckIn = 0, -- seconds until the unstuck button works again
 }
 -- the first-person view (src/client/Cockpit) says when it's on; the car being driven, for it to follow
 Drive.view = {
@@ -599,6 +604,8 @@ local thrustReadyAt = 0
 local boostUsedAt = 0
 local flingUntil = 0
 local stuckFor = 0
+-- the unstuck button: the trail of safe points behind this car, when it works next, how long it's been stuck
+local rescue = { crumbs = {} :: { UnstuckRules.Crumb }, readyAt = 0, heldFor = 0 }
 local flying = false -- Roadster in the air under flight control
 local jetOn = false -- its jet is lifting it right now
 local rearOn = false -- its rear jet is pushing it along the nose right now
@@ -961,6 +968,12 @@ local function bind()
 			mouseFire = false
 		end
 	end)
+	ContextActionService:BindAction("RoyfUnstuck", function(_, state)
+		if state == Enum.UserInputState.Begin then
+			Drive.unstuck()
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.T, Enum.KeyCode.DPadLeft)
 	ContextActionService:BindAction("RoyfRoll", function(_, state, input)
 		local dir = if input.KeyCode == Enum.KeyCode.Q
 				or input.KeyCode == Enum.KeyCode.ButtonL1
@@ -989,6 +1002,80 @@ function Drive.thruster()
 		thrustReadyAt = now + THRUST_COOLDOWN
 		thrustLeft = THRUST_TIME
 	end
+end
+
+-- stop it dead where it now stands
+local function stillNow(s: CarState)
+	s.chassis.AssemblyLinearVelocity = Vector3.zero
+	s.chassis.AssemblyAngularVelocity = Vector3.zero
+	speed, lateral, yawRate = 0, 0, 0
+	thrustLeft = 0
+	local drive = s.chassis:FindFirstChild("Drive")
+	if drive and drive:IsA("LinearVelocity") then
+		drive.VectorVelocity = Vector3.zero
+	end
+end
+
+-- back on its wheels where it is, lifted clear of the ground
+local function putUpright(s: CarState, flatLook: Vector3)
+	local chassis = s.chassis
+	local at = chassis.Position + Vector3.new(0, s.height + 2, 0)
+	s.car:PivotTo(CFrame.lookAt(at, at + flatLook) * CFrame.new(0, -chassis.Size.Y / 2, 0))
+	stillNow(s)
+end
+
+-- is there room for this car at that pivot? (only what the car would really bump into counts)
+local function roomAt(s: CarState, pivot: CFrame): boolean
+	local box, size = s.car:GetBoundingBox()
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { s.car, player.Character :: Instance }
+	params.CollisionGroup = "Vehicles"
+	params.RespectCanCollide = true
+	local at = pivot * s.car:GetPivot():ToObjectSpace(box) * CFrame.new(0, 1, 0)
+	return #workspace:GetPartBoundsInBox(at, size - Vector3.new(1, 2, 1), params) == 0
+end
+
+-- T / pad D-pad left / the phone's STUCK? button
+function Drive.unstuck()
+	local s = driving
+	if not s then
+		return
+	end
+	local chassis = s.chassis
+	local now = os.clock()
+	local mph = (chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude
+		/ Vehicles.StudsPerMetre
+		* MPH
+	local action = UnstuckRules.action(
+		chassis.CFrame.UpVector.Y,
+		flying,
+		now < flingUntil,
+		mph,
+		rescue.readyAt,
+		now,
+		Unstuck
+	)
+	if not action then
+		return
+	end
+	rescue.readyAt = now + Unstuck.Cooldown
+	rescue.heldFor = 0
+	local look = chassis.CFrame.LookVector * Vector3.new(1, 0, 1)
+	local flatLook = if look.Magnitude > 0.1 then look.Unit else Vector3.zAxis
+	if action == "back" then
+		local here = chassis.Position
+		for _, c in UnstuckRules.spots(rescue.crumbs, here.X, here.Z, Unstuck) do
+			local at = Vector3.new(c.x, c.y + 0.5, c.z)
+			local pivot = CFrame.lookAt(at, at + Vector3.new(c.lx, 0, c.lz))
+			if roomAt(s, pivot) then
+				s.car:PivotTo(pivot)
+				stillNow(s)
+				return
+			end
+		end
+	end
+	putUpright(s, flatLook)
 end
 
 -- a vehicle's horn (built on the chassis by the server), played from its head
@@ -1128,6 +1215,8 @@ local function step(dt: number)
 	if state ~= driving then
 		stopDriving()
 		driving = state
+		table.clear(rescue.crumbs)
+		rescue.heldFor = 0
 		if state then
 			speed = state.chassis.AssemblyLinearVelocity:Dot(state.chassis.CFrame.LookVector)
 				/ Vehicles.StudsPerMetre
@@ -1438,16 +1527,39 @@ local function step(dt: number)
 			stuckFor += dt
 			if stuckFor > 1.2 then
 				stuckFor = 0
-				local at = chassis.Position + Vector3.new(0, s.height + 2, 0)
-				s.car:PivotTo(
-					CFrame.lookAt(at, at + flatLook) * CFrame.new(0, -chassis.Size.Y / 2, 0)
-				)
-				chassis.AssemblyLinearVelocity = Vector3.zero
-				chassis.AssemblyAngularVelocity = Vector3.zero
+				putUpright(s, flatLook)
 			end
 		else
 			stuckFor = 0
 		end
+
+		-- the trail the unstuck button goes back along: flat road under open sky
+		local pivot = s.car:GetPivot()
+		if
+			not flying
+			and not s.airborne
+			and chassis.CFrame.UpVector.Y >= Unstuck.FlatUp
+			and UnstuckRules.due(rescue.crumbs, pivot.X, pivot.Z, Unstuck)
+			and not workspace:Raycast(
+				chassis.Position,
+				Vector3.yAxis * Unstuck.SkyCheck,
+				groundParams
+			)
+		then
+			UnstuckRules.push(
+				rescue.crumbs,
+				{ x = pivot.X, y = pivot.Y, z = pivot.Z, lx = flatLook.X, lz = flatLook.Z },
+				Unstuck
+			)
+		end
+		if throttle ~= 0 and flatSpeed < Unstuck.StuckMps and not s.airborne and not flying then
+			rescue.heldFor += dt
+		else
+			rescue.heldFor = 0
+		end
+		Drive.state.throttle = throttle
+		Drive.state.stuck = rescue.heldFor >= Unstuck.StuckSeconds
+		Drive.state.unstuckIn = math.max(0, rescue.readyAt - now)
 
 		detectHits(s, chassis.AssemblyLinearVelocity / slow)
 		features(s, dt)
