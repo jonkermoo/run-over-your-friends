@@ -13,7 +13,7 @@ for name in Net.Messages do
 	Net.remote(name :: any)
 end
 
--- Vehicles pass through players, NPCs, debris and each other: NPC and Wrecker hits are found by overlap
+-- Vehicles pass through players, NPCs, debris and each other: NPC and player hits are found by overlap
 for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture" } do
 	PhysicsService:RegisterCollisionGroup(g)
 end
@@ -35,7 +35,7 @@ local VehicleService = require(script.VehicleService)
 local CrowdService = require(script.CrowdService)
 local NpcService = require(script.NpcService)
 local BuildingService = require(script.BuildingService)
-local WreckerService = require(script.WreckerService)
+local PlayerHitService = require(script.PlayerHitService)
 local MapBuilder = require(script.MapBuilder)
 local OnboardingService = require(script.Onboarding)
 local QuestService = require(script.QuestService)
@@ -74,7 +74,7 @@ VehicleService.start()
 NpcService.start()
 TrafficService.start()
 BuildingService.start()
-WreckerService.start()
+PlayerHitService.start()
 OnboardingService.start()
 QuestService.start()
 DailyService.start()

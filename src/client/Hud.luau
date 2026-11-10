@@ -267,14 +267,6 @@ hintEdge.Size = UDim2.new(1, 0, 0, 3)
 hintEdge.Parent = hint
 local hintBox = hint
 
-local bombLabel = Style.label(gui, "SELF-DESTRUCT", 56, F.display, C.red)
-bombLabel.Rotation = -4
-bombLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-bombLabel.Position = UDim2.fromScale(0.5, 0.4)
-bombLabel.Size = UDim2.fromOffset(600, 60)
-Style.outline(bombLabel, 4)
-bombLabel.Visible = false
-
 ---------------------------------------------------------------- side buttons and panels
 
 -- top left: one asphalt strip of tabs split by dashed lane lines (the left middle of the screen is
@@ -716,12 +708,6 @@ local PASSES = {
 		text = "The dream car: rear jet, air control and a thruster. Plus $1,000,000 in game.",
 	},
 	{
-		name = "Wrecker",
-		title = "WRECKER",
-		accent = C.orange,
-		text = "Run over other players and fling their cars. Includes self-destruct.",
-	},
-	{
 		name = "DoubleMoney",
 		title = "2x MONEY",
 		accent = C.money,
@@ -1125,11 +1111,6 @@ local thrustB = holdButton("BOOST", UDim2.fromOffset(160, 80), "orange", functio
 end, function()
 	Drive.input.thrust = false
 end)
-local bombB = holdButton("BOMB", UDim2.fromOffset(0, 0), "red", function()
-	Drive.input.bomb = true
-end, function()
-	Drive.input.bomb = false
-end)
 local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), "dark", function()
 	Drive.input.roll = -1
 end, function()
@@ -1174,7 +1155,6 @@ RunService.RenderStepped:Connect(function()
 		placeTouch()
 	end
 	if not s.driving then
-		bombLabel.Visible = false
 		return
 	end
 	local stats = Vehicles.ById[s.vehicleId]
@@ -1183,7 +1163,6 @@ RunService.RenderStepped:Connect(function()
 	gearLabel.BackgroundColor3 = if s.reverse then C.red else C.blue
 	local hasJet = stats ~= nil and Vehicles.has(stats, "Jet")
 	local hasThruster = stats ~= nil and Vehicles.has(stats, "Thruster")
-	local wrecker = player:GetAttribute("PassWrecker") == true
 	local feature: string? = nil
 	if stats then
 		for f, text in FEATURE_NAMES do
@@ -1227,9 +1206,6 @@ RunService.RenderStepped:Connect(function()
 	elseif hasThruster then
 		table.insert(keys, "R thruster")
 	end
-	if wrecker then
-		table.insert(keys, "hold X self-destruct")
-	end
 	hint.Text = if s.stuck and wait == 0
 		then "STUCK?  Press T to get back on the road"
 		else table.concat(keys, "   ·   ")
@@ -1239,16 +1215,11 @@ RunService.RenderStepped:Connect(function()
 	featureB.Visible = feature ~= nil
 	featureB.Text = feature or ""
 	thrustB.Visible = hasThruster
-	bombB.Visible = wrecker
 	viewB.Visible = true
 	hornB.Visible = true
 	viewB.Text = if Cockpit.isOn() then "OUT" else "VIEW"
 	rollL.Visible = hasJet and s.airborne
 	rollR.Visible = hasJet and s.airborne
-	bombLabel.Visible = s.bombHold > 0.05
-	bombLabel.TextTransparency = if math.floor(os.clock() * (4 + s.bombHold * 12)) % 2 == 0
-		then 0
-		else 0.6
 end)
 
 function Hud.start()

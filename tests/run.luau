@@ -339,8 +339,6 @@ do
 	check("the payout has a cap", Fall.payout(100000, C) == C.PayMax)
 end
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
-check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))
-check("blast radius has a floor", Impact.blastRadius(0, 0) >= 14)
 
 -- world
 check("roads fit the semi", World.Map.RoadWidth >= 40)
@@ -2655,6 +2653,32 @@ local function checkUnstuck()
 	check("unstuck: not while flung", Rules.action(1, false, true, 0, 0, 10, Cfg) == nil)
 end
 checkUnstuck()
+
+-- player hits: big cars skip repeat falloff and get a shorter shield; repeats fall off to a floor
+do
+	local HitConfig = require("../src/shared/Config/PlayerHits")
+	local HitRules = require("../src/shared/Rules/PlayerHits")
+	local roadster = Vehicles.ById.Roadster.price
+	local sedan = Vehicles.ById.Sedan.price
+	check("roadster hits as a big car", HitRules.isBig(roadster, HitConfig))
+	check("sedan is not a big car", not HitRules.isBig(sedan, HitConfig))
+	check("first hit does full launch", HitRules.repeatScale(0, sedan, HitConfig) == 1)
+	check("repeat hit does less", HitRules.repeatScale(1, sedan, HitConfig) < 1)
+	check(
+		"repeat falloff has a floor",
+		HitRules.repeatScale(50, sedan, HitConfig) == HitConfig.RepeatFloor
+	)
+	check("big cars skip repeat falloff", HitRules.repeatScale(5, roadster, HitConfig) == 1)
+	local normal, big = HitConfig.Normal, HitConfig.Big
+	check(
+		"big cars get the shorter shield and stronger hits",
+		HitRules.terms(roadster, HitConfig) == big
+			and big.shield < normal.shield
+			and big.launchCap >= normal.launchCap
+			and big.ragdoll >= normal.ragdoll
+			and normal.shield > 0
+	)
+end
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

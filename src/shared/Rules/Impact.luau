@@ -129,9 +129,4 @@ function Impact.collapses(
 		and Impact.energy(weightKg, speed) >= config.CollapseEnergy
 end
 
--- self-destruct blast radius, studs, from weight and speed
-function Impact.blastRadius(weightKg: number, speed: number): number
-	return math.clamp(18 * (weightKg / 1000) ^ 0.4 + speed * 0.15, 14, 75)
-end
-
 return Impact

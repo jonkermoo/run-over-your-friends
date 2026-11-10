@@ -19,13 +19,10 @@ return table.freeze({
 	DoubleMoney = 2,
 	LikeReward = 5000,
 	RoadsterPassMoney = 1000000,
-	SelfDestructCooldown = 20,
-	NoHitWindow = 3, -- seconds after a spawn or a hit when Wrecker can't hit you again
 	AutosaveSeconds = 60,
 	-- game pass ids; 0 until the passes exist on the Creator Hub. In Studio the shop toggles them for testing.
 	Passes = table.freeze({
 		Roadster = 0,
-		Wrecker = 0,
 		DoubleMoney = 0,
 	}),
 })

@@ -2,8 +2,8 @@
 -- Driving for whoever sits in a tagged Vehicle's seat (the driver's client owns the physics), plus the
 -- visuals every client runs for every vehicle: wheel spin and steer, suspension, skid marks and sound.
 -- Tyres are a bicycle model with a Pacejka-style curve; each vehicle's numbers come from Config/Vehicles.
--- Also: Roadster hover flight (Config/Flight, Rules/Flight), thruster, hit detection (NPCs, buildings, Wrecker), features,
--- self-destruct, and flings sent by the server. The cabin moves too: steering wheel, gauge needles, joysticks, the
+-- Also: Roadster hover flight (Config/Flight, Rules/Flight), thruster, hit detection (NPCs, buildings, other players), features,
+-- and flings sent by the server. The cabin moves too: steering wheel, gauge needles, joysticks, the
 -- driver's hands, and the bulldozer's crawler tracks (Rules/Tracks), which also let it turn on the spot.
 
 local CollectionService = game:GetService("CollectionService")
@@ -41,7 +41,6 @@ Drive.state = {
 	airborne = false,
 	boost = 100, -- Roadster flight meter, 0-100
 	thruster = 1, -- 0 = just used, 1 = ready
-	bombHold = 0, -- 0-1 while holding self-destruct
 	throttle = 0, -- -1..1, what the driver is asking for
 	stuck = false, -- throttle held but going nowhere (Config/Unstuck)
 	unstuckIn = 0, -- seconds until the unstuck button works again
@@ -65,7 +64,6 @@ Drive.input = {
 	thrust = false, -- Roadster rear jet, held
 	roll = 0,
 	feature = false,
-	bomb = false,
 }
 
 local REGEN = 2.2
@@ -107,7 +105,6 @@ groundParams.CollisionGroup = "Vehicles"
 local GAS_LOOP, GAS_LOOP_REGION = "rbxassetid://9116496074", NumberRange.new(1, 3.1)
 local GAS_BURST = "rbxassetid://9113046025"
 local FLY_FORCE = Vector3.new(BIG, BIG, BIG)
-local BOMB_HOLD = 1.5
 -- suspension
 local ROLL_PER_G = 1.8
 local SQUAT_PER_G = 1.1
@@ -612,7 +609,6 @@ local rearOn = false -- its rear jet is pushing it along the nose right now
 local reversing = false -- its nose jets are pushing it backwards in the air right now
 local liftedAt = 0
 local flyYaw = 0
-local bombHeld = 0
 local pivotSpin = 0 -- crawler: rad/s of on-the-spot turn being asked for
 local savedZoom = { min = player.CameraMinZoomDistance, max = player.CameraMaxZoomDistance }
 local hornAt = 0
@@ -752,7 +748,6 @@ local function detectHits(s: CarState, velocity: Vector3)
 	local buildings = map and map:FindFirstChild("Buildings")
 	local props = map and map:FindFirstChild("Props")
 	local vehiclesFolder = workspace:FindFirstChild("Vehicles")
-	local wrecker = player:GetAttribute("PassWrecker") == true
 	local include: { Instance } = {}
 	if npcFolder then
 		table.insert(include, npcFolder)
@@ -765,14 +760,12 @@ local function detectHits(s: CarState, velocity: Vector3)
 	if props then
 		table.insert(include, props)
 	end
-	if wrecker then
-		if vehiclesFolder then
-			table.insert(include, vehiclesFolder)
-		end
-		for _, other in Players:GetPlayers() do
-			if other ~= player and other.Character then
-				table.insert(include, other.Character)
-			end
+	if vehiclesFolder then
+		table.insert(include, vehiclesFolder)
+	end
+	for _, other in Players:GetPlayers() do
+		if other ~= player and other.Character then
+			table.insert(include, other.Character)
 		end
 	end
 	if #include == 0 then
@@ -832,7 +825,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 			then
 				table.insert(pieces, p)
 			end
-		elseif wrecker then
+		else
 			local target: Model? = nil
 			if vehiclesFolder and p:IsDescendantOf(vehiclesFolder) then
 				local m = p:FindFirstAncestorOfClass("Model")
@@ -850,7 +843,7 @@ local function detectHits(s: CarState, velocity: Vector3)
 			end
 			if target and (wreckAt[target] or 0) + 1 < now then
 				wreckAt[target] = now
-				Net.waitFor("WreckerHit"):FireServer(target, velocity)
+				Net.waitFor("PlayerHit"):FireServer(target, velocity)
 				if target.Parent == vehiclesFolder then
 					speed *= 0.85 -- like smashing through a wall
 				end
@@ -942,10 +935,6 @@ local function bind()
 		end
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.R, Enum.KeyCode.ButtonX)
-	ContextActionService:BindAction("RoyfBomb", function(_, state)
-		Drive.input.bomb = state == Enum.UserInputState.Begin
-		return Enum.ContextActionResult.Pass
-	end, false, Enum.KeyCode.X, Enum.KeyCode.DPadDown)
 	ContextActionService:BindAction("RoyfHorn", function(_, state)
 		if state == Enum.UserInputState.Begin then
 			Drive.horn()
@@ -1102,7 +1091,8 @@ end
 
 ---------------------------------------------------------------- flings from the server
 
-local function onFling(kind: string, velocity: Vector3, spinV: Vector3)
+local function onFling(kind: string, velocity: Vector3, spinV: Vector3, seconds: number?)
+	local down = if typeof(seconds) == "number" then seconds else 1.4
 	local character = player.Character
 	if kind == "Character" then
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -1116,7 +1106,7 @@ local function onFling(kind: string, velocity: Vector3, spinV: Vector3)
 				root.AssemblyLinearVelocity = velocity
 				root.AssemblyAngularVelocity = spinV
 			end)
-			task.delay(2.6, function()
+			task.delay(down, function()
 				if humanoid.Parent then
 					humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 				end
@@ -1124,7 +1114,7 @@ local function onFling(kind: string, velocity: Vector3, spinV: Vector3)
 		end
 	elseif kind == "Vehicle" and driving then
 		local chassis = driving.chassis
-		flingUntil = os.clock() + 1.4
+		flingUntil = os.clock() + down
 		local drive = chassis:FindFirstChild("Drive") :: LinearVelocity
 		local turn = chassis:FindFirstChild("Turn") :: AngularVelocity
 		drive.Enabled = false
@@ -1162,7 +1152,7 @@ local function cannonAim(s: CarState): Vector3
 	return if dir.Magnitude > 0.1 then dir.Unit else s.chassis.CFrame.LookVector
 end
 
-local function features(s: CarState, dt: number)
+local function features(s: CarState, _dt: number)
 	local now = os.clock()
 	-- vehicle feature (G): taxi yell, jingle on/off once per press; the cannon fires while held
 	local feature = if Vehicles.has(s.stats, "Taxi")
@@ -1184,18 +1174,6 @@ local function features(s: CarState, dt: number)
 		Net.waitFor("Feature"):FireServer(feature)
 		Drive.input.feature = false
 	end
-	-- self-destruct (Wrecker): hold to arm
-	if Drive.input.bomb and player:GetAttribute("PassWrecker") == true then
-		bombHeld += dt
-		if bombHeld >= BOMB_HOLD then
-			bombHeld = 0
-			Drive.input.bomb = false
-			Net.waitFor("SelfDestruct"):FireServer()
-		end
-	else
-		bombHeld = math.max(0, bombHeld - dt * 3)
-	end
-	Drive.state.bombHold = bombHeld / BOMB_HOLD
 	Drive.state.thruster = if Vehicles.has(s.stats, "Thruster")
 			and not Vehicles.has(s.stats, "Jet")
 		then math.clamp(1 - (thrustReadyAt - now) / THRUST_COOLDOWN, 0, 1)

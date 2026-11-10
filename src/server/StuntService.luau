@@ -3,7 +3,7 @@
 -- for the jump (Rules/Stunts: air time and flat spins; slow vehicles boosted; double in the
 -- stunt park). Landing on the roof is a wipeout and pays nothing. Measured here, not on the client: a ray
 -- down from the chassis against the car's usual ride height. Jet cars don't score (they can fly), and air
--- right after a wrecker fling doesn't count.
+-- right after a player-hit fling doesn't count.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

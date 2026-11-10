@@ -15,8 +15,7 @@ Net.Messages = table.freeze({
 	HitNpc = "HitNpc", -- (npc: Model, velocity: Vector3)
 	BreakAt = "BreakAt", -- (position: Vector3, velocity: Vector3)
 	KnockProp = "KnockProp", -- (prop: Model, velocity: Vector3): street furniture hit by a vehicle
-	WreckerHit = "WreckerHit", -- (target: Model, velocity: Vector3)
-	SelfDestruct = "SelfDestruct", -- ()
+	PlayerHit = "PlayerHit", -- (target: Model, velocity: Vector3): the driver's vehicle hit a player or their vehicle
 	Feature = "Feature", -- (feature: string)
 	HitTraffic = "HitTraffic", -- (carId: number, velocity: Vector3): the driver's vehicle ran into a traffic car
 	Horn = "Horn", -- client -> server: () honk; server -> other clients: (vehicle: Model)
@@ -28,11 +27,11 @@ Net.Messages = table.freeze({
 	-- server -> client
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
 	TrafficCrash = "TrafficCrash", -- (carId, gen, fling: Vector3, hitterUserId): a traffic car is wrecked
-	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3)
+	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3, seconds: number): down/no control for seconds
 	Popup = "Popup", -- (text: string, kind: string)
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
-	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Boom" | "Dodge" | "Honk", position: Vector3, a: number, b: number, userId: number)
+	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Dodge" | "Honk", position: Vector3, a: number, b: number, userId: number)
 	Collapse = "Collapse", -- (building: Model, at: Vector3, push: Vector3, pay: number, userId: number): a whole building comes down
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
@@ -50,8 +49,7 @@ export type MessageName =
 	| "HitNpc"
 	| "BreakAt"
 	| "KnockProp"
-	| "WreckerHit"
-	| "SelfDestruct"
+	| "PlayerHit"
 	| "Feature"
 	| "Horn"
 	| "HitTraffic"

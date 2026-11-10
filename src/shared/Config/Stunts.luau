@@ -15,7 +15,7 @@ return table.freeze({
 	Clearance = 2.5, -- studs above the car's usual ride height before it counts as off the ground
 	Settle = 0.3, -- seconds back on the ground before the landing is judged (bounces stay one jump)
 	Upright = 0.5, -- the car's up has to point at least this far up to land clean
-	FlungGrace = 3, -- seconds after a wrecker flings a car that its air doesn't count
+	FlungGrace = 3, -- seconds after a player hit flings a car that its air doesn't count
 	-- the AIR ticker on screen while the car is up
 	TickerAfter = 0.4,
 })

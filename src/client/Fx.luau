@@ -362,10 +362,6 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		end
 		burst(at, Color3.fromRGB(190, 185, 175), 20 + math.min(a, 60), 25 + radius, 2.5)
 		shake(math.clamp((if mine then 0.35 else 0.15) * (1 - near / 300) + radius / 100, 0, 0.8))
-	elseif kind == "Boom" then
-		play("Boom", at)
-		burst(at, Color3.fromRGB(80, 75, 70), 40, 60, 5)
-		shake(math.clamp(1.1 - near / (a * 6), 0.1, 1))
 	end
 end
 

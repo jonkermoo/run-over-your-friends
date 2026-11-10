@@ -1,7 +1,7 @@
 --!strict
 -- Playing together (Config/Social, Rules/Social). Roblox friends in the same server boost each other's hit
 -- money; the count is published as the player attribute Friends for the HUD chip. When one player launches
--- another (Wrecker hits and blasts), the flight is watched and both get a toast with how far it went.
+-- another (player hits), the flight is watched and both get a toast with how far it went.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

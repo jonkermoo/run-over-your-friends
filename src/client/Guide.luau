@@ -799,17 +799,6 @@ end
 
 function Guide.start()
 	Net.waitFor("Celebrate").OnClientEvent:Connect(celebrate)
-	local wreckerTipped = false
-	player:GetAttributeChangedSignal("PassWrecker"):Connect(function()
-		if player:GetAttribute("PassWrecker") == true and not wreckerTipped then
-			wreckerTipped = true
-			showTip(
-				if UserInputService.TouchEnabled
-					then "Wrecker: drive into players to launch them. Hold BOMB to self-destruct."
-					else "Wrecker: drive into players to launch them. Hold X to self-destruct."
-			)
-		end
-	end)
 	Style.onTap(skip, function()
 		skip.Visible = false
 		stepEntered = os.clock()
