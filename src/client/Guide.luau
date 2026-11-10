@@ -38,6 +38,7 @@ gui.Name = "Guide"
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 5
 gui.Parent = playerGui
+Style.fit(gui)
 
 ---------------------------------------------------------------- goal card
 
@@ -463,8 +464,9 @@ local function showTarget(target: Target?, root: BasePart?)
 		beacon.Parent = nil
 	end
 	local p = cam:WorldToScreenPoint(target.at)
-	local size = gui.AbsoluteSize
-	local e = Rules.edgePoint(p.X, p.Y, p.Z, size.X, size.Y, Onboarding.EdgeMargins)
+	local k = Style.scale()
+	local size = gui.AbsoluteSize / k
+	local e = Rules.edgePoint(p.X / k, p.Y / k, p.Z, size.X, size.Y, Onboarding.EdgeMargins)
 	edge.Visible = not e.onScreen
 	if edge.Visible then
 		edge.Position = UDim2.fromOffset(e.x, e.y)
@@ -484,8 +486,9 @@ local function showPress(target: GuiObject?)
 		press.Visible = false
 		return
 	end
-	local at, s = target.AbsolutePosition, target.AbsoluteSize
-	local under = at.Y + s.Y / 2 < gui.AbsoluteSize.Y / 2
+	local k = Style.scale()
+	local at, s = target.AbsolutePosition / k, target.AbsoluteSize / k
+	local under = at.Y + s.Y / 2 < gui.AbsoluteSize.Y / k / 2
 	local bob = math.sin(os.clock() * 7) * 9
 	press.Visible = true
 	press.Rotation = if under then 180 else 0
@@ -503,7 +506,7 @@ local function bringIntoView(button: GuiObject)
 		+ button.AbsoluteSize.Y
 		- (list.AbsolutePosition.Y + list.AbsoluteSize.Y)
 	if over > 0 then
-		list.CanvasPosition += Vector2.new(0, over + 40)
+		list.CanvasPosition += Vector2.new(0, over / Style.scale() + 40)
 	end
 end
 
@@ -570,7 +573,7 @@ local function update()
 	local sheetOpen = sheet ~= nil and sheet.Visible
 	-- the tip sits just above the speedometer when it shows, like the Hud's key hint
 	local dash = hud and hud:FindFirstChild("Speedometer") :: GuiObject?
-	local dashH = if dash and dash.Visible then dash.AbsoluteSize.Y else 0
+	local dashH = if dash and dash.Visible then dash.Size.Y.Offset else 0
 	tipBox.Position = UDim2.new(0.5, 0, 1, -(18 + dashH + 14))
 	local stepValue = (player:GetAttribute("Tutorial") or Steps.Done) :: number
 	if not player:GetAttribute("DataReady") then
@@ -620,6 +623,9 @@ local function update()
 		barFill.Size = UDim2.fromScale(0, 1)
 		glowGarage = true
 		glowCard = Vehicles.Starter
+		if not garageOpen then
+			pressTarget = garageButton
+		end
 		if stuck then
 			hintText.Text = "Tap GARAGE at the top left, then SPAWN"
 			hintText.Visible = true
@@ -769,7 +775,7 @@ local function update()
 					and cardFrame ~= nil
 					and cardFrame.Name == glowCard
 				glow(c, mine)
-				if mine and stepValue == Steps.Buy then
+				if mine and (stepValue == Steps.Buy or stepValue == Steps.Spawn) then
 					if not scrolled then
 						scrolled = true
 						bringIntoView(c)
@@ -804,7 +810,7 @@ function Guide.start()
 			)
 		end
 	end)
-	skip.Activated:Connect(function()
+	Style.onTap(skip, function()
 		skip.Visible = false
 		stepEntered = os.clock()
 		Net.waitFor("TutorialSkip"):FireServer(player:GetAttribute("Tutorial"))

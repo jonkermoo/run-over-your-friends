@@ -20,6 +20,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "Stunts"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
+Style.fit(gui)
 
 local ticker = Style.label(gui, "", 40, F.display, C.yellow)
 ticker.Name = "AirTicker"

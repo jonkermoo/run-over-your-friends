@@ -1,6 +1,7 @@
 --!strict
--- The daily streak card: once a UTC day, after the tutorial, a road-sign card in the middle shows the
--- streak as a row of day tiles (collected, today, still to come) and a COLLECT button. The server pays.
+-- The daily streak card: once a UTC day, after the tutorial and once the player has stopped (src/client/Popups),
+-- a road-sign card in the middle shows the streak as a row of day tiles (collected, today, still to come) and a
+-- COLLECT button. The server pays.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local Config = require(ReplicatedStorage.Shared.Config.Daily)
 local Daily = require(ReplicatedStorage.Shared.Rules.Daily)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -28,6 +30,7 @@ gui.Name = "Streak"
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 5
 gui.Parent = playerGui
+Style.fit(gui)
 
 local card = Style.panel(gui)
 card.Name = "StreakCard"
@@ -131,22 +134,35 @@ end
 
 local function fit()
 	local cam = workspace.CurrentCamera
-	local view = if cam then cam.ViewportSize else Vector2.new(1280, 720)
+	local view = (if cam then cam.ViewportSize else Vector2.new(1280, 720)) / Style.scale()
 	scale.Scale = math.min(1, (view.X - 32) / W, (view.Y - 32) / H)
+end
+
+local function showCard()
+	draw()
+	fit()
+	local target = scale.Scale
+	scale.Scale = target * 0.8
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = target })
+		:Play()
+	card.Visible = true
+end
+
+local function hideCard()
+	card.Visible = false
+end
+
+local function isOpen(): boolean
+	return card.Visible
 end
 
 local function update()
 	local step = (player:GetAttribute("Tutorial") or 0) :: number
-	local show = state.ready and step >= Onboarding.Steps.Done
-	if show and not card.Visible then
-		draw()
-		fit()
-		local target = scale.Scale
-		scale.Scale = target * 0.8
-		TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = target })
-			:Play()
+	if state.ready and step >= Onboarding.Steps.Done then
+		Popups.want("Streak", 1, showCard, hideCard, isOpen)
+	else
+		Popups.drop("Streak")
 	end
-	card.Visible = show
 end
 
 collect.Activated:Connect(function()

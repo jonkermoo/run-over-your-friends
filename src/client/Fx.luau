@@ -142,6 +142,7 @@ gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 gui.DisplayOrder = 4
 gui.Parent = playerGui
+Style.fit(gui)
 local flash = Instance.new("Frame")
 flash.Size = UDim2.fromScale(1, 1)
 flash.BackgroundColor3 = Color3.new(1, 1, 1)

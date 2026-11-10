@@ -28,6 +28,7 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "EventBanner"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
+Style.fit(gui)
 
 -- a road sign at the top centre with painted lane lines along its top and bottom edges
 local banner = Style.panel(gui)
@@ -62,7 +63,7 @@ timer.TextXAlignment = Enum.TextXAlignment.Right
 local ROW = 18
 -- px: on narrower screens the live sign is slimmer (so its X clears the cash box, top right) and a
 -- contest lists only the leader and you
-local NARROW = 1000
+local NARROW = 1000 -- real px (not layout px, so phones count)
 local SIGN_W, SIGN_W_NARROW = 380, 290
 local rows: { TextLabel } = {}
 for i = 1, Config.ContestShown do
@@ -121,7 +122,7 @@ chipMark.ZIndex = 3
 local chipTimer = Style.label(chip, "", 18, F.display, C.yellow)
 chipTimer.Position = UDim2.fromOffset(40, 3)
 chipTimer.Size = UDim2.new(1, -46, 1, 0)
-hide.Activated:Connect(function()
+Style.onTap(hide, function()
 	shrunk = true
 end)
 chip.Activated:Connect(function()
@@ -281,7 +282,7 @@ local function update()
 		return
 	end
 	-- the X sits just right of the sign
-	hide.Position = UDim2.new(0.5, banner.AbsoluteSize.X / 2 + 10, 0, 8)
+	hide.Position = UDim2.new(0.5, banner.Size.X.Offset / 2 + 10, 0, 8)
 
 	if phase == "quiet" then
 		-- a slim asphalt sign: what's coming and when

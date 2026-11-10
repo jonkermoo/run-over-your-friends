@@ -180,9 +180,9 @@ local function fling(car: Car, push: Vector3)
 		Vector3.new(math.random() * 10 - 5, math.random() * 10 - 5, math.random() * 10 - 5)
 	task.delay(Cfg.WreckSeconds, function()
 		for _, e in copy.parts do
-			TweenService:Create(e.part, TweenInfo.new(0.6), { Transparency = 1 }):Play()
+			TweenService:Create(e.part, TweenInfo.new(Cfg.FadeSeconds), { Transparency = 1 }):Play()
 		end
-		task.delay(0.7, give, copy)
+		task.delay(Cfg.FadeSeconds + 0.1, give, copy)
 	end)
 end
 
@@ -240,11 +240,18 @@ local function onSnapshot(b: unknown)
 			wrecked[id] = nil
 		end
 	end
-	-- cars the server no longer sends (wrecked, or gone): let go of their copies
+	-- cars the server no longer sends (wrecked, or gone): let go of their copies; one that gave up waiting
+	-- behind a player fades away where it stands
 	for id, car in cars do
 		if not seen[id] then
-			if car.copy then
-				give(car.copy)
+			local copy = car.copy
+			if copy then
+				for _, e in copy.parts do
+					TweenService
+						:Create(e.part, TweenInfo.new(Cfg.FadeSeconds), { Transparency = 1 })
+						:Play()
+				end
+				task.delay(Cfg.FadeSeconds + 0.1, give, copy)
 			end
 			cars[id] = nil
 		end
