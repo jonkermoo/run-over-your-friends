@@ -37,6 +37,22 @@ function Impact.npcPayout(energy: number, hitsInCombo: number, config: PayoutCon
 	return base * Impact.comboMultiplier(hitsInCombo, config.ComboStep, config.ComboMax)
 end
 
+-- new players' pay boost: `multiplier` until they own a vehicle priced at `untilPrice` or more, then 1
+function Impact.rookieMultiplier(
+	owned: { [string]: boolean },
+	byId: { [string]: { price: number } },
+	untilPrice: number,
+	multiplier: number
+): number
+	for id in owned do
+		local vehicle = byId[id]
+		if vehicle and vehicle.price >= untilPrice then
+			return 1
+		end
+	end
+	return multiplier
+end
+
 -- how fast a hit NPC or player flies, studs per second
 function Impact.launchSpeed(energy: number): number
 	local s = Impact.strength(energy, 3000, 20000000)

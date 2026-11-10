@@ -12,6 +12,8 @@ return table.freeze({
 	ComboStep = 0.2,
 	ComboMax = 3,
 	RepeatWindow = 30, -- the same NPC again inside this many seconds pays half
+	RookieMultiplier = 2, -- hits on people pay this much more for new players...
+	RookieUntil = "Sedan", -- ...until they own this vehicle or one at least as expensive
 	MinHitSpeed = 6.7, -- m/s (15 mph): slower bumps don't count
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
