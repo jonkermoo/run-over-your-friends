@@ -1340,7 +1340,7 @@ local function keep(
 	local near: { { model: Model, d: number } } = {}
 	for _, model in models do
 		local d = (model.WorldPivot.Position - eye).Magnitude
-		if d < radius then
+		if d < radius and not model:GetAttribute("Collapsed") then
 			table.insert(near, { model = model, d = d })
 		end
 	end
@@ -1469,6 +1469,22 @@ function Interiors.start()
 			end
 		end
 		easeIndoors(builtTown)
+		-- a building that comes down takes its rooms with it at once, not at the next upkeep pass
+		local function dropWhenCollapsed(model: Model, built: { [Model]: Furnished })
+			model:GetAttributeChangedSignal("Collapsed"):Connect(function()
+				local entry = built[model]
+				if entry and model:GetAttribute("Collapsed") then
+					entry.folder:Destroy()
+					built[model] = nil
+				end
+			end)
+		end
+		for _, model in houses do
+			dropWhenCollapsed(model, builtHouses)
+		end
+		for _, model in town do
+			dropWhenCollapsed(model, builtTown)
+		end
 		while true do
 			task.wait(1)
 			local camera = workspace.CurrentCamera

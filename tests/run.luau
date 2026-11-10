@@ -250,8 +250,16 @@ do
 	check("Scooter at top speed breaks little", smashTop("Scooter") <= 6)
 	for _, id in { "Hatchback", "Scooter", "Cart", "Sedan", "Taxi" } do
 		check(
-			id .. " at top speed knocks out one wall piece",
-			smashTop(id) > 0 and smashTop(id) <= Smash.MinRadius
+			id .. " at top speed makes a hole, not a collapse",
+			smashTop(id) > 0
+				and smashTop(id) <= Vehicles.ById[id].maxBreak
+				and smashTop(id) < Smash.FloorsFallFrom
+				and not Impact.collapses(
+					Vehicles.ById[id].weight,
+					Vehicles.ById[id].topSpeed / 2.237,
+					Smash,
+					Vehicles.ById[id].maxBreak
+				)
 		)
 	end
 	check("Muscle breaks more than the Sedan", smashTop("Muscle") > smashTop("Sedan") + 5)
@@ -263,13 +271,16 @@ do
 	)
 	check("Semi at 30 mph drops the floors above", smashAt("Semi", 30) >= Smash.FloorsFallFrom)
 	check("faster breaks more", smashAt("Semi", 80) > smashAt("Semi", 30))
-	-- walls push back: early cars lose most of their speed, big fast ones plough on
+	-- walls push back: early cars lose a good part of their speed, big fast ones plough on
 	local function keptAtTop(id: string): number
 		local v = Vehicles.ById[id]
 		return Impact.wallSpeedKept(v.weight, v.topSpeed / 2.237, Smash)
 	end
 	for _, id in { "Cart", "Scooter", "Hatchback", "Sedan", "Taxi" } do
-		check(id .. " loses most of its speed in a wall", keptAtTop(id) <= 0.35)
+		check(
+			id .. " rolls on through a wall, slower",
+			keptAtTop(id) >= 0.5 and keptAtTop(id) <= 0.7
+		)
 	end
 	check("the Semi ploughs on at top speed", keptAtTop("Semi") > 0.8)
 	check("a car always keeps some speed", keptAtTop("Cart") == Smash.KeptLight)
@@ -297,6 +308,35 @@ do
 		Impact.wallSpeedKept(9000, 30, Smash) > Impact.wallSpeedKept(1700, 30, Smash)
 	)
 	check("standing still keeps everything", Impact.wallSpeedKept(1500, 0, Smash) == 1)
+	local function collapsesAt(id: string, mph: number): boolean
+		local v = Vehicles.ById[id]
+		return Impact.collapses(v.weight, mph / 2.237, Smash, v.maxBreak)
+	end
+	check("Muscle at 40 mph doesn't bring a building down", not collapsesAt("Muscle", 40))
+	check("Muscle at 60 mph brings a building down", collapsesAt("Muscle", 60))
+	check("Semi at 25 mph brings a building down", collapsesAt("Semi", 25))
+	check("a parked Bulldozer brings nothing down", not collapsesAt("Bulldozer", 3))
+	for _, v in Vehicles.List do
+		if not v.maxBreak then
+			check(v.id .. " can bring a building down", collapsesAt(v.id, v.topSpeed))
+		end
+	end
+	local Fall = require("../src/shared/Rules/Collapse")
+	local C = Smash.Collapse
+	check("the bottom storey goes first", Fall.startDelay(0, C) < Fall.startDelay(1, C))
+	check("heights past the roof stay in range", Fall.startDelay(2, C) == Fall.startDelay(1, C))
+	check("every piece starts inside the show", Fall.startDelay(1, C) < C.ShowSeconds)
+	check(
+		"the pieces only go after the slowest show",
+		C.HideSeconds > C.ShowSeconds + C.SlowSeconds * (1 / C.SlowScale - 1)
+	)
+	local y, landed = Fall.fallHeight(50, 0, 0.5, 120, 0, 4)
+	check("a piece falls under gravity", near(y, 50 - 15, 1e-6) and not landed)
+	local y2, landed2 = Fall.fallHeight(10, 0, 5, 120, 0, 4)
+	check("a landed piece sinks slowly", landed2 and y2 < 0 and y2 > -30)
+	check("a tiny shop still pays the minimum", Fall.payout(10, C) == C.PayMin)
+	check("a tower pays more than a shop", Fall.payout(200, C) > Fall.payout(80, C))
+	check("the payout has a cap", Fall.payout(100000, C) == C.PayMax)
 end
 check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1e4))
 check("blast radius bigger for heavier", Impact.blastRadius(20000, 0) > Impact.blastRadius(150, 0))

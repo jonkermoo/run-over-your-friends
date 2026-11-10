@@ -703,6 +703,28 @@ local hitPropAt: { [Model]: number } = {}
 local wreckAt: { [Model]: number } = {}
 local loosened: { { part: BasePart, at: number } } = {}
 local lastBreakSent = 0
+local lastWallAt = -math.huge -- when a wall last slowed the car (Smash.PassSeconds)
+local slowUntil, slowReadyAt = 0, 0 -- slow motion after bringing a building down
+
+-- how fast time runs for the driver right now: 1, or less in the slow motion after a collapse
+function Drive.timeScale(): number
+	local left = slowUntil - os.clock()
+	if left <= 0 then
+		return 1
+	end
+	local scale = Smash.Collapse.SlowScale
+	return if left < Smash.Collapse.SlowEase
+		then 1 - (1 - scale) * left / Smash.Collapse.SlowEase
+		else scale
+end
+
+local function startSlowMotion()
+	local now = os.clock()
+	if now >= slowReadyAt then
+		slowReadyAt = now + Smash.Collapse.SlowCooldown
+		slowUntil = now + Smash.Collapse.SlowSeconds
+	end
+end
 
 local function npcOf(part: BasePart, npcFolder: Instance): Model?
 	local node: Instance? = part
@@ -830,31 +852,66 @@ local function detectHits(s: CarState, velocity: Vector3)
 	end
 	if #pieces > 0 then
 		-- the break centres on the piece nearest the car; only the pieces it reaches let the car through
-		local at = pieces[1].Position
+		local first = pieces[1]
 		for _, p in pieces do
-			if (p.Position - chassis.Position).Magnitude < (at - chassis.Position).Magnitude then
-				at = p.Position
+			if
+				(p.Position - chassis.Position).Magnitude
+				< (first.Position - chassis.Position).Magnitude
+			then
+				first = p
 			end
 		end
-		for _, p in pieces do
-			if (p.Position - at).Magnitude <= breakRadius + p.Size.Magnitude / 2 then
-				-- let the car through at once; the server breaks it for everyone
-				p.CanCollide = false
-				table.insert(loosened, { part = p, at = now })
+		local at = first.Position
+		-- hit hard enough, the whole building gives way (the same rule the server uses)
+		local building: Instance? = first
+		while building and building.Parent ~= buildings do
+			building = building.Parent
+		end
+		local falling = building ~= nil
+			and building:IsA("Model")
+			and (building:GetAttribute("HouseType") ~= nil or building:GetAttribute("Interior") ~= nil)
+			and not building:GetAttribute("Collapsed")
+			and Impact.collapses(s.stats.weight, metres, Smash, s.stats.maxBreak)
+		if falling and building then
+			for _, p in building:GetDescendants() do
+				if p:IsA("BasePart") and p.CanCollide then
+					p.CanCollide = false
+					table.insert(loosened, { part = p, at = now })
+				end
+			end
+		else
+			for _, p in pieces do
+				if (p.Position - at).Magnitude <= breakRadius + p.Size.Magnitude / 2 then
+					-- let the car through at once; the server breaks it for everyone
+					p.CanCollide = false
+					table.insert(loosened, { part = p, at = now })
+				end
 			end
 		end
 		if now - lastBreakSent > 0.12 then
 			lastBreakSent = now
 			Net.waitFor("BreakAt"):FireServer(at, velocity)
-			-- the wall pushes back; slow the chassis and its drive target too, or the next frame syncs speed
-			-- back to its velocity
-			local kept = Impact.wallSpeedKept(s.stats.weight, metres, Smash)
-			speed *= kept
-			lateral *= kept
-			chassis.AssemblyLinearVelocity = velocity * Vector3.new(kept, 1, kept)
-			local drive = chassis:FindFirstChild("Drive")
-			if drive and drive:IsA("LinearVelocity") then
-				drive.VectorVelocity *= kept
+			if falling then
+				startSlowMotion()
+			end
+			-- the wall pushes back once per wall, not per piece; slow the chassis and its drive target too, or the
+			-- next frame syncs speed back to its velocity
+			local kept = 1
+			if falling then
+				kept = Smash.CollapseKept
+				lastWallAt = now
+			elseif now - lastWallAt >= Smash.PassSeconds and Drive.timeScale() >= 1 then
+				kept = Impact.wallSpeedKept(s.stats.weight, metres, Smash)
+				lastWallAt = now
+			end
+			if kept < 1 then
+				speed *= kept
+				lateral *= kept
+				chassis.AssemblyLinearVelocity = velocity * Vector3.new(kept, 1, kept)
+				local drive = chassis:FindFirstChild("Drive")
+				if drive and drive:IsA("LinearVelocity") then
+					drive.VectorVelocity *= kept
+				end
 			end
 		end
 	end
@@ -1108,7 +1165,11 @@ local function step(dt: number)
 		-- weight past the wheels on the ground (the nose out over a ledge): the levelling lets go and it tips.
 		-- Fast off a crest or ramp lip it flies level as before.
 		local tipping = false
-		local flatSpeed = (chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude / spm
+		-- slow motion after a collapse scales what the car does on the road, not what it thinks it's doing
+		local slow = if flying or s.airborne or now < flingUntil then 1 else Drive.timeScale()
+		local flatSpeed = (chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude
+			/ spm
+			/ slow
 		if n and not balanced and flatSpeed < Vehicles.Balance.maxSpeed then
 			s.overSince = s.overSince or now
 			tipping = now - (s.overSince :: number) > Vehicles.Balance.settle
@@ -1126,15 +1187,18 @@ local function step(dt: number)
 		else
 			s.groundUp = chassis.CFrame.UpVector
 		end
-		local actual = chassis.AssemblyLinearVelocity / spm
+		local actual = chassis.AssemblyLinearVelocity / spm / slow
 		local actualForward, actualLeft = actual:Dot(look), -actual:Dot(right)
-		if math.abs(actualForward - speed) > 2 or math.abs(actualLeft - lateral) > 2 then
+		if
+			slow >= 1
+			and (math.abs(actualForward - speed) > 2 or math.abs(actualLeft - lateral) > 2)
+		then
 			speed, lateral = actualForward, actualLeft
 		end
 		local spinNow = if n
 			then chassis.AssemblyAngularVelocity:Dot(s.groundUp)
 			else chassis.AssemblyAngularVelocity.Y
-		if math.abs(spinNow - yawRate) > 0.6 then
+		if slow >= 1 and math.abs(spinNow - yawRate) > 0.6 then
 			yawRate = spinNow
 		end
 
@@ -1326,10 +1390,10 @@ local function step(dt: number)
 				else math.max(topSpeed, math.min(speed, topSpeed + THRUST_DV) - 8 * dt)
 			speed = math.clamp(speed, -REVERSE_TOP, cap)
 			drive.Enabled = true
-			drive.VectorVelocity = (look * speed - right * lateral) * spm
+			drive.VectorVelocity = (look * speed - right * lateral) * spm * slow
 			-- tilt to the road and yaw about its up
 			turn.AngularVelocity = chassis.CFrame.UpVector:Cross(s.groundUp) * LEVEL_RATE
-				+ s.groundUp * yawRate
+				+ s.groundUp * yawRate * slow
 		elseif not flung then
 			-- in the air momentum carries the car; the thruster pushes along the nose
 			drive.Enabled = false
@@ -1385,7 +1449,7 @@ local function step(dt: number)
 			stuckFor = 0
 		end
 
-		detectHits(s, chassis.AssemblyLinearVelocity)
+		detectHits(s, chassis.AssemblyLinearVelocity / slow)
 		features(s, dt)
 
 		local shown = v * MPH * (if Vehicles.has(stats, "Cart") then 10 else 1)

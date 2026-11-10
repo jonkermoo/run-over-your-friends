@@ -1,25 +1,37 @@
 --!strict
 -- Destructible buildings: every building is anchored chunks (wall panels, windows, slabs, columns).
 -- A hit or a blast unanchors the chunks in a radius and drops what stood on them, up to the next floor slab;
--- parts marked Fixed (office floor slabs and roofs) are structure and never break. Debris fades and the
--- building puts itself back together later.
+-- parts marked Fixed (office floor slabs and roofs) are structure and never break in those. Debris fades and the
+-- building puts itself back together later. The biggest hits bring the whole building down: nothing goes loose
+-- here for those, every client draws the fall (src/client/Collapse) and the pieces just go.
 
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CollapseRules = require(ReplicatedStorage.Shared.Rules.Collapse)
+local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local Analytics = require(script.Parent.Analytics)
+local Data = require(script.Parent.Data)
+local Passes = require(script.Parent.Passes)
 local VehicleService = require(script.Parent.VehicleService)
 
 local BuildingService = {}
 local CFG = World.Debris
+local COLLAPSE = Smash.Collapse
 
 type Chunk = { cf: CFrame, transparency: number, glass: boolean }
 local chunks: { [BasePart]: Chunk } = {}
+-- whole buildings that can come down: their Fixed floors and roofs, every part, and which are down right now
+local structure: { [BasePart]: Chunk } = {}
+local buildingParts: { [Model]: { BasePart } } = {}
+local ownerOf: { [BasePart]: Model } = {}
+local down: { [Model]: boolean } = {}
 local loose: { { part: BasePart, at: number } } = {}
 local buildingsFolder: Folder? = nil
 local propsFolder: Folder? = nil
@@ -30,12 +42,30 @@ local random = Random.new()
 function BuildingService.register(folder: Folder)
 	buildingsFolder = folder
 	for _, p in folder:GetDescendants() do
-		if p:IsA("BasePart") and not p:GetAttribute("Fixed") then
-			chunks[p] = {
+		if p:IsA("BasePart") then
+			local chunk = {
 				cf = p.CFrame,
 				transparency = p.Transparency,
 				glass = p:GetAttribute("Glass") == true,
 			}
+			if p:GetAttribute("Fixed") then
+				structure[p] = chunk
+			else
+				chunks[p] = chunk
+			end
+		end
+	end
+	-- houses and town buildings can come down; containers, cranes and ships only lose pieces
+	for _, m in folder:GetChildren() do
+		if m:IsA("Model") and (m:GetAttribute("HouseType") or m:GetAttribute("Interior")) then
+			local parts = {}
+			for _, p in m:GetDescendants() do
+				if p:IsA("BasePart") and (chunks[p] or structure[p]) then
+					table.insert(parts, p)
+					ownerOf[p] = m
+				end
+			end
+			buildingParts[m] = parts
 		end
 	end
 end
@@ -57,9 +87,11 @@ local function hide(part: BasePart)
 	part.Transparency = 1
 end
 
-local function restore(part: BasePart)
-	local c = chunks[part]
-	if not c or not part.Parent then
+local function restore(part: BasePart, always: boolean?)
+	local c = chunks[part] or structure[part]
+	local owner = ownerOf[part]
+	-- a piece's own timer doesn't bring it back while its building is down; the building's does
+	if not c or not part.Parent or (owner and down[owner] and not always) then
 		return
 	end
 	part.Anchored = true
@@ -195,6 +227,69 @@ function BuildingService.breakAt(
 	return count + dropped
 end
 
+-- bring the whole building at pos down; true when it did (false: none there, or it's down already)
+local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolean
+	local folder = buildingsFolder
+	if not folder then
+		return false
+	end
+	local params = OverlapParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { folder }
+	local building: Model? = nil
+	local best = math.huge
+	for _, p in workspace:GetPartBoundsInRadius(pos, 6, params) do
+		local owner = ownerOf[p]
+		local d = (p.Position - pos).Magnitude
+		if owner and not down[owner] and not p:GetAttribute("Broken") and d < best then
+			building, best = owner, d
+		end
+	end
+	if not building then
+		return false
+	end
+	local model = building :: Model
+	down[model] = true
+	model:SetAttribute("Collapsed", true)
+	local parts = buildingParts[model]
+	local count = 0
+	for _, p in parts do
+		if not p:GetAttribute("Broken") then
+			p:SetAttribute("Broken", true)
+			p.CanCollide = false
+			p.CanQuery = false
+			count += 1
+		end
+	end
+	local pay = CollapseRules.payout(count, COLLAPSE)
+		* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+	Net.remote("Collapse"):FireAllClients(model, pos, velocity, pay, player.UserId)
+	task.delay(COLLAPSE.PaySeconds, function()
+		if player.Parent then
+			Data.addMoney(player, pay)
+		end
+	end)
+	Analytics.custom(player, "Demolished")
+	task.delay(COLLAPSE.HideSeconds, function()
+		for _, p in parts do
+			if p.Anchored and p:GetAttribute("Broken") then
+				hide(p)
+			end
+		end
+	end)
+	task.delay(CFG.RebuildSeconds, function()
+		down[model] = nil
+		model:SetAttribute("Collapsed", nil)
+		for _, p in parts do
+			restore(p, true)
+		end
+	end)
+	for _, listener in breakListeners do
+		task.spawn(listener, player, math.min(count, COLLAPSE.GoalPieces))
+	end
+	return true
+end
+
 local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	if
 		typeof(pos) ~= "Vector3"
@@ -226,7 +321,14 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 	if (pos - body.Position).Magnitude > body.Size.Magnitude / 2 + 16 + speed * 0.3 then
 		return
 	end
-	local radius = Impact.smashRadius(stats.weight, speed / spm, Smash, stats.maxBreak)
+	local metres = speed / spm
+	if
+		Impact.collapses(stats.weight, metres, Smash, stats.maxBreak)
+		and collapse(pos, velocity.Unit * speed, player)
+	then
+		return
+	end
+	local radius = Impact.smashRadius(stats.weight, metres, Smash, stats.maxBreak)
 	BuildingService.breakAt(pos, radius, velocity.Unit * speed, player)
 end
 

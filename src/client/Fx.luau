@@ -206,11 +206,12 @@ end
 ---------------------------------------------------------------- big text
 
 -- combo words slam in right of centre, slanted, with two hard offset copies behind (pink, then ink)
-local function announce(word: string, color: Color3, sizeBoost: number)
+local function announce(word: string, color: Color3, sizeBoost: number, x: number?, y: number?)
+	local left, top = x or 0.66, y or 0.4
 	local slam = Instance.new("Frame")
 	slam.BackgroundTransparency = 1
 	slam.AnchorPoint = Vector2.new(0.5, 0.5)
-	slam.Position = UDim2.fromScale(0.66, 0.4)
+	slam.Position = UDim2.fromScale(left, top)
 	slam.Size = UDim2.fromOffset(700, 100)
 	slam.Rotation = math.random(-8, -3)
 	slam.Parent = gui
@@ -233,7 +234,8 @@ local function announce(word: string, color: Color3, sizeBoost: number)
 	scale.Parent = slam
 	TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	task.delay(0.7, function()
-		TweenService:Create(slam, TweenInfo.new(0.35), { Position = UDim2.fromScale(0.66, 0.36) })
+		TweenService
+			:Create(slam, TweenInfo.new(0.35), { Position = UDim2.fromScale(left, top - 0.04) })
 			:Play()
 		for _, l in labels do
 			TweenService:Create(l, TweenInfo.new(0.35), { TextTransparency = 1 }):Play()
@@ -364,6 +366,31 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		burst(at, Color3.fromRGB(80, 75, 70), 40, 60, 5)
 		shake(math.clamp(1.1 - near / (a * 6), 0.1, 1))
 	end
+end
+
+-- a whole building coming down (src/client/Collapse): the hit, then the storeys landing one after another
+function Fx.feelCollapse(at: Vector3, mine: boolean, near: number)
+	play("Boom", at)
+	play("Crash", at, 0.8)
+	play("Glass", at)
+	if mine then
+		shake(1)
+		impactFlash(1)
+	else
+		shake(math.clamp(0.5 * (1 - near / 500), 0, 0.5))
+	end
+	for _, wait in { 0.35, 0.85, 1.4 } do
+		task.delay(wait, play, "Crash", at, 0.7 + math.random() * 0.15)
+		task.delay(wait, shake, if mine then 0.3 else 0.1)
+	end
+end
+
+-- the money shot, in the middle of the screen, with the till
+function Fx.announceBig(word: string, amount: string)
+	announce(word, C.yellow, 34, 0.5, 0.3)
+	announce(amount, C.money, 20, 0.5, 0.42)
+	play("Sting", nil, 0.85)
+	play("Cash", nil, 0.9)
 end
 
 function Fx.start()
