@@ -249,20 +249,29 @@ local function step(dt: number, now: number)
 				end
 			end
 		end
-		-- people and players in the way
+		-- people and players in the way (gapAhead measures from the car's middle, so take off its front half)
 		local gap, who =
 			Roads.gapAhead(car.x, car.z, car.hx, car.hz, Cfg.HalfWidth, Cfg.Look, px, pz, pr)
 		if gap < math.huge then
-			target = math.min(target, Roads.stopSpeed(gap - Cfg.Gap, Cfg.Brake))
+			target = math.min(
+				target,
+				Roads.stopSpeed(gap - Cfg.CarLength / 2 - Cfg.StopShort, Cfg.Brake)
+			)
 		end
 		-- stuck behind a player who stays put: honk, then pull out into the other lane and go round
+		if gap < math.huge and who >= firstPlayer and car.speed < 2 then
+			car.blockedFor += dt
+		else
+			car.blockedFor = 0
+		end
+		-- no way round (too near a crossing, or in the middle of one): it gives up and is placed again elsewhere
+		-- (clients fade it out), so a player stopped at a crosswalk doesn't collect a jam
+		if car.blockedFor > Cfg.GiveUp and not car.passing then
+			car.placed = false
+			continue
+		end
 		if not car.turn then
 			local toEdge = l.length - edge - car.s
-			if gap < math.huge and who >= firstPlayer and car.speed < 2 then
-				car.blockedFor += dt
-			else
-				car.blockedFor = 0
-			end
 			if not car.passing and car.blockedFor > Cfg.Patience and toEdge > Cfg.CarLength * 2 then
 				-- only into a clear other lane
 				local back = g.between[l.b][l.a]

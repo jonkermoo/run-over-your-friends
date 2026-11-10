@@ -2555,6 +2555,55 @@ do
 	check("traffic spacing and lane width fit the scaled everyday cars", fits)
 end
 
+local function checkPopups()
+	local Rules = require("../src/shared/Rules/Popups")
+	local Cfg = require("../src/shared/Config/Popups")
+	check("popups: on foot counts as still", Rules.isStill(false, 50, 1, Cfg))
+	check("popups: stopped with no throttle is still", Rules.isStill(true, 0, 0, Cfg))
+	check("popups: throttle held is not still (pushing a wall)", not Rules.isStill(true, 0, 1, Cfg))
+	check("popups: driving is not still", not Rules.isStill(true, 40, 0, Cfg))
+	check("popups: moving at MovingMph", Rules.isMoving(true, Cfg.MovingMph, Cfg))
+	check("popups: on foot is never moving", not Rules.isMoving(false, 99, Cfg))
+	check("popups: not while moving", not Rules.mayOpen(100, nil, nil, Cfg))
+	check(
+		"popups: not the moment they stop",
+		not Rules.mayOpen(100, 100 - Cfg.StoppedSeconds / 2, nil, Cfg)
+	)
+	check("popups: once stopped a moment", Rules.mayOpen(100, 100 - Cfg.StoppedSeconds, nil, Cfg))
+	check(
+		"popups: not straight after another",
+		not Rules.mayOpen(100, 0, 100 - Cfg.GapSeconds / 2, Cfg)
+	)
+	check("popups: after the gap", Rules.mayOpen(100, 0, 100 - Cfg.GapSeconds, Cfg))
+end
+checkPopups()
+
+local function checkUnstuck()
+	local Rules = require("../src/shared/Rules/Unstuck")
+	local Cfg = require("../src/shared/Config/Unstuck")
+	local crumbs: { any } = {}
+	check("unstuck: first trail point is due", Rules.due(crumbs, 0, 0, Cfg))
+	for i = 0, Cfg.MaxCrumbs + 4 do
+		Rules.push(crumbs, { x = i * Cfg.Spacing, y = 0, z = 0, lx = 1, lz = 0 }, Cfg)
+	end
+	check("unstuck: trail is capped", #crumbs == Cfg.MaxCrumbs)
+	local lastX = (Cfg.MaxCrumbs + 4) * Cfg.Spacing
+	check("unstuck: not due right away", not Rules.due(crumbs, lastX + 1, 0, Cfg))
+	check("unstuck: due after Spacing", Rules.due(crumbs, lastX + Cfg.Spacing, 0, Cfg))
+	local spots = Rules.spots(crumbs, lastX, 0, Cfg)
+	check("unstuck: nearest usable point first", lastX - spots[1].x >= Cfg.MinBack)
+	check("unstuck: and not further than needed", lastX - spots[1].x < Cfg.MinBack + Cfg.Spacing)
+	check("unstuck: newest first", spots[1].x > spots[2].x)
+	check("unstuck: empty trail, no spots", #Rules.spots({}, 0, 0, Cfg) == 0)
+	check("unstuck: upright goes back", Rules.action(1, false, false, 0, 0, 10, Cfg) == "back")
+	check("unstuck: on its side flips", Rules.action(0, false, false, 0, 0, 10, Cfg) == "flip")
+	check("unstuck: cooldown", Rules.action(1, false, false, 0, 11, 10, Cfg) == nil)
+	check("unstuck: not at speed", Rules.action(1, false, false, Cfg.MaxMph + 1, 0, 10, Cfg) == nil)
+	check("unstuck: not while flying", Rules.action(1, true, false, 0, 0, 10, Cfg) == nil)
+	check("unstuck: not while flung", Rules.action(1, false, true, 0, 0, 10, Cfg) == nil)
+end
+checkUnstuck()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

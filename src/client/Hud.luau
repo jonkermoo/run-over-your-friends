@@ -22,6 +22,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
 local PaintPicker = require(script.Parent.PaintPicker)
+local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -861,6 +862,7 @@ offerNo.Position = UDim2.new(0.5, 0, 0, 214)
 offerNo.Size = UDim2.fromOffset(200, 40)
 offerNo.ZIndex = 11
 local offerKey = ""
+local offerIsUpsell = false -- the "can't afford it" card, which a successful buy closes
 offerBuy.Activated:Connect(function()
 	offer.Visible = false
 	Net.waitFor("BuyProduct"):FireServer(offerKey)
@@ -900,6 +902,7 @@ offerFor = function(stats: Vehicles.Vehicle)
 			break
 		end
 	end
+	offerIsUpsell = true
 	showOffer(
 		`NEED {money(gap)} MORE`,
 		`Keep running people over to earn it, or grab {pick.title} ({money(pick.money)}) for the {stats.name} right now.`,
@@ -910,42 +913,54 @@ offerFor = function(stats: Vehicles.Vehicle)
 end
 
 -- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds
--- of play, the tutorial done, nothing else open. Once per session, never once bought.
+-- of play, the tutorial done; then it queues behind the streak card (src/client/Popups). Once per session,
+-- never once bought.
 local joinedAt = os.clock()
 local starterOffered = false
-local function maybeOfferStarter()
-	if starterOffered then
-		return
-	end
-	local bought = string.find(
+local function starterBought(): boolean
+	return string.find(
 		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
 		",Starter,",
 		1,
 		true
 	) ~= nil
+end
+local function maybeOfferStarter()
+	if starterOffered then
+		return
+	end
 	local step = (player:GetAttribute("Tutorial") or 0) :: number
-	if bought then
+	if starterBought() then
 		starterOffered = true
 		return
 	end
-	if
-		os.clock() - joinedAt < Products.StarterOfferAfter
-		or step < Onboarding.Steps.Done
-		or offer.Visible
-		or garage.Visible
-		or store.Visible
-	then
+	if os.clock() - joinedAt < Products.StarterOfferAfter or step < Onboarding.Steps.Done then
 		return
 	end
 	starterOffered = true
-	showOffer(
-		"STARTER PACK",
-		`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
-		starter,
-		"GET IT",
-		"NO THANKS"
-	)
+	Popups.want("Starter", 2, function()
+		if starterBought() then
+			return
+		end
+		offerIsUpsell = false
+		showOffer(
+			"STARTER PACK",
+			`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
+			starter,
+			"GET IT",
+			"NO THANKS"
+		)
+	end, function()
+		offer.Visible = false
+	end, function()
+		return offer.Visible and offerKey == starter.key
+	end)
 end
+Popups.addBusy(function()
+	local goalsGui = playerGui:FindFirstChild("Goals")
+	local sheet = goalsGui and goalsGui:FindFirstChild("GoalsSheet") :: GuiObject?
+	return garage.Visible or store.Visible or offer.Visible or (sheet ~= nil and sheet.Visible)
+end)
 
 garageButton.Activated:Connect(function()
 	store.Visible = false
@@ -1087,6 +1102,9 @@ local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
 end, function()
 	Drive.input.roll = 0
 end)
+local unstuckB = holdButton("STUCK?", UDim2.fromOffset(160, -80), "orange", function()
+	Drive.unstuck()
+end, function() end)
 
 ---------------------------------------------------------------- per frame
 
@@ -1132,7 +1150,14 @@ RunService.RenderStepped:Connect(function()
 	layoutMeters()
 	hint.Position = UDim2.new(0.5, 0, 1, -(18 + dash.Size.Y.Offset + 14))
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
-	local keys = { "WASD drive", "SPACE get out", "V view", "H horn" }
+	local wait = math.ceil(s.unstuckIn)
+	local keys = {
+		"WASD drive",
+		"SPACE get out",
+		"V view",
+		"H horn",
+		if wait > 0 then `T unstuck ({wait})` else "T unstuck",
+	}
 	local jingleOn = Drive.view.car ~= nil
 		and Drive.view.car.PrimaryPart ~= nil
 		and Drive.view.car.PrimaryPart:GetAttribute("JingleOn") == true
@@ -1157,7 +1182,11 @@ RunService.RenderStepped:Connect(function()
 	if wrecker then
 		table.insert(keys, "hold X self-destruct")
 	end
-	hint.Text = table.concat(keys, "   ·   ")
+	hint.Text = if s.stuck and wait == 0
+		then "STUCK?  Press T to get back on the road"
+		else table.concat(keys, "   ·   ")
+	hint.TextColor3 = if s.stuck and wait == 0 then C.yellow else C.text
+	unstuckB.Text = if wait > 0 then tostring(wait) else "STUCK?"
 	boostB.Visible = hasJet
 	featureB.Visible = feature ~= nil
 	featureB.Text = feature or ""
@@ -1180,7 +1209,13 @@ function Hud.start()
 		refreshMoney()
 		refreshCards()
 	end)
-	player:GetAttributeChangedSignal("Owned"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("Owned"):Connect(function()
+		refreshCards()
+		-- bought it: the "need more money" card from an earlier try is out of date
+		if offerIsUpsell then
+			offer.Visible = false
+		end
+	end)
 	player:GetAttributeChangedSignal("Friends"):Connect(refreshFriends)
 	refreshFriends()
 	player:GetAttributeChangedSignal("Paint"):Connect(refreshCards)

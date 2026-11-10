@@ -24,8 +24,10 @@ return table.freeze({
 	Brake = 60,
 	Gap = 9, -- bumper gap kept to whatever is in front
 	Look = 45, -- how far ahead they watch for people and players in their lane
+	StopShort = 3, -- studs their front bumper stops short of a person or a player's vehicle
 	StraightWeight = 3, -- at a crossing, straight on is this many times likelier than each turn
 	Patience = 5, -- seconds stuck behind a player (their vehicle, or them on foot) before honking and passing
+	GiveUp = 12, -- seconds stuck behind a player with no way past (near a crossing, in a turn): it fades out
 	PassShift = 7, -- studs/s sideways while pulling out into the other lane and back
 	PassSpeed = 22, -- studs/s while out of their lane
 	StopLine = 47, -- studs before a crossing's centre where they wait at a red light
@@ -52,6 +54,7 @@ return table.freeze({
 	CrashReach = 38, -- server check: studs between the player's vehicle and the car (at Game.VehicleScale), plus their lag
 	RespawnSeconds = 8,
 	WreckSeconds = 5, -- the flung car stays this long on screen, then fades
+	FadeSeconds = 0.6, -- how long a wreck, or a car the server stops sending, takes to fade out
 	Pay = 40, -- money per wreck at CrashSpeed...
 	PayMax = 3, -- ...up to this many times more at speed
 	FlingAlong = 1.2, -- a wreck flies off at this share of the closing velocity...
