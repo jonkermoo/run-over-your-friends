@@ -1047,6 +1047,7 @@ def car_cabin(vid, f, glass, sp):
     xr = f.side(-sx, elbow, sz, RIGHT) - 0.12
     belt = min(f.belt(sx, sz, LEFT), ey - 0.4)
     top = min(max(belt - 0.3, sy + 2.25), sy + 2.85)  # dash top, a little under the window line
+    top -= DASH_DROP.get(vid, 0.0)
     zws = f.screen(sx, top + 0.05) + 0.05
     zd = sz - 2.55  # the dash's face towards the driver
     zfire = sz - 4.0
@@ -1436,6 +1437,9 @@ EYE_SILL = 1.2  # in a tall cab the eye sits this far above the side window's bo
 # low sports cars: the driver sits down on the floor, below the side windows, so a tall avatar's head and hair
 # stay under the roof (their seat heights in Config/Vehicles win over the two sit-up rules above)
 LOW_CABS = ("Supercar", "Roadster")
+# a dash this much lower than the rule above: the Supercar's seat sits 0.5 over roof - 4.7 so the driver sees out,
+# and its dash would rise with it
+DASH_DROP = {"Supercar": 0.45}
 DOZER_LIFT = 2.0  # the bulldozer's seat rides this far above its cab floor's usual height (roomy cab)
 SEAT_ROOM = 2.3  # studs from the seat spot to the cab's back wall that the seat back needs
 SCREEN_GAP = 4.6  # a driver sitting further than this behind the windscreen (vans, trucks) moves up to it
