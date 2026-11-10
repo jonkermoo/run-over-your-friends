@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local CockpitConfig = require(ReplicatedStorage.Shared.Config.Cockpit)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
@@ -437,7 +438,33 @@ local function statBar(parent: Instance, y: number, name: string, value: number,
 	Style.laneGaps(back, C.card)
 end
 
-local function preview(parent: Instance, id: string): Model?
+-- the template holds its moving parts as modelled: the steering wheel or handlebars stand upright and the marker
+-- parts (pivots, hand grips) are still in it; lean the steering about its pivot as VehicleBuilder's weld does and
+-- drop the markers, so the picture shows the vehicle as it drives
+local MARKERS =
+	{ SteerPivot = true, GripL = true, GripR = true, StickLPivot = true, StickRPivot = true }
+local function posePreview(m: Model, stats: Vehicles.Vehicle)
+	local steer = m:FindFirstChild("Steer")
+	local mark = m:FindFirstChild("SteerPivot")
+	if steer and steer:IsA("BasePart") then
+		local pivot = if mark and mark:IsA("BasePart") then mark.Position else steer.Position
+		local turn = m:GetPivot().Rotation
+		local tilt = math.rad(stats.steerTilt or CockpitConfig.steerTilt)
+		steer.CFrame = CFrame.new(pivot)
+			* turn
+			* CFrame.Angles(-tilt, 0, 0)
+			* turn:Inverse()
+			* CFrame.new(-pivot)
+			* steer.CFrame
+	end
+	for _, part in m:GetChildren() do
+		if MARKERS[part.Name] then
+			part:Destroy()
+		end
+	end
+end
+
+local function preview(parent: Instance, stats: Vehicles.Vehicle): Model?
 	local vf = Instance.new("ViewportFrame")
 	vf.Position = UDim2.fromOffset(6, 6)
 	vf.Size = UDim2.new(1, -12, 0, 122)
@@ -450,11 +477,12 @@ local function preview(parent: Instance, id: string): Model?
 	line.Position = UDim2.fromOffset(6, 128)
 	line.Size = UDim2.new(1, -12, 0, 3)
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
-	local template = models:FindFirstChild(id) :: Model?
+	local template = models:FindFirstChild(stats.id) :: Model?
 	if not template then
 		return nil
 	end
 	local m = template:Clone()
+	posePreview(m, stats)
 	m.Parent = vf
 	local cf, size = m:GetBoundingBox()
 	local cam = Instance.new("Camera")
@@ -471,7 +499,7 @@ for _, stats in Vehicles.List do
 	local card = Style.card(garageList, 16)
 	card.LayoutOrder = stats.order
 	card.Name = stats.id
-	local shown = preview(card, stats.id)
+	local shown = preview(card, stats)
 	-- painted bay number in the corner of the preview
 	local bay = Style.label(card, string.format("%02d", stats.order), 30, F.display, C.yellow)
 	bay.Position = UDim2.fromOffset(14, 10)

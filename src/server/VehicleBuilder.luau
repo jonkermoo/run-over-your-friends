@@ -25,7 +25,7 @@ local SOUNDS = {
 local BIG = 1e8
 local GLASS_SEE_THROUGH = 0.45
 local MIRROR_SHINE = 0.25 -- any more and the sky turns it into a white slab
-local STEER_TILT = 22 -- degrees the cabin steering wheel leans back towards the driver, unless the row says
+local STEER_TILT = Cockpit.steerTilt -- unless the row says (steerTilt in Config/Vehicles)
 local S = Game.VehicleScale -- every model is built this much bigger than its mesh, to fit the bigger drivers
 
 local function weld(name: string, part0: BasePart, part1: BasePart): Weld

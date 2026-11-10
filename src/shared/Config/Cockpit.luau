@@ -31,6 +31,7 @@ return table.freeze({
 	pads = { "ButtonR3" }, -- gamepad buttons that toggle it
 
 	-- dials: needles swing from 7 o'clock (empty) round to 5 o'clock (full)
+	steerTilt = 22, -- degrees a steering wheel leans back towards the driver (a Config/Vehicles row can say otherwise)
 	gaugeTilt = 15, -- every dial leans back this much; tools/blender/export_vehicles.py builds them to match
 	needleZero = 135, -- degrees from straight up, anticlockwise as the driver sees it
 	needleSweep = 270,

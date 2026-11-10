@@ -589,19 +589,25 @@ BULL_SHIFT = place("Bulldozer", body, wheels, STUDS)
 
 # ---- scooter
 RED, CREAM, BLACK, CHROME = (0.78, 0.2, 0.18), (0.92, 0.88, 0.78), (0.1, 0.1, 0.11), (0.7, 0.71, 0.72)
+# Front -Y. The front hub, the fork and the steering column share one raked axis (SCOOT_RAKE degrees from upright,
+# through SCOOT_HUB), so the fork stays on the axle when the bars turn; the leg shield sits just behind it.
+# Config/Vehicles' Scooter steerTilt must be 90 - SCOOT_RAKE (the weld leans the column by it).
+SCOOT_HUB, SCOOT_RAKE, SCOOT_HEAD = Vector((0, -0.42, 0.14)), 10.0, 0.68  # head: pack height of the column top
 parts = [
-    box("deck", (0.26, 0.62, 0.08), (0, 0.02, 0.2), BLACK, 0.02),
-    box("rearBody", (0.32, 0.42, 0.26), (0, 0.24, 0.36), RED, 0.05),
-    box("seat", (0.24, 0.5, 0.08), (0, 0.17, 0.52), BLACK, 0.03),
-    box("shield", (0.3, 0.08, 0.5), (0, -0.3, 0.5), RED, 0.03),
-    box("guard", (0.14, 0.24, 0.04), (0, 0.4, 0.33), RED),
-    box("mat", (0.22, 0.4, 0.01), (0, -0.06, 0.245), (0.3, 0.3, 0.32)),
-    box("headTube", (0.07, 0.07, 0.2), (0, -0.37, 0.72), RED),
-    box("fender", (0.12, 0.2, 0.04), (0, -0.44, 0.3), RED),
+    box("floor", (0.26, 0.29, 0.05), (0, -0.09, 0.22), BLACK, 0.015),
+    box("mat", (0.22, 0.25, 0.01), (0, -0.09, 0.248), (0.3, 0.3, 0.32)),
+    box("frame", (0.16, 0.5, 0.07), (0, 0.0, 0.16), BLACK, 0.02),
+    box("shield", (0.3, 0.05, 0.39), (0, -0.26, 0.445), RED, 0.02),
+    box("tunnel", (0.27, 0.08, 0.26), (0, 0.08, 0.365), RED, 0.03),
+    box("rearBody", (0.34, 0.46, 0.21), (0, 0.29, 0.395), RED, 0.06),
+    box("seat", (0.25, 0.46, 0.07), (0, 0.2, 0.525), BLACK, 0.03),
+    box("tailLamp", (0.12, 0.02, 0.05), (0, 0.522, 0.43), (0.75, 0.05, 0.05)),
+    cyl("exhaust", 0.025, 0.2, (-0.13, 0.38, 0.17), CHROME, "Y", 8),
 ]
 body = join(parts, "body")
-# the handlebars, column, lamp and fork are the Steer part (built with the cabins), so they turn together
-wheels = [wheel("w", 0.14, 0.08, (0, -0.42, 0.14)), wheel("w", 0.14, 0.08, (0, 0.42, 0.14))]
+# the handlebars, column, lamp, fork and front mudguard are the Steer part (built with the cabins), so they turn
+# together about the raked axis
+wheels = [wheel("w", 0.14, 0.08, tuple(SCOOT_HUB)), wheel("w", 0.14, 0.08, (0, 0.42, 0.14))]
 SCOOT_SHIFT = place("Scooter", body, wheels, STUDS)
 
 # ---- shopping cart (big enough to sit in)
@@ -694,10 +700,11 @@ config = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..
 SEATS = {m.group(1): tuple(float(v) for v in m.group(2).split(",")) for m in re.finditer(r'id = "(\w+)",.*?seat = \{([^}]*)\}', config, re.S)}
 # the steering wheel's lean towards the driver (VehicleBuilder's default unless the row sets steerTilt)
 TILTS = {m.group(1): float(m.group(2)) for m in re.finditer(r'id = "(\w+)",(?:(?!id = ").)*?steerTilt = ([\d.]+)', config, re.S)}
-STEER_TILT = 22
+STEER_TILT = 22  # Config/Cockpit steerTilt
 GAUGE_TILT = 15  # every analogue dial leans back this much; VehicleBuilder turns the needles' welds to match
 PANE = (0.14, 0.14, 0.12)  # the pack paints its windows this near-black
 SEAT_AT = {}
+STEER_PIVOT = {}  # a Steer part's SteerPivot marker, where it has one (the preview leans it about that)
 GLASS_FROM = {"FireTruck": 0.28}  # window faces above this share of the height become glass (default 0.4)
 ROBLOX = Matrix(((-1, 0, 0, 0), (0, 0, 1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))  # Roblox (x, y, z) -> Blender (-x, z, y)
 UP, DOWN, LEFT, RIGHT, AHEAD, BACK = (0, 1, 0), (0, -1, 0), (-1, 0, 0), (1, 0, 0), (0, 0, -1), (0, 0, 1)
@@ -1546,36 +1553,55 @@ def towards(a, b):
 
 
 def scooter_cockpit():
-    """Handlebars that turn: a raked column with the fork, a headset with the lamp and a speedo, bars with grips,
-    levers and mirrors (the Steer part, turned about SteerPivot); a glovebox and hook on the leg shield."""
+    """Handlebars that turn: the fork (legs on the front axle, crown, mudguard), the column, a headset with the lamp
+    and a speedo, bars with grips, levers and mirrors (the Steer part, turned about SteerPivot on the raked axis
+    through the front hub); a glovebox and hook on the back of the leg shield."""
     vid = "Scooter"
     R = lambda x, y, z: Vector(roblox_point(Vector((x, y, z)), STUDS, SCOOT_SHIFT))
-    p = R(0, -0.37, 0.72)
     sx, sy, sz = SEATS[vid]
+    tilt = TILTS.get(vid, STEER_TILT)
+    assert abs(tilt - (90 - SCOOT_RAKE)) < 1e-6, "Config/Vehicles Scooter steerTilt must be 90 - SCOOT_RAKE"
+    # the steering axis, in the Roblox frame: up and back towards the rider, through the front hub
+    axis = Vector((0, math.sin(math.radians(tilt)), math.cos(math.radians(tilt))))
+    hub_at = R(*SCOOT_HUB)
+    reach = (SCOOT_HEAD - SCOOT_HUB.z) * STUDS / axis.y  # hub to the column top, along the axis
+    p = hub_at + axis * reach
+    STEER_PIVOT[vid] = p
     # grips a little below and ahead of a seated avatar's shoulders (measured in Studio: about 2.1 above the
     # seat spot), far enough out to leave the view clear
     global SCOOT_GRIPS
     SCOOT_GRIPS = Vector((0, sy + 2.05, sz - 1.75))
-    tilt = TILTS.get(vid, STEER_TILT)
-    axis = Vector((0, math.sin(math.radians(tilt)), math.cos(math.radians(tilt))))
     # built as it stands, then baked untilted about the pivot so the steering weld can lean it back again
     k = Kit(vid, Matrix.Translation(p) @ rot(tilt))
-    lean = rot(-(90 - tilt))
-    k.cyl(0.24, 3.4, axis * 0.3, C["chrome"], towards((0, 0, 0), axis), 8)
-    hub = R(0, -0.42, 0.14) - p
-    for x in (-0.38, 0.38):
-        top = axis * -1.4 + Vector((x, 0, 0))
-        foot = hub + Vector((x, 0, 0))
-        k.cyl(0.13, (foot - top).length, (top + foot) / 2, C["chrome"], towards(top, foot), 8)
-    head = axis * 1.75
-    k.box((1.5, 0.75, 1.1), head, C["red"], 0.25, lean)
-    k.box((0.9, 0.6, 0.12), head + Vector((0, -0.05, -0.58)), C["cream"], 0.08, lean)
-    # the speedo on top of the headset, its face turned up to the rider
-    k.box((0.85, 0.08, 0.6), head + Vector((0, 0.4, 0.1)), C["black"], 0.04, lean @ rot(90))
-    k.box((0.55, 0.04, 0.3), head + Vector((0, 0.42, 0.16)), C["amber"], 0.02, lean @ rot(90))
+    along = rot(SCOOT_RAKE)  # a part's Y along the column
+    hub = hub_at - p
+    on = lambda s: axis * s  # a point on the axis, s studs above the pivot
+    # the axle through the wheel, the fork legs either side of it and the crown joining them over the mudguard
+    k.cyl(0.12, 1.3, hub, C["chrome"], rot(0, 90), 8)
+    crown = -reach + 1.95
+    for x in (-0.52, 0.52):
+        a, b = on(-reach - 0.12) + Vector((x, 0, 0)), on(crown) + Vector((x, 0, 0))
+        k.cyl(0.13, (b - a).length, (a + b) / 2, C["chrome"], towards(a, b), 8)
+    k.box((1.3, 0.35, 0.4), on(crown), C["char"], 0.08, along)
+    # the column up to the headset (just in front of the leg shield)
+    a, b = on(crown), on(0.3)
+    k.cyl(0.22, (b - a).length, (a + b) / 2, C["char"], towards(a, b), 8)
+    # the front mudguard: an arc of plates over the wheel, from just behind the top round to the front
+    radius, steps = 1.42, 6
+    for i in range(steps):
+        f0, f1 = math.radians(-30 + 100 * i / steps), math.radians(-30 + 100 * (i + 1) / steps)
+        f = (f0 + f1) / 2
+        k.box((0.7, 0.1, radius * (f1 - f0) * 1.08), hub + Vector((0, math.cos(f), -math.sin(f))) * radius,
+              C["black"], 0.02, rot(-math.degrees(f)))
+    # the headset over the column: the lamp facing ahead, the speedo facing the rider
+    head = on(0.3)
+    k.box((1.4, 0.9, 1.0), head, C["char"], 0.22, along)
+    k.cyl(0.32, 0.16, head + Vector((0, 0.02, -0.52)), C["pale"], along, 12)
+    k.box((0.85, 0.08, 0.55), head + Vector((0, 0.47, 0.12)), C["black"], 0.04, along @ rot(25))
+    k.box((0.55, 0.04, 0.3), head + Vector((0, 0.52, 0.14)), C["amber"], 0.02, along @ rot(25))
     bars = SCOOT_GRIPS - p
-    for x in (-0.6, 0.6):
-        riser = head + Vector((x, 0.3, 0.2))
+    for x in (-0.55, 0.55):
+        riser = head + Vector((x, 0.35, 0.3))
         k.cyl(0.11, (bars + Vector((x, 0, 0)) - riser).length, (riser + bars + Vector((x, 0, 0))) / 2, C["black"],
               towards(riser, bars + Vector((x, 0, 0))), 8)
     k.cyl(0.12, 2.6, bars, C["black"], rot(0, 90), 8)
@@ -1589,12 +1615,13 @@ def scooter_cockpit():
     mark(vid, "SteerPivot", p)
     for side, name in ((-1, "GripL"), (1, "GripR")):
         mark(vid, name, p + bars + Vector((side * 1.75, 0, 0)))
+    # the back of the leg shield (the body's shield, front face red): a cream panel, glovebox and bag hook
     i = Kit(vid)
-    shield = R(0, -0.25, 0.48)
-    i.box((1.8, 2.0, 0.08), shield, C["cream"], 0.05)
-    i.box((1.0, 0.6, 0.1), shield + Vector((0, 0.3, 0.06)), C["red"], 0.04)
-    i.box((0.3, 0.06, 0.06), shield + Vector((0, 0.3, 0.12)), C["chrome"])
-    i.box((0.1, 0.35, 0.1), shield + Vector((0, -0.5, 0.1)), C["chrome"], 0.02)
+    shield = R(0, -0.26 + 0.025, 0.445) + Vector((0, 0, 0.04))
+    i.box((2.1, 2.9, 0.08), shield, C["cream"], 0.03)
+    i.box((1.0, 0.6, 0.1), shield + Vector((0, 0.6, 0.08)), C["char"], 0.04)
+    i.box((0.3, 0.06, 0.06), shield + Vector((0, 0.6, 0.14)), C["chrome"])
+    i.box((0.1, 0.35, 0.1), shield + Vector((0, -0.6, 0.1)), C["chrome"], 0.02)
     i.make(vid + "_Interior")
     SEAT_AT[vid] = SEATS[vid]
 
@@ -1830,6 +1857,8 @@ if cabin_preview:
         if lean:
             lo, hi = bounds([o])
             c = (lo + hi) / 2
+            if part == "Steer" and vid in STEER_PIVOT:
+                c = in_slot(vid, *STEER_PIVOT[vid])
             m = (flip @ rot(-lean).to_3x3() @ flip.inverted()).to_4x4()
             o.data.transform(Matrix.Translation(c) @ m @ Matrix.Translation(-c))
     # nothing may sit inside the camera's near plane: report the closest surface to each driver's eye

@@ -133,7 +133,7 @@ local list: { Vehicle } = {
 		seat = { 0, 4.3, 0.4 },
 		engine = "Kart",
 		horn = "Bike",
-		steerTilt = 60,
+		steerTilt = 80, -- 90 - SCOOT_RAKE in tools/blender/export_vehicles.py (the column runs through the front hub)
 		steerRatio = 1,
 		blurb = "Tiny and silly. Barely tips people over.",
 	}),
