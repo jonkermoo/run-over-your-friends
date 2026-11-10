@@ -181,13 +181,17 @@ function NpcService.knock(
 		end
 		pay *= SocialService.multiplier(player)
 		local profile = Data.get(player)
-		if profile then
-			pay *= Impact.rookieMultiplier(
+		if
+			profile
+			and not Impact.rookieOver(
 				profile.owned,
+				profile.money,
+				profile.rookieDone,
 				Vehicles.ById,
-				Vehicles.ById[Economy.RookieUntil].price,
-				Economy.RookieMultiplier
+				Vehicles.ById[Economy.RookieUntil].price
 			)
+		then
+			pay *= Economy.RookieMultiplier
 		end
 		Data.addMoney(player, pay)
 		local text = "+$" .. tostring(math.floor(pay + 0.5))

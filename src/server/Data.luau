@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
@@ -27,7 +28,10 @@ export type Profile = {
 	paints: { [string]: boolean }, -- paid paint colours
 	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
 	sale: { day: number, id: string? }?, -- this player's car of the day and the UTC day it was picked, by DailyService
+	rookieDone: boolean, -- rookie pay (Config/Economy) has ended for good: they could afford the RookieUntil car
 }
+
+local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
 
 local Data = {}
 
@@ -54,10 +58,18 @@ local function default(): Profile
 		bought = {},
 		paint = {},
 		paints = {},
+		rookieDone = false,
 	}
 end
 
 local function publish(player: Player, profile: Profile)
+	-- every money or garage change passes here: once rookie pay is over it stays over, even after spending
+	if
+		not profile.rookieDone
+		and Impact.rookieOver(profile.owned, profile.money, false, Vehicles.ById, ROOKIE_PRICE)
+	then
+		profile.rookieDone = true
+	end
 	local stats = player:FindFirstChild("leaderstats")
 	if not stats then
 		stats = Instance.new("Folder")
@@ -213,6 +225,7 @@ local function load(player: Player)
 				profile.money = tonumber(decoded.money) or profile.money
 				profile.likeClaimed = decoded.likeClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
+				profile.rookieDone = decoded.rookieDone == true
 				-- saves from before the tutorial skip it, and so do saves past its old end
 				profile.tutorial =
 					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)

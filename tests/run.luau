@@ -2558,25 +2558,22 @@ end
 local function checkRookiePay()
 	local untilVehicle = Vehicles.ById[Economy.RookieUntil]
 	check("rookie pay ends at a real vehicle", untilVehicle ~= nil and untilVehicle.price > 0)
-	local function rookie(owned: { [string]: boolean }): number
-		return Impact.rookieMultiplier(
-			owned,
-			Vehicles.ById,
-			untilVehicle.price,
-			Economy.RookieMultiplier
-		)
+	local price = untilVehicle.price
+	local function over(owned: { [string]: boolean }, money: number, done: boolean?): boolean
+		return Impact.rookieOver(owned, money, done == true, Vehicles.ById, price)
 	end
-	check("starter car gets rookie pay", rookie({ Hatchback = true }) == Economy.RookieMultiplier)
+	check("a new player gets rookie pay", not over({ Hatchback = true }, 0))
+	check("just short of the price keeps rookie pay", not over({ Hatchback = true }, price - 1))
 	check(
 		"cheap joke cars keep rookie pay",
-		rookie({ Hatchback = true, Scooter = true, Cart = true }) == Economy.RookieMultiplier
+		not over({ Hatchback = true, Scooter = true, Cart = true }, 100)
 	)
-	check("owning the Sedan ends rookie pay", rookie({ Hatchback = true, Sedan = true }) == 1)
-	check("a dearer car ends rookie pay", rookie({ Hatchback = true, Supercar = true }) == 1)
-	check(
-		"unknown saved ids are ignored",
-		rookie({ Hatchback = true, Gone = true }) == Economy.RookieMultiplier
-	)
+	check("holding the price in cash ends rookie pay", over({ Hatchback = true }, price))
+	check("owning the Sedan ends rookie pay", over({ Hatchback = true, Sedan = true }, 0))
+	check("a dearer car ends rookie pay", over({ Hatchback = true, Supercar = true }, 0))
+	check("spending back down doesn't bring it back", over({ Hatchback = true }, 0, true))
+	check("unknown saved ids are ignored", not over({ Hatchback = true, Gone = true }, 0))
+	check("rookie pay is a real boost", Economy.RookieMultiplier > 1)
 end
 checkRookiePay()
 

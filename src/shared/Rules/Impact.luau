@@ -37,20 +37,25 @@ function Impact.npcPayout(energy: number, hitsInCombo: number, config: PayoutCon
 	return base * Impact.comboMultiplier(hitsInCombo, config.ComboStep, config.ComboMax)
 end
 
--- new players' pay boost: `multiplier` until they own a vehicle priced at `untilPrice` or more, then 1
-function Impact.rookieMultiplier(
+-- is a player past the new players' pay boost? Yes once it ended before (`done`, saved), once they hold
+-- `untilPrice` in cash, or once they own a vehicle priced at `untilPrice` or more
+function Impact.rookieOver(
 	owned: { [string]: boolean },
+	money: number,
+	done: boolean,
 	byId: { [string]: { price: number } },
-	untilPrice: number,
-	multiplier: number
-): number
+	untilPrice: number
+): boolean
+	if done or money >= untilPrice then
+		return true
+	end
 	for id in owned do
 		local vehicle = byId[id]
 		if vehicle and vehicle.price >= untilPrice then
-			return 1
+			return true
 		end
 	end
-	return multiplier
+	return false
 end
 
 -- how fast a hit NPC or player flies, studs per second
