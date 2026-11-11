@@ -28,6 +28,12 @@ return table.freeze({
 	BuildsPerTick = 4, -- new characters made per think tick (avatar building is slow)
 	PoolSpare = 24, -- spare ordinary characters kept ready
 	FriendRigsMax = 30, -- built friend characters kept (each friend avatar is its own rig)
+	-- Studio test players (Test tab, Clients: 2) have no Roblox friends, so in Studio test player N (user id
+	-- -N) gets list N here as its friends (real accounts, so their avatars load); lists wrap round
+	StudioFakeFriends = table.freeze({
+		table.freeze({ 1, 156, 261 }), -- Roblox, builderman, Shedletsky
+		table.freeze({ 2, 3 }), -- John Doe, Jane Doe
+	}) :: { { number } },
 	ThinkSeconds = 0.25,
 	RecallDistance = 900, -- a walker this far from every player...
 	RecallChance = 0.08, -- ...has this chance per half second...
@@ -147,6 +153,10 @@ return table.freeze({
 		FadeEvery = 0.1, -- seconds between fade updates
 		Mine = { 255, 208, 0 } :: RGB, -- your own friends: road yellow, big and bold
 		MineSize = 30, -- text height in pixels (name), sub-line is half
+		-- your own friends also get a yellow outline (only where you can see them) and a longer-range tag
+		MineFadeFrom = 80,
+		MineFadeTo = 110,
+		MaxOutlines = 12, -- outlines drawn at once, nearest first (Roblox draws at most 31 highlights)
 		OtherSize = 21, -- another player's friends: smaller, in one of these colours (fixed per friend)
 		Others = table.freeze({
 			{ 120, 220, 255 },

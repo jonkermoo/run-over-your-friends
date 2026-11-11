@@ -5,6 +5,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
@@ -63,6 +64,22 @@ local function addFriends(player: Player)
 		return
 	end
 	friendsAdded[player] = true
+	-- Studio test players have no friends: give them stand-ins (Config/Crowd.StudioFakeFriends)
+	local fake = CrowdConfig.StudioFakeFriends
+	if RunService:IsStudio() and player.UserId <= 0 and #fake > 0 then
+		for _, id in fake[(-player.UserId - 1) % #fake + 1] do
+			local okName, name = pcall(function()
+				return Players:GetNameFromUserIdAsync(id)
+			end)
+			CrowdService.addFriend({
+				userId = id,
+				name = if okName and name then name else `Friend{id}`,
+				friendOf = player.DisplayName,
+				friendOfId = player.UserId,
+			})
+		end
+		return
+	end
 	local ok, pages = pcall(function()
 		return Players:GetFriendsAsync(player.UserId)
 	end)
