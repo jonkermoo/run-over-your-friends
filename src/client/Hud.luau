@@ -12,6 +12,8 @@ local UserInputService = game:GetService("UserInputService")
 
 local CockpitConfig = require(ReplicatedStorage.Shared.Config.Cockpit)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
+local DriveHudConfig = require(ReplicatedStorage.Shared.Config.DriveHud)
+local DriveHudRules = require(ReplicatedStorage.Shared.Rules.DriveHud)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
@@ -190,31 +192,34 @@ end
 
 ---------------------------------------------------------------- speedometer
 
--- bottom centre: a gear chip, the big number and a yellow MPH tab on one asphalt plate; flight and
--- thruster meters run under it as dashed lane bars
-local DASH_W, DASH_H, METER_H = 214, 64, 12
+-- bottom centre: an asphalt plate with a yellow lane line along the top, a gear chip, the big number and a
+-- yellow MPH; flight and thruster meters run under it as dashed lane bars
+local DASH_W, DASH_H, METER_H = 220, 70, 12
 local dash = Style.panel(gui)
 dash.Name = "Speedometer"
 dash.AnchorPoint = Vector2.new(0.5, 1)
 dash.Position = UDim2.new(0.5, 0, 1, -18)
 dash.Size = UDim2.fromOffset(DASH_W, DASH_H)
 dash.Visible = false
-local gearLabel = Style.label(dash, "D", 26, F.display, C.text)
+local dashTop = Instance.new("Frame")
+dashTop.BackgroundColor3 = C.yellow
+dashTop.BorderSizePixel = 0
+dashTop.Size = UDim2.new(1, 0, 0, 4)
+dashTop.Parent = dash
+local gearLabel = Style.label(dash, "D", 28, F.display, C.text)
 gearLabel.BackgroundColor3 = C.blue
 gearLabel.BackgroundTransparency = 0
-gearLabel.Size = UDim2.fromOffset(40, DASH_H)
-local speedLabel = Style.label(dash, "0", 52, F.display, C.text)
-speedLabel.Position = UDim2.fromOffset(40, 6)
-speedLabel.Size = UDim2.new(1, -40 - 30, 0, DASH_H - 6)
-local unitLabel = Style.label(dash, "MPH", 13, F.heavy, C.ink)
-unitLabel.BackgroundColor3 = C.yellow
-unitLabel.BackgroundTransparency = 0
-unitLabel.AnchorPoint = Vector2.new(1, 0)
-unitLabel.Position = UDim2.fromScale(1, 0)
-unitLabel.Size = UDim2.fromOffset(DASH_H, 30)
-unitLabel.Rotation = -90
--- a rotated label turns about its centre: shift it so it fills the 30 px strip on the right edge
-unitLabel.Position = UDim2.new(1, (DASH_H - 30) / 2, 0, (DASH_H - 30) / 2)
+gearLabel.Position = UDim2.fromOffset(10, 14)
+gearLabel.Size = UDim2.fromOffset(38, 46)
+local speedLabel = Style.label(dash, "0", 54, F.display, C.text)
+speedLabel.TextXAlignment = Enum.TextXAlignment.Right
+speedLabel.Position = UDim2.fromOffset(54, 12)
+speedLabel.Size = UDim2.new(1, -54 - 58, 0, DASH_H - 12)
+local unitLabel = Style.label(dash, "MPH", 18, F.display, C.yellow)
+unitLabel.TextXAlignment = Enum.TextXAlignment.Left
+unitLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+unitLabel.Position = UDim2.new(1, -52, 0, 14)
+unitLabel.Size = UDim2.fromOffset(46, 40)
 
 local function meter(color: Color3): (Frame, Frame)
 	local back, fill = Style.bar(dash, color)
@@ -250,14 +255,184 @@ local function layoutMeters()
 	dash.Size = UDim2.fromOffset(DASH_W, if y > DASH_H + 2 then y + 4 else DASH_H)
 end
 
--- the hint line above the speedometer: an asphalt strip with a yellow edge line under it
-local hint = Style.label(gui, "", 14, F.bold, C.text)
-hint.BackgroundColor3 = C.panel
-hint.BackgroundTransparency = 0
+---------------------------------------------------------------- key caps (keyboard players)
+
+-- a key cap: lighter asphalt with a yellow rim and a thicker lip along the bottom, the key in yellow
+local function keyCap(parent: Instance, text: string, color: Color3?): TextLabel
+	local ink = color or C.yellow
+	local cap = Style.label(parent, text, 15, F.display, ink)
+	cap.Name = "Cap"
+	cap.BackgroundColor3 = C.card
+	cap.BackgroundTransparency = 0
+	Style.stroke(cap, ink, 2, 0)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingBottom = UDim.new(0, 4)
+	pad.Parent = cap
+	local lip = Instance.new("Frame")
+	lip.Name = "Lip"
+	lip.BackgroundColor3 = ink
+	lip.BorderSizePixel = 0
+	lip.AnchorPoint = Vector2.new(0, 1)
+	lip.Position = UDim2.new(0, 0, 1, 4) -- the padding moves children up; this puts it on the bottom edge
+	lip.Size = UDim2.new(1, 0, 0, 4)
+	lip.Parent = cap
+	Style.fitText(cap, 7, 5)
+	return cap
+end
+
+-- bottom right: the controls card, open for your first drives (Config/DriveHud), then folded into a
+-- KEYS chip; K or a click opens and folds it
+local controls = Style.panel(gui)
+controls.Name = "Controls"
+controls.AnchorPoint = Vector2.new(1, 1)
+controls.Position = UDim2.new(1, -DriveHudConfig.Margin, 1, -DriveHudConfig.Margin)
+controls.Visible = false
+local controlsEdge = Instance.new("Frame")
+controlsEdge.BackgroundColor3 = C.pink
+controlsEdge.BorderSizePixel = 0
+controlsEdge.Size = UDim2.new(0, 4, 1, 0)
+controlsEdge.Parent = controls
+local PAD = DriveHudConfig.CardPad
+local controlsTitle = Style.label(controls, "CONTROLS", 17, F.display, C.pink)
+controlsTitle.TextXAlignment = Enum.TextXAlignment.Left
+controlsTitle.Position = UDim2.fromOffset(PAD + 4, PAD - 2)
+controlsTitle.Size = UDim2.fromOffset(100, DriveHudConfig.TitleHeight)
+local foldHint = Style.label(controls, DriveHudConfig.ToggleKey .. " to hide", 12, F.bold, C.dim)
+foldHint.TextXAlignment = Enum.TextXAlignment.Right
+foldHint.AnchorPoint = Vector2.new(1, 0)
+foldHint.Position = UDim2.new(1, -PAD, 0, PAD - 2)
+foldHint.Size = UDim2.fromOffset(80, DriveHudConfig.TitleHeight)
+local foldButton = Instance.new("TextButton")
+foldButton.Name = "Fold"
+foldButton.BackgroundTransparency = 1
+foldButton.Text = ""
+foldButton.Size = UDim2.new(1, 0, 0, PAD + DriveHudConfig.TitleHeight)
+foldButton.Parent = controls
+
+-- one row per key; rebuilt only when the keys change, labels are updated in place
+local keyRows: { { row: Frame, cap: TextLabel, label: TextLabel } } = {}
+local shownKeys = ""
+local function setRows(rows: { DriveHudRules.Row })
+	local keys = {}
+	for _, r in rows do
+		table.insert(keys, r.key)
+	end
+	local signature = table.concat(keys, ",")
+	if signature ~= shownKeys then
+		shownKeys = signature
+		for _, r in keyRows do
+			r.row:Destroy()
+		end
+		table.clear(keyRows)
+		for i, r in rows do
+			local row = Instance.new("Frame")
+			row.BackgroundTransparency = 1
+			row.Position = UDim2.fromOffset(
+				PAD + 4,
+				PAD
+					+ DriveHudConfig.TitleHeight
+					+ 4
+					+ (i - 1) * (DriveHudConfig.RowHeight + DriveHudConfig.RowGap)
+			)
+			row.Size = UDim2.new(1, -PAD * 2 - 4, 0, DriveHudConfig.RowHeight)
+			row.Parent = controls
+			local cap = keyCap(row, r.key)
+			cap.AnchorPoint = Vector2.new(0, 0.5)
+			cap.Position = UDim2.fromScale(0, 0.5)
+			local label = Style.label(row, r.label, 14, F.bold, C.text)
+			label.TextXAlignment = Enum.TextXAlignment.Left
+			label.Size = UDim2.new(0, 200, 1, 0)
+			table.insert(keyRows, { row = row, cap = cap, label = label })
+		end
+	end
+	for i, r in rows do
+		keyRows[i].label.Text = r.label
+	end
+end
+
+-- line the labels up after the widest cap and size the card round its rows
+local function layoutControls()
+	local s = Style.scale()
+	local capW = 0
+	for _, r in keyRows do
+		capW = math.max(capW, r.cap.Size.X.Offset)
+	end
+	local labelW = 0
+	for _, r in keyRows do
+		r.label.Position = UDim2.fromOffset(capW + 10, 0)
+		labelW = math.max(labelW, r.label.TextBounds.X / s)
+	end
+	local width = math.max(PAD + 4 + capW + 10 + labelW + PAD, PAD + 4 + 100 + 80 + PAD)
+	local n = #keyRows
+	local height = PAD
+		+ DriveHudConfig.TitleHeight
+		+ 4
+		+ n * (DriveHudConfig.RowHeight + DriveHudConfig.RowGap)
+		- DriveHudConfig.RowGap
+		+ PAD
+	controls.Size = UDim2.fromOffset(math.ceil(width), height)
+end
+
+-- the folded card: a K cap and KEYS
+local keysChip = Instance.new("TextButton")
+keysChip.Name = "KeysChip"
+keysChip.Text = ""
+keysChip.AutoButtonColor = false
+keysChip.BackgroundColor3 = C.panel
+keysChip.BorderSizePixel = 0
+keysChip.AnchorPoint = Vector2.new(1, 1)
+keysChip.Position = controls.Position
+keysChip.Size = UDim2.fromOffset(104, 42)
+keysChip.Visible = false
+keysChip.Parent = gui
+Style.shadow(keysChip)
+local chipEdge = controlsEdge:Clone()
+chipEdge.Parent = keysChip
+local chipCap = keyCap(keysChip, DriveHudConfig.ToggleKey)
+chipCap.AnchorPoint = Vector2.new(0, 0.5)
+chipCap.Position = UDim2.new(0, 14, 0.5, 0)
+local chipText = Style.label(keysChip, "KEYS", 17, F.display, C.text)
+chipText.TextXAlignment = Enum.TextXAlignment.Left
+chipText.Position = UDim2.fromOffset(48, 0)
+chipText.Size = UDim2.new(1, -48, 1, 0)
+
+-- open for the first drives each time you join; once you open or fold it yourself, that sticks
+local controlsOpen = false
+local controlsChoice: boolean? = nil
+local drives = 0
+local returning: boolean? = nil
+local function toggleControls()
+	controlsOpen = not controlsOpen
+	controlsChoice = controlsOpen
+end
+foldButton.Activated:Connect(toggleControls)
+keysChip.Activated:Connect(toggleControls)
+UserInputService.InputBegan:Connect(function(input, used)
+	if
+		not used
+		and Drive.state.driving
+		and input.KeyCode == (Enum.KeyCode :: any)[DriveHudConfig.ToggleKey]
+	then
+		toggleControls()
+	end
+end)
+local function onDriveStart()
+	drives += 1
+	if returning == nil then
+		returning = player:GetAttribute("Tutorial") == Onboarding.Steps.Done
+	end
+	controlsOpen = if controlsChoice ~= nil
+		then controlsChoice
+		else DriveHudRules.startsOpen(drives, returning == true, DriveHudConfig)
+end
+
+-- over the speedometer: the one hint you need right now (stuck: press T), a T cap and yellow words
+local hint = Style.panel(gui)
+hint.Name = "DriveHint"
 hint.AnchorPoint = Vector2.new(0.5, 1)
 hint.Position = UDim2.new(0.5, 0, 1, -104)
+hint.Size = UDim2.fromOffset(260, 38)
 hint.Visible = false
-Style.fitText(hint, 14, 6)
 local hintEdge = Instance.new("Frame")
 hintEdge.BackgroundColor3 = C.yellow
 hintEdge.BorderSizePixel = 0
@@ -265,6 +440,16 @@ hintEdge.AnchorPoint = Vector2.new(0, 1)
 hintEdge.Position = UDim2.fromScale(0, 1)
 hintEdge.Size = UDim2.new(1, 0, 0, 3)
 hintEdge.Parent = hint
+local hintCap = keyCap(hint, "T")
+hintCap.AnchorPoint = Vector2.new(0, 0.5)
+hintCap.Position = UDim2.new(0, 10, 0.5, -1)
+local hintText = Style.label(hint, "Stuck? Back on the road", 15, F.heavy, C.yellow)
+hintText.TextXAlignment = Enum.TextXAlignment.Left
+hintText.Position = UDim2.fromOffset(44, 0)
+hintText.Size = UDim2.new(1, -44, 1, -3)
+hintText:GetPropertyChangedSignal("TextBounds"):Connect(function()
+	hint.Size = UDim2.fromOffset(44 + hintText.TextBounds.X / Style.scale() + 14, 38)
+end)
 local hintBox = hint
 
 ---------------------------------------------------------------- side buttons and panels
@@ -1037,7 +1222,14 @@ local function placeTouch()
 	touch.Position = UDim2.new(1, -20, 1, -clear / s)
 end
 
-local BAND = { blue = C.blue, gold = C.yellow, orange = C.orange, red = C.red, dark = C.pink }
+local RIM = {
+	blue = C.blue,
+	gold = C.yellow,
+	orange = C.orange,
+	red = C.red,
+	pink = C.pink,
+	dark = C.yellow,
+}
 local function holdButton(
 	text: string,
 	pos: UDim2,
@@ -1045,9 +1237,9 @@ local function holdButton(
 	down: () -> (),
 	up: () -> ()
 ): TextButton
-	-- an asphalt plate with a yellow painted edge; a band of the button's own colour along the top tells
-	-- them apart at a glance. The touch area is the same 74 px square in the same spot as before; the
-	-- plate is drawn a little inside it so neighbours keep a clear gap.
+	-- a big key cap like the controls card's: an asphalt plate with a rim and a thick bottom lip in the
+	-- button's colour (yellow for most, orange BOOST, blue FLY, pink STUCK?). The touch area is the 74 px
+	-- square; the plate is drawn a little inside it so neighbours keep a clear gap.
 	local b = Style.button(touch, text, "dark", 16)
 	b.BackgroundTransparency = 1
 	b.TextTransparency = 1 -- the label below shows the text; code keeps setting b.Text
@@ -1064,16 +1256,19 @@ local function holdButton(
 	face.Position = UDim2.fromScale(0.5, 0.5)
 	face.Size = UDim2.new(1, -10, 1, -10)
 	face.Parent = b
-	Style.stroke(face, C.yellow, 2, 0)
+	local rim = RIM[kind] or C.yellow
+	Style.stroke(face, rim, 2, 0)
 	Style.shadow(face, C.ink, 3)
-	local band = Instance.new("Frame")
-	band.BackgroundColor3 = BAND[kind] or C.grey
-	band.BorderSizePixel = 0
-	band.Size = UDim2.new(1, 0, 0, 8)
-	band.Parent = face
-	local caption = Style.label(face, text, 15, F.display, C.text)
-	caption.Position = UDim2.fromOffset(0, 8)
-	caption.Size = UDim2.new(1, 0, 1, -8)
+	local lip = Instance.new("Frame")
+	lip.Name = "Lip"
+	lip.BackgroundColor3 = rim
+	lip.BorderSizePixel = 0
+	lip.AnchorPoint = Vector2.new(0, 1)
+	lip.Position = UDim2.fromScale(0, 1)
+	lip.Size = UDim2.new(1, 0, 0, 7)
+	lip.Parent = face
+	local caption = Style.label(face, text, 16, F.display, C.text)
+	caption.Size = UDim2.new(1, 0, 1, -7)
 	b:GetPropertyChangedSignal("Text"):Connect(function()
 		caption.Text = b.Text
 	end)
@@ -1128,12 +1323,13 @@ local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
 end, function()
 	Drive.input.roll = 0
 end)
-local unstuckB = holdButton("STUCK?", UDim2.fromOffset(160, -80), "orange", function()
+local unstuckB = holdButton("STUCK?", UDim2.fromOffset(160, -80), "pink", function()
 	Drive.unstuck()
 end, function() end)
 
 ---------------------------------------------------------------- per frame
 
+local wasDriving = false
 local FEATURE_NAMES = { Taxi = "TAXI!", Jingle = "JINGLE", Cannon = "WATER" }
 
 RunService.RenderStepped:Connect(function()
@@ -1149,12 +1345,19 @@ RunService.RenderStepped:Connect(function()
 	local tipShown = guide ~= nil
 		and (guide:FindFirstChild("Tip") :: GuiObject?) ~= nil
 		and (guide:FindFirstChild("Tip") :: GuiObject).Visible
-	hintBox.Visible = s.driving and not UserInputService.TouchEnabled and not tipShown
+	local keyboard = s.driving and not UserInputService.TouchEnabled
+	if s.driving and not wasDriving then
+		onDriveStart()
+	end
+	wasDriving = s.driving
+	controls.Visible = keyboard and controlsOpen
+	keysChip.Visible = keyboard and not controlsOpen
 	touch.Visible = s.driving and UserInputService.TouchEnabled
 	if touch.Visible then
 		placeTouch()
 	end
 	if not s.driving then
+		hintBox.Visible = false
 		return
 	end
 	local stats = Vehicles.ById[s.vehicleId]
@@ -1178,38 +1381,25 @@ RunService.RenderStepped:Connect(function()
 	hint.Position = UDim2.new(0.5, 0, 1, -(18 + dash.Size.Y.Offset + 14))
 	thrustFill.Size = UDim2.fromScale(s.thruster, 1)
 	local wait = math.ceil(s.unstuckIn)
-	local keys = {
-		"WASD drive",
-		"SPACE get out",
-		"V view",
-		"H horn",
-		if wait > 0 then `T unstuck ({wait})` else "T unstuck",
-	}
 	local jingleOn = Drive.view.car ~= nil
 		and Drive.view.car.PrimaryPart ~= nil
 		and Drive.view.car.PrimaryPart:GetAttribute("JingleOn") == true
+	if keyboard then
+		setRows(DriveHudRules.rows({
+			feature = feature,
+			jingleOn = jingleOn,
+			jet = hasJet,
+			thruster = hasThruster,
+			unstuckWait = wait,
+		}))
+		if controls.Visible then
+			layoutControls()
+		end
+	end
 	if feature == "JINGLE" then
-		table.insert(keys, if jingleOn then "G jingle off" else "G jingle on")
 		feature = if jingleOn then "JINGLE OFF" else "JINGLE ON"
-	elseif feature == "WATER" then
-		table.insert(keys, "aim with the mouse, hold CLICK or G water")
-	elseif feature then
-		table.insert(keys, "G " .. string.lower(feature))
 	end
-	if hasJet then
-		table.insert(keys, "hold SHIFT jet up")
-		table.insert(keys, "hold Q/E roll")
-		table.insert(keys, "S reverse jet")
-	end
-	if hasJet then
-		table.insert(keys, "hold R rear jet")
-	elseif hasThruster then
-		table.insert(keys, "R thruster")
-	end
-	hint.Text = if s.stuck and wait == 0
-		then "STUCK?  Press T to get back on the road"
-		else table.concat(keys, "   ·   ")
-	hint.TextColor3 = if s.stuck and wait == 0 then C.yellow else C.text
+	hintBox.Visible = keyboard and not tipShown and s.stuck and wait == 0
 	unstuckB.Text = if wait > 0 then tostring(wait) else "STUCK?"
 	boostB.Visible = hasJet
 	featureB.Visible = feature ~= nil
