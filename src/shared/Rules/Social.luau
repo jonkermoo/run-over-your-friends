@@ -69,45 +69,4 @@ function Social.toastText(hitterName: string, victimName: string, studs: number)
 	return `You launched {victimName} {n} studs!`, `{hitterName} launched you {n} studs!`
 end
 
--- Friends in the server, as the player attribute FriendsHere carries them: one "<userId> <display name>"
--- per line. The server writes it; each client reads it to draw friend outlines and tags.
-export type FriendEntry = { id: number, name: string }
-
-function Social.encodeFriends(list: { FriendEntry }): string
-	local lines = {}
-	for _, f in list do
-		table.insert(lines, `{f.id} {f.name}`)
-	end
-	table.sort(lines)
-	return table.concat(lines, "\n")
-end
-
-function Social.decodeFriends(s: string): { FriendEntry }
-	local out = {}
-	for line in string.gmatch(s, "[^\n]+") do
-		local id, name = string.match(line, "^(-?%d+) (.+)$")
-		if id and name then
-			table.insert(out, { id = tonumber(id) :: number, name = name })
-		end
-	end
-	return out
-end
-
--- how `viewer` sees a player with these friends: "mine" (a friend of the viewer), "other" with the
--- first other friend (the one the tag names), or nil for a stranger
-function Social.friendTag(
-	list: { FriendEntry },
-	viewer: number
-): ("mine" | "other" | nil, FriendEntry?)
-	for _, f in list do
-		if f.id == viewer then
-			return "mine", f
-		end
-	end
-	if list[1] then
-		return "other", list[1]
-	end
-	return nil, nil
-end
-
 return Social

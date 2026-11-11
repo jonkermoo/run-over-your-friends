@@ -1,12 +1,10 @@
 --!strict
 -- Playing together (Config/Social, Rules/Social). Roblox friends in the same server boost each other's hit
--- money; the count is published as the player attribute Friends for the HUD chip, and who they are as
--- FriendsHere (Rules/Social.encodeFriends) for the friend outlines and tags (client/NameTags). When one player launches
+-- money; the count is published as the player attribute Friends for the HUD chip. When one player launches
 -- another (player hits), the flight is watched and both get a toast with how far it went.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Social)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -28,30 +26,10 @@ local function count(player: Player): number
 	return n
 end
 
--- Studio only: "all", "others" or "off" (Config.StudioFakeFriends, or the workspace attribute FakeFriends)
-local function fakeMode(): string
-	if not RunService:IsStudio() then
-		return "off"
-	end
-	local v = workspace:GetAttribute("FakeFriends")
-	return if typeof(v) == "string" then v else Config.StudioFakeFriends
-end
-
 local function publish(player: Player)
-	if not player.Parent then
-		return
+	if player.Parent then
+		player:SetAttribute("Friends", count(player))
 	end
-	player:SetAttribute("Friends", count(player))
-	local list: { Social.FriendEntry } = {}
-	for other, yes in friends[player] or {} do
-		if yes and other.Parent then
-			table.insert(list, { id = other.UserId, name = other.DisplayName })
-		end
-	end
-	if fakeMode() == "others" then
-		table.insert(list, { id = 0, name = Config.FakeOwnerName })
-	end
-	player:SetAttribute("FriendsHere", Social.encodeFriends(list))
 end
 
 -- hit money multiplier from friends in the server
@@ -60,12 +38,9 @@ function SocialService.multiplier(player: Player): number
 end
 
 local function checkPair(newcomer: Player, other: Player)
-	local ok, yes = true, true
-	if fakeMode() ~= "all" then
-		ok, yes = pcall(function()
-			return newcomer:IsFriendsWith(other.UserId)
-		end)
-	end
+	local ok, yes = pcall(function()
+		return newcomer:IsFriendsWith(other.UserId)
+	end)
 	if
 		not (
 			ok
@@ -126,15 +101,6 @@ function SocialService.start()
 		end
 	end
 	Players.PlayerAdded:Connect(onAdded)
-	-- Studio: switching the fake-friends mode mid-test starts every pair over
-	workspace:GetAttributeChangedSignal("FakeFriends"):Connect(function()
-		for _, p in Players:GetPlayers() do
-			friends[p] = nil
-		end
-		for _, p in Players:GetPlayers() do
-			onAdded(p)
-		end
-	end)
 	for _, p in Players:GetPlayers() do
 		if not friends[p] then
 			onAdded(p)

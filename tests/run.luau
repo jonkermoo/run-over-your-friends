@@ -1807,24 +1807,6 @@ do
 			"the friend chip shows a whole percent",
 			Social.friendPercent(1, per, max) == 10 and Social.friendPercent(5, per, max) == 30
 		)
-		local friendList = Social.decodeFriends(
-			Social.encodeFriends({ { id = 456, name = "Sam" }, { id = 123, name = "Alex Two" } })
-		)
-		check(
-			"friends attribute round-trips, sorted",
-			#friendList == 2 and friendList[1].id == 123 and friendList[1].name == "Alex Two"
-		)
-		check("empty friends attribute", #Social.decodeFriends("") == 0)
-		local kind = Social.friendTag(friendList, 456)
-		local otherKind, owner = Social.friendTag(friendList, 999)
-		check(
-			"friend tag: yours beats others', strangers get none",
-			kind == "mine"
-				and otherKind == "other"
-				and owner ~= nil
-				and owner.name == "Alex Two"
-				and Social.friendTag({}, 1) == nil
-		)
 		local toastState = Social.newToasts()
 		local cfg = SocialConfig
 		check("a short flight gets no toast", not Social.allowToast(toastState, 1, 2, 10, 0, cfg))
