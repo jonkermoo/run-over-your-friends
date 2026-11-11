@@ -12,6 +12,8 @@ type Config = {
 	TouchClearLarge: number,
 	ThumbZoneWidth: number,
 	ThumbZoneTop: number,
+	TouchPitch: number,
+	TouchKey: number,
 }
 
 -- the scale for a screen with this much GUI area: 1 when the layout fits, smaller when it doesn't
@@ -29,6 +31,21 @@ function Layout.touchClear(width: number, height: number, cfg: Config): number
 	return if math.min(width, height) <= cfg.SmallScreen
 		then cfg.TouchClearSmall
 		else cfg.TouchClearLarge
+end
+
+-- should the touch buttons use the wide two-row rack? Yes when the three-row rack's top would come within
+-- gap of the cash box's bottom. All real pixels from the GUI's top: guiHeight, clear (above the bottom
+-- edge), cashBottom, gap; keyScale is the buttons' real size per layout px.
+function Layout.touchWide(
+	guiHeight: number,
+	clear: number,
+	keyScale: number,
+	cashBottom: number,
+	gap: number,
+	cfg: Config
+): boolean
+	local tall = (2 * cfg.TouchPitch + cfg.TouchKey) * keyScale
+	return guiHeight - clear - tall < cashBottom + gap
 end
 
 -- is this point (real pixels) where the thumbstick takes touches? Buttons there would steal them.

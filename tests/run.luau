@@ -2655,6 +2655,27 @@ do
 		"layout: right side is clear of the thumb",
 		not Layout.inThumbZone(600, 300, 848, 395, cfg)
 	)
+	-- the touch rack folds to two rows where its top row would reach the cash box (real px, GUI 339
+	-- tall on a short phone, 354 on a normal one, 732 on a tablet)
+	local function wideAt(guiW: number, guiH: number): boolean
+		local s = Layout.scale(guiW, guiH, cfg)
+		local key = math.max(s, cfg.TouchMinScale)
+		local clear = Layout.touchClear(guiW, guiH, cfg)
+		return Layout.touchWide(guiH, clear, key, 62 * s, cfg.TouchCashGap * s, cfg)
+	end
+	check("layout: a short phone folds the touch rack", wideAt(667, 339))
+	check("layout: a normal phone keeps three rows", not wideAt(844, 354))
+	check("layout: a tablet keeps three rows", not wideAt(1024, 732))
+	local filled: { [string]: boolean } = {}
+	for name, slot in cfg.TouchSlotsWide do
+		local k = `{slot[1]},{slot[2]}`
+		check(`layout: wide rack slot {name} is free`, not filled[k])
+		filled[k] = true
+		check(`layout: wide rack has no top row ({name})`, slot[2] >= 0)
+	end
+	for name in cfg.TouchSlots do
+		check(`layout: {name} has a wide slot`, cfg.TouchSlotsWide[name] ~= nil)
+	end
 end
 do
 	local Rules = require("../src/shared/Rules/DriveHud")

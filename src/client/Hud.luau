@@ -1210,16 +1210,42 @@ touch.Parent = gui
 local touchFit = Instance.new("UIScale")
 touchFit.Parent = touch
 
--- thumb-sized on any screen, and above Roblox's jump button
+-- each button's grid slot name (Config/Layout TouchSlots), filled as they are made
+local slotOf: { [TextButton]: string } = {}
+local wideRack: boolean? = nil
+
+local function slotPos(slot: { number }): UDim2
+	return UDim2.fromOffset(slot[1] * LayoutConfig.TouchPitch, slot[2] * LayoutConfig.TouchPitch)
+end
+
+-- thumb-sized on any screen, and above Roblox's jump button; on short screens the top row folds into a
+-- column on the left so it stays off the cash box
 local function placeTouch()
 	local cam = workspace.CurrentCamera
 	if not cam then
 		return
 	end
 	local s = Style.scale()
-	touchFit.Scale = LayoutRules.touchBoost(s, LayoutConfig.TouchMinScale)
+	local boost = LayoutRules.touchBoost(s, LayoutConfig.TouchMinScale)
+	touchFit.Scale = boost
 	local clear = LayoutRules.touchClear(cam.ViewportSize.X, cam.ViewportSize.Y, LayoutConfig)
 	touch.Position = UDim2.new(1, -20, 1, -clear / s)
+	local top = gui.AbsolutePosition.Y
+	local wide = LayoutRules.touchWide(
+		gui.AbsoluteSize.Y,
+		clear,
+		s * boost,
+		moneyBox.AbsolutePosition.Y + moneyBox.AbsoluteSize.Y - top,
+		LayoutConfig.TouchCashGap * s,
+		LayoutConfig
+	)
+	if wide ~= wideRack then
+		wideRack = wide
+		local slots = if wide then LayoutConfig.TouchSlotsWide else LayoutConfig.TouchSlots
+		for b, name in slotOf do
+			b.Position = slotPos(slots[name])
+		end
+	end
 end
 
 local RIM = {
@@ -1232,7 +1258,7 @@ local RIM = {
 }
 local function holdButton(
 	text: string,
-	pos: UDim2,
+	slot: string,
 	kind: string,
 	down: () -> (),
 	up: () -> ()
@@ -1243,8 +1269,9 @@ local function holdButton(
 	local b = Style.button(touch, text, "dark", 16)
 	b.BackgroundTransparency = 1
 	b.TextTransparency = 1 -- the label below shows the text; code keeps setting b.Text
-	b.Size = UDim2.fromOffset(74, 74)
-	b.Position = pos
+	b.Size = UDim2.fromOffset(LayoutConfig.TouchKey, LayoutConfig.TouchKey)
+	b.Position = slotPos(LayoutConfig.TouchSlots[slot])
+	slotOf[b] = slot
 	for _, extra in { b:FindFirstChild("Edge"), b:FindFirstChild("Shadow") } do
 		extra:Destroy()
 	end
@@ -1290,40 +1317,40 @@ local function holdButton(
 	end)
 	return b
 end
-local boostB = holdButton("FLY", UDim2.fromOffset(160, 0), "blue", function()
+local boostB = holdButton("FLY", "Fly", "blue", function()
 	Drive.input.boost = true
 end, function()
 	Drive.input.boost = false
 end)
-local featureB = holdButton("HORN", UDim2.fromOffset(80, 0), "gold", function()
+local featureB = holdButton("HORN", "Feature", "gold", function()
 	Drive.input.feature = true
 end, function()
 	Drive.input.feature = false
 end)
-local thrustB = holdButton("BOOST", UDim2.fromOffset(160, 80), "orange", function()
+local thrustB = holdButton("BOOST", "Boost", "orange", function()
 	Drive.input.thrust = true
 	Drive.thruster()
 end, function()
 	Drive.input.thrust = false
 end)
-local rollL = holdButton("ROLL L", UDim2.fromOffset(0, 80), "dark", function()
+local rollL = holdButton("ROLL L", "RollL", "dark", function()
 	Drive.input.roll = -1
 end, function()
 	Drive.input.roll = 0
 end)
 -- first-person view: a tap toggles it
-local viewB = holdButton("VIEW", UDim2.fromOffset(0, -80), "dark", function()
+local viewB = holdButton("VIEW", "View", "dark", function()
 	Cockpit.toggle()
 end, function() end)
-local hornB = holdButton("HONK", UDim2.fromOffset(80, -80), "gold", function()
+local hornB = holdButton("HONK", "Honk", "gold", function()
 	Drive.horn()
 end, function() end)
-local rollR = holdButton("ROLL R", UDim2.fromOffset(80, 80), "dark", function()
+local rollR = holdButton("ROLL R", "RollR", "dark", function()
 	Drive.input.roll = 1
 end, function()
 	Drive.input.roll = 0
 end)
-local unstuckB = holdButton("STUCK?", UDim2.fromOffset(160, -80), "pink", function()
+local unstuckB = holdButton("STUCK?", "Stuck", "pink", function()
 	Drive.unstuck()
 end, function() end)
 
