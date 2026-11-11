@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cfg = require(ReplicatedStorage.Shared.Config.Country)
 local Outskirts = require(ReplicatedStorage.Shared.Config.Outskirts)
 local Greenery = require(script.Parent.Greenery)
+local PaintKit = require(script.Parent.PaintKit)
 local Places = require(script.Parent.Places)
 
 local CountryKit = {}
@@ -175,6 +176,7 @@ local function pine(folder: Instance, at: Vector3, height: number, random: Rando
 	p.CanCollide = true
 	return p
 end
+CountryKit.pine = pine
 
 -- hills, woods and pines past the north, east and south edges; the sea and islands past the west
 local function edges(ctx: Ctx)
@@ -952,23 +954,13 @@ function CountryKit.lot(static: Instance, props: Instance, lotCentre: Vector3, i
 	local centre = lotCentre + Vector3.new(L.Shift, 0, 0) -- east, clear of the lot's west ramp
 	local bw, bd = L.Bay[1], L.Bay[2]
 	local rowLen = L.Bays * bw
+	local draw = PaintKit.patch(static, centre + Vector3.new(0, 0.13, 0), rowLen + 2, bd * 2 + 14)
 	for _, side in { -1, 1 } do
 		for k = 0, L.Bays do
-			local x = -rowLen / 2 + k * bw
-			paint(
-				static,
-				Vector3.new(L.Line, 0.05, bd),
-				CFrame.new(centre + Vector3.new(x, 0.11, side * bd / 2 + side * 6)),
-				WHITE
-			)
+			draw(-rowLen / 2 + k * bw, side * (bd / 2 + 6), L.Line, bd, WHITE)
 		end
 	end
-	paint(
-		static,
-		Vector3.new(rowLen, 0.05, L.Line),
-		CFrame.new(centre + Vector3.new(0, 0.11, 0)),
-		WHITE
-	)
+	draw(0, 0, rowLen, L.Line, WHITE)
 	for k = 0, L.Lamps - 1 do
 		local a = (k + 0.5) / L.Lamps * math.pi * 2
 		local at = lotCentre + Vector3.new(math.cos(a), 0, math.sin(a)) * inner * 0.42

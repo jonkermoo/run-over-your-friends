@@ -19,6 +19,9 @@ return table.freeze({
 	-- road paint
 	PaintHeight = 0.135, -- centre of the paint, just above both road surfaces
 	PaintThick = 0.04,
+	-- road segments draw their paint as frames on one SurfaceGui: sharpness, and how far away it still draws
+	PaintPixelsPerStud = 8,
+	PaintDrawDistance = 2500,
 	LineWidth = 0.45,
 	DashLength = 14,
 	DashGap = 30,

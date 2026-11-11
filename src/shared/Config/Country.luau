@@ -53,6 +53,25 @@ return table.freeze({
 		WoodScale = table.freeze({ 0.45, 0.75 }),
 	}),
 
+	-- what still fills the open grass after the meadow (WildsKit), in this order, each clear of what came before:
+	-- rocky knolls (terrain), pine stands (one mesh each), more strips of woods, hedgerows of trees, wildflower
+	-- patches with bushes, then rolling hills in the gaps. `n` is how many are tried; a crowded map gets fewer.
+	Fill = table.freeze({
+		Margin = 16,
+		Knolls = table.freeze({ n = 45, radius = 40, rocks = { 3, 6 }, size = { 10, 24 } }), -- rock balls, half sunk
+		Pines = table.freeze({ n = 42, radius = 52, trees = { 8, 13 } }),
+		Woods = table.freeze({ n = 90, scale = { 0.4, 0.7 } }),
+		Hedges = table.freeze({ n = 24, trees = { 5, 8 }, gap = 15 }), -- a straight row of leafy trees
+		Flowers = table.freeze({
+			n = 38,
+			radius = 30,
+			beds = { 4, 7 },
+			scale = { 1, 1.8 },
+			bushes = 2,
+		}),
+		Hills = table.freeze({ n = 150, radius = { 50, 180 }, height = { 6, 30 } }),
+	}),
+
 	-- north-east: fields of crop rows, wind breaks of trees, a red barn, a silo and hay bales
 	Farm = table.freeze({
 		Rect = table.freeze({ x = 2150, z = -2150, w = 1000, d = 1000 }),
@@ -134,6 +153,9 @@ return table.freeze({
 		Gas = table.freeze({ pad = { 80, 46 }, canopy = { 44, 26, 15 }, shop = { 26, 16, 12 } }), -- w, d, h
 		GasRed = { 214, 58, 48 } :: RGB,
 	}),
+
+	-- terrain grass (hills, knolls) renders lighter than the ground part's Grass; this tint matches them (Studio)
+	TerrainGrass = { 66, 120, 50 } :: RGB,
 
 	-- a sidewalk along the outside of the city's outer road
 	OuterSidewalk = true,

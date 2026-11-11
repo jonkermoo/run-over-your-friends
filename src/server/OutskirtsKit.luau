@@ -13,6 +13,7 @@ local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local CountryKit = require(script.Parent.CountryKit)
 local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
+local WildsKit = require(script.Parent.WildsKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
 
@@ -217,8 +218,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local places: { Places.Place } = {}
 	local terrain = workspace.Terrain
 	terrain:Clear()
-	terrain:SetMaterialColor(Enum.Material.Grass, COLORS.grass)
-	terrain:SetMaterialColor(Enum.Material.Sand, COLORS.sand)
+	-- terrain grass draws lighter than the ground part's Grass, so it gets a darker tint to blend in
+	terrain:SetMaterialColor(Enum.Material.Grass, rgb(Country.TerrainGrass))
+	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
 	terrain.WaterColor = rgb(C.water)
 	terrain.WaterWaveSize = 0.08
@@ -800,7 +802,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			static,
 			Vector3.new(ds.w, 1, ds.d),
 			CFrame.new(ds.x, -0.43, ds.z),
-			COLORS.sand,
+			rgb(D.Floor),
 			Enum.Material.Sand
 		)
 		for _ = 1, D.Dunes do
@@ -825,6 +827,23 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				size,
 				Enum.Material.Sandstone
 			)
+		end
+		-- sandstone outcrops: a few rock balls half sunk in the sand, round the dunes
+		for _ = 1, D.Outcrops do
+			local x = ds.x + random:NextNumber(-ds.w / 2 + 40, ds.w / 2 - 40)
+			local z = ds.z + random:NextNumber(-ds.d / 2 + 40, ds.d / 2 - 40)
+			for _ = 1, random:NextInteger(2, 4) do
+				local r = random:NextNumber(D.OutcropSize[1], D.OutcropSize[2]) / 2
+				terrain:FillBall(
+					Vector3.new(
+						x + random:NextNumber(-14, 14),
+						-r * 0.3,
+						z + random:NextNumber(-14, 14)
+					),
+					r,
+					Enum.Material.Sandstone
+				)
+			end
 		end
 		local green = rgb(C.cactus)
 		for _ = 1, D.Cacti do
@@ -1180,6 +1199,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			random:NextNumber(M.HillHeight[1], M.HillHeight[2])
 		)
 	end
+	-- the last pass: knolls, pine stands, woods, hedgerows, wildflowers, more hills (Config/Country Fill)
+	WildsKit.fill(country, exclude)
 	return { walkPoints = walkPoints, places = places }
 end
 

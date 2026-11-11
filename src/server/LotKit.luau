@@ -9,6 +9,7 @@ local Cfg = require(ReplicatedStorage.Shared.Config.Lots)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Greenery = require(script.Parent.Greenery)
+local PaintKit = require(script.Parent.PaintKit)
 
 local LotKit = {}
 
@@ -36,14 +37,6 @@ local function part(
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Parent = parent
 	return p
-end
-
-local function paint(parent: Instance, size: Vector3, cf: CFrame)
-	local p = part(parent, size, cf, WHITE)
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.CastShadow = false
 end
 
 local function prop(folder: Instance, kind: string): Model
@@ -175,10 +168,17 @@ function LotKit.yard(
 	end
 	local rowLen = n * bw
 	local rowAt = centre + toward * (depth / 2 - Cfg.Edge - bd / 2)
-	local turn = CFrame.lookAt(Vector3.zero, toward)
+	-- the bay lines: one paint patch (lots are square to the world, so `toward` is along x or z)
+	local function world(a: number, t: number): (number, number)
+		local v = along * a + toward * t
+		return math.abs(v.X), math.abs(v.Z)
+	end
+	local px, pz = world(rowLen + 2, bd + 1)
+	local draw = PaintKit.patch(static, rowAt + Vector3.new(0, Cfg.Ground + 0.02, 0), px, pz)
+	local ex, ez = world(Cfg.Line, bd)
 	for k = 0, n do
-		local at = rowAt + along * (-rowLen / 2 + k * bw) + Vector3.new(0, Cfg.Ground, 0)
-		paint(static, Vector3.new(Cfg.Line, 0.05, bd), CFrame.new(at) * turn)
+		local o = along * (-rowLen / 2 + k * bw)
+		draw(o.X, o.Z, ex, ez, WHITE)
 	end
 	-- cars in random bays, nose to the building
 	local free = {}
@@ -343,12 +343,21 @@ function LotKit.warehouse(
 )
 	local along = Vector3.new(-out.Z, 0, out.X)
 	local D = Cfg.Dock
-	local turn = CFrame.lookAt(Vector3.zero, out)
 	local front = centre + out * (Crowd.WarehouseSize[2] / 2 + D.length / 2)
+	local span = math.max(table.unpack(D.bays)) - math.min(table.unpack(D.bays)) + D.lane + 2
+	local mid = (math.max(table.unpack(D.bays)) + math.min(table.unpack(D.bays))) / 2
+	local sizeV = along * span + out * D.length
+	local draw = PaintKit.patch(
+		static,
+		front + along * mid + Vector3.new(0, Cfg.Ground + 0.02, 0),
+		math.abs(sizeV.X),
+		math.abs(sizeV.Z)
+	)
+	local lineV = along * Cfg.Line + out * D.length
 	for _, x in D.bays do
 		for _, e in { -1, 1 } do
-			local at = front + along * (x + e * D.lane / 2) + Vector3.new(0, Cfg.Ground, 0)
-			paint(static, Vector3.new(Cfg.Line, 0.05, D.length), CFrame.new(at) * turn)
+			local o = along * (x - mid + e * D.lane / 2)
+			draw(o.X, o.Z, math.abs(lineV.X), math.abs(lineV.Z), WHITE)
 		end
 	end
 	for _, x in D.pallets do
