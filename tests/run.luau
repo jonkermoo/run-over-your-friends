@@ -2803,6 +2803,34 @@ do
 	)
 end
 
+-- the car parks: parked cars are real vehicle ids, the ramp lots keep their ramp's run clear
+local function checkLots()
+	local Lots = require("../src/shared/Config/Lots")
+	local VehicleIds = require("../src/shared/Config/Vehicles").ById
+	local Country = require("../src/shared/Config/Country")
+	local ok = true
+	for _, list in { Lots.Cars, Lots.LotCars } do
+		for _, id in list do
+			ok = ok and VehicleIds[id] ~= nil
+		end
+	end
+	check("parked cars are vehicles that exist", ok)
+	-- the ramp lot's south ramp stands at x 30 (MapBuilder), 30 wide; parked bays keep off it
+	local L = Country.Lot
+	local clear = true
+	for _, k in Lots.LotParked do
+		local x = L.Shift - L.Bays * L.Bay[1] / 2 + (k - 0.5) * L.Bay[1]
+		clear = clear and k >= 1 and k <= L.Bays and math.abs(x - 30) > 15 + L.Bay[1] / 2
+	end
+	check("ramp lots' parked cars keep clear of the south ramp", clear)
+	local yardsOk = true
+	for _, y in { Lots.ShopYard, Lots.OfficeLot, Lots.BurgerLot } do
+		yardsOk = yardsOk and y.cars <= y.bays and y.bays >= 1
+	end
+	check("yards park no more cars than they have bays", yardsOk)
+end
+checkLots()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
