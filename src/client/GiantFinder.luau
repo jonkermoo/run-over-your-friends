@@ -55,20 +55,29 @@ dist.Size = UDim2.new(1, 0, 0, 18)
 dist.ZIndex = 3
 Style.outline(dist, 2)
 
--- the light column, a local part only this player sees
-local beam = Instance.new("Part")
+-- the light column: a billboard (drawn like screen UI, so the air's haze can't wash it out from across
+-- the map), a fixed number of studs wide plus a few pixels so it never thins to nothing
+local beam = Instance.new("BillboardGui")
 beam.Name = "GiantBeam"
-beam.Shape = Enum.PartType.Cylinder -- along its X axis, turned upright below
-beam.Size = Vector3.new(G.BeamHeight, G.BeamWidth, G.BeamWidth)
-beam.Material = Enum.Material.Neon
-beam.Color = RED
-beam.Transparency = G.BeamTransparency
-beam.Anchored = true
-beam.CanCollide = false
-beam.CanQuery = false
-beam.CanTouch = false
-beam.CastShadow = false
-local UPRIGHT = CFrame.Angles(0, 0, math.pi / 2)
+beam.ResetOnSpawn = false
+beam.LightInfluence = 0
+beam.AlwaysOnTop = false -- buildings in front still hide its foot
+beam.Size = UDim2.new(G.BeamWidth, G.BeamMinPixels, G.BeamHeight, 0)
+beam.Enabled = false
+local glow = Instance.new("Frame")
+glow.Size = UDim2.fromScale(1, 1)
+glow.BackgroundColor3 = RED
+glow.BackgroundTransparency = G.BeamTransparency
+glow.BorderSizePixel = 0
+glow.Parent = beam
+local core = Instance.new("Frame")
+core.AnchorPoint = Vector2.new(0.5, 0)
+core.Position = UDim2.fromScale(0.5, 0)
+core.Size = UDim2.fromScale(G.BeamCore, 1)
+core.BackgroundColor3 = Color3.new(1, 1, 1)
+core.BackgroundTransparency = G.BeamTransparency
+core.BorderSizePixel = 0
+core.Parent = beam
 
 local giant: Model? = nil
 local scanAt = 0
@@ -88,7 +97,7 @@ end
 
 local function hide()
 	gui.Enabled = false
-	beam.Parent = nil
+	beam.Enabled = false
 end
 
 local function update()
@@ -105,8 +114,11 @@ local function update()
 		return
 	end
 	local top = head.Position + Vector3.new(0, head.Size.Y / 2, 0)
-	beam.CFrame = CFrame.new(top + Vector3.new(0, G.BeamHeight / 2, 0)) * UPRIGHT
-	beam.Parent = workspace
+	if beam.Adornee ~= head then
+		beam.Adornee = head
+		beam.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + G.BeamHeight / 2, 0)
+	end
+	beam.Enabled = true
 
 	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character.PrimaryPart
 	local from = if root then root.Position else cam.CFrame.Position
@@ -146,6 +158,11 @@ local function update()
 		local ky = if math.abs(d.Y) > 1e-3 then (center.Y - margin) / math.abs(d.Y) else math.huge
 		at, dir = center + d * math.min(kx, ky), d.Unit
 	end
+	-- never past the margin (a short window, or the head right at the top)
+	at = Vector2.new(
+		math.clamp(at.X, margin, vp.X - margin),
+		math.clamp(at.Y, margin, vp.Y - margin)
+	)
 	local pos = at / s
 	plate.Position = UDim2.fromOffset(pos.X, pos.Y)
 	-- the pointer sits where the plate's edge meets the way to the giant
@@ -157,7 +174,9 @@ local function update()
 end
 
 function GiantFinder.start()
-	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	gui.Parent = playerGui
+	beam.Parent = playerGui
 	RunService.RenderStepped:Connect(update)
 end
 

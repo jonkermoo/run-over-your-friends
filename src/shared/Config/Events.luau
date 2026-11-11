@@ -84,7 +84,9 @@ return table.freeze({
 	GiantFinder = table.freeze({
 		BeamHeight = 900, -- studs above the giant's head
 		BeamWidth = 10, -- studs
-		BeamTransparency = 0.25,
+		BeamMinPixels = 6, -- added on screen, so it stays a few pixels wide from across the map
+		BeamTransparency = 0.15,
+		BeamCore = 0.35, -- the white middle stripe, as a share of the width
 		HideWithin = 90, -- studs: closer than this the pointer hides and the name tag takes over
 		EdgeMargin = 70, -- layout px kept clear at the screen edge
 		AboveHead = 40, -- layout px: the on-screen marker sits this far above the giant's head
