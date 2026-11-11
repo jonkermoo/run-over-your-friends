@@ -9,10 +9,11 @@ return table.freeze({
 		Trunk = table.freeze({ 9, 14 }), -- height, shortest to tallest
 		TrunkWidth = 1.6,
 		Crown = table.freeze({ 9, 13 }), -- the main ball's size; two smaller lumps sit off its sides
-		Lumps = 0.65, -- the side lumps' size as a share of the main ball
+		Lumps = 0.65, -- the side lumps' size as a share of the main ball (baked into the Crown mesh)
+		CrownLift = 0.0575, -- the Crown mesh's box centre sits this far (in main-ball sizes) above the main ball
 	}),
 	Bush = table.freeze({ 4, 6.5 }),
-	FlowerBed = table.freeze({ width = 10, depth = 4, flowers = 7 }),
+	FlowerBed = table.freeze({ width = 10, depth = 4, bloomHeight = 1.8 }), -- the Blooms mesh is 10 x 4
 
 	Greens = table.freeze({
 		{ 70, 140, 70 },

@@ -20,6 +20,20 @@ function Buildings.pieces(length: number, maxPiece: number): { Span }
 	return out
 end
 
+-- `n` panels joined into runs of at most `per` (first panel 0-based, how many), spread evenly so no run is
+-- much shorter than the rest
+function Buildings.runs(n: number, per: number): { { first: number, count: number } }
+	local k = math.max(1, math.ceil(n / math.max(1, per) - 1e-9))
+	local out = {}
+	local at = 0
+	for r = 1, k do
+		local upto = math.floor(n * r / k + 0.5)
+		table.insert(out, { first = at, count = upto - at })
+		at = upto
+	end
+	return out
+end
+
 -- panel boundaries (1..n-1) that get a pilaster: every `every` panels, never on a corner
 function Buildings.pilasters(n: number, every: number): { number }
 	local out = {}

@@ -14,10 +14,9 @@ return table.freeze({
 		Connector = 80, -- the roads out to the stunt park and the port
 	}),
 
-	-- trees and every other cell a billboard, between the city and the ring
+	-- every other cell between the city and the ring gets a billboard (what else stands there: Config/Country)
 	RingCells = table.freeze({
 		BillboardEvery = 2,
-		Trees = 3,
 	}),
 
 	Stunt = table.freeze({

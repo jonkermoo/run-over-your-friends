@@ -17,7 +17,9 @@ local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
+local Country = require(ReplicatedStorage.Shared.Config.Country)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local CountryKit = require(script.Parent.CountryKit)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local OutskirtsKit = require(script.Parent.OutskirtsKit)
@@ -652,6 +654,8 @@ function MapBuilder.build(): Result
 					local at = centre + Vector3.new(c[1], 0, c[2]) * (inner / 2 - 16)
 					Greenery.tree(props, at, random)
 				end
+				-- market stalls round the edge (Config/Country Plaza)
+				CountryKit.plaza(props, centre, inner, random)
 			elseif kind == "homes" then
 				-- a street of family homes facing the north and south sidewalks, gardens behind
 				part(
@@ -761,6 +765,8 @@ function MapBuilder.build(): Result
 					8,
 					36
 				)
+				-- painted bays and lamps (Config/Country Lot)
+				CountryKit.lot(static, props, centre, inner)
 			end
 			-- the district's wall material on the walls of what was just built here
 			local wallMaterial = (Enum.Material :: any)[style.wallMaterial]
@@ -776,6 +782,38 @@ function MapBuilder.build(): Result
 						end
 					end
 				end
+			end
+		end
+	end
+
+	-- a sidewalk along the outside of the outer road, between the roads that run out to the ring
+	if Country.OuterSidewalk then
+		local SW = M.SidewalkWidth
+		local style = Streets.Districts.maple
+		local colour = Color3.fromRGB(style.sidewalk[1], style.sidewalk[2], style.sidewalk[3])
+		local mat = (Enum.Material :: any)[style.sidewalkMaterial]
+		for k = 0, M.BlocksX - 1 do
+			local x = x0 + R + k * pitch + B / 2
+			for _, s in { -1, 1 } do
+				part(
+					static,
+					Vector3.new(B, 1, SW),
+					CFrame.new(x, -0.42, s * (spanZ / 2 + SW / 2)),
+					colour,
+					mat
+				)
+			end
+		end
+		for k = 0, M.BlocksZ - 1 do
+			local z = z0 + R + k * pitch + B / 2
+			for _, s in { -1, 1 } do
+				part(
+					static,
+					Vector3.new(SW, 1, B),
+					CFrame.new(s * (spanX / 2 + SW / 2), -0.42, z),
+					colour,
+					mat
+				)
 			end
 		end
 	end

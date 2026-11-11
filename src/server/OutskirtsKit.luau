@@ -10,6 +10,8 @@ local Cfg = require(ReplicatedStorage.Shared.Config.Outskirts)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
+local CountryKit = require(script.Parent.CountryKit)
+local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
@@ -347,19 +349,26 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local RC = Cfg.RingCells
 	local inner = ring - RW / 2
 	local cellCount = 0
+	local country: CountryKit.Ctx = {
+		static = static,
+		buildings = buildings,
+		props = props,
+		random = random,
+		half = half,
+		seaEdge = seaEdge,
+		port = zones.port,
+		desert = zones.desert,
+		connectors = connectors,
+	}
+	local uses = Country.Cells.Uses
 	local function cell(x: number, z: number, w: number, d: number, out: Vector3)
 		cellCount += 1
-		for _ = 1, RC.Trees do
-			Greenery.tree(
-				props,
-				Vector3.new(
-					x + random:NextNumber(-w, w) * 0.35,
-					0,
-					z + random:NextNumber(-d, d) * 0.35
-				),
-				random
-			)
+		-- gas stations only where a billboard isn't (they'd stand in each other's way)
+		local use = uses[(cellCount - 1) % #uses + 1]
+		if use == "gas" and cellCount % RC.BillboardEvery == 0 then
+			use = "trees"
 		end
+		CountryKit.cell(country, use, x, z, w, d, out)
 		if cellCount % RC.BillboardEvery == 0 then
 			local depth = math.abs(out.X) * w + math.abs(out.Z) * d
 			local at = Vector3.new(x, 0, z) + out * (depth / 2 - 12)
@@ -387,6 +396,18 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		local d = roadZ[j + 1] - roadZ[j] - R
 		for _, s in { 1, -1 } do
 			cell(s * (ctx.spanX / 2 + bandX / 2), cz, bandX, d, Vector3.new(s, 0, 0))
+		end
+	end
+
+	-- the four corner cells, where the band turns
+	for _, sx in { 1, -1 } do
+		for _, sz in { 1, -1 } do
+			CountryKit.corner(
+				country,
+				sx * (ctx.spanX / 2 + bandX / 2),
+				sz * (ctx.spanZ / 2 + bandZ / 2),
+				math.min(bandX, bandZ)
+			)
 		end
 	end
 
@@ -1112,6 +1133,10 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	for _, c in connectors do
 		table.insert(exclude, c)
 	end
+	-- the countryside: hills past the edge, farm, motocross, beaches, forest (Config/Country)
+	for _, r in CountryKit.build(country) do
+		table.insert(exclude, r)
+	end
 	local function rng(): number
 		return random:NextNumber()
 	end
@@ -1139,6 +1164,21 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		water.Transparency = 0.15
 		water.Reflectance = 0.15
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
+	end
+	-- what's still open: strips of woods, then low hills between them (Config/Country Meadow)
+	local M = Country.Meadow
+	local woodRadius = CountryKit.beltLength * M.WoodScale[2] / 2
+	for _, w in Rules.clearSpots(half, exclude, M.Woods, woodRadius, W.Margin, rng) do
+		CountryKit.wood(country, w.x, w.z, random:NextNumber(M.WoodScale[1], M.WoodScale[2]))
+		table.insert(exclude, { x = w.x, z = w.z, w = woodRadius * 2, d = woodRadius * 2 })
+	end
+	for _, h in Rules.clearSpots(half, exclude, M.Hills, M.HillRadius[2], W.Margin, rng) do
+		CountryKit.hill(
+			h.x,
+			h.z,
+			random:NextNumber(M.HillRadius[1], M.HillRadius[2]),
+			random:NextNumber(M.HillHeight[1], M.HillHeight[2])
+		)
 	end
 	return { walkPoints = walkPoints, places = places }
 end

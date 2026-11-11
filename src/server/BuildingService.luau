@@ -149,6 +149,12 @@ end
 
 local breakListeners: { (Player, number) -> () } = {}
 
+-- how many pieces a part counts for: town buildings join a few wall panels into one part ("Pieces")
+local function worth(p: BasePart): number
+	local n = p:GetAttribute("Pieces")
+	return if typeof(n) == "number" then n else 1
+end
+
 -- called with the player and how many pieces they broke
 function BuildingService.onBreak(listener: (Player, number) -> ())
 	table.insert(breakListeners, listener)
@@ -179,7 +185,7 @@ function BuildingService.breakAt(
 					+ away * random:NextNumber(15, 35)
 					+ Vector3.new(0, random:NextNumber(5, 25), 0)
 			)
-			count += 1
+			count += worth(p)
 		end
 	end
 	if count == 0 then
@@ -214,7 +220,7 @@ function BuildingService.breakAt(
 			and p.Position.Y < ceiling
 		then
 			loosen(p, Vector3.new(random:NextNumber(-4, 4), 0, random:NextNumber(-4, 4)))
-			dropped += 1
+			dropped += worth(p)
 		end
 	end
 	Net.remote("Fx")
@@ -258,7 +264,7 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 			p:SetAttribute("Broken", true)
 			p.CanCollide = false
 			p.CanQuery = false
-			count += 1
+			count += worth(p)
 		end
 	end
 	local pay = CollapseRules.payout(count, COLLAPSE)

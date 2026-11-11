@@ -19,6 +19,9 @@ return table.freeze({
 		DoorHeight = 10,
 		CorniceEvery = 3, -- floors between cornice bands (pilasters run between them)
 		PilasterEvery = 2, -- panels between pilasters
+		-- above the lobby, this many panels share one spandrel and one pane of glass (fewer parts); each piece
+		-- still counts as that many when smashed (the "Pieces" attribute), so pay and goals don't change
+		UpperPanels = 3,
 		Parapet = 3,
 		Footprint = { 0.52, 0.75 }, -- tower width and depth, as a share of the block inside its sidewalks
 		Setback = 6, -- the tower's front stands this far in from its sidewalk; its car park fills the rest

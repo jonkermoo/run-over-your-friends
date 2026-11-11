@@ -17,7 +17,8 @@ local Vector3 = roblox.Vector3
 
 local raw, out = process.args[1], process.args[2]
 local factor = 1 / assert(tonumber(process.args[3]), "importer scale")
-local texture = roblox.Content.fromUri("rbxassetid://" .. assert(process.args[4], "palette image id"))
+local texture =
+	roblox.Content.fromUri("rbxassetid://" .. assert(process.args[4], "palette image id"))
 
 local source = roblox.deserializeModel(fs.readFile(raw))[1]
 local groups: { [string]: { any } } = {}
@@ -41,8 +42,16 @@ for id, parts in groups do
 		end
 		local half = p.Size * factor / 2
 		local c = p.CFrame.Position * factor
-		lo = Vector3.new(math.min(lo.X, c.X - half.X), math.min(lo.Y, c.Y - half.Y), math.min(lo.Z, c.Z - half.Z))
-		hi = Vector3.new(math.max(hi.X, c.X + half.X), math.max(hi.Y, c.Y + half.Y), math.max(hi.Z, c.Z + half.Z))
+		lo = Vector3.new(
+			math.min(lo.X, c.X - half.X),
+			math.min(lo.Y, c.Y - half.Y),
+			math.min(lo.Z, c.Z - half.Z)
+		)
+		hi = Vector3.new(
+			math.max(hi.X, c.X + half.X),
+			math.max(hi.Y, c.Y + half.Y),
+			math.max(hi.Z, c.Z + half.Z)
+		)
 	end
 	local origin = Vector3.new((lo.X + hi.X) / 2, lo.Y, (lo.Z + hi.Z) / 2)
 	local model = Instance.new("Model")
@@ -71,7 +80,16 @@ for id, parts in groups do
 		p.Parent = model
 	end
 	model.Parent = folder
-	print(string.format("%-10s %6.1f x %5.1f x %6.1f studs, %d parts", id, hi.X - lo.X, hi.Y - lo.Y, hi.Z - lo.Z, #parts))
+	print(
+		string.format(
+			"%-10s %6.1f x %5.1f x %6.1f studs, %d parts",
+			id,
+			hi.X - lo.X,
+			hi.Y - lo.Y,
+			hi.Z - lo.Z,
+			#parts
+		)
+	)
 end
 fs.writeFile(out, roblox.serializeModel({ folder }))
 print("wrote", out)

@@ -6,6 +6,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local P = require(ReplicatedStorage.Shared.Config.Parks)
 
+-- one-piece meshes (assets/Scenery.rbxm, tools/blender/export_scenery.py): a tree's crown and a bed's flowers
+-- are one part each instead of four and fourteen
+local MESHES = ReplicatedStorage:WaitForChild("SceneryModels")
+
 local Greenery = {}
 
 local function rgb(c: { number }): Color3
@@ -49,7 +53,26 @@ local function green(random: Random): Color3
 	return rgb(P.Greens[random:NextInteger(1, #P.Greens)])
 end
 
--- a leafy tree: a trunk and a crown of three lumps in two greens, turned a random way
+-- a template mesh from assets/Scenery.rbxm, scaled by `scale`, centred at `cf`
+function Greenery.mesh(
+	parent: Instance,
+	name: string,
+	scale: number,
+	cf: CFrame,
+	color: Color3
+): MeshPart
+	local template = MESHES:FindFirstChild(name)
+	assert(template and template:IsA("MeshPart"), `no scenery mesh "{name}" in assets/Scenery.rbxm`)
+	local m = template:Clone()
+	m.Size = m.Size * scale
+	m.CFrame = cf
+	m.Color = color
+	m.Material = Enum.Material.Grass
+	m.Parent = parent
+	return m
+end
+
+-- a leafy tree: a trunk and one crown (a main ball with two side lumps and a top lump), turned a random way
 function Greenery.tree(folder: Instance, at: Vector3, random: Random)
 	local T = P.Tree
 	local m = prop(folder, "Tree")
@@ -62,20 +85,16 @@ function Greenery.tree(folder: Instance, at: Vector3, random: Random)
 		Enum.Material.Wood
 	)
 	local r = random:NextNumber(T.Crown[1], T.Crown[2])
-	local top = at + Vector3.new(0, h + r * 0.25, 0)
-	local main, side = green(random), green(random)
-	ball(m, r, top, main)
-	local a = random:NextNumber(0, math.pi * 2)
-	for k = 0, 1 do
-		local dir = Vector3.new(math.cos(a + k * math.pi), 0, math.sin(a + k * math.pi))
-		ball(m, r * T.Lumps, top + dir * r * 0.4 + Vector3.new(0, -r * (0.1 + k * 0.1), 0), side)
-	end
-	ball(
+	-- the mesh's box is centred CrownLift main-ball sizes above the main ball's centre
+	local top = at + Vector3.new(0, h + r * (0.25 + T.CrownLift), 0)
+	local crown = Greenery.mesh(
 		m,
-		r * T.Lumps * 0.8,
-		top + Vector3.new(0, r * 0.38, 0),
-		main:Lerp(Color3.new(1, 1, 1), 0.08)
+		"Crown",
+		r,
+		CFrame.new(top) * CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0),
+		green(random)
 	)
+	crown.CanCollide = true
 end
 
 -- a low round bush of one or two balls
@@ -114,20 +133,14 @@ function Greenery.flowerBed(folder: Instance, at: Vector3, along: Vector3, rando
 		rgb(P.Soil),
 		Enum.Material.Ground
 	)
-	for k = 1, F.flowers do
-		local x = -F.width / 2 + (k - 0.5) * F.width / F.flowers
-		local z = random:NextNumber(-0.25, 0.25) * F.depth
-		local stem = cf * CFrame.new(x, 1.8, z)
-		block(m, Vector3.new(0.3, 1.2, 0.3), stem, rgb(P.Greens[1]))
-		local head = block(
-			m,
-			Vector3.one * 1.1,
-			stem * CFrame.new(0, 0.8, 0),
-			rgb(P.Flowers[random:NextInteger(1, #P.Flowers)])
-		)
-		head.Shape = Enum.PartType.Ball
-		head.CanCollide = false
-	end
+	Greenery.mesh(
+		m,
+		"Blooms",
+		1,
+		cf + Vector3.new(0, 1.25 + F.bloomHeight / 2, 0), -- 1.25: the soil's top (1.1 up, 0.3 thick)
+		rgb(P.Flowers[random:NextInteger(1, #P.Flowers)])
+	).Material =
+		Enum.Material.SmoothPlastic
 end
 
 return Greenery

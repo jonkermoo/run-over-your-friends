@@ -75,9 +75,10 @@ function TownKit.office(
 	local door = Vector3.new(centre.X, 0, centre.Z)
 	local sections = Rules.sections(floors, O.CorniceEvery)
 
-	local function glass(size: Vector3, cf: CFrame)
+	local function glass(size: Vector3, cf: CFrame): Part
 		local g = part(model, size, cf, glassColour, Enum.Material.Glass, 0.25)
 		g:SetAttribute("Glass", true)
+		return g
 	end
 
 	-- one face: `origin` is its left end on the ground, `length` along `along`, facing `outward`
@@ -187,18 +188,28 @@ function TownKit.office(
 						c.stone,
 						stoneMat
 					)
-				else
-					-- spandrel below, window band above
-					part(
+				end
+			end
+			if f > 0 then
+				-- spandrel below, window band above, a few panels to a piece
+				for _, run in Rules.runs(n, O.UpperPanels) do
+					local mid = origin + along * ((run.first + run.count / 2) * pw)
+					local cf = CFrame.lookAt(mid, mid + outward)
+					local width = run.count * pw
+					local s = part(
 						model,
-						Vector3.new(pw, sill, T),
+						Vector3.new(width, sill, T),
 						cf + Vector3.new(0, y0 + sill / 2, 0),
 						c.wall
 					)
-					glass(
-						Vector3.new(pw, FH - sill - 0.05, T * 0.6),
+					local g = glass(
+						Vector3.new(width, FH - sill - 0.05, T * 0.6),
 						cf + Vector3.new(0, y0 + sill + (FH - sill - 0.05) / 2, 0)
 					)
+					if run.count > 1 then
+						s:SetAttribute("Pieces", run.count)
+						g:SetAttribute("Pieces", run.count)
+					end
 				end
 			end
 		end

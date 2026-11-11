@@ -1099,6 +1099,57 @@ check("a band no longer than a piece stays whole", #BuildingRules.pieces(48, 48)
 local pil = BuildingRules.pilasters(8, 2)
 check("pilasters every 2 panels, never on a corner", #pil == 3 and pil[1] == 2 and pil[3] == 6)
 check("a narrow face gets no inner pilaster", #BuildingRules.pilasters(2, 2) == 0)
+-- upper office floors join panels into runs: every panel once, in order, none longer than the limit
+do
+	local ok = true
+	for n = 1, 13 do
+		for per = 1, 4 do
+			local runs = BuildingRules.runs(n, per)
+			local at = 0
+			for _, r in runs do
+				ok = ok and r.first == at and r.count >= 1 and r.count <= per
+				at += r.count
+			end
+			ok = ok and at == n and #runs == math.ceil(n / per)
+		end
+	end
+	check("office panel runs cover every panel once, at most UpperPanels each", ok)
+	check("a 7-panel face in runs of 3 is 3 pieces", #BuildingRules.runs(7, 3) == 3)
+end
+-- the countryside stays clear of the zones, the ring and the map's edge
+do
+	local Country = require("../src/shared/Config/Country")
+	local ringOuter = 8 * 284 / 2 + 32 + OutskirtsConfig.Ring.Gap + OutskirtsConfig.Ring.Width / 2
+	local zones = OutskirtsRules.zones(
+		ringOuter,
+		OutskirtsConfig.Stunt,
+		OutskirtsConfig.Port,
+		OutskirtsConfig.Desert,
+		OutskirtsConfig.Site
+	)
+	local function overlaps(p, q)
+		return math.abs(p.x - q.x) < (p.w + q.w) / 2 and math.abs(p.z - q.z) < (p.d + q.d) / 2
+	end
+	local ok = true
+	for _, r in { Country.Farm.Rect, Country.Moto.Rect, Country.Forest.Rect } do
+		for _, z in zones do
+			ok = ok and not overlaps(r, z)
+		end
+		ok = ok and not overlaps(r, { x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 })
+		ok = ok and math.abs(r.x) + r.w / 2 < 3000 and math.abs(r.z) + r.d / 2 < 3000
+	end
+	check("farm, motocross and forest miss the zones and the ring, inside the map", ok)
+	local odd = true
+	for k, use in Country.Cells.Uses do
+		if use == "gas" then
+			odd = odd and k % 2 == 1 and #Country.Cells.Uses % 2 == 0
+		end
+	end
+	check(
+		"gas stations fall on cells without a billboard",
+		odd and OutskirtsConfig.RingCells.BillboardEvery == 2
+	)
+end
 local secOk = true
 for floors = 1, 9 do
 	local secs = BuildingRules.sections(floors, BuildingConfig.Office.CorniceEvery)
