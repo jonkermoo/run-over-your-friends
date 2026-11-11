@@ -2,7 +2,8 @@
 -- Name tags over the city's friends and giants, built on this screen only so each player reads their own:
 -- "friend of You" for their own friends (road yellow, big and bold), "friend of <name>" for another
 -- player's friends (smaller, in one fixed colour per friend), and GIANT with the hits left. Tags keep
--- the same size on screen and fade out with distance from the camera.
+-- the same size on screen and fade out with distance from the camera. Your own friends also get a yellow
+-- outline (only where you can see them) and stay tagged further out.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,7 +21,9 @@ type Tag = {
 	gui: BillboardGui,
 	labels: { TextLabel },
 	strokes: { UIStroke },
-	giant: boolean,
+	from: number, -- fade starts this far from the camera (studs)
+	to: number,
+	outline: Highlight?, -- your own friends: a yellow outline, drawn only where you can see them
 }
 
 local tags: { [Model]: Tag } = {}
@@ -75,6 +78,9 @@ local function drop(m: Model)
 	local t = tags[m]
 	if t then
 		t.gui:Destroy()
+		if t.outline then
+			t.outline:Destroy()
+		end
 		tags[m] = nil
 	end
 end
@@ -101,6 +107,7 @@ local function build(m: Model)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + T.Lift * m:GetScale(), 0)
 
 	local name, sub, color, size, bold
+	local mine = false
 	if typeof(hp) == "number" then
 		name, sub, color, size, bold =
 			"GIANT",
@@ -109,7 +116,8 @@ local function build(m: Model)
 			T.GiantSize,
 			true
 	else
-		local line, mine = friendLine(m)
+		local line
+		line, mine = friendLine(m)
 		local id = m:GetAttribute("FriendId")
 		local pick = (if typeof(id) == "number" then id else 0) % #T.Others + 1
 		name, sub = string.upper(friendName :: string), line
@@ -130,11 +138,27 @@ local function build(m: Model)
 		table.insert(strokes, s)
 	end
 	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	-- a golden pedestrian keeps its gold glow instead (one highlight per character shows)
+	local outline: Highlight? = nil
+	if mine and not m:GetAttribute("Golden") then
+		local h = Instance.new("Highlight")
+		h.Name = "FriendOutline"
+		h.Adornee = m
+		h.FillTransparency = 1
+		h.OutlineColor = rgb(T.Mine)
+		h.DepthMode = Enum.HighlightDepthMode.Occluded
+		h.Enabled = false -- fade() turns it on in range
+		h.Parent = m
+		outline = h
+	end
+	local giant = typeof(hp) == "number"
 	tags[m] = {
 		gui = gui,
 		labels = { nameLabel, subLabel },
 		strokes = strokes,
-		giant = typeof(hp) == "number",
+		from = if giant then T.GiantFadeFrom elseif mine then T.MineFadeFrom else T.FadeFrom,
+		to = if giant then T.GiantFadeTo elseif mine then T.MineFadeTo else T.FadeTo,
+		outline = outline,
 	}
 end
 
@@ -161,28 +185,35 @@ local function watch(m: Model)
 		m:GetAttributeChangedSignal("FriendOf"):Connect(refresh),
 		m:GetAttributeChangedSignal("FriendName"):Connect(refresh),
 		m:GetAttributeChangedSignal("FriendOfName"):Connect(refresh),
+		m:GetAttributeChangedSignal("Golden"):Connect(refresh),
 	}
 	refresh()
 end
 
--- fade with distance; hidden while knocked down
+-- fade with distance; hidden while knocked down. Outlines go on the nearest friends in range only.
 local function fade()
 	local cam = workspace.CurrentCamera
 	if not cam then
 		return
 	end
 	local eye = cam.CFrame.Position
+	local outlined: { { h: Highlight, d: number } } = {}
 	for m, t in tags do
 		local head = t.gui.Adornee :: BasePart?
 		if not head or not head.Parent then
 			continue
 		end
-		local from = if t.giant then T.GiantFadeFrom else T.FadeFrom
-		local to = if t.giant then T.GiantFadeTo else T.FadeTo
 		local d = (head.Position - eye).Magnitude
-		local a = math.clamp((d - from) / (to - from), 0, 1)
+		local a = math.clamp((d - t.from) / (t.to - t.from), 0, 1)
 		local show = a < 1 and not m:GetAttribute("Down")
 		t.gui.Enabled = show
+		if t.outline then
+			t.outline.Enabled = false
+			if show then
+				t.outline.OutlineTransparency = a
+				table.insert(outlined, { h = t.outline, d = d })
+			end
+		end
 		if show then
 			for _, l in t.labels do
 				l.TextTransparency = a
@@ -191,6 +222,12 @@ local function fade()
 				s.Transparency = a
 			end
 		end
+	end
+	table.sort(outlined, function(x, y)
+		return x.d < y.d
+	end)
+	for i = 1, math.min(#outlined, T.MaxOutlines) do
+		outlined[i].h.Enabled = true
 	end
 end
 
