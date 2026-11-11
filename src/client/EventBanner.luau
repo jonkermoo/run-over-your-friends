@@ -1,12 +1,14 @@
 --!strict
 -- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
--- During a contest event the sign also lists the top 3 and your own place (the Contest remote, once a second).
+-- During a contest event a slim line under the sign shows the leader and your own place (the Contest remote,
+-- once a second).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local GuiService = game:GetService("GuiService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
@@ -30,12 +32,14 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 Style.fit(gui)
 
--- a road sign at the top centre with painted lane lines along its top and bottom edges
+-- a road sign at the top centre with painted lane lines along its top and bottom edges: one line (pill,
+-- title, timer) up in the empty middle of Roblox's top bar, and during a contest one slim line under it
+local Card = Config.Card
 local banner = Style.panel(gui)
 banner.Name = "Sign"
 banner.AnchorPoint = Vector2.new(0.5, 0)
-banner.Position = UDim2.new(0.5, 0, 0, 8)
-banner.Size = UDim2.fromOffset(250, 42)
+banner.Position = UDim2.new(0.5, 0, 0, Card.Gap)
+banner.Size = UDim2.fromOffset(Card.QuietWidth, Card.Height)
 banner.Visible = false
 local topLine = Style.dashes(banner, C.yellow)
 topLine.Position = UDim2.fromOffset(0, 3)
@@ -43,43 +47,33 @@ local bottomLine = Style.dashes(banner, C.yellow)
 bottomLine.AnchorPoint = Vector2.new(0, 1)
 bottomLine.Position = UDim2.new(0, 0, 1, -3)
 local pill = Style.pill(banner, "", C.ink)
-pill.Position = UDim2.fromOffset(12, 10)
-local title = Style.label(banner, "", 20, F.display, C.text)
-title.Position = UDim2.fromOffset(14, 10)
-title.Size = UDim2.new(1, -28, 0, 24)
+pill.AnchorPoint = Vector2.new(0, 0.5)
+pill.Position = UDim2.fromOffset(14, Card.Height / 2)
+local title = Style.label(banner, "", Card.TitleText, F.display, C.text)
+title.AnchorPoint = Vector2.new(0, 0.5)
+title.Position = UDim2.fromOffset(14, Card.Height / 2)
+title.Size = UDim2.new(1, -28, 0, Card.TitleText + 4)
 title.TextXAlignment = Enum.TextXAlignment.Left
-local text = Style.label(banner, "", 13, F.bold, C.text)
-text.Position = UDim2.fromOffset(14, 54)
-text.Size = UDim2.new(1, -28, 0, 16)
-text.TextXAlignment = Enum.TextXAlignment.Left
-text.TextTruncate = Enum.TextTruncate.AtEnd
-local timer = Style.label(banner, "", 18, F.display, C.yellow)
-timer.AnchorPoint = Vector2.new(1, 0)
-timer.Position = UDim2.new(1, -14, 0, 11)
-timer.Size = UDim2.fromOffset(150, 22)
+title.TextTruncate = Enum.TextTruncate.AtEnd
+local timer = Style.label(banner, "", Card.TimerText, F.display, C.yellow)
+timer.AnchorPoint = Vector2.new(1, 0.5)
+timer.Position = UDim2.new(1, -14, 0, Card.Height / 2)
+timer.Size = UDim2.fromOffset(150, Card.TimerText + 4)
 timer.TextXAlignment = Enum.TextXAlignment.Right
 
--- contest standings: one row per leader, then your own place
-local ROW = 18
--- px: on narrower screens the live sign is slimmer (so its X clears the cash box, top right) and a
--- contest lists only the leader and you
-local NARROW = 1000 -- real px (not layout px, so phones count)
-local SIGN_W, SIGN_W_NARROW = 380, 290
-local rows: { TextLabel } = {}
-for i = 1, Config.ContestShown do
-	local r = Style.label(banner, "", 14, F.heavy, C.text)
-	r.Position = UDim2.fromOffset(14, 74 + (i - 1) * ROW)
-	r.Size = UDim2.new(1, -28, 0, ROW)
-	r.TextXAlignment = Enum.TextXAlignment.Left
-	r.TextTruncate = Enum.TextTruncate.AtEnd
-	r.Visible = false
-	rows[i] = r
-end
-local you = Style.label(banner, "", 14, F.display, C.text)
-you.Size = UDim2.new(1, -28, 0, ROW)
-you.TextXAlignment = Enum.TextXAlignment.Left
-you.TextTruncate = Enum.TextTruncate.AtEnd
-you.Visible = false
+-- contest standings on one line: the leader on the left (a long name gets cut), your own place on the right
+local contest = Style.label(banner, "", Card.ContestText, F.heavy, C.text)
+contest.Position = UDim2.fromOffset(14, Card.Height - 6)
+contest.Size = UDim2.new(1, -28, 0, Card.ContestRow)
+contest.TextXAlignment = Enum.TextXAlignment.Left
+contest.TextTruncate = Enum.TextTruncate.AtEnd
+contest.Visible = false
+local contestYou = Style.label(banner, "", Card.ContestText, F.display, C.text)
+contestYou.AnchorPoint = Vector2.new(1, 0)
+contestYou.Position = UDim2.new(1, -14, 0, Card.Height - 6)
+contestYou.Size = UDim2.new(1, -28, 0, Card.ContestRow)
+contestYou.TextXAlignment = Enum.TextXAlignment.Right
+contestYou.Visible = false
 
 type Standings = {
 	key: string,
@@ -96,14 +90,14 @@ local shrunk = false
 local hide = Style.button(gui, "X", "dark", 18)
 hide.Name = "HideEvent"
 hide.BackgroundColor3 = C.panel
-hide.Size = UDim2.fromOffset(40, 40)
+hide.Size = UDim2.fromOffset(Card.Height - 4, Card.Height - 4)
 hide.Visible = false
 local chip = Style.button(gui, "", "dark", 18)
 chip.Name = "EventChip"
 chip.BackgroundColor3 = C.panel
 chip.AnchorPoint = Vector2.new(0.5, 0)
-chip.Position = UDim2.new(0.5, 0, 0, 8)
-chip.Size = UDim2.fromOffset(112, 44)
+chip.Position = UDim2.new(0.5, 0, 0, Card.Gap)
+chip.Size = UDim2.fromOffset(112, Card.Height)
 chip.Visible = false
 -- the chip's icon: a diamond road sign in the event's colour with a "!" on it
 local chipDot = Instance.new("Frame")
@@ -206,49 +200,41 @@ end
 
 local lastPhase, lastKey = "", ""
 
-local function showRows(on: boolean)
-	for _, r in rows do
-		r.Visible = on
-	end
-	you.Visible = on
-end
-
--- fills the standings rows; returns the extra height they need
+-- fills the contest line (the leader, then you); returns the extra height it needs
 local function fillStandings(event: Config.Event, ink: Color3): number
 	local c = event.contest
 	local s = standings
 	if not c or not s or s.key ~= event.key then
-		showRows(false)
+		contest.Visible, contestYou.Visible = false, false
 		return 0
 	end
-	showRows(true)
-	local function amount(n: number): string
-		return Contest.amount(n, c.unit)
+	contest.Visible, contestYou.Visible = true, true
+	contest.TextColor3, contestYou.TextColor3 = ink, ink
+	local lead = s.top[1]
+	if not lead then
+		contest.Text = "NO SCORES YET: BE THE FIRST!"
+		contestYou.Visible = false
+		contest.Size = UDim2.new(1, -28, 0, Card.ContestRow)
+		return Card.ContestRow - 2
 	end
-	-- on a narrow screen (Studio, phones) only the leader and you show, one row each and right-aligned
-	-- (the tutorial's job card, top left, covers the sign's left end there), so the sign stays short
-	local narrow = gui.AbsoluteSize.X < NARROW
-	local align = if narrow then Enum.TextXAlignment.Right else Enum.TextXAlignment.Left
-	you.TextXAlignment = align
-	for i, r in rows do
-		local e = s.top[i]
-		r.TextColor3 = ink
-		r.TextXAlignment = align
-		r.Visible = not narrow or i == 1
-		r.Text = if e
-			then `{Contest.ordinal(i)}   {e.name}   {amount(e.score)}`
-			else `{Contest.ordinal(i)}   -`
-	end
-	you.TextColor3 = ink
-	you.Text = if s.place > 0
-		then `YOU: {Contest.ordinal(s.place)} OF {s.count}   {amount(s.score)}`
+	local first = `1st {lead.name} {Contest.amount(lead.score, c.unit)}`
+	local mine = if s.place > 0
+		then `YOU: {Contest.ordinal(s.place)} OF {s.count}`
 		else "YOU: NOT SCORED YET"
-	if narrow then
-		you.Position = UDim2.fromOffset(14, 74 + ROW)
-		return 2 * ROW + 8
+	contest.Text = first
+	contestYou.Text = mine
+	contest.Size =
+		UDim2.new(1, -(28 + contestYou.TextBounds.X / Style.scale() + 12), 0, Card.ContestRow)
+	return Card.ContestRow - 2
+end
+
+-- the sign's top: centred in Roblox's top bar when it fits there, else just under it
+local function topY(): number
+	local bar = GuiService:GetGuiInset().Y / Style.scale()
+	if Card.InTopBar and bar >= Card.Height then
+		return -bar + (bar - Card.Height) / 2
 	end
-	you.Position = UDim2.fromOffset(14, 78 + Config.ContestShown * ROW)
-	return Config.ContestShown * ROW + ROW + 12
+	return Card.Gap
 end
 
 local function update()
@@ -267,6 +253,9 @@ local function update()
 	banner.Visible = not shrunk
 	hide.Visible = not shrunk
 	chip.Visible = shrunk
+	local y = topY()
+	banner.Position = UDim2.new(0.5, 0, 0, y)
+	chip.Position = UDim2.new(0.5, 0, 0, y)
 	local color = Style.colors[event.color] or C.gold
 	local left = endsAt - workspace:GetServerTimeNow()
 	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) then
@@ -281,51 +270,56 @@ local function update()
 		Style.setShadow(chip, if blink then C.text else C.ink)
 		return
 	end
-	-- the X sits just right of the sign
-	hide.Position = UDim2.new(0.5, banner.Size.X.Offset / 2 + 10, 0, 8)
 
+	local k = Style.scale()
 	if phase == "quiet" then
 		-- a slim asphalt sign: what's coming and when
-		banner.Size = UDim2.fromOffset(250, 42)
+		banner.Size = UDim2.fromOffset(Card.QuietWidth, Card.Height)
 		banner.BackgroundColor3 = C.panel
 		paintLines(C.yellow)
 		pill.Visible = false
-		text.Visible = false
-		showRows(false)
+		contest.Visible, contestYou.Visible = false, false
 		title.Text = "NEXT EVENT"
 		title.TextColor3 = C.text
-		title.Position = UDim2.fromOffset(14, 10)
+		title.Position = UDim2.fromOffset(14, Card.Height / 2)
 		timer.Text = fmt(left + Config.WarnSeconds)
 		timer.TextColor3 = C.yellow
 		Style.setShadow(banner, C.ink)
-		return
+	else
+		-- warn or live: the sign is painted the event's colour
+		local ink = inkOn(color)
+		local extra = if phase == "live" then fillStandings(event, ink) else 0
+		if phase ~= "live" then
+			contest.Visible, contestYou.Visible = false, false
+		end
+		local wide = gui.AbsoluteSize.X >= Card.NarrowPx
+		banner.Size =
+			UDim2.fromOffset(if wide then Card.Width else Card.WidthNarrow, Card.Height + extra)
+		banner.BackgroundColor3 = color
+		paintLines(ink)
+		pill.Visible = true
+		pill.Text = if phase == "live" then "LIVE" else "SOON"
+		pill.BackgroundColor3 = ink
+		pill.TextColor3 = color
+		title.Text = event.title
+		title.TextColor3 = ink
+		title.Position = UDim2.fromOffset(14 + pill.AbsoluteSize.X / k + 8, Card.Height / 2)
+		timer.Text = (if phase == "live" then "ENDS " else "IN ") .. fmt(left)
+		timer.TextColor3 = ink
+		-- the warning blinks its shadow
+		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
+		Style.setShadow(banner, if blink then C.text else C.ink)
 	end
-	-- warn or live: the sign is painted the event's colour
-	local ink = inkOn(color)
-	local extra = if phase == "live" then fillStandings(event, ink) else 0
-	if phase ~= "live" then
-		showRows(false)
-	end
-	banner.Size =
-		UDim2.fromOffset(if gui.AbsoluteSize.X < NARROW then SIGN_W_NARROW else SIGN_W, 80 + extra)
-	banner.BackgroundColor3 = color
-	paintLines(ink)
-	pill.Visible = true
-	pill.Text = if phase == "live" then "LIVE" else "SOON"
-	pill.BackgroundColor3 = ink
-	pill.TextColor3 = color
-	pill.Position = UDim2.fromOffset(14, 12)
-	title.Text = event.title
-	title.TextColor3 = ink
-	title.Position = UDim2.fromOffset(14, 30)
-	text.Visible = true
-	text.Text = event.text
-	text.TextColor3 = ink
-	timer.Text = (if phase == "live" then "ENDS " else "IN ") .. fmt(left)
-	timer.TextColor3 = ink
-	-- the warning blinks its shadow
-	local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
-	Style.setShadow(banner, if blink then C.text else C.ink)
+	-- the title stops short of the timer
+	title.Size = UDim2.new(
+		1,
+		-(title.Position.X.Offset + timer.TextBounds.X / k + 22),
+		0,
+		Card.TitleText + 4
+	)
+	-- the X sits just right of the sign's top line
+	hide.Position =
+		UDim2.new(0.5, banner.Size.X.Offset / 2 + 8, 0, y + (Card.Height - hide.Size.Y.Offset) / 2)
 end
 
 function EventBanner.start()

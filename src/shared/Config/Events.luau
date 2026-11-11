@@ -103,7 +103,22 @@ return table.freeze({
 	-- contests: places 1, 2, 3, then everyone else who scored at least once
 	ContestPrizes = table.freeze({ 5000, 3000, 2000 }),
 	ContestTakePart = 500,
-	ContestShown = 3, -- names on the banner
+	ContestShown = 3, -- standings sent to each player (the banner shows the leader and you)
+	-- the event sign (top centre, src/client/EventBanner): one line (LIVE pill, title, timer) sitting in the
+	-- empty middle of Roblox's top bar, plus one slim line under it during a contest. Layout px.
+	Card = table.freeze({
+		InTopBar = true, -- centred in the top bar; false puts it just under the bar
+		Gap = 8, -- the gap under the bar when InTopBar is false
+		Height = 42, -- the one-line sign (also NEXT EVENT and the shrunk chip)
+		Width = 360, -- warn / live sign
+		WidthNarrow = 320, -- on screens under NarrowPx real px wide (Studio, phones)
+		NarrowPx = 1000,
+		QuietWidth = 250, -- the NEXT EVENT sign
+		ContestRow = 20, -- the contest line under the sign
+		TitleText = 20,
+		TimerText = 18,
+		ContestText = 14,
+	}),
 	ContestSendSeconds = 1, -- standings to each player this often while one runs
 	ContestMinLaunch = 10, -- studs: shorter flings don't count for Fling Fest
 })
