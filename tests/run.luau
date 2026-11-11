@@ -2656,6 +2656,48 @@ do
 		not Layout.inThumbZone(600, 300, 848, 395, cfg)
 	)
 end
+do
+	local Rules = require("../src/shared/Rules/DriveHud")
+	local cfg = require("../src/shared/Config/DriveHud")
+	local function keyList(rows: { Rules.Row }): string
+		local list = {}
+		for _, r in rows do
+			table.insert(list, r.key)
+		end
+		return table.concat(list, ",")
+	end
+	check("drive hud: a plain car lists the basics", keyList(Rules.rows({})) == "WASD,SPACE,V,H,T")
+	check(
+		"drive hud: the unstuck row counts down",
+		Rules.rows({ unstuckWait = 4 })[5].label == "Unstuck (4)"
+	)
+	check(
+		"drive hud: a thruster car adds R",
+		keyList(Rules.rows({ thruster = true })) == "WASD,SPACE,V,H,T,R"
+	)
+	check(
+		"drive hud: a jet car lists its flight keys, not the thruster",
+		keyList(Rules.rows({ jet = true, thruster = true })) == "WASD,SPACE,V,H,T,SHIFT,Q/E,S,R"
+	)
+	check(
+		"drive hud: a taxi's G row reads Taxi!",
+		Rules.rows({ feature = "TAXI!" })[6].label == "Taxi!"
+	)
+	check(
+		"drive hud: the jingle row says what G does next",
+		Rules.rows({ feature = "JINGLE", jingleOn = true })[6].label == "Jingle off"
+	)
+	check(
+		"drive hud: the card is open on the first drives",
+		Rules.startsOpen(cfg.OpenDrives, false, cfg)
+	)
+	check("drive hud: then it folds", not Rules.startsOpen(cfg.OpenDrives + 1, false, cfg))
+	check(
+		"drive hud: returning players see it for fewer drives",
+		cfg.OpenDrivesReturning < cfg.OpenDrives
+			and not Rules.startsOpen(cfg.OpenDrivesReturning + 1, true, cfg)
+	)
+end
 local function checkPopups()
 	local Rules = require("../src/shared/Rules/Popups")
 	local Cfg = require("../src/shared/Config/Popups")
