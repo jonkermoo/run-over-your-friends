@@ -79,6 +79,23 @@ return table.freeze({
 	GiantHits = 5,
 	GiantHitPay = 1500,
 	GiantToppleBonus = 5000,
+	-- finding the giant from anywhere (client/GiantFinder): a light column over it and a pointer on the
+	-- screen edge with the distance. Colour: Config/Crowd Tags.Giant.
+	GiantFinder = table.freeze({
+		BeamHeight = 900, -- studs above the giant's head
+		BeamWidth = 10, -- studs
+		BeamTransparency = 0.25,
+		HideWithin = 90, -- studs: closer than this the pointer hides and the name tag takes over
+		EdgeMargin = 70, -- layout px kept clear at the screen edge
+		AboveHead = 40, -- layout px: the on-screen marker sits this far above the giant's head
+		PlateWidth = 104, -- layout px
+		PlateHeight = 50,
+		Pointer = 22, -- layout px: the diamond that points the way
+		ScanSeconds = 0.5, -- how often to look for the giant in the crowd
+		Unit = "m", -- distance label: one stud is one of these
+	}),
+	-- Studio only: set this workspace attribute to an event key (e.g. "Giant") to start that event now
+	StudioStartAttribute = "StartEvent",
 	StampedeExtraNpcs = 25,
 	StampedeMultiplier = 2,
 	-- contests: places 1, 2, 3, then everyone else who scored at least once
