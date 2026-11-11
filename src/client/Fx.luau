@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -207,26 +208,30 @@ end
 ---------------------------------------------------------------- big text
 
 -- combo words slam in right of centre, slanted, with two hard offset copies behind (pink, then ink)
-local function announce(word: string, color: Color3, sizeBoost: number, x: number?, y: number?)
-	local left, top = x or 0.66, y or 0.4
+local function announce(word: string, color: Color3, size: number, x: number?, y: number?)
+	local left, top = x or Callouts.ComboX, y or Callouts.ComboY
 	local slam = Instance.new("Frame")
 	slam.BackgroundTransparency = 1
 	slam.AnchorPoint = Vector2.new(0.5, 0.5)
 	slam.Position = UDim2.fromScale(left, top)
-	slam.Size = UDim2.fromOffset(700, 100)
+	slam.Size = UDim2.fromOffset(700, math.ceil(size * 1.5))
 	slam.Rotation = math.random(-8, -3)
 	slam.Parent = gui
-	local size = 64 + sizeBoost
+	local back = math.max(2, math.floor(size * 0.12 + 0.5)) -- the offset copies behind, in step with the size
 	local labels = {}
 	for i, look in
-		{ { C.ink, 10 }, { if color == C.pink then C.blue else C.pink, 5 }, { color, 0 } }
+		{
+			{ C.ink, back },
+			{ if color == C.pink then C.blue else C.pink, math.floor(back / 2) },
+			{ color, 0 },
+		}
 	do
 		local l = Style.label(slam, word, size, F.display, look[1])
 		l.Position = UDim2.fromOffset(look[2], look[2])
 		l.Size = UDim2.fromScale(1, 1)
 		l.ZIndex = i
 		if i == 3 then
-			Style.outline(l, 4)
+			Style.outline(l, 3)
 		end
 		table.insert(labels, l)
 	end
@@ -258,11 +263,13 @@ local function worldText(at: Vector3, text: string, color: Color3)
 	local bb = Instance.new("BillboardGui")
 	bb.Adornee = anchor
 	bb.AlwaysOnTop = true
-	bb.Size = UDim2.fromOffset(260, 60)
+	local k = Style.billboardScale()
+	local size = math.floor(Callouts.LandingSize * k + 0.5)
+	bb.Size = UDim2.fromOffset(size * 8, size * 2)
 	bb.Parent = playerGui
-	local l = Style.label(bb, text, 34, F.display, color)
+	local l = Style.label(bb, text, size, F.display, color)
 	l.Size = UDim2.fromScale(1, 1)
-	Style.outline(l, 3)
+	Style.outline(l, 2)
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
 	scale.Parent = l
@@ -332,7 +339,12 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 			task.delay(0.12, play, "Cash", nil, 1 + math.min(b, 8) * 0.06)
 			if b >= 2 then
 				local i = math.min(b, #COMBO_WORDS)
-				announce(COMBO_WORDS[i], COMBO_COLORS[i], math.min(b, 10) * 3)
+				local hits = math.min(b, Callouts.ComboMaxHits) - 2
+				announce(
+					COMBO_WORDS[i],
+					COMBO_COLORS[i],
+					math.floor(Callouts.ComboSize + hits * Callouts.ComboStep + 0.5)
+				)
 				play("Sting", nil, 0.9 + math.min(b, 10) * 0.05)
 			end
 		elseif near < 120 then
@@ -384,8 +396,8 @@ end
 
 -- the money shot, in the middle of the screen, with the till
 function Fx.announceBig(word: string, amount: string)
-	announce(word, C.yellow, 34, 0.5, 0.3)
-	announce(amount, C.money, 20, 0.5, 0.42)
+	announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigY)
+	announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountY)
 	play("Sting", nil, 0.85)
 	play("Cash", nil, 0.9)
 end

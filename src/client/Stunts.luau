@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Config = require(ReplicatedStorage.Shared.Config.Stunts)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
@@ -22,14 +23,14 @@ gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 Style.fit(gui)
 
-local ticker = Style.label(gui, "", 40, F.display, C.yellow)
+local ticker = Style.label(gui, "", Callouts.AirTickerSize, F.display, C.yellow)
 ticker.Name = "AirTicker"
 ticker.AnchorPoint = Vector2.new(0.5, 1)
 ticker.Position = UDim2.new(0.5, 0, 1, -140)
-ticker.Size = UDim2.fromOffset(320, 50)
+ticker.Size = UDim2.fromOffset(320, Callouts.AirTickerSize + 10)
 ticker.Rotation = -4
 ticker.Visible = false
-Style.outline(ticker, 3)
+Style.outline(ticker, 2)
 local scale = Instance.new("UIScale")
 scale.Parent = ticker
 

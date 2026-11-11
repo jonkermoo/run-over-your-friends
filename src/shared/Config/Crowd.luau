@@ -148,16 +148,16 @@ return table.freeze({
 		GiantFadeFrom = 120,
 		GiantFadeTo = 170,
 		Lift = 1.3, -- studs above the top of the head
-		Width = 320, -- tag box in pixels (text is centred in it)
-		Height = 80,
+		Width = 240, -- tag box in pixels (text is centred in it); world labels shrink on small screens
+		Height = 60,
 		FadeEvery = 0.1, -- seconds between fade updates
 		Mine = { 255, 208, 0 } :: RGB, -- your own friends: road yellow, big and bold
-		MineSize = 30, -- text height in pixels (name), sub-line is half
+		MineSize = 20, -- text height in pixels (name), sub-line is half
 		-- your own friends also get a yellow outline (only where you can see them) and a longer-range tag
 		MineFadeFrom = 80,
 		MineFadeTo = 110,
 		MaxOutlines = 12, -- outlines drawn at once, nearest first (Roblox draws at most 31 highlights)
-		OtherSize = 21, -- another player's friends: smaller, in one of these colours (fixed per friend)
+		OtherSize = 16, -- another player's friends: smaller, in one of these colours (fixed per friend)
 		Others = table.freeze({
 			{ 120, 220, 255 },
 			{ 255, 130, 200 },
@@ -167,7 +167,7 @@ return table.freeze({
 			{ 110, 240, 210 },
 		}) :: { RGB },
 		Giant = { 255, 84, 60 } :: RGB,
-		GiantSize = 36,
+		GiantSize = 24,
 	}),
 	Casual = table.freeze({
 		Shirts = table.freeze({

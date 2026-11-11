@@ -12,6 +12,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
+local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
@@ -186,11 +187,16 @@ edge.ZIndex = Z_ARROW
 edge.Parent = gui
 local edgeTurn = Instance.new("Frame")
 edgeTurn.BackgroundTransparency = 1
+edgeTurn.AnchorPoint = Vector2.new(0.5, 0.5)
+edgeTurn.Position = UDim2.fromScale(0.5, 0.5)
 edgeTurn.Size = UDim2.fromScale(1, 1)
 edgeTurn.ZIndex = Z_ARROW
 edgeTurn.Parent = edge
 local edgeBars = chevron(edgeTurn, UDim.new(0.5, 10), 28, 88, 26, Z_ARROW)
-local edgeText = label(edge, "", 18, BOLD, WHITE)
+local edgeScale = Instance.new("UIScale")
+edgeScale.Scale = Callouts.EdgeScale
+edgeScale.Parent = edgeTurn
+local edgeText = label(edge, "", Callouts.EdgeTextSize, BOLD, WHITE)
 edgeText.AnchorPoint = Vector2.new(0.5, 0.5)
 edgeText.Position = UDim2.fromScale(0.5, 0.5)
 edgeText.Size = UDim2.fromOffset(170, 24)
@@ -254,21 +260,21 @@ cheer.Parent = gui
 
 local function celebrate(title: string, subtitle: string)
 	cheer:Play()
-	local t = label(gui, title, 58, BOLD, GOLD)
+	local t = label(gui, title, Callouts.CheerSize, BOLD, GOLD)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
-	t.Position = UDim2.fromScale(0.5, 0.36)
-	t.Size = UDim2.fromOffset(760, 68)
+	t.Position = UDim2.fromScale(0.5, Callouts.CheerY)
+	t.Size = UDim2.fromOffset(760, Callouts.CheerSize + 10)
 	t.Rotation = -4
-	Style.outline(t, 4)
+	Style.outline(t, 3)
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
 	scale.Parent = t
 	-- the subtitle on a black paint strip
-	local s = label(gui, subtitle, 18, F.heavy, WHITE)
+	local s = label(gui, subtitle, Callouts.CheerSubSize, F.heavy, WHITE)
 	s.BackgroundColor3 = INK
 	s.BackgroundTransparency = 0
 	s.AnchorPoint = Vector2.new(0.5, 0.5)
-	s.Position = UDim2.new(0.5, 0, 0.36, 54)
+	s.Position = UDim2.new(0.5, 0, Callouts.CheerY, math.floor(Callouts.CheerSize * 0.95))
 	Style.fitText(s, 16, 5)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	-- confetti from the top of the screen
@@ -450,8 +456,10 @@ local function showTarget(target: Target?, root: BasePart?)
 	arrow.Enabled = true
 	paint(arrowBars, target.color)
 	arrowText.Text = target.text
-	arrowHolder.Position = UDim2.new(0.5, 0, 1, -14 + math.sin(t * 6) * 14)
-	arrowScale.Scale = math.clamp(cam.ViewportSize.Y / 720, 0.6, 1) * (1 + 0.06 * math.sin(t * 6))
+	arrowHolder.Position = UDim2.new(0.5, 0, 1, (-14 + math.sin(t * 6) * 14) * Callouts.ArrowScale)
+	arrowScale.Scale = Callouts.ArrowScale
+		* math.clamp(cam.ViewportSize.Y / 720, 0.6, 1)
+		* (1 + 0.06 * math.sin(t * 6))
 	if target.beacon then
 		beacon.Color = target.color
 		beacon.CFrame = CFrame.new(target.beacon + Vector3.new(0, Onboarding.BeaconHeight / 2, 0))
@@ -473,7 +481,8 @@ local function showTarget(target: Target?, root: BasePart?)
 		edgeTurn.Rotation = e.angle
 		-- the label sits on the screen side of the arrow, clear of its tip
 		local away = math.rad(e.angle + 90)
-		edgeText.Position = UDim2.new(0.5, -math.cos(away) * 82, 0.5, -math.sin(away) * 82)
+		local gap = Callouts.EdgeTextGap
+		edgeText.Position = UDim2.new(0.5, -math.cos(away) * gap, 0.5, -math.sin(away) * gap)
 		paint(edgeBars, target.color)
 		local metres = (target.at - root.Position).Magnitude / Vehicles.StudsPerMetre
 		edgeText.Text = `{target.text} {math.floor(metres)}M`

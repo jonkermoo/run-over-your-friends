@@ -102,7 +102,9 @@ local function build(m: Model)
 	gui.ResetOnSpawn = false
 	gui.LightInfluence = 0
 	gui.AlwaysOnTop = false
-	gui.Size = UDim2.fromOffset(T.Width, T.Height)
+	local k = Style.billboardScale() -- smaller on small screens, never unreadable
+	local height = math.floor(T.Height * k + 0.5)
+	gui.Size = UDim2.fromOffset(math.floor(T.Width * k + 0.5), height)
 	gui.SizeOffset = Vector2.new(0, 0.5) -- the tag sits on its bottom edge
 	gui.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + T.Lift * m:GetScale(), 0)
 
@@ -125,15 +127,16 @@ local function build(m: Model)
 		size = if mine then T.MineSize else T.OtherSize
 		bold = mine
 	end
-	local subSize = math.floor(size * 0.5 + 0.5)
-	local top = T.Height - size - subSize - 2
+	size = math.floor(size * k + 0.5)
+	local subSize = math.max(10, math.floor(size * 0.5 + 0.5))
+	local top = height - size - subSize - 2
 	local nameLabel = label(gui, name, Style.fonts.display, size, color, top)
 	local subLabel = label(gui, sub, Style.fonts.bold, subSize, Color3.new(1, 1, 1), top + size + 2)
 	local strokes = {}
 	for _, l in { nameLabel, subLabel } do
 		local s = Instance.new("UIStroke")
 		s.Color = INK
-		s.Thickness = if l == nameLabel then (if bold then 3 else 2) else 2
+		s.Thickness = if l == nameLabel and bold then 2 else 1.5
 		s.Parent = l
 		table.insert(strokes, s)
 	end

@@ -18,5 +18,9 @@ return table.freeze({
 	ThumbZoneWidth = 0.4,
 	ThumbZoneTop = 1 / 3,
 
+	-- world labels (name tags, the tutorial arrow's word, landing text) shrink with the UI on small screens,
+	-- but never below this, so their few words stay readable
+	BillboardMinScale = 0.8,
+
 	TapPad = 12, -- extra touch area around small buttons on touch screens
 })

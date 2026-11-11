@@ -50,6 +50,11 @@ function Style.scale(): number
 	return currentScale
 end
 
+-- the scale for world labels (BillboardGuis): they shrink with the UI but stay readable
+function Style.billboardScale(): number
+	return math.max(currentScale, LayoutConfig.BillboardMinScale)
+end
+
 -- draw this ScreenGui at the shared scale
 function Style.fit(gui: ScreenGui)
 	local s = Instance.new("UIScale")
