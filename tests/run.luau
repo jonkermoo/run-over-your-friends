@@ -2919,6 +2919,79 @@ local function checkCrumble()
 end
 checkCrumble()
 
+-- the car parks: parked cars are real vehicle ids, the ramp lots keep their ramp's run clear
+local function checkLots()
+	local Lots = require("../src/shared/Config/Lots")
+	local VehicleIds = require("../src/shared/Config/Vehicles").ById
+	local Country = require("../src/shared/Config/Country")
+	local ok = true
+	for _, list in { Lots.Cars, Lots.LotCars } do
+		for _, id in list do
+			ok = ok and VehicleIds[id] ~= nil
+		end
+	end
+	check("parked cars are vehicles that exist", ok)
+	-- the ramp lot's south ramp stands at x 30 (MapBuilder), 30 wide; parked bays keep off it
+	local L = Country.Lot
+	local clear = true
+	for _, k in Lots.LotParked do
+		local x = L.Shift - L.Bays * L.Bay[1] / 2 + (k - 0.5) * L.Bay[1]
+		clear = clear and k >= 1 and k <= L.Bays and math.abs(x - 30) > 15 + L.Bay[1] / 2
+	end
+	check("ramp lots' parked cars keep clear of the south ramp", clear)
+	local yardsOk = true
+	for _, y in { Lots.ShopYard, Lots.OfficeLot, Lots.BurgerLot } do
+		yardsOk = yardsOk and y.cars <= y.bays and y.bays >= 1
+	end
+	check("yards park no more cars than they have bays", yardsOk)
+end
+checkLots()
+
+-- the island (Config/Land): everything the old square map had stays on land inside the walls, and the suburbs
+-- fit inside the edge
+local function checkLand()
+	local LandCfg = require("../src/shared/Config/Land")
+	local Land = require("../src/shared/Rules/Land")
+	local Suburbs = require("../src/shared/Config/Suburbs")
+	local seaEdge = -2203 -- the port's quay (Outskirts zones at the default ring), as measured in Studio
+	check("the coast is straight along the beaches", Land.coast(LandCfg, seaEdge, 2999) == seaEdge)
+	check("the coast curves inland past them", Land.coast(LandCfg, seaEdge, 4000) > seaEdge + 200)
+	local inside = true
+	for _, p in
+		{
+			{ 2650, 2650 },
+			{ 2650, -2650 },
+			{ -1950, -2800 },
+			{ 2400, 0 },
+			{ 0, -2700 },
+			{ 0, 2700 },
+		}
+	do
+		inside = inside and Land.isLand(LandCfg, seaEdge, p[1], p[2], 200)
+	end
+	check("the old map's far corners are well inside the island", inside)
+	local outline = Land.outline(LandCfg, seaEdge, 120)
+	local ok = #outline == 120
+	for _, p in outline do
+		ok = ok and Land.inBounds(LandCfg, seaEdge, p.x * 0.99, p.z * 0.99)
+	end
+	check("the walls run round the bounds", ok)
+	local fits = true
+	for _, h in Suburbs.Hoods do
+		local dir = { x = h.dir[1], z = h.dir[2] }
+		local perp = { x = -dir.z, z = dir.x }
+		local ox, oz = math.abs(dir.z) * h.offset, math.abs(dir.x) * h.offset
+		for _, u in { h.start, h.start + h.length + Suburbs.Bulb + 60 } do
+			for _, v in { -h.half, h.half } do
+				local x, z = ox + dir.x * u + perp.x * v, oz + dir.z * u + perp.z * v
+				fits = fits and Land.isLand(LandCfg, seaEdge, x, z, 150)
+			end
+		end
+	end
+	check("every suburb's corners are on land, clear of the edge hills", fits)
+end
+checkLand()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

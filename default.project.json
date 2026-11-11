@@ -17,7 +17,11 @@
     },
     "Workspace": {
       "$properties": {
-        "StreamingEnabled": false
+        "StreamingEnabled": true,
+        "StreamingMinRadius": 512,
+        "StreamingTargetRadius": 2048,
+        "StreamOutBehavior": "Default",
+        "ModelStreamingBehavior": "Improved"
       }
     },
     "Lighting": {

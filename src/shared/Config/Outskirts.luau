@@ -77,11 +77,17 @@ return table.freeze({
 		Gap = 120,
 		Width = 1800,
 		Depth = 800,
-		Dunes = 34,
+		Dunes = 48,
 		DuneRadius = table.freeze({ 30, 80 }),
 		DuneSlope = table.freeze({ 20, 35 }), -- height as a percent of the dune's radius
-		Mesas = 4,
-		Cacti = 14,
+		Mesas = 7,
+		Cacti = 36,
+		Outcrops = 26, -- clusters of half-sunk sandstone balls (terrain)
+		OutcropSize = table.freeze({ 10, 26 }),
+		EdgeSpill = 160, -- ragged squares of sand past the floor's edges...
+		SpillSize = table.freeze({ 24, 90 }), -- ...this big...
+		SpillOut = 70, -- ...reaching this far out
+		TerrainSand = { 200, 162, 104 } :: RGB, -- dunes and outcrops: terrain sand draws lighter, so darker here
 	}),
 
 	Site = table.freeze({
@@ -94,22 +100,22 @@ return table.freeze({
 		FrameFloors = 4,
 		FrameSize = 80,
 		Cranes = 2,
-		DirtPiles = 10,
+		DirtPiles = 16,
 		PipeStacks = 3,
 		Cabins = 3,
-		Cones = 30,
-		Pallets = 12,
+		Cones = 48,
+		Pallets = 26,
 		Workers = 30, -- crowd spots
 	}),
 
 	-- the flat grass: groves of trees (props), ponds (flat discs) with a sandy bank
 	Wilds = table.freeze({
 		Margin = 20,
-		Groves = 22,
+		Groves = 50,
 		GroveRadius = 28,
 		GroveTrees = table.freeze({ 3, 5 }), -- fewest, most
-		Ponds = 6,
-		PondRadius = 34,
+		Ponds = 14,
+		PondRadius = 40,
 	}),
 
 	Colours = table.freeze({

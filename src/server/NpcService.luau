@@ -138,6 +138,7 @@ function NpcService.spawnGiant(at: Vector3): Model?
 	npc:ScaleTo(EventConfig.GiantScale * Game.BodyScale) -- GiantScale times an ordinary person
 	npc:PivotTo(CFrame.new(at + Vector3.new(0, 4 * EventConfig.GiantScale, 0)))
 	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
+	npc.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- every screen points at it (GiantFinder)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.WalkSpeed = 14

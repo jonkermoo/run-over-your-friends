@@ -18,14 +18,7 @@ function Streets.start()
 	task.spawn(function()
 		local map = workspace:WaitForChild("Map")
 		local props = map:WaitForChild("Props")
-		task.wait(2)
 		local lamps: { NS: { BasePart }, EW: { BasePart } } = { NS = {}, EW = {} }
-		for _, p in props:GetDescendants() do
-			local which = p:GetAttribute("Signal")
-			if p:IsA("BasePart") and (which == "NS" or which == "EW") then
-				table.insert(lamps[which], p)
-			end
-		end
 		local function set(list: { BasePart }, color: Color3)
 			for _, l in list do
 				l.Color = color
@@ -34,6 +27,30 @@ function Streets.start()
 		-- the phase comes from server time (Rules/Roads), so every screen and the traffic agree
 		local COLOURS = { green = GREEN, amber = AMBER, red = RED }
 		local shownNs, shownEw = "", ""
+		-- lamps stream in and out round the player: each one joins its list as it arrives, in the shown colour
+		local function add(p: Instance)
+			local which = p:GetAttribute("Signal")
+			if p:IsA("BasePart") and (which == "NS" or which == "EW") then
+				table.insert(lamps[which], p)
+				local shown = if which == "NS" then shownNs else shownEw
+				if COLOURS[shown] then
+					p.Color = COLOURS[shown]
+				end
+			end
+		end
+		local function remove(p: Instance)
+			for _, list in lamps do
+				local i = table.find(list, p :: any)
+				if i then
+					table.remove(list, i)
+				end
+			end
+		end
+		for _, p in props:GetDescendants() do
+			add(p)
+		end
+		props.DescendantAdded:Connect(add)
+		props.DescendantRemoving:Connect(remove)
 		while true do
 			local ns, ew = Roads.lights(workspace:GetServerTimeNow(), S)
 			if ns ~= shownNs then

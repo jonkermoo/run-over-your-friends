@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
+local PaintKit = require(script.Parent.PaintKit)
 local Places = require(script.Parent.Places)
 
 local StreetKit = {}
@@ -43,15 +44,6 @@ local function block(
 	return p
 end
 
-local function paint(parent: Instance, sx: number, sz: number, x: number, z: number, color: Color3)
-	local p =
-		block(parent, Vector3.new(sx, S.PaintThick, sz), CFrame.new(x, S.PaintHeight, z), color)
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.CastShadow = false
-end
-
 local function prop(folder: Instance, kind: string): Model
 	local m = Instance.new("Model")
 	m.Name = kind
@@ -79,9 +71,16 @@ end
 
 export type Grid = Routes.Grid
 
--- paint one road segment between two crossings; `alongX` for east-west roads
+-- paint one road segment between two crossings; `alongX` for east-west roads. All of a segment's paint is one
+-- PaintKit patch (one part instead of twenty).
 local function segment(parent: Instance, grid: Grid, centre: Vector3, alongX: boolean)
 	local B, R = grid.block, grid.road
+	local draw = PaintKit.patch(
+		parent,
+		Vector3.new(centre.X, S.PaintHeight, centre.Z),
+		if alongX then B else R,
+		if alongX then R else B
+	)
 	local function put(
 		along: number,
 		across: number,
@@ -90,9 +89,9 @@ local function segment(parent: Instance, grid: Grid, centre: Vector3, alongX: bo
 		color: Color3
 	)
 		if alongX then
-			paint(parent, lenAlong, lenAcross, centre.X + along, centre.Z + across, color)
+			draw(along, across, lenAlong, lenAcross, color)
 		else
-			paint(parent, lenAcross, lenAlong, centre.X + across, centre.Z + along, color)
+			draw(across, along, lenAcross, lenAlong, color)
 		end
 	end
 	local len = B - 2 * S.EndClear

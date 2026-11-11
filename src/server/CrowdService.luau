@@ -609,6 +609,7 @@ local function activate(p: Person, asFriend: boolean?): boolean
 	p.gait = nil
 	p.model = m
 	byModel[m] = p
+	m.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	m.Parent = folder
 	pcall(function()
 		root:SetNetworkOwner(nil)

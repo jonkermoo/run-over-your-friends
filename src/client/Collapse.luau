@@ -198,6 +198,10 @@ local function start(building: Model, at: Vector3, push: Vector3, pay: number, u
 		Fx.feelCollapse(at, false, near)
 	end
 
+	-- a building streamed out on this screen arrives as nil: the feel and the pay above are all it gets
+	if typeof(building) ~= "Instance" then
+		return
+	end
 	local parts: { BasePart } = {}
 	local minY, maxY = math.huge, -math.huge
 	for _, p in building:GetDescendants() do

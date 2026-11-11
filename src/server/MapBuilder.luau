@@ -22,6 +22,10 @@ local World = require(ReplicatedStorage.Shared.Config.World)
 local CountryKit = require(script.Parent.CountryKit)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
+local LotKit = require(script.Parent.LotKit)
+local TowerKit = require(script.Parent.TowerKit)
+local SuburbKit = require(script.Parent.SuburbKit)
+local Lots = require(ReplicatedStorage.Shared.Config.Lots)
 local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
@@ -54,6 +58,8 @@ local COLORS = {
 }
 
 local random = Random.new(M.Seed)
+-- the car parks' life (LotKit) rolls its own numbers, so the rest of the map stays as it was
+local lotRandom = Random.new(M.Seed + 1)
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -440,8 +446,9 @@ function MapBuilder.build(): Result
 				f.Parent = static
 				paintPlaza(static, cx, cz, inner)
 				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
-				local boards = Instance.new("Folder")
+				local boards = Instance.new("Model")
 				boards.Name = "Boards"
+				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
 				boards.Parent = static
 				-- a sign gantry over them: a road-yellow beam on two black posts
 				local gz = cz - B / 2 + 5
@@ -484,9 +491,13 @@ function MapBuilder.build(): Result
 				addPlace(Places.open("spawn", centre, crowdPoints), i, j)
 			elseif kind == "office" then
 				-- office towers in the town style: a stone lobby with a door, window bands, the name on the roof
+				local OF = BuildingConfig.Office
 				local floors = if distFromCentre < 2.5
 					then random:NextInteger(5, 9)
 					else random:NextInteger(3, 5)
+				if distFromCentre < OF.DowntownReach then
+					floors = lotRandom:NextInteger(OF.DowntownFloors[1], OF.DowntownFloors[2])
+				end
 				local fp = BuildingConfig.Office.Footprint
 				local w = random:NextNumber(fp[1], fp[2]) * inner
 				local d = random:NextNumber(fp[1], fp[2]) * inner
@@ -506,6 +517,16 @@ function MapBuilder.build(): Result
 						COLORS.road,
 						Enum.Material.Asphalt
 					)
+					LotKit.yard(
+						static,
+						props,
+						centre - out * (inner / 2 - lot / 2),
+						out,
+						inner,
+						lot,
+						Lots.OfficeLot,
+						lotRandom
+					)
 				end
 				local wall = wallColour()
 				local look = (BuildingConfig.Office.Looks :: any)[district] :: BuildingConfig.OfficeLook
@@ -515,9 +536,22 @@ function MapBuilder.build(): Result
 					accent = rgb(style.accent),
 					roof = rgb(look.roof),
 					stone = rgb(look.stone),
+					glass = rgb(OF.Tints[(offices * 5) % #OF.Tints + 1]),
 				}
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
+				-- its own crown, taken in turn so neighbours differ (TowerKit)
+				TowerKit.crown(
+					model,
+					OF.Crowns[(offices - 1) % #OF.Crowns + 1],
+					tower,
+					w,
+					d,
+					out,
+					floors * M.FloorHeight,
+					colours :: any,
+					lotRandom
+				)
 				-- the company name and a parody billboard stand on the roof, behind the parapet
 				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
 				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
@@ -570,6 +604,21 @@ function MapBuilder.build(): Result
 						"Shop" .. count
 					)
 					addPlace(place, i, j)
+					local shopModel = buildings:FindFirstChild("Shop" .. count)
+					if shopModel and shopModel:IsA("Model") then
+						LotKit.shopBack(
+							shopModel,
+							centre
+								+ Vector3.new(
+									-inner / 2 + (k + 0.5) * fw,
+									0.12,
+									z - SH.Depth / 2 - Lots.Back.WallOut
+								),
+							Vector3.new(0, 0, -1),
+							fw,
+							lotRandom
+						)
+					end
 				end
 				local yard = inner - SH.Setback - SH.Depth - 4
 				part(
@@ -578,6 +627,16 @@ function MapBuilder.build(): Result
 					CFrame.new(cx, -0.39, cz - inner / 2 + yard / 2),
 					COLORS.road,
 					Enum.Material.Asphalt
+				)
+				LotKit.yard(
+					static,
+					props,
+					Vector3.new(cx, 0, cz - inner / 2 + yard / 2),
+					Vector3.new(0, 0, 1),
+					inner,
+					yard,
+					Lots.ShopYard,
+					lotRandom
 				)
 				for k = 0, 5 do
 					table.insert(
@@ -696,6 +755,18 @@ function MapBuilder.build(): Result
 								"Home" .. count
 							)
 							addPlace(home, i, j)
+							-- detached homes get a back garden: a tree, a fence, maybe a pool (SuburbKit)
+							if t.perLot == 1 then
+								SuburbKit.garden(
+									static,
+									props,
+									centre + Vector3.new(x, 0, z),
+									out,
+									t.width,
+									t.depth,
+									lotRandom
+								)
+							end
 						end
 					end
 				end
@@ -724,6 +795,17 @@ function MapBuilder.build(): Result
 				)
 				local lotAt = centre - out * (inner * 0.32) + Vector3.new(0, -0.37, 0)
 				part(static, lotSize, CFrame.new(lotAt), COLORS.road, Enum.Material.Asphalt)
+				LotKit.yard(
+					static,
+					props,
+					Vector3.new(lotAt.X, 0, lotAt.Z),
+					out,
+					inner,
+					inner * 0.36,
+					Lots.BurgerLot,
+					lotRandom
+				)
+				LotKit.picnic(props, centre + out * (inner / 2 - 20), out, Crowd.RestaurantSize[1])
 				local D = Crowd.RestaurantSize[2]
 				addPlace(
 					Places.restaurant(buildings, centre + out * (inner / 2 - D / 2 - 20), out),
@@ -740,6 +822,7 @@ function MapBuilder.build(): Result
 					Enum.Material.Concrete
 				)
 				addPlace(Places.warehouse(buildings, centre, towardSpawn(i, j)), i, j)
+				LotKit.warehouse(static, props, centre, towardSpawn(i, j), inner / 2, lotRandom)
 			else
 				-- parking lot with launch ramps
 				part(
@@ -767,6 +850,7 @@ function MapBuilder.build(): Result
 				)
 				-- painted bays and lamps (Config/Country Lot)
 				CountryKit.lot(static, props, centre, inner)
+				LotKit.rampLot(props, centre, Country.Lot, lotRandom)
 			end
 			-- the district's wall material on the walls of what was just built here
 			local wallMaterial = (Enum.Material :: any)[style.wallMaterial]
@@ -854,6 +938,9 @@ function MapBuilder.build(): Result
 	for _, place in outskirts.places do
 		table.insert(places, place)
 	end
+	for _, p in outskirts.spawnPoints do
+		table.insert(spawnPoints, p)
+	end
 
 	-- subtle materials on the buildings' plain plastic (World.Surfaces); materials only, no new parts
 	local S = World.Surfaces
@@ -920,6 +1007,14 @@ function MapBuilder.build(): Result
 	bloom.Threshold = look.BloomThreshold
 	bloom.Parent = Lighting
 
+	-- streaming: a building or prop arrives whole (smashing, collapses and rooms read all its parts)
+	for _, folder in { buildings, props } do
+		for _, m in folder:GetChildren() do
+			if m:IsA("Model") and m.ModelStreamingMode == Enum.ModelStreamingMode.Default then
+				m.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+			end
+		end
+	end
 	map.Parent = workspace
 	return {
 		buildings = buildings,

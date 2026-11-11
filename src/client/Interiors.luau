@@ -1459,15 +1459,6 @@ function Interiors.start()
 		local builtHouses: { [Model]: Furnished } = {}
 		local builtTown: { [Model]: Furnished } = {}
 		task.wait(1)
-		for _, m in buildings:GetChildren() do
-			if m:IsA("Model") then
-				if m:GetAttribute("HouseType") then
-					table.insert(houses, m)
-				elseif m:GetAttribute("Interior") then
-					table.insert(town, m)
-				end
-			end
-		end
 		easeIndoors(builtTown)
 		-- a building that comes down takes its rooms with it at once, not at the next upkeep pass
 		local function dropWhenCollapsed(model: Model, built: { [Model]: Furnished })
@@ -1479,12 +1470,39 @@ function Interiors.start()
 				end
 			end)
 		end
-		for _, model in houses do
-			dropWhenCollapsed(model, builtHouses)
+		-- buildings stream in and out round the player, so the lists follow them (a building streamed back in is
+		-- a new instance; the old one's rooms go with it)
+		local function add(m: Instance)
+			if not m:IsA("Model") then
+				return
+			end
+			if m:GetAttribute("HouseType") then
+				table.insert(houses, m)
+				dropWhenCollapsed(m, builtHouses)
+			elseif m:GetAttribute("Interior") then
+				table.insert(town, m)
+				dropWhenCollapsed(m, builtTown)
+			end
 		end
-		for _, model in town do
-			dropWhenCollapsed(model, builtTown)
+		local function remove(m: Instance)
+			for _, pair in { { houses, builtHouses }, { town, builtTown } } do
+				local list, built = pair[1] :: { Model }, pair[2] :: { [Model]: Furnished }
+				local i = table.find(list, m :: any)
+				if i then
+					table.remove(list, i)
+				end
+				local entry = built[m :: any]
+				if entry then
+					entry.folder:Destroy()
+					built[m :: any] = nil
+				end
+			end
 		end
+		for _, m in buildings:GetChildren() do
+			add(m)
+		end
+		buildings.ChildAdded:Connect(add)
+		buildings.ChildRemoved:Connect(remove)
 		while true do
 			task.wait(1)
 			local camera = workspace.CurrentCamera

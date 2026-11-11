@@ -10,8 +10,9 @@ export type Colours = { wall: RGB, trim: RGB, accent: RGB, roof: RGB, material: 
 return table.freeze({
 	-- trim bands are laid in pieces no longer than this, so a hit knocks out a piece, not a whole strip
 	BandPiece = 48,
-	-- the whole map, measured in Studio; the restyle must keep it under this
-	PartBudget = 34000,
+	-- the whole map, measured in Studio (about 87,000 with the suburbs); with streaming on, each player only
+	-- loads what is near them, so this caps the server's map, not a phone's
+	PartBudget = 100000,
 
 	Office = table.freeze({
 		PanelWidth = 16, -- wider than other buildings: big windows, fewer parts
@@ -27,6 +28,35 @@ return table.freeze({
 		Setback = 6, -- the tower's front stands this far in from its sidewalk; its car park fills the rest
 		Glass = { 96, 140, 170 } :: RGB,
 		StoneMaterial = "Limestone", -- the lobby floor
+		-- every tower gets its own glass tint and a crown on the back half of its roof (TowerKit), taken in
+		-- turn so neighbours differ; the towers this close to the middle of town (in blocks) stand taller
+		Tints = table.freeze({
+			{ 96, 140, 170 },
+			{ 80, 150, 140 },
+			{ 150, 122, 92 },
+			{ 150, 162, 178 },
+			{ 66, 98, 140 },
+			{ 120, 160, 120 },
+		}) :: { RGB },
+		Crowns = table.freeze({
+			"penthouse",
+			"spire",
+			"garden",
+			"pyramid",
+			"helipad",
+			"watertower",
+			"fins",
+			"dome",
+		}),
+		DowntownReach = 1.5,
+		DowntownFloors = { 10, 13 },
+		RoofTrees = table.freeze({ trunk = { 5, 8 }, crown = { 7, 10 }, shade = 0.25 }), -- the roof garden's
+		CrownColours = table.freeze({
+			copper = { 92, 158, 132 },
+			water = { 132, 96, 64 },
+			pad = { 58, 60, 66 },
+			grass = { 92, 150, 70 },
+		}),
 		-- trim, lobby stone and roof per district; the accent is the district's accent
 		Looks = table.freeze({
 			neon = table.freeze({

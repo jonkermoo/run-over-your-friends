@@ -165,6 +165,9 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	VehicleService.despawn(player)
 
 	local model = VehicleBuilder.build(id)
+	-- the driver's own car never streams out under them; everyone else gets it whole (like Atomic)
+	model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer
+	model:AddPersistentPlayer(player)
 	VehicleBuilder.paint(model, PaintRules.colour(id, profile.paint[id]))
 	local _, size = model:GetBoundingBox()
 	local ignore = { character, folder }
