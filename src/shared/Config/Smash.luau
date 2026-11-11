@@ -65,8 +65,8 @@ return table.freeze({
 		MinCell = 1.6, -- studs: the smallest brick
 		MaxGrid = 300, -- most cells one wall is cut into
 		Ragged = 0.35, -- share of the hole's radius each cell's edge wanders in or out, for a broken edge
-		MaxFly = 16, -- most bricks one broken wall throws
-		Budget = 220, -- most bricks one break throws in all (shared out over the walls it breaks)
+		MaxFly = 28, -- most bricks one broken wall throws
+		Budget = 260, -- most bricks one break throws in all (shared out over the walls it breaks)
 		PropFly = 4, -- most pieces one part of a lamp post, bench or sign breaks into
 		-- server: leftover blocks are real parts until their building rebuilds
 		MaxStay = 12, -- a wall that would stand on as more blocks than this comes down whole
@@ -79,7 +79,8 @@ return table.freeze({
 		FarStuds = 700, -- breaks further from the camera than this throw no bricks (just the dust)
 		Shrink = { 0.72, 0.95 }, -- share of its cell a brick fills, so they read as rubble, not a grid
 		Shade = 0.12, -- most a brick's colour drifts darker or lighter
-		PushShare = 0.55, -- share of the hitter's velocity the bricks carry on with
+		PushShare = 0.55, -- share of the hitter's velocity the bricks carry on with...
+		PushSpread = { 0.1, 1 }, -- ...times this, per brick: some spill down at the hole, some fly on in
 		DropScatter = 0.15, -- share of Out and Up the walls falling from above the hit get (they mostly drop)
 		PropPush = 0.8, -- share of the hitter's velocity a lamp post's or bench's pieces carry on with
 		PropLift = 12, -- studs/s up on top
@@ -88,7 +89,7 @@ return table.freeze({
 		Spin = 6, -- radians/s, most in each axis
 		SettleAfter = 1.5, -- seconds: from then a brick that has nearly stopped is frozen in place (no physics)
 		SettleSpeed = 2.5, -- studs/s
-		LifeSeconds = { 6, 9 }, -- a brick lies this long...
+		LifeSeconds = { 8, 12 }, -- a brick lies this long...
 		SinkSeconds = 1.2, -- ...then sinks into the ground over this long and goes back to the pool
 	}),
 })

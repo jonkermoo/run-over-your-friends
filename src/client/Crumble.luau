@@ -126,7 +126,7 @@ end
 local function launch(p: BasePart, at: Vector3, push: Vector3, scatter: number)
 	local away = p.Position - at
 	away = if away.Magnitude > 0.1 then away.Unit else Vector3.yAxis
-	p.AssemblyLinearVelocity = push
+	p.AssemblyLinearVelocity = push * between(CFG.PushSpread)
 		+ (away * between(CFG.Out) + Vector3.new(0, between(CFG.Up), 0)) * scatter
 	p.AssemblyAngularVelocity = Vector3.new(
 		random:NextNumber(-CFG.Spin, CFG.Spin),
