@@ -22,15 +22,100 @@ local function count(random: Random, range: { number }): number
 	return random:NextInteger(range[1], range[2])
 end
 
+-- the lakes (Config/Country Lakes): a wobbly bowl of terrain water with a sandy shore, trees round it; each
+-- joins `exclude`
+function WildsKit.lakes(ctx: CountryKit.Ctx, exclude: { Rules.Rect })
+	local terrain = workspace.Terrain
+	local random = ctx.random
+	for _, L in Country.Lakes do
+		local p1, p2 = random:NextNumber(0, math.pi * 2), random:NextNumber(0, math.pi * 2)
+		local function edgeAt(a: number): number
+			return L.r * (1 + 0.18 * math.sin(2 * a + p1) + 0.1 * math.sin(5 * a + p2))
+		end
+		local reach = L.r * (1.28 + Country.LakeBeach)
+		local x0, z0 = math.floor((L.x - reach) / 4) * 4, math.floor((L.z - reach) / 4) * 4
+		local span = math.ceil(reach * 2 / 4) * 4
+		local y0 = -4 * math.ceil((Country.LakeDepth + 8) / 4)
+		local region = Region3.new(Vector3.new(x0, y0, z0), Vector3.new(x0 + span, 4, z0 + span))
+		local mats, occs = terrain:ReadVoxels(region, 4)
+		local size = mats.Size
+		for i = 1, size.X do
+			local dx = x0 + (i - 0.5) * 4 - L.x
+			for k = 1, size.Z do
+				local dz = z0 + (k - 0.5) * 4 - L.z
+				local d = math.sqrt(dx * dx + dz * dz)
+				local e = edgeAt(math.atan2(dz, dx))
+				local f = d / e
+				if f < 1 + Country.LakeBeach then
+					local bed = if f < 1
+						then -Country.LakeDepth * (1 + math.cos(math.pi * f)) / 2 - 0.5
+						else 0
+					for j = 1, size.Y do
+						local bottom = y0 + (j - 1) * 4
+						if bottom >= 0 then
+							continue
+						end
+						if f >= 1 then
+							-- the dry shore: sand where the ground is
+							if occs[i][j][k] > 0 then
+								mats[i][j][k] = Enum.Material.Sand
+							end
+						elseif bottom >= -4 or bottom >= bed then
+							-- the top layer is always water inside the edge, and so is everything above the bed
+							mats[i][j][k], occs[i][j][k] = Enum.Material.Water, 1
+						else
+							-- the bed: solid up to `bed`; a voxel it barely reaches stays water (they can't share)
+							local occ = math.clamp((bed - bottom) / 4, 0, 1)
+							if occ < 0.5 then
+								mats[i][j][k], occs[i][j][k] = Enum.Material.Water, 1
+							else
+								mats[i][j][k], occs[i][j][k] = Enum.Material.Sand, occ
+							end
+						end
+					end
+				end
+			end
+		end
+		-- a voxel keeps its solid part when water is written into it (shorelines), so the water's voxels are
+		-- cleared to air first, then filled (measured in Studio)
+		local wet: { Vector3 } = {}
+		for i = 1, size.X do
+			for j = 1, size.Y do
+				for k = 1, size.Z do
+					if mats[i][j][k] == Enum.Material.Water then
+						table.insert(wet, Vector3.new(i, j, k))
+						mats[i][j][k], occs[i][j][k] = Enum.Material.Air, 0
+					end
+				end
+			end
+		end
+		terrain:WriteVoxels(region, 4, mats, occs)
+		for _, v in wet do
+			mats[v.X][v.Y][v.Z], occs[v.X][v.Y][v.Z] = Enum.Material.Water, 1
+		end
+		terrain:WriteVoxels(region, 4, mats, occs)
+		for _ = 1, Country.LakeTrees do
+			local a = random:NextNumber(0, math.pi * 2)
+			local d = edgeAt(a) * (1 + Country.LakeBeach) + random:NextNumber(8, 40)
+			Greenery.tree(
+				ctx.props,
+				Vector3.new(L.x + math.cos(a) * d, 0, L.z + math.sin(a) * d),
+				random
+			)
+		end
+		table.insert(exclude, { x = L.x, z = L.z, w = reach * 2 + 40, d = reach * 2 + 40 })
+	end
+end
+
 function WildsKit.fill(ctx: CountryKit.Ctx, exclude: { Rules.Rect })
 	local F = Country.Fill
 	local random = ctx.random
-	local half = ctx.half
+	local half = ctx.reach
 	local function rng(): number
 		return random:NextNumber()
 	end
 	local function spots(n: number, r: number): { { x: number, z: number } }
-		local list = Rules.clearSpots(half, exclude, n, r, F.Margin, rng)
+		local list = Rules.clearSpots(half, exclude, n, r, F.Margin, rng, ctx.allowed)
 		for _, s in list do
 			table.insert(exclude, { x = s.x, z = s.z, w = r * 2, d = r * 2 })
 		end
@@ -44,11 +129,7 @@ function WildsKit.fill(ctx: CountryKit.Ctx, exclude: { Rules.Rect })
 	-- rocky knolls: a few rock balls half sunk in the grass, a grassy skirt round them
 	local K = F.Knolls
 	for _, s in spots(K.n, K.radius) do
-		workspace.Terrain:FillBall(
-			Vector3.new(s.x, -K.radius * 0.35, s.z),
-			K.radius * 0.7,
-			Enum.Material.Grass
-		)
+		CountryKit.bell(s.x, s.z, K.radius * 1.2, K.radius * 0.3, Enum.Material.Grass)
 		for _ = 1, count(random, K.rocks) do
 			local size = between(random, K.size)
 			local at = around(s, K.radius * 0.5)
@@ -117,6 +198,36 @@ function WildsKit.fill(ctx: CountryKit.Ctx, exclude: { Rules.Rect })
 		for _ = 1, FL.bushes do
 			Greenery.bush(ctx.props, around(s, FL.radius), random)
 		end
+	end
+
+	-- patches of darker grass: a wobbly blob each, its grass voxels turned leafy (not kept clear of anything:
+	-- it is only colour)
+	local PA = F.Patches
+	local terrain = workspace.Terrain
+	for _, s in Rules.clearSpots(half, {}, PA.n, PA.radius, 0, rng, ctx.allowed) do
+		local r = between(random, PA.size)
+		local p1, p2 = random:NextNumber(0, math.pi * 2), random:NextNumber(0, math.pi * 2)
+		local x0, z0 = math.floor((s.x - r * 1.4) / 4) * 4, math.floor((s.z - r * 1.4) / 4) * 4
+		local span = math.ceil(r * 2.8 / 4) * 4
+		local region = Region3.new(Vector3.new(x0, -8, z0), Vector3.new(x0 + span, 4, z0 + span))
+		local mats, occs = terrain:ReadVoxels(region, 4)
+		local size = mats.Size
+		for i = 1, size.X do
+			local dx = x0 + (i - 0.5) * 4 - s.x
+			for k = 1, size.Z do
+				local dz = z0 + (k - 0.5) * 4 - s.z
+				local a = math.atan2(dz, dx)
+				local edge = r * (1 + 0.25 * math.sin(3 * a + p1) + 0.15 * math.sin(5 * a + p2))
+				if dx * dx + dz * dz < edge * edge then
+					for j = 1, size.Y do
+						if mats[i][j][k] == Enum.Material.Grass then
+							mats[i][j][k] = Enum.Material.LeafyGrass
+						end
+					end
+				end
+			end
+		end
+		terrain:WriteVoxels(region, 4, mats, occs)
 	end
 
 	-- rolling hills in the gaps (terrain)

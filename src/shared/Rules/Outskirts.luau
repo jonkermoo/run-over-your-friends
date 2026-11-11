@@ -54,14 +54,16 @@ function Outskirts.overlaps(a: Rect, b: Rect): boolean
 	return math.abs(a.x - b.x) < (a.w + b.w) / 2 and math.abs(a.z - b.z) < (a.d + b.d) / 2
 end
 
--- up to `n` spots of radius `r` on the flat ground: clear of every rect by `margin`, and of each other; tries a fixed number of times, so a crowded map gets fewer
+-- up to `n` spots of radius `r` on the flat ground (within `half` of the middle, and where `allowed` says so):
+-- clear of every rect by `margin`, and of each other; tries a fixed number of times, so a crowded map gets fewer
 function Outskirts.clearSpots(
 	half: number,
 	exclude: { Rect },
 	n: number,
 	r: number,
 	margin: number,
-	rng: () -> number
+	rng: () -> number,
+	allowed: ((x: number, z: number, r: number) -> boolean)?
 ): { { x: number, z: number } }
 	local out: { { x: number, z: number } } = {}
 	for _ = 1, n * 30 do
@@ -70,8 +72,8 @@ function Outskirts.clearSpots(
 		end
 		local x = (rng() * 2 - 1) * (half - r - margin)
 		local z = (rng() * 2 - 1) * (half - r - margin)
-		local ok = true
-		for _, e in exclude do
+		local ok = allowed == nil or allowed(x, z, r + margin)
+		for _, e in if ok then exclude else {} do
 			if Outskirts.distance(e, x, z) < r + margin then
 				ok = false
 				break

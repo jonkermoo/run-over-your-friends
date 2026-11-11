@@ -13,10 +13,10 @@ return table.freeze({
 		ShadowSoftness = 0.6,
 		DiffuseScale = 1, -- sky light on surfaces
 		SpecularScale = 1, -- sky reflections on smooth parts (glass, paint)
-		AirDensity = 0.2,
+		AirDensity = 0.28, -- a light haze gives the bigger map depth and softens where far ground stops loading
 		AirOffset = 0.1,
-		AirHaze = 0,
-		AirGlare = 0,
+		AirHaze = 0.8,
+		AirGlare = 0.2,
 		AirColor = table.freeze({ 215, 230, 245 }),
 		AirDecay = table.freeze({ 190, 210, 235 }),
 		Saturation = 0.08,

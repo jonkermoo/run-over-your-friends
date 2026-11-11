@@ -533,6 +533,7 @@ function VehicleBuilder.build(id: string): Model
 	model:SetAttribute("Length", length)
 	model.WorldPivot = CFrame.new()
 	CollectionService:AddTag(model, "Vehicle")
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic -- chassis, welds and trailer arrive together
 	return model
 end
 

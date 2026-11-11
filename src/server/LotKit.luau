@@ -143,6 +143,7 @@ local function lamp(props: Instance, at: Vector3)
 	)
 	head.Material = Enum.Material.Neon
 end
+LotKit.lamp = lamp
 
 -- a lot beside a building: `centre` is the lot's middle on the ground, `toward` the unit way to the building,
 -- `width` the lot's length across that way and `depth` along it. A row of bays runs along the building's side

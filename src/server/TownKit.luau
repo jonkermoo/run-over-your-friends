@@ -28,6 +28,7 @@ export type OfficeColours = {
 	accent: Color3,
 	roof: Color3,
 	stone: Color3,
+	glass: Color3?, -- the tower's own tint (Config/Buildings Office.Tints); Office.Glass if missing
 }
 
 local function part(
@@ -69,7 +70,7 @@ function TownKit.office(
 	local sill = FH * O.SillShare
 	local top = floors * FH
 	local stoneMat = (Enum.Material :: any)[O.StoneMaterial] :: Enum.Material
-	local glassColour = Kit.rgb(O.Glass)
+	local glassColour = c.glass or Kit.rgb(O.Glass)
 	local plinth = c.stone:Lerp(BLACK, 0.3)
 	local parapet = c.wall:Lerp(BLACK, 0.3)
 	local door = Vector3.new(centre.X, 0, centre.Z)

@@ -56,7 +56,19 @@ local RateLimit = require(script.RateLimit)
 local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
 
-local world = MapBuilder.build()
+-- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
+local Players = game:GetService("Players")
+Players.CharacterAutoLoads = false
+local built, world = pcall(MapBuilder.build)
+Players.CharacterAutoLoads = true -- even if the build failed, so players still spawn and the error shows
+if not built then
+	error(world)
+end
+for _, p in Players:GetPlayers() do
+	if not p.Character then
+		task.spawn(p.LoadCharacter, p)
+	end
+end
 BuildingService.register(world.buildings)
 BuildingService.registerProps(world.props)
 CrowdService.setup(world.places, world.grid)

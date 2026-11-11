@@ -7,6 +7,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Outskirts)
+local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
+local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
@@ -14,6 +16,7 @@ local CountryKit = require(script.Parent.CountryKit)
 local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
+local SuburbKit = require(script.Parent.SuburbKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
 
@@ -34,7 +37,7 @@ export type Ctx = {
 	blocksX: number,
 	blocksZ: number,
 }
-export type Result = { walkPoints: { Vector3 }, places: { Places.Place } }
+export type Result = { walkPoints: { Vector3 }, places: { Places.Place }, spawnPoints: { Vector3 } }
 
 local C = Cfg.Colours
 local function rgb(c: { number }): Color3
@@ -220,6 +223,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	terrain:Clear()
 	-- terrain grass draws lighter than the ground part's Grass, so it gets a darker tint to blend in
 	terrain:SetMaterialColor(Enum.Material.Grass, rgb(Country.TerrainGrass))
+	terrain:SetMaterialColor(Enum.Material.LeafyGrass, rgb(Country.TerrainLeafy))
 	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
 	terrain.WaterColor = rgb(C.water)
@@ -235,37 +239,93 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local zones = Rules.zones(ringOuter, Cfg.Stunt, Cfg.Port, Cfg.Desert, Cfg.Site)
 	local seaEdge = zones.port.x - zones.port.w / 2
 
-	-- the ground (the sea takes the west strip beyond the port's quay) and the invisible edge walls
-	local landW = half - seaEdge
-	part(
-		static,
-		Vector3.new(landW, 20, half * 2),
-		CFrame.new(seaEdge + landW / 2, -10, 0),
-		COLORS.grass,
-		Enum.Material.Grass
-	)
-	for _, s in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+	-- the ground is terrain, so hills, sand and dirt blend into it: land (sand along the curved coast), the sea
+	-- west of the coast, filled in rows of square cells; then the invisible walls round the island (Config/Land)
+	local L = LandCfg
+	local P = Cfg.Port
+	local tile = L.Cell
+	local spread = 0
+	for _, w in L.Waves do
+		spread += math.abs(w.amp)
+	end
+	local reach = L.Radius + spread
+	local fill = math.ceil((reach + L.Overrun) / tile) * tile
+	local seaFar = L.SeaReach + 2800 -- the sea runs on to the horizon past the walls
+	local edgeAt: { number } = {}
+	local EDGE_STEPS = 4096
+	for i = 0, EDGE_STEPS do
+		edgeAt[i] = Land.edge(L, i / EDGE_STEPS * math.pi * 2)
+	end
+	local function insetAt(x: number, z: number): number
+		local a = math.atan2(z, x)
+		if a < 0 then
+			a += math.pi * 2
+		end
+		return edgeAt[math.floor(a / (math.pi * 2) * EDGE_STEPS + 0.5)] - math.sqrt(x * x + z * z)
+	end
+	local SAND, GRASS = Enum.Material.Sand, Enum.Material.Grass
+	for z = -fill, fill - tile, tile do
+		local zc = z + tile / 2
+		if z % (tile * 32) == 0 then
+			task.wait() -- the fill is long: yield so the build doesn't time out
+		end
+		local coastX = Land.coast(L, seaEdge, zc)
+		local curved = math.abs(zc) > L.CoastStraight
+		local runFrom, runKind = 0, nil :: Enum.Material?
+		local function flush(xTo: number)
+			if not runKind then
+				return
+			end
+			local len = xTo - runFrom
+			terrain:FillBlock(
+				CFrame.new(runFrom + len / 2, -L.GroundDepth / 2 - L.GroundSink, zc),
+				Vector3.new(len, L.GroundDepth, tile),
+				runKind
+			)
+		end
+		local seaFrom, seaTo = math.huge, -math.huge
+		for x = -fill, fill, tile do
+			local kind: Enum.Material? = nil
+			if x < fill then
+				local xc = x + tile / 2
+				if xc > coastX and insetAt(xc, zc) > -L.Overrun then
+					kind = if curved and xc - coastX < L.Shore then SAND else GRASS
+				elseif xc <= coastX and xc > coastX - seaFar then
+					seaFrom, seaTo = math.min(seaFrom, x), math.max(seaTo, x + tile)
+				end
+			end
+			if kind ~= runKind then
+				flush(x)
+				runFrom, runKind = x, kind
+			end
+		end
+		if seaTo > seaFrom then
+			local len = seaTo - seaFrom
+			terrain:FillBlock(
+				CFrame.new(seaFrom + len / 2, -P.SeaDepth - 2, zc),
+				Vector3.new(len, 4, tile),
+				SAND
+			)
+			terrain:FillBlock(
+				CFrame.new(seaFrom + len / 2, -P.SeaDepth / 2 - 0.5, zc),
+				Vector3.new(len, P.SeaDepth - 1, tile),
+				Enum.Material.Water
+			)
+		end
+	end
+	local outline = Land.outline(L, seaEdge, L.WallSegments)
+	for i, a in outline do
+		local b = outline[i % #outline + 1]
+		local pa, pb = Vector3.new(a.x, 30, a.z), Vector3.new(b.x, 30, b.z)
 		part(
 			static,
-			Vector3.new(if s[1] ~= 0 then 10 else half * 2, 80, if s[2] ~= 0 then 10 else half * 2),
-			CFrame.new(s[1] * half, 30, s[2] * half),
+			Vector3.new(10, 80, (pb - pa).Magnitude + 10),
+			CFrame.lookAt((pa + pb) / 2, pb),
 			COLORS.concrete,
 			nil,
 			1
 		)
 	end
-	local seaW = seaEdge + half
-	local P = Cfg.Port
-	terrain:FillBlock(
-		CFrame.new(seaEdge - seaW / 2, -P.SeaDepth - 2, 0),
-		Vector3.new(seaW, 4, half * 2),
-		Enum.Material.Sand
-	)
-	terrain:FillBlock(
-		CFrame.new(seaEdge - seaW / 2, -P.SeaDepth / 2 - 0.5, 0),
-		Vector3.new(seaW, P.SeaDepth - 1, half * 2),
-		Enum.Material.Water
-	)
 
 	-- highway ring, joined to every grid road, a double yellow down the middle
 	for _, s in { 1, -1 } do
@@ -357,6 +417,11 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		props = props,
 		random = random,
 		half = half,
+		reach = reach,
+		-- open ground: inside the edge's fill band and east of the coast (by r)
+		allowed = function(x: number, z: number, r: number): boolean
+			return insetAt(x, z) >= L.FillBand + r and x >= Land.coast(L, seaEdge, z) + r
+		end,
 		seaEdge = seaEdge,
 		port = zones.port,
 		desert = zones.desert,
@@ -798,13 +863,32 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	do
 		local D = Cfg.Desert
 		local ds = zones.desert
-		part(
-			static,
-			Vector3.new(ds.w, 1, ds.d),
-			CFrame.new(ds.x, -0.43, ds.z),
-			rgb(D.Floor),
-			Enum.Material.Sand
-		)
+		-- the floor is the ground turned to sand (terrain), so it blends into the grass; ragged squares of sand
+		-- spill past its edges
+		local function sand(x0: number, z0: number, x1: number, z1: number)
+			terrain:ReplaceMaterial(
+				Region3.new(
+					Vector3.new(math.floor(x0 / 4) * 4, -8, math.floor(z0 / 4) * 4),
+					Vector3.new(math.ceil(x1 / 4) * 4, 4, math.ceil(z1 / 4) * 4)
+				),
+				4,
+				Enum.Material.Grass,
+				Enum.Material.Sand
+			)
+		end
+		sand(ds.x - ds.w / 2, ds.z - ds.d / 2, ds.x + ds.w / 2, ds.z + ds.d / 2)
+		for k = 1, D.EdgeSpill do
+			local size = random:NextNumber(D.SpillSize[1], D.SpillSize[2])
+			local t = random:NextNumber(-0.5, 0.5)
+			local spill = random:NextNumber(-size / 2, D.SpillOut)
+			local x, z
+			if k % 4 < 2 then
+				x, z = ds.x + t * ds.w, ds.z + (if k % 4 == 0 then -1 else 1) * (ds.d / 2 + spill)
+			else
+				x, z = ds.x + (if k % 4 == 2 then -1 else 1) * (ds.w / 2 + spill), ds.z + t * ds.d
+			end
+			sand(x - size / 2, z - size / 2, x + size / 2, z + size / 2)
+		end
 		for _ = 1, D.Dunes do
 			local f = random:NextNumber(D.DuneRadius[1], D.DuneRadius[2])
 			local h = f * random:NextNumber(D.DuneSlope[1], D.DuneSlope[2]) / 100
@@ -1147,7 +1231,6 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		zones.port,
 		zones.desert,
 		zones.site,
-		{ x = seaEdge - seaW / 2, z = 0, w = seaW, d = half * 2 },
 	}
 	for _, c in connectors do
 		table.insert(exclude, c)
@@ -1156,13 +1239,28 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	for _, r in CountryKit.build(country) do
 		table.insert(exclude, r)
 	end
+	-- the suburbs on the new land, each with its road out from the ring (Config/Suburbs; own seed)
+	local suburbs =
+		SuburbKit.build(ringOuter, static, buildings, props, Random.new(LandCfg.SuburbSeed))
+	for _, r in suburbs.rects do
+		table.insert(exclude, r)
+	end
+	for _, p in suburbs.walkPoints do
+		table.insert(walkPoints, p)
+	end
+	for _, p in suburbs.places do
+		table.insert(places, p)
+	end
+	WildsKit.lakes(country, exclude)
 	local function rng(): number
 		return random:NextNumber()
 	end
 
 	-- the flat grass: groves of trees, ponds with a sandy bank
 	local W = Cfg.Wilds
-	for _, g in Rules.clearSpots(half, exclude, W.Groves, W.GroveRadius, W.Margin, rng) do
+	for _, g in
+		Rules.clearSpots(reach, exclude, W.Groves, W.GroveRadius, W.Margin, rng, country.allowed)
+	do
 		for _ = 1, random:NextInteger(W.GroveTrees[1], W.GroveTrees[2]) do
 			local a, d = random:NextNumber(0, math.pi * 2), random:NextNumber(0, W.GroveRadius)
 			Greenery.tree(
@@ -1173,25 +1271,28 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		end
 		table.insert(exclude, { x = g.x, z = g.z, w = W.GroveRadius * 2, d = W.GroveRadius * 2 })
 	end
-	for _, p in Rules.clearSpots(half, exclude, W.Ponds, W.PondRadius, W.Margin, rng) do
-		-- two flat discs (the ground is a part, so terrain water can't sit below it): a sandy bank, the water
-		local bank = post(static, 0.2, W.PondRadius * 2, Vector3.new(p.x, 0, p.z), COLORS.sand)
-		bank.Material = Enum.Material.Sand
-		local water =
-			post(static, 0.3, W.PondRadius * 2 - 14, Vector3.new(p.x, 0, p.z), rgb(C.water))
-		water.Material = Enum.Material.Glass
-		water.Transparency = 0.15
-		water.Reflectance = 0.15
+	for _, p in
+		Rules.clearSpots(reach, exclude, W.Ponds, W.PondRadius, W.Margin, rng, country.allowed)
+	do
+		-- terrain: a sandy bank sunk a little, then water in it
+		terrain:FillCylinder(CFrame.new(p.x, -1, p.z), 2, W.PondRadius, Enum.Material.Sand)
+		terrain:FillCylinder(CFrame.new(p.x, -1, p.z), 2, W.PondRadius - 3, Enum.Material.Air)
+		terrain:FillCylinder(CFrame.new(p.x, -4, p.z), 4, W.PondRadius - 7, Enum.Material.Sand)
+		terrain:FillCylinder(CFrame.new(p.x, -2.5, p.z), 4, W.PondRadius - 7, Enum.Material.Water)
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
 	end
 	-- what's still open: strips of woods, then low hills between them (Config/Country Meadow)
 	local M = Country.Meadow
 	local woodRadius = CountryKit.beltLength * M.WoodScale[2] / 2
-	for _, w in Rules.clearSpots(half, exclude, M.Woods, woodRadius, W.Margin, rng) do
+	for _, w in
+		Rules.clearSpots(reach, exclude, M.Woods, woodRadius, W.Margin, rng, country.allowed)
+	do
 		CountryKit.wood(country, w.x, w.z, random:NextNumber(M.WoodScale[1], M.WoodScale[2]))
 		table.insert(exclude, { x = w.x, z = w.z, w = woodRadius * 2, d = woodRadius * 2 })
 	end
-	for _, h in Rules.clearSpots(half, exclude, M.Hills, M.HillRadius[2], W.Margin, rng) do
+	for _, h in
+		Rules.clearSpots(reach, exclude, M.Hills, M.HillRadius[2], W.Margin, rng, country.allowed)
+	do
 		CountryKit.hill(
 			h.x,
 			h.z,
@@ -1201,7 +1302,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	end
 	-- the last pass: knolls, pine stands, woods, hedgerows, wildflowers, more hills (Config/Country Fill)
 	WildsKit.fill(country, exclude)
-	return { walkPoints = walkPoints, places = places }
+	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 
 return OutskirtsKit

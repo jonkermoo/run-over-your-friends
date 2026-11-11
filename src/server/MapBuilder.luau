@@ -23,6 +23,8 @@ local CountryKit = require(script.Parent.CountryKit)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local LotKit = require(script.Parent.LotKit)
+local TowerKit = require(script.Parent.TowerKit)
+local SuburbKit = require(script.Parent.SuburbKit)
 local Lots = require(ReplicatedStorage.Shared.Config.Lots)
 local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
@@ -444,8 +446,9 @@ function MapBuilder.build(): Result
 				f.Parent = static
 				paintPlaza(static, cx, cz, inner)
 				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
-				local boards = Instance.new("Folder")
+				local boards = Instance.new("Model")
 				boards.Name = "Boards"
+				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
 				boards.Parent = static
 				-- a sign gantry over them: a road-yellow beam on two black posts
 				local gz = cz - B / 2 + 5
@@ -488,9 +491,13 @@ function MapBuilder.build(): Result
 				addPlace(Places.open("spawn", centre, crowdPoints), i, j)
 			elseif kind == "office" then
 				-- office towers in the town style: a stone lobby with a door, window bands, the name on the roof
+				local OF = BuildingConfig.Office
 				local floors = if distFromCentre < 2.5
 					then random:NextInteger(5, 9)
 					else random:NextInteger(3, 5)
+				if distFromCentre < OF.DowntownReach then
+					floors = lotRandom:NextInteger(OF.DowntownFloors[1], OF.DowntownFloors[2])
+				end
 				local fp = BuildingConfig.Office.Footprint
 				local w = random:NextNumber(fp[1], fp[2]) * inner
 				local d = random:NextNumber(fp[1], fp[2]) * inner
@@ -529,9 +536,22 @@ function MapBuilder.build(): Result
 					accent = rgb(style.accent),
 					roof = rgb(look.roof),
 					stone = rgb(look.stone),
+					glass = rgb(OF.Tints[(offices * 5) % #OF.Tints + 1]),
 				}
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
+				-- its own crown, taken in turn so neighbours differ (TowerKit)
+				TowerKit.crown(
+					model,
+					OF.Crowns[(offices - 1) % #OF.Crowns + 1],
+					tower,
+					w,
+					d,
+					out,
+					floors * M.FloorHeight,
+					colours :: any,
+					lotRandom
+				)
 				-- the company name and a parody billboard stand on the roof, behind the parapet
 				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
 				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
@@ -735,6 +755,18 @@ function MapBuilder.build(): Result
 								"Home" .. count
 							)
 							addPlace(home, i, j)
+							-- detached homes get a back garden: a tree, a fence, maybe a pool (SuburbKit)
+							if t.perLot == 1 then
+								SuburbKit.garden(
+									static,
+									props,
+									centre + Vector3.new(x, 0, z),
+									out,
+									t.width,
+									t.depth,
+									lotRandom
+								)
+							end
 						end
 					end
 				end
@@ -906,6 +938,9 @@ function MapBuilder.build(): Result
 	for _, place in outskirts.places do
 		table.insert(places, place)
 	end
+	for _, p in outskirts.spawnPoints do
+		table.insert(spawnPoints, p)
+	end
 
 	-- subtle materials on the buildings' plain plastic (World.Surfaces); materials only, no new parts
 	local S = World.Surfaces
@@ -972,6 +1007,14 @@ function MapBuilder.build(): Result
 	bloom.Threshold = look.BloomThreshold
 	bloom.Parent = Lighting
 
+	-- streaming: a building or prop arrives whole (smashing, collapses and rooms read all its parts)
+	for _, folder in { buildings, props } do
+		for _, m in folder:GetChildren() do
+			if m:IsA("Model") and m.ModelStreamingMode == Enum.ModelStreamingMode.Default then
+				m.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+			end
+		end
+	end
 	map.Parent = workspace
 	return {
 		buildings = buildings,

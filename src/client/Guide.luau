@@ -351,11 +351,14 @@ end
 
 -- the building nearest the player: its centre and roof line, measured once
 type Spot = { centre: Vector3, top: number }
+-- measured again every few seconds: buildings stream in and out round the player
 local spots: { Spot }? = nil
+local spotsAt = -math.huge
 local function buildingSpots(): { Spot }
-	if spots then
+	if spots and os.clock() - spotsAt < 5 then
 		return spots
 	end
+	spotsAt = os.clock()
 	local found = {}
 	local map = workspace:FindFirstChild("Map")
 	local folder = map and map:FindFirstChild("Buildings")

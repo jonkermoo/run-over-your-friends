@@ -84,7 +84,9 @@ return table.freeze({
 		Cacti = 36,
 		Outcrops = 26, -- clusters of half-sunk sandstone balls (terrain)
 		OutcropSize = table.freeze({ 10, 26 }),
-		Floor = { 222, 184, 124 } :: RGB, -- the flat sand (a part)
+		EdgeSpill = 160, -- ragged squares of sand past the floor's edges...
+		SpillSize = table.freeze({ 24, 90 }), -- ...this big...
+		SpillOut = 70, -- ...reaching this far out
 		TerrainSand = { 200, 162, 104 } :: RGB, -- dunes and outcrops: terrain sand draws lighter, so darker here
 	}),
 
@@ -109,11 +111,11 @@ return table.freeze({
 	-- the flat grass: groves of trees (props), ponds (flat discs) with a sandy bank
 	Wilds = table.freeze({
 		Margin = 20,
-		Groves = 22,
+		Groves = 50,
 		GroveRadius = 28,
 		GroveTrees = table.freeze({ 3, 5 }), -- fewest, most
-		Ponds = 6,
-		PondRadius = 34,
+		Ponds = 14,
+		PondRadius = 40,
 	}),
 
 	Colours = table.freeze({

@@ -9,36 +9,33 @@
 export type RGB = { number }
 
 return table.freeze({
-	-- past the map's edge (outside the invisible walls, so nobody drives there): two rows of terrain hills on
-	-- the north, east and south, a belt of woods at their foot, pines on the slopes; the sea runs on in the
-	-- west with a few islands
+	-- past the island's edge (Config/Land; outside the invisible walls, so nobody drives there): two rows of
+	-- terrain hills wherever the edge is land, a belt of woods at their foot, pines on the slopes; the sea runs
+	-- on past the west coast with a few islands. `out` distances are past the edge.
 	Edge = table.freeze({
-		Spacing = 170, -- between hills along a side
-		MoundStep = 4, -- hills are stacked terrain discs this thick
-		Overrun = 900, -- the rows run this far past each corner, so corners are closed
+		Spacing = 170, -- between hills along the edge
+		MoundStep = 4, -- tall hills are stacked terrain discs this thick...
+		BellMax = 45, -- ...lower ones are smooth bells written voxel by voxel (no terraces)
 		Near = table.freeze({ out = { 60, 220 }, radius = { 220, 340 }, height = { 35, 80 } }), -- out: past the edge
 		Far = table.freeze({ out = { 380, 650 }, radius = { 380, 560 }, height = { 140, 300 } }),
 		RockFrom = 270, -- far hills this tall are rock, not grass
 		BeltOut = 25, -- the woods' centre line, past the edge
-		BeltSpacing = 190, -- between belt meshes along a side (each is about 210 long)
-		BeltOverrun = 450, -- belts run this far past each corner
+		BeltSpacing = 190, -- between belt meshes along the edge (each is about 210 long)
 		BeltLook = 90, -- a belt sits at the lowest ground found this far either side of its middle
 		CoastClear = 120, -- no woods or pines this close to the west coast
-		PineOverrun = 400, -- pines spread this far past each corner...
-		PineOut = table.freeze({ 80, 700 }), -- ...and this far past the edge
+		PineOut = table.freeze({ 80, 700 }), -- pines spread this far past the edge
 		PineTries = 10, -- spots tried per pine before giving up
 		PineMinHeight = 6, -- pines only on slopes at least this high (not in the flat between hills)
 		BeltSink = 4, -- woods sit this far into the slope
 		BeltColours = table.freeze({ { 58, 112, 60 }, { 66, 126, 64 }, { 52, 100, 56 } }) :: { RGB },
-		Pines = 150, -- on the hills, three sides together
+		Pines = 300, -- on the hills, all round
 		PineHeight = table.freeze({ 30, 55 }),
 		PineColours = table.freeze({ { 46, 94, 60 }, { 54, 106, 64 }, { 40, 84, 54 } }) :: { RGB },
-		SeaReach = 700, -- the sea runs on this far past the west edge
-		Islands = 5,
+		Islands = 7,
 		IslandRadius = table.freeze({ 90, 200 }),
 		IslandHeight = table.freeze({ 30, 70 }),
-		IslandOut = table.freeze({ 250, 550 }), -- past the edge
-		IslandJitter = 200, -- along the coast, from even spacing
+		IslandOut = table.freeze({ 250, 550 }), -- past the walls in the sea
+		IslandJitter = 300, -- along the coast, from even spacing
 		BeachSpread = 1.15, -- each island's sand skirt, as a share of its radius...
 		BeachRise = 0.25, -- ...and of its height
 	}),
@@ -46,10 +43,10 @@ return table.freeze({
 	-- the open grass inside the walls the zones leave empty (after the groves and ponds): low rolling hills to
 	-- drive over (terrain) and strips of woods (one Belt mesh each, scaled down, turned a random way)
 	Meadow = table.freeze({
-		Hills = 26,
+		Hills = 50,
 		HillRadius = table.freeze({ 60, 120 }),
 		HillHeight = table.freeze({ 5, 14 }),
-		Woods = 14,
+		Woods = 30,
 		WoodScale = table.freeze({ 0.45, 0.75 }),
 	}),
 
@@ -58,18 +55,20 @@ return table.freeze({
 	-- patches with bushes, then rolling hills in the gaps. `n` is how many are tried; a crowded map gets fewer.
 	Fill = table.freeze({
 		Margin = 16,
-		Knolls = table.freeze({ n = 45, radius = 40, rocks = { 3, 6 }, size = { 10, 24 } }), -- rock balls, half sunk
-		Pines = table.freeze({ n = 42, radius = 52, trees = { 8, 13 } }),
-		Woods = table.freeze({ n = 90, scale = { 0.4, 0.7 } }),
-		Hedges = table.freeze({ n = 24, trees = { 5, 8 }, gap = 15 }), -- a straight row of leafy trees
+		Knolls = table.freeze({ n = 90, radius = 40, rocks = { 3, 6 }, size = { 10, 24 } }), -- rock balls, half sunk
+		Pines = table.freeze({ n = 90, radius = 52, trees = { 8, 13 } }),
+		Woods = table.freeze({ n = 180, scale = { 0.4, 0.7 } }),
+		Hedges = table.freeze({ n = 50, trees = { 5, 8 }, gap = 15 }), -- a straight row of leafy trees
 		Flowers = table.freeze({
-			n = 38,
+			n = 80,
 			radius = 30,
 			beds = { 4, 7 },
 			scale = { 1, 1.8 },
 			bushes = 2,
 		}),
-		Hills = table.freeze({ n = 150, radius = { 50, 180 }, height = { 6, 30 } }),
+		Hills = table.freeze({ n = 300, radius = { 50, 180 }, height = { 6, 30 } }),
+		-- patches of a second, darker grass (terrain colour blends at the edges): wobbly blobs `size` across
+		Patches = table.freeze({ n = 420, radius = 90, size = { 30, 75 } }),
 	}),
 
 	-- north-east: fields of crop rows, wind breaks of trees, a red barn, a silo and hay bales
@@ -154,8 +153,18 @@ return table.freeze({
 		GasRed = { 214, 58, 48 } :: RGB,
 	}),
 
+	-- lakes on the new land (terrain water in a sandy bowl), trees round the shore
+	Lakes = table.freeze({
+		table.freeze({ x = 3300, z = 2900, r = 280 }),
+		table.freeze({ x = 3150, z = -3250, r = 210 }),
+	}),
+	LakeDepth = 10,
+	LakeBeach = 0.12, -- the sandy shore, as a share of the radius either side of the edge
+	LakeTrees = 16,
+
 	-- terrain grass (hills, knolls) renders lighter than the ground part's Grass; this tint matches them (Studio)
-	TerrainGrass = { 66, 120, 50 } :: RGB,
+	TerrainGrass = { 70, 122, 52 } :: RGB,
+	TerrainLeafy = { 52, 96, 44 } :: RGB, -- the patches (Fill.Patches)
 
 	-- a sidewalk along the outside of the city's outer road
 	OuterSidewalk = true,

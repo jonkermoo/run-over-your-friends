@@ -9,6 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Country)
 local Outskirts = require(ReplicatedStorage.Shared.Config.Outskirts)
+local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
+local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Greenery = require(script.Parent.Greenery)
 local PaintKit = require(script.Parent.PaintKit)
 local Places = require(script.Parent.Places)
@@ -21,7 +23,9 @@ export type Ctx = {
 	buildings: Folder,
 	props: Folder,
 	random: Random,
-	half: number, -- half the ground's size
+	half: number, -- half the old square ground (the beaches and the straight coast reach this far)
+	reach: number, -- the island's furthest edge from the middle
+	allowed: (x: number, z: number, r: number) -> boolean, -- open ground: a circle this big fits inside the edge's fill band
 	seaEdge: number, -- x of the west coast (the port's quay)
 	port: Rect,
 	desert: Rect,
@@ -118,7 +122,72 @@ local function inside(r: Rect, x: number, z: number, pad: number): boolean
 end
 
 -- terrain mounds (buried balls); `hills` keeps them so things can be stood on the slopes
-type Ball = { x: number, z: number, cy: number, r: number }
+-- a ball's cap (cy, r) or, with `h`, a bell `h` tall reaching out to r
+type Ball = { x: number, z: number, cy: number, r: number, h: number? }
+
+-- a smooth hill written voxel by voxel: a bell (cosine) profile `height` tall that flattens into the ground at
+-- `radius`, so it has no rim or terraces; merged with what is already there (never digs). It is filled from
+-- `floor` up (the ground's underside if not given); given a floor (islands from the sea bed), water counts as
+-- empty.
+local BELL_TILE = 128
+local function bell(
+	x: number,
+	z: number,
+	radius: number,
+	height: number,
+	material: Enum.Material,
+	floor: number?
+)
+	local terrain = workspace.Terrain
+	local function down(v: number): number
+		return math.floor(v / 4) * 4
+	end
+	local function up(v: number): number
+		return math.ceil(v / 4) * 4
+	end
+	local x0, x1, z0, z1 = down(x - radius), up(x + radius), down(z - radius), up(z + radius)
+	local y0, y1 = down(floor or -4), up(height + 4)
+	for tx = x0, x1 - 1, BELL_TILE do
+		for tz = z0, z1 - 1, BELL_TILE do
+			local region = Region3.new(
+				Vector3.new(tx, y0, tz),
+				Vector3.new(math.min(tx + BELL_TILE, x1), y1, math.min(tz + BELL_TILE, z1))
+			)
+			local mats, occs = terrain:ReadVoxels(region, 4)
+			local size = mats.Size
+			local changed = false
+			for i = 1, size.X do
+				local dx = tx + (i - 0.5) * 4 - x
+				for k = 1, size.Z do
+					local dz = tz + (k - 0.5) * 4 - z
+					local d = math.sqrt(dx * dx + dz * dz)
+					if d < radius then
+						local h = height * (1 + math.cos(math.pi * d / radius)) / 2
+						for j = 1, size.Y do
+							local bottom = y0 + (j - 1) * 4
+							local occ = math.clamp((h - bottom) / 4, 0, 1)
+							-- islands (built from the sea bed) take the water's place; hills on land leave lakes be
+							local wet = floor ~= nil and mats[i][j][k] == Enum.Material.Water
+							if occ > 0 and (wet or occ > occs[i][j][k]) then
+								occs[i][j][k] = occ
+								if wet or mats[i][j][k] == Enum.Material.Air then
+									mats[i][j][k] = material
+								end
+								changed = true
+							end
+						end
+					end
+				end
+			end
+			if changed then
+				terrain:WriteVoxels(region, 4, mats, occs)
+			end
+		end
+	end
+end
+CountryKit.bell = bell
+
+local mounds = 0
 local function mound(
 	hills: { Ball }?,
 	x: number,
@@ -127,8 +196,19 @@ local function mound(
 	height: number,
 	material: Enum.Material
 )
+	mounds += 1
+	if mounds % 6 == 0 then
+		task.wait() -- terrain is slow to fill: yield so the map's build doesn't time out
+	end
 	local r = (radius * radius / height + height) / 2
 	local cy = height - r
+	if height <= Cfg.Edge.BellMax then
+		bell(x, z, radius, height, material)
+		if hills then
+			table.insert(hills, { x = x, z = z, cy = 0, r = radius, h = height })
+		end
+		return
+	end
 	-- the cap of a ball this big is too large for one FillBall, so stack it in flat discs from the sea floor up
 	local step = MOUND_STEP
 	local y = -SEA_DEPTH
@@ -158,7 +238,13 @@ local function heightAt(hills: { Ball }, x: number, z: number): number
 		local dx, dz = x - b.x, z - b.z
 		local d2 = dx * dx + dz * dz
 		if d2 < b.r * b.r then
-			y = math.max(y, b.cy + math.sqrt(b.r * b.r - d2))
+			local h = b.h
+			y = math.max(
+				y,
+				if h
+					then h * (1 + math.cos(math.pi * math.sqrt(d2) / b.r)) / 2
+					else b.cy + math.sqrt(b.r * b.r - d2)
+			)
 		end
 	end
 	return y
@@ -178,70 +264,74 @@ local function pine(folder: Instance, at: Vector3, height: number, random: Rando
 end
 CountryKit.pine = pine
 
--- hills, woods and pines past the north, east and south edges; the sea and islands past the west
+-- round the island's edge (Config/Land): two rows of hills, a belt of woods at their foot and pines on the
+-- slopes, wherever the edge is land; the sea runs on past the west coast with islands on the horizon
 local function edges(ctx: Ctx)
 	local E = Cfg.Edge
-	local random, half = ctx.random, ctx.half
+	local random = ctx.random
 	local hills: { Ball } = {}
-	-- each side: (along, out) as unit vectors in x/z; west is the sea
-	local sides = {
-		{ along = Vector3.new(1, 0, 0), out = Vector3.new(0, 0, -1) },
-		{ along = Vector3.new(0, 0, 1), out = Vector3.new(1, 0, 0) },
-		{ along = Vector3.new(1, 0, 0), out = Vector3.new(0, 0, 1) },
-	}
-	for _, s in sides do
-		for _, row in { E.Near, E.Far } do
-			local t = -half - E.Overrun
-			while t <= half + E.Overrun do
-				local radius = between(random, row.radius)
+	local function landAt(x: number, z: number, clear: number): boolean
+		return x > Land.coast(LandCfg, ctx.seaEdge, z) + clear
+	end
+	-- calls `fn(theta)` every `step` studs round the edge
+	local function around(step: number, fn: (theta: number) -> ())
+		local theta = 0
+		local count = 0
+		while theta < math.pi * 2 do
+			fn(theta)
+			count += 1
+			if count % 8 == 0 then
+				task.wait() -- terrain is slow to fill: yield so the build doesn't time out
+			end
+			theta += step / Land.edge(LandCfg, theta)
+		end
+	end
+	local function ray(theta: number, out: number): (Vector3, Vector3)
+		local dir = Vector3.new(math.cos(theta), 0, math.sin(theta))
+		return dir * (Land.edge(LandCfg, theta) + out), dir
+	end
+	for _, row in { E.Near, E.Far } do
+		around(E.Spacing, function(theta)
+			local t = theta + random:NextNumber(-0.3, 0.3) * E.Spacing / LandCfg.Radius
+			local at = ray(t, between(random, row.out))
+			if landAt(at.X, at.Z, 0) then
 				local height = between(random, row.height)
-				local at = s.along * (t + random:NextNumber(-0.3, 0.3) * E.Spacing)
-					+ s.out * (half + between(random, row.out))
-				-- the west end of the north and south rows runs out over the sea: no hills there
-				if at.X > ctx.seaEdge then
-					local material = if height >= E.RockFrom
-						then Enum.Material.Rock
-						else Enum.Material.Grass
-					mound(hills, at.X, at.Z, radius, height, material)
-				end
-				t += E.Spacing
+				local material = if height >= E.RockFrom
+					then Enum.Material.Rock
+					else Enum.Material.Grass
+				mound(hills, at.X, at.Z, between(random, row.radius), height, material)
 			end
-		end
+		end)
 	end
-	-- a belt of woods along each side's foot, just outside the walls
-	for _, s in sides do
-		local t = -half - E.BeltOverrun
-		while t <= half + E.BeltOverrun do
-			local at = s.along * t + s.out * (half + E.BeltOut)
-			if at.X > ctx.seaEdge + E.CoastClear then
-				local y = math.min(
-					heightAt(hills, at.X - s.along.X * E.BeltLook, at.Z - s.along.Z * E.BeltLook),
-					heightAt(hills, at.X, at.Z),
-					heightAt(hills, at.X + s.along.X * E.BeltLook, at.Z + s.along.Z * E.BeltLook)
-				)
-				local belt = Greenery.mesh(
-					ctx.static,
-					"Belt",
-					1,
-					CFrame.lookAt(at, at + s.out)
-						+ Vector3.new(0, y - E.BeltSink + BELT_HEIGHT / 2, 0),
-					pick(random, E.BeltColours)
-				)
-				belt.CanCollide = false
-				belt.CanQuery = false
-			end
-			t += E.BeltSpacing
+	-- a belt of woods along the hills' foot, just outside the walls, facing in
+	around(E.BeltSpacing, function(theta)
+		local at, out = ray(theta, E.BeltOut)
+		if not landAt(at.X, at.Z, E.CoastClear) then
+			return
 		end
-	end
+		local along = Vector3.new(-out.Z, 0, out.X)
+		local y = math.min(
+			heightAt(hills, at.X - along.X * E.BeltLook, at.Z - along.Z * E.BeltLook),
+			heightAt(hills, at.X, at.Z),
+			heightAt(hills, at.X + along.X * E.BeltLook, at.Z + along.Z * E.BeltLook)
+		)
+		local belt = Greenery.mesh(
+			ctx.static,
+			"Belt",
+			1,
+			CFrame.lookAt(at, at + out) + Vector3.new(0, y - E.BeltSink + BELT_HEIGHT / 2, 0),
+			pick(random, E.BeltColours)
+		)
+		belt.CanCollide = false
+		belt.CanQuery = false
+	end)
 	-- pines up the slopes
 	local placed = 0
 	local tries = 0
 	while placed < E.Pines and tries < E.Pines * E.PineTries do
 		tries += 1
-		local s = sides[random:NextInteger(1, #sides)]
-		local at = s.along * random:NextNumber(-half - E.PineOverrun, half + E.PineOverrun)
-			+ s.out * (half + between(random, E.PineOut))
-		if at.X > ctx.seaEdge + E.CoastClear then
+		local at = ray(random:NextNumber(0, math.pi * 2), between(random, E.PineOut))
+		if landAt(at.X, at.Z, E.CoastClear) then
 			local y = heightAt(hills, at.X, at.Z)
 			if y > E.PineMinHeight then
 				local p = pine(
@@ -256,34 +346,20 @@ local function edges(ctx: Ctx)
 			end
 		end
 	end
-	-- the sea runs on past the west edge, islands on the horizon
-	local seaW = E.SeaReach
-	local depth = SEA_DEPTH
-	workspace.Terrain:FillBlock(
-		CFrame.new(-half - seaW / 2, -depth - 2, 0),
-		Vector3.new(seaW, 4, half * 2 + E.Overrun * 2),
-		Enum.Material.Sand
-	)
-	workspace.Terrain:FillBlock(
-		CFrame.new(-half - seaW / 2, -depth / 2 - 0.5, 0),
-		Vector3.new(seaW, depth - 1, half * 2 + E.Overrun * 2),
-		Enum.Material.Water
-	)
+	-- islands on the horizon, off the west coast
+	local spread = LandCfg.CoastStraight + E.IslandJitter
 	for k = 1, E.Islands do
-		local z = -half
-			+ (k - 0.5) / E.Islands * half * 2
+		local z = -spread
+			+ (k - 0.5) / E.Islands * spread * 2
 			+ random:NextNumber(-E.IslandJitter, E.IslandJitter)
-		local x = -half - between(random, E.IslandOut)
+		local x = Land.coast(LandCfg, ctx.seaEdge, z)
+			- LandCfg.SeaReach
+			- between(random, E.IslandOut)
 		local radius = between(random, E.IslandRadius)
-		mound(
-			nil,
-			x,
-			z,
-			radius * E.BeachSpread,
-			between(random, E.IslandHeight) * E.BeachRise,
-			Enum.Material.Sand
-		)
-		mound(nil, x, z, radius, between(random, E.IslandHeight), Enum.Material.Grass)
+		local height = between(random, E.IslandHeight)
+		-- smooth bells from the sea bed: a sand skirt, then the grassy hill
+		bell(x, z, radius * E.BeachSpread, height * E.BeachRise, Enum.Material.Sand, -SEA_DEPTH - 4)
+		bell(x, z, radius, height, Enum.Material.Grass, -SEA_DEPTH - 4)
 	end
 end
 
@@ -917,14 +993,11 @@ function CountryKit.build(ctx: Ctx): { Rect }
 	forest(ctx)
 	desertEdge(ctx)
 	local half = ctx.half
-	local band = 260 -- the hills' foot reaches this far in from the edge
+	-- (the hills round the edge are kept clear by ctx.allowed)
 	return {
 		Cfg.Farm.Rect,
 		Cfg.Moto.Rect,
 		Cfg.Forest.Rect,
-		{ x = 0, z = -half + band / 2, w = half * 2, d = band },
-		{ x = 0, z = half - band / 2, w = half * 2, d = band },
-		{ x = half - band / 2, z = 0, w = band, d = half * 2 },
 		{ x = ctx.seaEdge + Cfg.Beach.Width / 2, z = 0, w = Cfg.Beach.Width + 40, d = half * 2 },
 	}
 end
