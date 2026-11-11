@@ -4,6 +4,7 @@
 -- own hits, pooled 3D sounds (made once so they play on time), dust and glass bursts, the combo
 -- announcer, and a "112 STUDS!" readout where your victim lands.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -208,12 +209,14 @@ end
 ---------------------------------------------------------------- big text
 
 -- combo words slam in right of centre, slanted, with two hard offset copies behind (pink, then ink)
-local function announce(word: string, color: Color3, size: number, x: number?, y: number?)
-	local left, top = x or Callouts.ComboX, y or Callouts.ComboY
+-- top: layout px below Roblox's top bar (this screen ignores the inset, so it is added back here)
+local function announce(word: string, color: Color3, size: number, x: number?, top: number?)
+	local left = x or Callouts.ComboX
+	local y = (top or Callouts.ComboTop) + GuiService:GetGuiInset().Y / Style.scale()
 	local slam = Instance.new("Frame")
 	slam.BackgroundTransparency = 1
 	slam.AnchorPoint = Vector2.new(0.5, 0.5)
-	slam.Position = UDim2.fromScale(left, top)
+	slam.Position = UDim2.new(left, 0, 0, y)
 	slam.Size = UDim2.fromOffset(700, math.ceil(size * 1.5))
 	slam.Rotation = math.random(-8, -3)
 	slam.Parent = gui
@@ -240,8 +243,7 @@ local function announce(word: string, color: Color3, size: number, x: number?, y
 	scale.Parent = slam
 	TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	task.delay(0.7, function()
-		TweenService
-			:Create(slam, TweenInfo.new(0.35), { Position = UDim2.fromScale(left, top - 0.04) })
+		TweenService:Create(slam, TweenInfo.new(0.35), { Position = UDim2.new(left, 0, 0, y - 30) })
 			:Play()
 		for _, l in labels do
 			TweenService:Create(l, TweenInfo.new(0.35), { TextTransparency = 1 }):Play()
@@ -396,8 +398,8 @@ end
 
 -- the money shot, in the middle of the screen, with the till
 function Fx.announceBig(word: string, amount: string)
-	announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigY)
-	announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountY)
+	announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigTop)
+	announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountTop)
 	play("Sting", nil, 0.85)
 	play("Cash", nil, 0.9)
 end

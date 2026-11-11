@@ -262,7 +262,7 @@ local function celebrate(title: string, subtitle: string)
 	cheer:Play()
 	local t = label(gui, title, Callouts.CheerSize, BOLD, GOLD)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
-	t.Position = UDim2.fromScale(0.5, Callouts.CheerY)
+	t.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop)
 	t.Size = UDim2.fromOffset(760, Callouts.CheerSize + 10)
 	t.Rotation = -4
 	Style.outline(t, 3)
@@ -274,7 +274,7 @@ local function celebrate(title: string, subtitle: string)
 	s.BackgroundColor3 = INK
 	s.BackgroundTransparency = 0
 	s.AnchorPoint = Vector2.new(0.5, 0.5)
-	s.Position = UDim2.new(0.5, 0, Callouts.CheerY, math.floor(Callouts.CheerSize * 0.95))
+	s.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop + math.floor(Callouts.CheerSize * 0.95))
 	Style.fitText(s, 16, 5)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	-- confetti from the top of the screen
