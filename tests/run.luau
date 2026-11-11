@@ -342,7 +342,6 @@ check("launch grows with energy", Impact.launchSpeed(1e7) > Impact.launchSpeed(1
 
 -- world
 check("roads fit the semi", World.Map.RoadWidth >= 40)
-check("debris budget positive", World.Debris.MaxLoose > 0)
 
 -- goals
 local function rngFrom(seed: number): () -> number
@@ -2802,6 +2801,123 @@ do
 			and normal.shield > 0
 	)
 end
+
+-- crumbling walls (Rules/Crumble, Config/Smash Crumble)
+local function checkCrumble()
+	local Crumble = require("../src/shared/Rules/Crumble")
+	local Net = require("../src/shared/Net")
+	local C = Smash.Crumble
+	check("crumble message is named in Net", Net.Messages.Crumble == "Crumble")
+	local k, ka, kb = Crumble.axes(30, 12, 1.5)
+	check(
+		"a wall's thickness is its thin side, its long side first",
+		k == 3 and ka == 1 and kb == 2
+	)
+	local k2, a2, b2 = Crumble.axes(0.6, 20, 0.6)
+	check("a pole is cut along its length", a2 == 2 and k2 ~= 2 and b2 ~= 2)
+
+	-- a light car's hole in a long town wall: a few bricks out, the rest standing as a few blocks
+	local A, B = 30, 12
+	local cut = Crumble.grid(A, B, 3, C.MaxFly, C)
+	check("cells are never smaller than a brick", A / cut.na >= C.MinCell - 1e-6)
+	check("a wall is cut into at most MaxGrid cells", cut.na * cut.nb <= C.MaxGrid)
+	local thrown = Crumble.hole(cut, A, B, 0, -3, 3, C.MaxFly, 12345, C)
+	check("a small hit throws a few bricks", #thrown >= 2 and #thrown <= C.MaxFly)
+	local standing = Crumble.mesh(cut, thrown)
+	check("what's left stands as a handful of blocks", #standing >= 2 and #standing <= C.MaxStay)
+	-- every cell is thrown or in exactly one standing block
+	local seen: { [number]: number } = {}
+	for _, cell in thrown do
+		seen[cell] = (seen[cell] or 0) + 1
+	end
+	local area = 0
+	for _, r in standing do
+		for j = r.j0, r.j1 do
+			for i = r.i0, r.i1 do
+				local cell = j * cut.na + i + 1
+				seen[cell] = (seen[cell] or 0) + 1
+			end
+		end
+		local _, _, w, h = Crumble.rectBox(cut, A, B, r)
+		area += w * h
+	end
+	local exact = true
+	for cell = 1, cut.na * cut.nb do
+		if seen[cell] ~= 1 then
+			exact = false
+		end
+	end
+	check("thrown cells and standing blocks cover the wall once", exact)
+	check(
+		"standing blocks plus thrown bricks make up the wall",
+		near(area + #thrown * (A / cut.na) * (B / cut.nb), A * B, 1e-6)
+	)
+	-- the hole is around the hit, not somewhere else on the wall
+	local farthest = 0
+	for _, cell in thrown do
+		local i, j = (cell - 1) % cut.na, (cell - 1) // cut.na
+		local u, v = Crumble.cellCentre(cut, A, B, i, j)
+		farthest = math.max(farthest, math.sqrt(u * u + (v + 3) ^ 2))
+	end
+	check("the bricks come from around the hit", farthest <= 3 * (1 + C.Ragged) + 1e-6)
+	check(
+		"the same break always cuts the same way",
+		table.concat(Crumble.hole(cut, A, B, 0, -3, 3, C.MaxFly, 12345, C), ",")
+			== table.concat(thrown, ",")
+	)
+	local tiny = Crumble.hole(cut, A, B, 0, -3, 0, C.MaxFly, 1, C)
+	check("a glancing hit still throws one brick", #tiny == 1)
+
+	-- a big hit over the whole wall: bigger cells so it's still only about MaxFly bricks
+	local whole = Crumble.grid(A, B, math.huge, C.MaxFly, C)
+	check("a whole wall breaks into about MaxFly bricks", whole.na * whole.nb <= C.MaxFly * 2)
+	check("a whole wall is more than one brick", whole.na * whole.nb > 1)
+	check("nothing stands of a wall thrown whole", #Crumble.mesh(whole, Crumble.all(whole)) == 0)
+	local full = Crumble.hole(whole, A, B, 0, 0, 1000, C.MaxFly, 7, C)
+	check("a hole never throws more than its share", #full <= C.MaxFly)
+
+	-- a lamp post breaks into a few lengths, not a heap of slivers
+	local pole = Crumble.grid(20, 0.6, math.huge, C.PropFly, C)
+	check(
+		"a lamp post breaks into a few lengths",
+		pole.nb == 1 and pole.na >= 2 and pole.na <= C.PropFly
+	)
+
+	-- budgets
+	check(
+		"one break's bricks are shared out",
+		Crumble.share(C.Budget, 100, C.MaxFly) * 100 <= C.Budget
+	)
+	check(
+		"every broken wall throws at least one brick",
+		Crumble.share(C.Budget, 10000, C.MaxFly) == 1
+	)
+	check(
+		"one wall never throws more than MaxFly",
+		Crumble.share(C.Budget, 1, C.MaxFly) == C.MaxFly
+	)
+	check("phones keep fewer bricks", C.MaxLivePhone < C.MaxLive and C.MaxLivePhone > 0)
+	check("bricks lie a while, then sink", C.LifeSeconds[1] > C.SettleAfter and C.SinkSeconds > 0)
+	check("leftover blocks fit the map's part budget", C.MaxRemnants > 0 and C.MaxRemnants <= 1000)
+	check(
+		"a hole's reach shrinks off the wall's face",
+		Crumble.reach(5, 3) == 4 and Crumble.reach(2, 3) == 0
+	)
+	local spread = 0
+	for cell = 1, 200 do
+		local x = Crumble.noise(99, cell)
+		if x < 0 or x >= 1 then
+			spread = -1000
+		end
+		spread += x
+	end
+	check(
+		"the ragged edge's noise is spread over 0..1",
+		spread / 200 > 0.35 and spread / 200 < 0.65
+	)
+	check("collapse bricks fit the screen's budget", Smash.Collapse.CrumbleBudget <= C.MaxLive)
+end
+checkCrumble()
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

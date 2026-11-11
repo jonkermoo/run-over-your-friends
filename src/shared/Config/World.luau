@@ -73,7 +73,6 @@ return table.freeze({
 		CannonDown = -0.75, -- steep enough to hit people right beside the truck
 	}),
 	Debris = table.freeze({
-		MaxLoose = 1500,
 		RebuildSeconds = 75,
 		ChunkFallReach = 0.7, -- share of the break radius that also drops the floors above
 	}),

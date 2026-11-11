@@ -12,6 +12,7 @@ local TweenService = game:GetService("TweenService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Rules = require(ReplicatedStorage.Shared.Rules.Collapse)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
+local Crumble = require(script.Parent.Crumble)
 local Drive = require(script.Parent.Drive)
 local Fx = require(script.Parent.Fx)
 
@@ -29,6 +30,7 @@ type Piece = {
 	axis: Vector3,
 	spin: number,
 	floorY: number,
+	brick: boolean, -- a brick of a wall blown out near the hit (src/client/Crumble), given back at the end
 }
 type Show = {
 	pieces: { Piece },
@@ -104,10 +106,16 @@ local function puff(show: Show)
 end
 
 local function finish(show: Show)
+	local bricks = {}
 	for _, piece in show.pieces do
-		piece.part.CFrame = piece.from
-		vanish(piece.part)
+		if piece.brick then
+			table.insert(bricks, piece.part)
+		else
+			piece.part.CFrame = piece.from
+			vanish(piece.part)
+		end
 	end
+	Crumble.release(bricks)
 	local anchor = show.anchor
 	task.delay(5, function()
 		anchor:Destroy()
@@ -212,16 +220,12 @@ local function start(building: Model, at: Vector3, push: Vector3, pay: number, u
 	local tall = math.max(maxY - minY, 1)
 	local pieces: { Piece } = {}
 	local flat = push * Vector3.new(1, 0, 1)
-	for i, p in parts do
-		if i > CFG.MaxPieces then
-			vanish(p)
-			continue
-		end
-		local height = (p.Position.Y - minY) / tall
-		local away = (p.Position - at) * Vector3.new(1, 0, 1)
+	local bricksLeft = CFG.CrumbleBudget
+	local function add(p: BasePart, from: CFrame, blasted: boolean, brick: boolean)
+		local height = (from.Position.Y - minY) / tall
+		local away = (from.Position - at) * Vector3.new(1, 0, 1)
 		local reach = away.Magnitude
 		away = if reach > 0.1 then away.Unit else flat.Unit
-		local blasted = (p.Position - at).Magnitude < CFG.BlastRadius
 		local velocity
 		if blasted then
 			velocity = flat * CFG.BlastPush
@@ -239,7 +243,7 @@ local function start(building: Model, at: Vector3, push: Vector3, pay: number, u
 		).Unit
 		table.insert(pieces, {
 			part = p,
-			from = p.CFrame,
+			from = from,
 			wait = if blasted then 0 else Rules.startDelay(height, CFG),
 			velocity = velocity,
 			axis = axis,
@@ -248,7 +252,28 @@ local function start(building: Model, at: Vector3, push: Vector3, pay: number, u
 				then random:NextNumber(CFG.BlastSpin[1], CFG.BlastSpin[2])
 				else random:NextNumber(CFG.DropSpin[1], CFG.DropSpin[2]),
 			floorY = minY + p.Size.Y / 2,
+			brick = brick,
 		})
+	end
+	for i, p in parts do
+		if i > CFG.MaxPieces then
+			vanish(p)
+			continue
+		end
+		local blasted = (p.Position - at).Magnitude < CFG.BlastRadius
+		-- a wall blown out near the hit breaks into bricks (while the budget lasts), not one flying slab
+		local bricks = if blasted and bricksLeft >= 2
+			then Crumble.cut(p, math.min(CFG.CrumbleEach, bricksLeft))
+			else nil
+		if bricks then
+			bricksLeft -= #bricks
+			vanish(p)
+			for _, b in bricks do
+				add(b, b.CFrame, true, true)
+			end
+		else
+			add(p, p.CFrame, blasted, false)
+		end
 	end
 
 	local cf, size = building:GetBoundingBox()

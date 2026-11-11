@@ -56,5 +56,39 @@ return table.freeze({
 		PayMin = 300,
 		PayMax = 2500,
 		GoalPieces = 260, -- most pieces one collapse counts for goals and events
+		CrumbleBudget = 140, -- most bricks the pieces thrown out near the hit break into (each screen's own)
+		CrumbleEach = 8, -- ...and most bricks one of them breaks into
+	}),
+	-- walls crumble into bricks (Rules/Crumble): the cells of a broken wall near the hit are thrown out as bricks
+	-- that only each screen simulates, and the rest stands on as a few blocks until the building rebuilds
+	Crumble = table.freeze({
+		MinCell = 1.6, -- studs: the smallest brick
+		MaxGrid = 300, -- most cells one wall is cut into
+		Ragged = 0.35, -- share of the hole's radius each cell's edge wanders in or out, for a broken edge
+		MaxFly = 16, -- most bricks one broken wall throws
+		Budget = 220, -- most bricks one break throws in all (shared out over the walls it breaks)
+		PropFly = 4, -- most pieces one part of a lamp post, bench or sign breaks into
+		-- server: leftover blocks are real parts until their building rebuilds
+		MaxStay = 12, -- a wall that would stand on as more blocks than this comes down whole
+		MinStayShare = 0.15, -- ...and so does one with less than this share of it left
+		MaxRemnants = 600, -- most leftover blocks standing across the map at once (the map's part budget)
+		ClearStuds = 1, -- the hitting vehicle's way through stays this much wider than it, so it never sticks
+		-- each screen: the bricks
+		MaxLive = 260, -- most bricks moving or lying about at once; the oldest goes first
+		MaxLivePhone = 110, -- ...on a phone or tablet
+		FarStuds = 700, -- breaks further from the camera than this throw no bricks (just the dust)
+		Shrink = { 0.72, 0.95 }, -- share of its cell a brick fills, so they read as rubble, not a grid
+		Shade = 0.12, -- most a brick's colour drifts darker or lighter
+		PushShare = 0.55, -- share of the hitter's velocity the bricks carry on with
+		DropScatter = 0.15, -- share of Out and Up the walls falling from above the hit get (they mostly drop)
+		PropPush = 0.8, -- share of the hitter's velocity a lamp post's or bench's pieces carry on with
+		PropLift = 12, -- studs/s up on top
+		Out = { 12, 30 }, -- studs/s away from the hit
+		Up = { 6, 24 }, -- studs/s up
+		Spin = 6, -- radians/s, most in each axis
+		SettleAfter = 1.5, -- seconds: from then a brick that has nearly stopped is frozen in place (no physics)
+		SettleSpeed = 2.5, -- studs/s
+		LifeSeconds = { 6, 9 }, -- a brick lies this long...
+		SinkSeconds = 1.2, -- ...then sinks into the ground over this long and goes back to the pool
 	}),
 })

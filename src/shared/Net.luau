@@ -32,6 +32,9 @@ Net.Messages = table.freeze({
 	Celebrate = "Celebrate", -- (title: string, subtitle: string): confetti moment
 	Goals = "Goals", -- (state: { Hourly: Set, Daily: Set }): the player's current goal sets
 	Fx = "Fx", -- (kind: "Hit" | "Land" | "Break" | "Dodge" | "Honk", position: Vector3, a: number, b: number, userId: number)
+	-- (bursts: { Burst }, at: Vector3, push: Vector3): parts broken by one hit, each { cf, size, color, material,
+	-- transparency, shape, part, na, nb, fly } (src/client/Crumble); every screen throws their bricks itself
+	Crumble = "Crumble",
 	Collapse = "Collapse", -- (building: Model, at: Vector3, push: Vector3, pay: number, userId: number): a whole building comes down
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
@@ -65,6 +68,8 @@ export type MessageName =
 	| "Celebrate"
 	| "Goals"
 	| "Fx"
+	| "Crumble"
+	| "Collapse"
 	| "Contest"
 	| "Boards"
 	| "Daily"

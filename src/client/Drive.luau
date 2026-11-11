@@ -861,7 +861,30 @@ local function detectHits(s: CarState, velocity: Vector3)
 				first = p
 			end
 		end
-		local at = first.Position
+		-- the break centres where the car meets that piece (the wall crumbles around it, Rules/Crumble): along the
+		-- way it's going, or the nearest point of the piece when that misses
+		local onPiece = RaycastParams.new()
+		onPiece.FilterType = Enum.RaycastFilterType.Include
+		onPiece.FilterDescendantsInstances = { first }
+		local heading = if velocity.Magnitude > 0.1
+			then velocity.Unit
+			else chassis.CFrame.LookVector
+		local ray = workspace:Raycast(
+			chassis.Position,
+			heading * ((first.Position - chassis.Position).Magnitude + first.Size.Magnitude),
+			onPiece
+		)
+		local inside = first.CFrame:PointToObjectSpace(chassis.Position)
+		local half = first.Size / 2
+		local at = if ray
+			then ray.Position
+			else first.CFrame:PointToWorldSpace(
+				Vector3.new(
+					math.clamp(inside.X, -half.X, half.X),
+					math.clamp(inside.Y, -half.Y, half.Y),
+					math.clamp(inside.Z, -half.Z, half.Z)
+				)
+			)
 		-- hit hard enough, the whole building gives way (the same rule the server uses)
 		local building: Instance? = first
 		while building and building.Parent ~= buildings do

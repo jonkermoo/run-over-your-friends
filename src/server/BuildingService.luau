@@ -1,14 +1,18 @@
 --!strict
 -- Destructible buildings: every building is anchored chunks (wall panels, windows, slabs, columns).
--- A hit or a blast unanchors the chunks in a radius and drops what stood on them, up to the next floor slab;
--- parts marked Fixed (office floor slabs and roofs) are structure and never break in those. Debris fades and the
--- building puts itself back together later. The biggest hits bring the whole building down: nothing goes loose
--- here for those, every client draws the fall (src/client/Collapse) and the pieces just go.
+-- A hit breaks the chunks in a radius and drops what stood on them, up to the next floor slab; parts marked
+-- Fixed (office floor slabs and roofs) are structure and never break in those. A broken wall crumbles
+-- (Rules/Crumble): the cells near the hit are thrown out as bricks that every client simulates on its own
+-- (src/client/Crumble), and the rest stands on here as a few real blocks ("remnants", breakable in turn) until
+-- the building puts itself back together. Nothing goes loose in the server's physics. The biggest hits bring
+-- the whole building down: every client draws the fall (src/client/Collapse) and the pieces just go.
 
 local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CollapseRules = require(ReplicatedStorage.Shared.Rules.Collapse)
+local CrumbleRules = require(ReplicatedStorage.Shared.Rules.Crumble)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -24,6 +28,7 @@ local VehicleService = require(script.Parent.VehicleService)
 local BuildingService = {}
 local CFG = World.Debris
 local COLLAPSE = Smash.Collapse
+local CRUMBLE = Smash.Crumble
 
 type Chunk = { cf: CFrame, transparency: number, glass: boolean }
 local chunks: { [BasePart]: Chunk } = {}
@@ -32,7 +37,10 @@ local structure: { [BasePart]: Chunk } = {}
 local buildingParts: { [Model]: { BasePart } } = {}
 local ownerOf: { [BasePart]: Model } = {}
 local down: { [Model]: boolean } = {}
-local loose: { { part: BasePart, at: number } } = {}
+-- the blocks still standing of each broken wall, and the wall each came from
+local remnantsOf: { [BasePart]: { BasePart } } = {}
+local rootOf: { [BasePart]: BasePart } = {}
+local remnantCount = 0
 local buildingsFolder: Folder? = nil
 local propsFolder: Folder? = nil
 local propDownUntil: { [Model]: number } = {}
@@ -87,12 +95,35 @@ local function hide(part: BasePart)
 	part.Transparency = 1
 end
 
+local function dropRemnant(rem: BasePart)
+	local root = rootOf[rem]
+	chunks[rem] = nil
+	ownerOf[rem] = nil
+	rootOf[rem] = nil
+	local list = root and remnantsOf[root]
+	if list then
+		local i = table.find(list, rem)
+		if i then
+			table.remove(list, i)
+		end
+	end
+	remnantCount -= 1
+	rem:Destroy()
+end
+
 local function restore(part: BasePart, always: boolean?)
 	local c = chunks[part] or structure[part]
 	local owner = ownerOf[part]
 	-- a piece's own timer doesn't bring it back while its building is down; the building's does
-	if not c or not part.Parent or (owner and down[owner] and not always) then
+	if not c or not part.Parent or rootOf[part] or (owner and down[owner] and not always) then
 		return
+	end
+	local standing = remnantsOf[part]
+	if standing then
+		for i = #standing, 1, -1 do
+			dropRemnant(standing[i])
+		end
+		remnantsOf[part] = nil
 	end
 	part.Anchored = true
 	part.AssemblyLinearVelocity = Vector3.zero
@@ -121,51 +152,221 @@ local function shatter(part: BasePart)
 	Debris:AddItem(a, 2)
 end
 
-local function loosen(part: BasePart, push: Vector3)
-	if part:GetAttribute("Broken") then
-		return
-	end
-	part:SetAttribute("Broken", true)
-	local c = chunks[part]
-	if c and c.glass then
-		shatter(part)
-		hide(part)
-	else
-		part.CollisionGroup = "Debris"
-		part.Anchored = false
-		part.AssemblyLinearVelocity = push
-		part.AssemblyAngularVelocity = Vector3.new(
-			random:NextNumber(-3, 3),
-			random:NextNumber(-3, 3),
-			random:NextNumber(-3, 3)
-		)
-		pcall(function()
-			part:SetNetworkOwner(nil)
-		end)
-		table.insert(loose, { part = part, at = os.clock() })
-	end
-	task.delay(CFG.RebuildSeconds + random:NextNumber(0, 8), restore, part)
-end
-
-local breakListeners: { (Player, number) -> () } = {}
-
 -- how many pieces a part counts for: town buildings join a few wall panels into one part ("Pieces")
 local function worth(p: BasePart): number
 	local n = p:GetAttribute("Pieces")
 	return if typeof(n) == "number" then n else 1
 end
 
+export type Burst = {
+	cf: CFrame,
+	size: Vector3,
+	color: Color3,
+	material: Enum.Material,
+	transparency: number,
+	shape: string,
+	part: BasePart?,
+	na: number,
+	nb: number,
+	fly: { number },
+}
+
+-- the hitting vehicle's way through: no block is left standing within `radius` of the line from `at` along `dir`
+type Way = { at: Vector3, dir: Vector3, radius: number }
+
+local function shapeOf(p: BasePart): string
+	if p:IsA("Part") then
+		if p.Shape == Enum.PartType.Block then
+			return "Block"
+		elseif p.Shape == Enum.PartType.Cylinder then
+			return "Cylinder"
+		end
+	end
+	return "Other"
+end
+
+-- a vector with x on side a and y on side b (1 = X, 2 = Y, 3 = Z), the third side from `rest` (or 0)
+local function onAxes(a: number, b: number, x: number, y: number, rest: { number }?): Vector3
+	local v = if rest then { rest[1], rest[2], rest[3] } else { 0, 0, 0 }
+	v[a], v[b] = x, y
+	return Vector3.new(v[1], v[2], v[3])
+end
+
+-- a standing block cut from `source` (a wall or an earlier block of it), a real part until the wall rebuilds
+local function addRemnant(source: BasePart, root: BasePart, cf: CFrame, size: Vector3)
+	local rem = source:Clone()
+	for _, child in rem:GetChildren() do
+		if not child:IsA("Texture") then
+			child:Destroy()
+		end
+	end
+	rem:SetAttribute("Broken", nil)
+	rem:SetAttribute("Pieces", 0) -- the wall paid when it broke; what's left pays nothing more
+	rem.Size = size
+	rem.CFrame = cf
+	local c = chunks[source]
+	chunks[rem] = {
+		cf = cf,
+		transparency = if c then c.transparency else source.Transparency,
+		glass = false,
+	}
+	rootOf[rem] = root
+	ownerOf[rem] = ownerOf[root]
+	local list = remnantsOf[root] or {}
+	remnantsOf[root] = list
+	table.insert(list, rem)
+	remnantCount += 1
+	rem.Parent = source.Parent
+end
+
+-- cut a broken part for throwing: around the hit (a hole of `radius`, the rest left standing as remnants) or,
+-- with no hit, all of it; about `most` bricks at most
+local function crumble(
+	part: BasePart,
+	hit: Vector3?,
+	radius: number,
+	most: number,
+	way: Way?
+): Burst
+	local shape = shapeOf(part)
+	local size = part.Size
+	local s = { size.X, size.Y, size.Z }
+	local k, a, b = CrumbleRules.axes(s[1], s[2], s[3])
+	if shape == "Cylinder" then
+		k, a, b = 3, 1, 2
+	end
+	local A, B = s[a], s[b]
+	local grid: CrumbleRules.Grid? = nil
+	local fly: { number } = {}
+	local stays: { CrumbleRules.Rect } = {}
+	if shape == "Block" and hit then
+		local l = part.CFrame:PointToObjectSpace(hit)
+		local lp = { l.X, l.Y, l.Z }
+		local r = CrumbleRules.reach(radius, math.max(math.abs(lp[k]) - s[k] / 2, 0))
+		local cut = CrumbleRules.grid(A, B, r, most, CRUMBLE)
+		local seed = random:NextInteger(0, 2 ^ 31 - 1)
+		fly = CrumbleRules.hole(cut, A, B, lp[a], lp[b], r, most, seed, CRUMBLE)
+		if way then
+			local gone = {}
+			for _, cell in fly do
+				gone[cell] = true
+			end
+			for j = 0, cut.nb - 1 do
+				for i = 0, cut.na - 1 do
+					local cell = j * cut.na + i + 1
+					if not gone[cell] then
+						local u, v = CrumbleRules.cellCentre(cut, A, B, i, j)
+						local rel = part.CFrame:PointToWorldSpace(onAxes(a, b, u, v)) - way.at
+						if (rel - way.dir * rel:Dot(way.dir)).Magnitude < way.radius then
+							table.insert(fly, cell)
+						end
+					end
+				end
+			end
+		end
+		stays = CrumbleRules.mesh(cut, fly)
+		local left = 1 - #fly / (cut.na * cut.nb)
+		if
+			#stays <= CRUMBLE.MaxStay
+			and left >= CRUMBLE.MinStayShare
+			and remnantCount + #stays <= CRUMBLE.MaxRemnants
+		then
+			grid = cut
+		else
+			stays = {}
+		end
+	end
+	if not grid then
+		local whole = CrumbleRules.grid(A, B, math.huge, most, CRUMBLE)
+		if shape == "Cylinder" then
+			whole = { na = math.min(whole.na, most), nb = 1 }
+		elseif shape == "Other" then
+			whole = { na = 1, nb = 1 }
+		end
+		grid = whole
+		fly = CrumbleRules.all(whole)
+	end
+	local cut = grid :: CrumbleRules.Grid
+	local root = rootOf[part] or part
+	for _, rect in stays do
+		local u, v, w, h = CrumbleRules.rectBox(cut, A, B, rect)
+		addRemnant(part, root, part.CFrame * CFrame.new(onAxes(a, b, u, v)), onAxes(a, b, w, h, s))
+	end
+	local c = chunks[part]
+	return {
+		cf = part.CFrame,
+		size = size,
+		color = part.Color,
+		material = part.Material,
+		transparency = if c then c.transparency else part.Transparency,
+		shape = shape,
+		part = if shape == "Other" then part else nil,
+		na = cut.na,
+		nb = cut.nb,
+		fly = fly,
+	}
+end
+
+-- send the bricks of a break only to players near enough to see them (Config/Smash Crumble FarStuds)
+local function sendBricks(at: Vector3, bursts: { Burst }, push: Vector3, scatter: number?)
+	if #bursts == 0 then
+		return
+	end
+	local remote = Net.remote("Crumble")
+	for _, p in Players:GetPlayers() do
+		local character = p.Character
+		local root = character and character.PrimaryPart
+		if root and (root.Position - at).Magnitude < CRUMBLE.FarStuds + 100 then
+			remote:FireClient(p, bursts, at, push, scatter)
+		end
+	end
+end
+
+-- break one part: glass shatters, anything else crumbles into `bursts`; a wall rebuilds later (with whatever
+-- of it was left standing), a remnant just goes. Returns the pieces it counts for.
+local function loosen(
+	part: BasePart,
+	bursts: { Burst },
+	hit: Vector3?,
+	radius: number,
+	most: number,
+	way: Way?
+): number
+	if part:GetAttribute("Broken") then
+		return 0
+	end
+	part:SetAttribute("Broken", true)
+	local c = chunks[part]
+	if c and c.glass then
+		shatter(part)
+	else
+		table.insert(bursts, crumble(part, hit, radius, most, way))
+	end
+	hide(part)
+	local pieces = worth(part)
+	if rootOf[part] then
+		dropRemnant(part)
+	else
+		task.delay(CFG.RebuildSeconds + random:NextNumber(0, 8), restore, part)
+	end
+	return pieces
+end
+
+local breakListeners: { (Player, number) -> () } = {}
+
 -- called with the player and how many pieces they broke
 function BuildingService.onBreak(listener: (Player, number) -> ())
 	table.insert(breakListeners, listener)
 end
 
--- break everything within radius of pos; push is the hitter's velocity (studs/s); returns the pieces broken
+-- break everything within radius of pos; push is the hitter's velocity (studs/s); `way` keeps the hitter's path
+-- through the wall open. Returns the pieces broken.
 function BuildingService.breakAt(
 	pos: Vector3,
 	radius: number,
 	push: Vector3,
-	player: Player?
+	player: Player?,
+	way: Way?
 ): number
 	if not buildingsFolder or radius <= 0 then
 		return 0
@@ -173,22 +374,15 @@ function BuildingService.breakAt(
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { buildingsFolder }
-	local hit = workspace:GetPartBoundsInRadius(pos, radius, params)
-	local count = 0
-	for _, p in hit do
+	local struck: { BasePart } = {}
+	local taken: { [BasePart]: boolean } = {}
+	for _, p in workspace:GetPartBoundsInRadius(pos, radius, params) do
 		if p.Anchored and chunks[p] and not p:GetAttribute("Broken") then
-			local away = p.Position - pos
-			away = if away.Magnitude > 0.1 then away.Unit else Vector3.yAxis
-			loosen(
-				p,
-				push * 0.55
-					+ away * random:NextNumber(15, 35)
-					+ Vector3.new(0, random:NextNumber(5, 25), 0)
-			)
-			count += worth(p)
+			table.insert(struck, p)
+			taken[p] = true
 		end
 	end
-	if count == 0 then
+	if #struck == 0 then
 		return 0
 	end
 	-- whatever stood on the broken part falls too, unless the break is only a small hole; a floor slab above
@@ -207,30 +401,51 @@ function BuildingService.breakAt(
 			ceiling = math.min(ceiling, p.Position.Y)
 		end
 	end
-	local dropped = 0
+	local falling: { BasePart } = {}
 	for _, p in above do
-		if dropped > 260 then
+		if #falling >= 260 then
 			break
 		end
 		if
-			p.Anchored
+			not taken[p]
+			and p.Anchored
 			and chunks[p]
 			and not p:GetAttribute("Broken")
 			and p.Position.Y > pos.Y + 2
 			and p.Position.Y < ceiling
 		then
-			loosen(p, Vector3.new(random:NextNumber(-4, 4), 0, random:NextNumber(-4, 4)))
-			dropped += worth(p)
+			table.insert(falling, p)
 		end
+	end
+	-- the bricks one break may throw are shared out over everything it breaks
+	local most = CrumbleRules.share(CRUMBLE.Budget, #struck + #falling, CRUMBLE.MaxFly)
+	local thrown: { Burst } = {}
+	local count = 0
+	for _, p in struck do
+		count += loosen(p, thrown, pos, radius, most, way)
+	end
+	sendBricks(pos, thrown, push * CRUMBLE.PushShare)
+	if #falling > 0 then
+		local dropping: { Burst } = {}
+		for _, p in falling do
+			count += loosen(p, dropping, nil, 0, most)
+		end
+		sendBricks(pos, dropping, Vector3.zero, CRUMBLE.DropScatter)
 	end
 	Net.remote("Fx")
-		:FireAllClients("Break", pos, count + dropped, radius, if player then player.UserId else 0)
-	if player then
+		:FireAllClients(
+			"Break",
+			pos,
+			math.max(count, 1),
+			radius,
+			if player then player.UserId else 0
+		)
+	if player and count > 0 then
 		for _, listener in breakListeners do
-			task.spawn(listener, player, count + dropped)
+			task.spawn(listener, player, count)
 		end
 	end
-	return count + dropped
+	return count
 end
 
 -- bring the whole building at pos down; true when it did (false: none there, or it's down already)
@@ -266,6 +481,12 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 			p.CanQuery = false
 			count += worth(p)
 		end
+		-- what was left standing of its broken walls comes down with it (and goes when they rebuild)
+		for _, rem in remnantsOf[p] or {} do
+			rem:SetAttribute("Broken", true)
+			rem.CanCollide = false
+			rem.CanQuery = false
+		end
 	end
 	local pay = CollapseRules.payout(count, COLLAPSE)
 		* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
@@ -280,6 +501,9 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 		for _, p in parts do
 			if p.Anchored and p:GetAttribute("Broken") then
 				hide(p)
+			end
+			for _, rem in remnantsOf[p] or {} do
+				hide(rem)
 			end
 		end
 	end)
@@ -335,7 +559,16 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 		return
 	end
 	local radius = Impact.smashRadius(stats.weight, metres, Smash, stats.maxBreak)
-	BuildingService.breakAt(pos, radius, velocity.Unit * speed, player)
+	-- the vehicle's own outline (plus a little) stays open along its way, so it never sticks in what's left
+	local extents = (vehicle :: Model):GetExtentsSize()
+	local way: Way? = if speed > 0.1
+		then {
+			at = pos,
+			dir = velocity.Unit,
+			radius = math.max(math.min(extents.X, extents.Z), extents.Y) / 2 + CRUMBLE.ClearStuds,
+		}
+		else nil
+	BuildingService.breakAt(pos, radius, velocity.Unit * speed, player, way)
 end
 
 local function spray(at: Vector3)
@@ -394,29 +627,19 @@ local function onKnockProp(player: Player, prop: unknown, velocity: unknown)
 		return
 	end
 	propDownUntil[prop] = now + Streets.PropRebuildSeconds
-	local push = (if speed > 0.1 then velocity.Unit * speed else Vector3.zero) * 0.8
+	local push = (if speed > 0.1 then velocity.Unit * speed else Vector3.zero) * CRUMBLE.PropPush
+		+ Vector3.new(0, CRUMBLE.PropLift, 0)
+	-- it breaks into a few pieces that fly on every screen; the real one waits, hidden, to be stood back up
+	local thrown: { Burst } = {}
 	for _, p in prop:GetDescendants() do
 		if p:IsA("BasePart") and chunks[p] and not p:GetAttribute("Broken") then
 			p:SetAttribute("Broken", true)
-			p.CollisionGroup = "Debris"
-			p.Anchored = false
-			p.AssemblyLinearVelocity = push
-				+ Vector3.new(
-					random:NextNumber(-6, 6),
-					random:NextNumber(18, 34),
-					random:NextNumber(-6, 6)
-				)
-			p.AssemblyAngularVelocity = Vector3.new(
-				random:NextNumber(-6, 6),
-				random:NextNumber(-6, 6),
-				random:NextNumber(-6, 6)
-			)
-			pcall(function()
-				p:SetNetworkOwner(nil)
-			end)
+			table.insert(thrown, crumble(p, nil, 0, CRUMBLE.PropFly))
+			hide(p)
 			task.delay(Streets.PropRebuildSeconds, restore, p)
 		end
 	end
+	sendBricks(pivot, thrown, push)
 	if prop:GetAttribute("Prop") == "Hydrant" then
 		spray(pivot + Vector3.new(0, 1, 0))
 	end
@@ -426,26 +649,9 @@ end
 function BuildingService.start()
 	Net.remote("BreakAt").OnServerEvent:Connect(onBreak)
 	Net.remote("KnockProp").OnServerEvent:Connect(onKnockProp)
-	game:GetService("Players").PlayerRemoving:Connect(function(p)
+	Players.PlayerRemoving:Connect(function(p)
 		lastProp[p] = nil
 		lastBreak[p] = nil
-	end)
-	-- debris: fade out after a while; over budget, the oldest goes first
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			local now = os.clock()
-			local over = #loose - CFG.MaxLoose
-			for i = #loose, 1, -1 do
-				local e = loose[i]
-				if now - e.at > 14 or i <= over then
-					if e.part.Parent and e.part:GetAttribute("Broken") then
-						hide(e.part)
-					end
-					table.remove(loose, i)
-				end
-			end
-		end
 	end)
 end
 
