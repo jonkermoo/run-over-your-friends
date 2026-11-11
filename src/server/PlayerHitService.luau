@@ -173,7 +173,10 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 		local other = VehicleService.stats(target)
 		local ratio = math.clamp(stats.weight / (if other then other.weight else 1500), 0.25, 4)
 			^ 0.5
-		local launch = math.min(Impact.launchSpeed(energy) * ratio, terms.carLaunchCap)
+		local launch = math.min(
+			Impact.launchSpeed(energy) * ratio,
+			HitRules.carLaunchCap(stats.price, HitConfig)
+		)
 		if owner then
 			launch *= repeatScale(player, owner, stats.price)
 		end

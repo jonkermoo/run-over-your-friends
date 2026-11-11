@@ -2669,6 +2669,15 @@ do
 		HitRules.repeatScale(50, sedan, HitConfig) == HitConfig.RepeatFloor
 	)
 	check("big cars skip repeat falloff", HitRules.repeatScale(5, roadster, HitConfig) == 1)
+	local hatch = HitRules.carLaunchCap(Vehicles.ById.Hatchback.price, HitConfig)
+	local muscle = HitRules.carLaunchCap(Vehicles.ById.Muscle.price, HitConfig)
+	check(
+		"cheap cars knock other cars less",
+		hatch == HitConfig.CheapCarLaunchCap
+			and hatch < muscle
+			and muscle < HitConfig.Normal.carLaunchCap
+			and HitRules.carLaunchCap(roadster, HitConfig) == HitConfig.Big.carLaunchCap
+	)
 	local normal, big = HitConfig.Normal, HitConfig.Big
 	check(
 		"big cars get the shorter shield and stronger hits",

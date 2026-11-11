@@ -11,13 +11,17 @@ return table.freeze({
 	RepeatWindow = 60,
 	RepeatFactor = 0.5,
 	RepeatFloor = 0.25,
+	-- a car's knock on another car grows with its price: CheapCarLaunchCap at CheapCarPrice and below,
+	-- rising (log scale) to Normal.carLaunchCap at BigCarPrice
+	CheapCarPrice = 3000, -- Hatchback and Sedan
+	CheapCarLaunchCap = 100, -- studs/s
 	Normal = table.freeze({
 		shield = 6, -- seconds after a hit when this attacker can't hit the victim again
 		ragdoll = 1.5, -- seconds a launched player on foot lies before getting up
 		carRecover = 0.8, -- seconds until a flung driver's car drives again
 		parkedRecover = 1.5, -- seconds until a flung parked car's motors come back
 		launchCap = 130, -- studs/s, a player on foot
-		carLaunchCap = 160, -- studs/s, a car
+		carLaunchCap = 160, -- studs/s, a car (cheaper cars knock less, see CheapCarLaunchCap)
 	}),
 	Big = table.freeze({
 		shield = 2, -- still a short gap, so a hit can't land every frame
