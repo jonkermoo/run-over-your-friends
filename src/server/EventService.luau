@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Rules = require(ReplicatedStorage.Shared.Rules.Events)
@@ -25,6 +26,8 @@ local random = Random.new()
 local t0 = os.clock() -- the schedule's start; hurry() moves it to bring the next event forward
 local phase = "quiet"
 local untilWarn = 0
+local offset = 0 -- which event in the list comes first
+local restart = false -- Studio: start the live event over (a fresh giant)
 
 -- the contest running now, if any
 type Running = { event: Config.Event, scores: Contest.Scores, names: { [number]: string } }
@@ -205,7 +208,22 @@ function EventService.start()
 		end
 	end)
 	t0 = os.clock()
-	local offset = random:NextInteger(0, #Config.List - 1)
+	offset = random:NextInteger(0, #Config.List - 1)
+	if RunService:IsStudio() then
+		-- testing: put the schedule at the start of the named event
+		local attr = Config.StudioStartAttribute
+		workspace:GetAttributeChangedSignal(attr):Connect(function()
+			local key = workspace:GetAttribute(attr)
+			for i, e in Config.List do
+				if e.key == key then
+					offset = i - 1
+					t0 = os.clock() - Config.FirstAfter
+					restart = true
+					workspace:SetAttribute(attr, nil) -- so the same key can start it again
+				end
+			end
+		end)
+	end
 	local live: string? = nil
 	task.spawn(function()
 		while true do
@@ -221,7 +239,8 @@ function EventService.start()
 			local event = Config.List[ph.index]
 			local key = if event then event.key else ""
 			local nowLive = if ph.phase == "live" then key else nil
-			if nowLive ~= live then
+			if nowLive ~= live or restart then
+				restart = false
 				if live then
 					finish(live)
 				end
