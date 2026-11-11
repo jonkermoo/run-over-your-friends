@@ -186,6 +186,12 @@ local function watch(m: Model)
 		m:GetAttributeChangedSignal("FriendName"):Connect(refresh),
 		m:GetAttributeChangedSignal("FriendOfName"):Connect(refresh),
 		m:GetAttributeChangedSignal("Golden"):Connect(refresh),
+		-- a character reaches this client before its parts do: build once the head arrives
+		m.ChildAdded:Connect(function(child)
+			if child.Name == "Head" then
+				refresh()
+			end
+		end),
 	}
 	refresh()
 end
