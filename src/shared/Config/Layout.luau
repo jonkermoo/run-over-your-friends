@@ -41,13 +41,6 @@ return table.freeze({
 	}),
 	TouchCashGap = 8, -- layout px kept clear under the cash box
 
-	-- the event card (top centre) on short screens: a one-line strip; a tap opens the full card, which folds
-	-- back after EventOpenSeconds or on another tap
-	EventStripBelow = 600, -- GUI height in real px under which the strip is used (every phone held sideways)
-	EventStripWidth = 290,
-	EventStripHeight = 30,
-	EventOpenSeconds = 6,
-
 	-- Roblox's dynamic thumbstick takes touches on the left of the screen, from a third of the way down
 	ThumbZoneWidth = 0.4,
 	ThumbZoneTop = 1 / 3,

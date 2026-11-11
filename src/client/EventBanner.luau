@@ -9,7 +9,6 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
-local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
@@ -128,58 +127,6 @@ Style.onTap(hide, function()
 end)
 chip.Activated:Connect(function()
 	shrunk = false
-end)
-
--- on short screens (phones) the sign is a one-line strip: a pill, the title and the timer (a contest adds
--- your place). A tap opens the full sign; it folds back after a few seconds or on another tap.
-local strip = Style.button(gui, "", "dark", 16)
-strip.Name = "EventStrip"
-strip.Text = ""
-strip.BackgroundColor3 = C.panel
-strip.AnchorPoint = Vector2.new(0.5, 0)
-strip.Position = UDim2.new(0.5, 0, 0, 8)
-strip.Size = UDim2.fromOffset(LayoutConfig.EventStripWidth, LayoutConfig.EventStripHeight)
-strip.Visible = false
-local stripPill = Style.pill(strip, "", C.ink)
-stripPill.AnchorPoint = Vector2.new(0, 0.5)
-stripPill.Position = UDim2.new(0, 8, 0.5, 0)
-local stripTitle = Style.label(strip, "", 16, F.display, C.text)
-stripTitle.AnchorPoint = Vector2.new(0, 0.5)
-stripTitle.Size = UDim2.new(1, -150, 0, 20)
-stripTitle.TextXAlignment = Enum.TextXAlignment.Left
-stripTitle.TextTruncate = Enum.TextTruncate.AtEnd
-local stripTimer = Style.label(strip, "", 16, F.display, C.yellow)
-stripTimer.AnchorPoint = Vector2.new(1, 0.5)
-stripTimer.Position = UDim2.new(1, -24, 0.5, 0)
-stripTimer.Size = UDim2.fromOffset(120, 20)
-stripTimer.TextXAlignment = Enum.TextXAlignment.Right
--- a small "more" chevron at the right end, drawn from two rotated bars (glyph arrows don't draw)
-local chevron: { Frame } = {}
-for i, side in { -1, 1 } do
-	local bar = Instance.new("Frame")
-	bar.BorderSizePixel = 0
-	bar.AnchorPoint = Vector2.new(0.5, 0.5)
-	bar.Position = UDim2.new(1, -14 + side * 2.5, 0.5, 0)
-	bar.Size = UDim2.fromOffset(8, 3)
-	bar.Rotation = side * -40
-	bar.Parent = strip
-	chevron[i] = bar
-end
--- while the full sign is open on a short screen, a tap anywhere on it folds it back
-local bannerTap = Instance.new("TextButton")
-bannerTap.Name = "Fold"
-bannerTap.Text = ""
-bannerTap.BackgroundTransparency = 1
-bannerTap.Size = UDim2.fromScale(1, 1)
-bannerTap.ZIndex = 5
-bannerTap.Visible = false
-bannerTap.Parent = banner
-local openUntil = 0
-strip.Activated:Connect(function()
-	openUntil = os.clock() + LayoutConfig.EventOpenSeconds
-end)
-bannerTap.Activated:Connect(function()
-	openUntil = 0
 end)
 
 -- dark text on bright paint, white on dark paint
@@ -309,60 +256,23 @@ local function update()
 	local key = workspace:GetAttribute("EventKey")
 	local endsAt = workspace:GetAttribute("EventEndsAt")
 	if typeof(phase) ~= "string" or typeof(key) ~= "string" or typeof(endsAt) ~= "number" then
-		banner.Visible, hide.Visible, chip.Visible, strip.Visible = false, false, false, false
+		banner.Visible, hide.Visible, chip.Visible = false, false, false
 		return
 	end
 	local event = byKey[key]
 	if not event then
-		banner.Visible, hide.Visible, chip.Visible, strip.Visible = false, false, false, false
+		banner.Visible, hide.Visible, chip.Visible = false, false, false
 		return
 	end
+	banner.Visible = not shrunk
+	hide.Visible = not shrunk
+	chip.Visible = shrunk
 	local color = Style.colors[event.color] or C.gold
 	local left = endsAt - workspace:GetServerTimeNow()
 	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) then
 		bigTitle(event)
 	end
 	lastPhase, lastKey = phase, key
-	local compact = gui.AbsoluteSize.Y < LayoutConfig.EventStripBelow
-	local open = compact and os.clock() < openUntil
-	bannerTap.Visible = open
-	if compact and not open then
-		banner.Visible, hide.Visible, chip.Visible = false, false, false
-		strip.Visible = true
-		local quiet = phase == "quiet"
-		local paint = if quiet then C.panel else color
-		local ink = if quiet then C.text else inkOn(color)
-		strip.BackgroundColor3 = paint
-		stripPill.Visible = not quiet
-		stripPill.Text = if phase == "live" then "LIVE" else "SOON"
-		stripPill.BackgroundColor3 = ink
-		stripPill.TextColor3 = paint
-		stripTitle.Text = if quiet then "NEXT EVENT" else event.title
-		stripTitle.TextColor3 = ink
-		stripTitle.Position = UDim2.new(0, if quiet then 10 else 64, 0.5, 0)
-		local place = ""
-		local st = standings
-		if phase == "live" and event.contest and st and st.key == event.key and st.place > 0 then
-			place = `YOU {Contest.ordinal(st.place)}  `
-		end
-		stripTimer.Text = place .. fmt(if quiet then left + Config.WarnSeconds else left)
-		stripTimer.TextColor3 = if quiet then C.yellow else ink
-		-- the title gets what the timer leaves (TextBounds are real px, the strip is laid out in layout px)
-		local titleX = if quiet then 10 else 64
-		local timerW = stripTimer.TextBounds.X / Style.scale()
-		stripTitle.Size = UDim2.new(1, -(titleX + 24 + 8 + timerW), 0, 20)
-		for _, bar in chevron do
-			bar.BackgroundColor3 = ink
-		end
-		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
-		Style.setShadow(strip, if blink then C.text else C.ink)
-		return
-	end
-	strip.Visible = false
-	shrunk = shrunk and not compact
-	banner.Visible = not shrunk
-	hide.Visible = not shrunk and not compact
-	chip.Visible = shrunk
 	if shrunk then
 		chipDot.BackgroundColor3 = if phase == "quiet" then C.grey else color
 		chipMark.TextColor3 = inkOn(chipDot.BackgroundColor3)
