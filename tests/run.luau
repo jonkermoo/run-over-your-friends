@@ -2655,16 +2655,16 @@ do
 		"layout: right side is clear of the thumb",
 		not Layout.inThumbZone(600, 300, 848, 395, cfg)
 	)
-	-- the touch rack folds to two rows where its top row would reach the cash box (real px, GUI 339
-	-- tall on a short phone, 354 on a normal one, 732 on a tablet)
+	-- the touch rack folds to two rows where its top row would reach the cash box (real GUI px under
+	-- Roblox's top bar, measured in Studio's emulator: iPhone 14 749x323; iPhone SE about 667x317)
 	local function wideAt(guiW: number, guiH: number): boolean
 		local s = Layout.scale(guiW, guiH, cfg)
 		local key = math.max(s, cfg.TouchMinScale)
 		local clear = Layout.touchClear(guiW, guiH, cfg)
 		return Layout.touchWide(guiH, clear, key, 62 * s, cfg.TouchCashGap * s, cfg)
 	end
-	check("layout: a short phone folds the touch rack", wideAt(667, 339))
-	check("layout: a normal phone keeps three rows", not wideAt(844, 354))
+	check("layout: a short phone folds the touch rack", wideAt(667, 317))
+	check("layout: a normal phone folds the touch rack", wideAt(749, 323))
 	check("layout: a tablet keeps three rows", not wideAt(1024, 732))
 	local filled: { [string]: boolean } = {}
 	for name, slot in cfg.TouchSlotsWide do
