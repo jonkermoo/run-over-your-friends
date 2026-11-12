@@ -3,6 +3,7 @@
 -- stats, buy and spawn), the store (passes, like reward, credits) and the phone driving buttons.
 -- Every visual comes from Style.
 
+local GroupService = game:GetService("GroupService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -829,6 +830,7 @@ local function header(order: number, text: string)
 	h.Size = UDim2.new(1, -12, 0, 26)
 	h.TextXAlignment = Enum.TextXAlignment.Left
 	h.LayoutOrder = order
+	return h
 end
 
 -- "R$ 99": the configured label until the product exists, then Roblox's real price
@@ -956,16 +958,25 @@ for i, p in PASSES do
 		Net.waitFor("BuyPass"):FireServer(p.name)
 	end)
 end
-header(9, "FREE")
-local likeButton = storeRow(
+local freeHeader = header(9, "FREE")
+local groupButton = storeRow(
 	10,
-	"LIKE REWARD",
-	`Liked the game? Thanks! Here's {money(Economy.LikeReward)}, once.`,
+	"GROUP REWARD",
+	`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
 	"CLAIM",
 	C.gold,
 	"green",
 	function()
-		Net.waitFor("ClaimLike"):FireServer()
+		if player:GetAttribute("GroupClaimed") == true then
+			return
+		end
+		if Economy.GroupId ~= 0 then
+			-- Roblox's own join prompt; the server checks membership either way
+			pcall(function()
+				(GroupService :: any):PromptJoinAsync(Economy.GroupId)
+			end)
+		end
+		Net.waitFor("ClaimGroup"):FireServer()
 	end
 )
 local credits = Style.label(
@@ -1004,9 +1015,13 @@ local function refreshStore()
 			h.Visible = not bought
 		end
 	end
-	local claimed = player:GetAttribute("LikeClaimed") == true
-	likeButton.Text = if claimed then "CLAIMED" else "CLAIM"
-	Style.setKind(likeButton, if claimed then "dark" else "green")
+	local claimed = player:GetAttribute("GroupClaimed") == true
+	groupButton.Text = if claimed then "CLAIMED" else "CLAIM"
+	Style.setKind(groupButton, if claimed then "dark" else "green")
+	-- no group yet: nothing to offer outside Studio
+	local groupLive = Economy.GroupId ~= 0 or RunService:IsStudio()
+	freeHeader.Visible = groupLive;
+	(groupButton.Parent :: GuiObject).Visible = groupLive
 end
 
 local function open(p: Frame)
@@ -1456,7 +1471,7 @@ function Hud.start()
 	refreshFriends()
 	player:GetAttributeChangedSignal("Paint"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("Paints"):Connect(refreshCards)
-	player:GetAttributeChangedSignal("LikeClaimed"):Connect(refreshStore)
+	player:GetAttributeChangedSignal("GroupClaimed"):Connect(refreshStore)
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
 	local function tutorialStep()
 		local step = (player:GetAttribute("Tutorial") or 0) :: number

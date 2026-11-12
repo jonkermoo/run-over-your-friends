@@ -17,7 +17,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 export type Profile = {
 	money: number, -- fractional; rounded only for display
 	owned: { [string]: boolean },
-	likeClaimed: boolean,
+	groupClaimed: boolean,
 	roadsterPassPaid: boolean,
 	tutorial: number, -- Config/Onboarding Steps
 	quests: { [string]: any }, -- Hourly/Daily goal sets, checked by QuestService
@@ -49,7 +49,7 @@ local function default(): Profile
 	return {
 		money = Economy.StartMoney,
 		owned = { [Vehicles.Starter] = true },
-		likeClaimed = false,
+		groupClaimed = false,
 		roadsterPassPaid = false,
 		tutorial = 1,
 		quests = {},
@@ -86,7 +86,7 @@ local function publish(player: Player, profile: Profile)
 		table.insert(owned, id)
 	end
 	player:SetAttribute("Owned", table.concat(owned, ","))
-	player:SetAttribute("LikeClaimed", profile.likeClaimed)
+	player:SetAttribute("GroupClaimed", profile.groupClaimed)
 	player:SetAttribute("Tutorial", profile.tutorial)
 	local bought = {}
 	for key, yes in profile.bought do
@@ -223,7 +223,7 @@ local function load(player: Player)
 		else
 			if typeof(decoded) == "table" and decoded.money ~= nil then
 				profile.money = tonumber(decoded.money) or profile.money
-				profile.likeClaimed = decoded.likeClaimed == true
+				profile.groupClaimed = decoded.groupClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
 				profile.rookieDone = decoded.rookieDone == true
 				-- saves from before the tutorial skip it, and so do saves past its old end

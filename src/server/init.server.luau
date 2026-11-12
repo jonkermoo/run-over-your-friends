@@ -1,8 +1,10 @@
 --!strict
 -- Server entry: collision groups, the world, then every service.
 
+local GroupService = game:GetService("GroupService")
 local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -141,24 +143,47 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 	OnboardingService.purchased(player, stats)
 end)
 
--- like reward: honour system, once per account (Roblox can't tell a game whether you liked it)
-Net.remote("ClaimLike").OnServerEvent:Connect(function(player)
-	if not RateLimit.allow(player, "like", 2) then
+-- group reward: once per account, for members of the game's group (checked fresh, so joining mid-session counts)
+local function inGroup(player: Player): boolean
+	if Economy.GroupId == 0 then
+		return RunService:IsStudio() -- no group yet: a test grant in Studio only
+	end
+	local ok, groups = pcall(GroupService.GetGroupsAsync, GroupService, player.UserId)
+	if not ok or typeof(groups) ~= "table" then
+		return false
+	end
+	for _, g in groups do
+		if g.Id == Economy.GroupId then
+			return true
+		end
+	end
+	return false
+end
+
+Net.remote("ClaimGroup").OnServerEvent:Connect(function(player)
+	if not RateLimit.allow(player, "group", 2) then
 		return
 	end
 	local profile = Data.get(player)
-	if not profile or profile.likeClaimed then
+	if not profile or profile.groupClaimed then
 		return
 	end
-	profile.likeClaimed = true
-	profile.money += Economy.LikeReward
+	if not inGroup(player) then
+		Net.remote("Popup"):FireClient(player, "Join the group first, then press CLAIM", "info")
+		return
+	end
+	if profile.groupClaimed or not player.Parent then
+		return -- claimed again while the group check was waiting
+	end
+	profile.groupClaimed = true
+	profile.money += Economy.GroupReward
 	Data.changed(player)
 	Analytics.source(
 		player,
-		Economy.LikeReward,
+		Economy.GroupReward,
 		Enum.AnalyticsEconomyTransactionType.TimedReward,
-		"LikeReward"
+		"GroupReward"
 	)
 	Net.remote("Popup")
-		:FireClient(player, "+$" .. Economy.LikeReward .. "  Thanks for the like!", "big")
+		:FireClient(player, "+$" .. Economy.GroupReward .. "  Thanks for joining!", "big")
 end)

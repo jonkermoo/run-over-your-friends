@@ -17,7 +17,9 @@ return table.freeze({
 	MinHitSpeed = 6.7, -- m/s (15 mph): slower bumps don't count
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
-	LikeReward = 5000,
+	-- one-time cash for joining the game's Roblox group; 0 = no group yet (the row is hidden live, a test grant in Studio)
+	GroupId = 0,
+	GroupReward = 5000,
 	RoadsterPassMoney = 1000000,
 	AutosaveSeconds = 60,
 	-- game pass ids; 0 until the passes exist on the Creator Hub. In Studio the shop toggles them for testing.

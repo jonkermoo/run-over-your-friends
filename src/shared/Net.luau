@@ -11,7 +11,7 @@ Net.Messages = table.freeze({
 	BuyVehicle = "BuyVehicle", -- (vehicleId)
 	BuyPass = "BuyPass", -- (passName): real purchase prompt, or a test toggle in Studio
 	BuyProduct = "BuyProduct", -- (productKey): Robux money pack or starter pack
-	ClaimLike = "ClaimLike", -- ()
+	ClaimGroup = "ClaimGroup", -- (): pays the group reward once, if the player is in Economy.GroupId
 	HitNpc = "HitNpc", -- (npc: Model, velocity: Vector3)
 	BreakAt = "BreakAt", -- (position: Vector3, velocity: Vector3)
 	KnockProp = "KnockProp", -- (prop: Model, velocity: Vector3): street furniture hit by a vehicle
@@ -48,7 +48,7 @@ export type MessageName =
 	| "BuyVehicle"
 	| "BuyPass"
 	| "BuyProduct"
-	| "ClaimLike"
+	| "ClaimGroup"
 	| "HitNpc"
 	| "BreakAt"
 	| "KnockProp"
