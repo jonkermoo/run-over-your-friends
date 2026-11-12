@@ -493,7 +493,8 @@ local function showTarget(target: Target?, root: BasePart?)
 end
 
 -- the arrow at a button; under it when the button is in the top half of the screen, over it otherwise
-local function showPress(target: GuiObject?)
+-- fromSide: point in from the right (a button in a list row, whose text sits above and left of it)
+local function showPress(target: GuiObject?, fromSide: boolean?)
 	if not (target and target.Visible and target.AbsoluteSize.X > 0) then
 		press.Visible = false
 		return
@@ -503,6 +504,11 @@ local function showPress(target: GuiObject?)
 	local under = at.Y + s.Y / 2 < gui.AbsoluteSize.Y / k / 2
 	local bob = math.sin(os.clock() * 7) * 9
 	press.Visible = true
+	if fromSide and at.X + s.X + 92 < gui.AbsoluteSize.X / k then
+		press.Rotation = 90 -- the down arrow turned to point left, at the button's right edge
+		press.Position = UDim2.fromOffset(at.X + s.X + 46 + bob, at.Y + s.Y / 2)
+		return
+	end
 	press.Rotation = if under then 180 else 0
 	press.Position =
 		UDim2.fromOffset(at.X + s.X / 2, if under then at.Y + s.Y + 46 + bob else at.Y - 46 - bob)
@@ -612,6 +618,7 @@ local function update()
 	hintText.Visible = false
 	local target: Target? = nil
 	local pressTarget: GuiObject? = nil
+	local pressFromSide = false
 	local glowGarage, glowGoals = false, false
 	local glowCard: string? = nil
 	stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
@@ -707,6 +714,7 @@ local function update()
 		barFill.Size = UDim2.fromScale(0, 1)
 		if sheetOpen then
 			pressTarget = goalsGui and goalsGui:FindFirstChild("TutorialClaim", true) :: GuiObject?
+			pressFromSide = true -- from above, the arrow sat on the goal's own text
 		else
 			glowGoals = true
 			pressTarget = goalsButton
@@ -798,7 +806,7 @@ local function update()
 		end
 	end
 	showTarget(target, root)
-	showPress(pressTarget)
+	showPress(pressTarget, pressFromSide)
 
 	local id = Drive.state.vehicleId
 	if Drive.state.driving and id ~= lastVehicle then

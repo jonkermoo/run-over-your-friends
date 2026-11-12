@@ -6,6 +6,7 @@
 -- right after a player-hit fling doesn't count. A jump needs a real launch (speed and a change of height) and
 -- is void past Config MaxAir, so a car that floats or flies up earns nothing.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -32,7 +33,9 @@ type Track = {
 		speed: number, -- m/s across the ground as it left it
 		fromY: number, -- chassis height where it left the ground
 		hiY: number,
+		ramp: boolean, -- left the ground off a jump ramp
 	}?,
+	ground: Instance?, -- what it last stood on
 	downAt: number, -- when it last touched down (the landing is judged Settle seconds later)
 	last: CFrame,
 	airLeft: number, -- fractions of a second of air not yet sent to the goals
@@ -40,7 +43,7 @@ type Track = {
 local tracks: { [Player]: Track } = {}
 
 local listeners: { (Player, string, number) -> () } = {}
--- kind: "Air" (whole seconds), "Jumps" (1 per clean landing) or "Stunt" (one jump's pay, for contests)
+-- kind: "Air" (whole seconds), "Jumps" (1 per clean landing), "RampJumps" (the same, off a jump ramp) or "Stunt" (one jump's pay, for contests)
 function StuntService.onStunt(listener: (Player, string, number) -> ())
 	table.insert(listeners, listener)
 end
@@ -67,10 +70,11 @@ local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 rayParams.CollisionGroup = "Vehicles" -- people, debris and other cars don't count as ground
 
-local function clearance(chassis: BasePart, vehicle: Model): number?
+local function clearance(chassis: BasePart, vehicle: Model): (number?, Instance?)
 	rayParams.FilterDescendantsInstances = { vehicle }
 	local hit = workspace:Raycast(chassis.Position, Vector3.new(0, -60, 0), rayParams)
-	return hit and (chassis.Position.Y - hit.Position.Y)
+	return if hit then chassis.Position.Y - hit.Position.Y else nil,
+		if hit then hit.Instance else nil
 end
 
 -- degrees the nose swung round flat between two frames
@@ -116,6 +120,9 @@ local function land(player: Player, t: Track, chassis: BasePart, stats: Vehicles
 		emit(player, "Air", whole)
 	end
 	emit(player, "Jumps", 1)
+	if j.ramp then
+		emit(player, "RampJumps", 1)
+	end
 	emit(player, "Stunt", result.pay)
 end
 
@@ -137,7 +144,7 @@ local function step(player: Player, now: number, dt: number)
 		tracks[player] = t
 	end
 	local cf = chassis.CFrame
-	local c = clearance(chassis, vehicle)
+	local c, under = clearance(chassis, vehicle)
 	local rest = t.rest
 	local upright = cf.UpVector.Y > 0.8
 	-- the ride height: the lowest it sits upright, drifting back up slowly (suspension, a new car)
@@ -149,6 +156,9 @@ local function step(player: Player, now: number, dt: number)
 	end
 	local wasUp = t.up
 	t.up = rest ~= nil and (c == nil or c > rest + Config.Clearance)
+	if not t.up and not t.jump then
+		t.ground = under
+	end
 
 	if t.up then
 		local flungAt = vehicle:GetAttribute("FlungAt")
@@ -161,6 +171,8 @@ local function step(player: Player, now: number, dt: number)
 					/ Vehicles.StudsPerMetre,
 				fromY = cf.Position.Y,
 				hiY = cf.Position.Y,
+				ramp = t.ground ~= nil
+					and CollectionService:HasTag(t.ground :: Instance, "JumpRamp"),
 			}
 		t.jump = j
 		j.hiY = math.max(j.hiY, cf.Position.Y)

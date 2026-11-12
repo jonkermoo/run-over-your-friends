@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollapseRules = require(ReplicatedStorage.Shared.Rules.Collapse)
 local CrumbleRules = require(ReplicatedStorage.Shared.Rules.Crumble)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
@@ -353,10 +354,30 @@ local function loosen(
 	return pieces
 end
 
-local breakListeners: { (Player, number) -> () } = {}
+local breakListeners: { (Player, number, boolean) -> () } = {}
+-- is this part of a real building (a model in the Buildings folder at least Onboarding.SmashMinHeight tall,
+-- the ones the tutorial points at), not a fence, tree or shed? Cached per model.
+local tallModels: { [Model]: boolean } = {}
+local function inTallBuilding(p: BasePart): boolean
+	local folder = buildingsFolder
+	local m: Instance? = p
+	while m and m.Parent ~= folder do
+		m = m.Parent
+	end
+	if not (m and m:IsA("Model")) then
+		return false
+	end
+	local tall = tallModels[m]
+	if tall == nil then
+		local _, size = m:GetBoundingBox()
+		tall = size.Y >= Onboarding.SmashMinHeight
+		tallModels[m] = tall
+	end
+	return tall :: boolean
+end
 
--- called with the player and how many pieces they broke
-function BuildingService.onBreak(listener: (Player, number) -> ())
+-- called with the player, how many pieces they broke and whether any were a real building's
+function BuildingService.onBreak(listener: (Player, number, boolean) -> ())
 	table.insert(breakListeners, listener)
 end
 
@@ -442,8 +463,15 @@ function BuildingService.breakAt(
 			if player then player.UserId else 0
 		)
 	if player and count > 0 then
+		local building = false
+		for _, p in struck do
+			if inTallBuilding(p) then
+				building = true
+				break
+			end
+		end
 		for _, listener in breakListeners do
-			task.spawn(listener, player, count)
+			task.spawn(listener, player, count, building)
 		end
 	end
 	return count
@@ -516,7 +544,7 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 		end
 	end)
 	for _, listener in breakListeners do
-		task.spawn(listener, player, math.min(count, COLLAPSE.GoalPieces))
+		task.spawn(listener, player, math.min(count, COLLAPSE.GoalPieces), true)
 	end
 	return true
 end

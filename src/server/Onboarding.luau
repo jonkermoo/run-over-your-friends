@@ -160,18 +160,22 @@ function OnboardingService.start()
 			moveOn(player, Steps.Hits)
 		end
 	end)
+	-- the ramp step wants a jump off a jump ramp, not any kerb or crest
 	StuntService.onStunt(function(player, kind)
-		if kind ~= "Jumps" then
+		if kind ~= "RampJumps" then
 			return
 		end
 		sessionOf(player).jumped = true
 		tookPart(player)
 		complete(player, Steps.Ramp)
 	end)
-	BuildingService.onBreak(function(player, count)
+	BuildingService.onBreak(function(player, count, building)
 		local s = sessionOf(player)
-		s.pieces += count
 		tookPart(player)
+		if not building then
+			return -- fences, trees and sheds don't teach smashing
+		end
+		s.pieces += count
 		if step(player) == Steps.Smash then
 			player:SetAttribute("TutorialCount", s.pieces)
 			if s.pieces >= Onboarding.SmashGoal then

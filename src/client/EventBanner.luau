@@ -13,6 +13,8 @@ local GuiService = game:GetService("GuiService")
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -149,7 +151,9 @@ local function fmt(seconds: number): string
 	return string.format("%d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
+local titleUntil = 0 -- the big title is on screen until then: queued cards (daily streak) wait for it
 local function bigTitle(event: Config.Event)
+	titleUntil = os.clock() + Config.TitleSeconds
 	sting:Play()
 	local color = Style.colors[event.color] or C.gold
 	local holder = Instance.new("Frame")
@@ -258,7 +262,11 @@ local function update()
 	chip.Position = UDim2.new(0.5, 0, 0, y)
 	local color = Style.colors[event.color] or C.gold
 	local left = endsAt - workspace:GetServerTimeNow()
-	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) then
+	-- a player still early in the tutorial isn't interrupted by the big title (the card still shows it);
+	-- from the tutorial's event step on, it plays
+	local step = (Players.LocalPlayer:GetAttribute("Tutorial") or 0) :: number
+	local inTutorial = step < Onboarding.Steps.Event
+	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) and not inTutorial then
 		bigTitle(event)
 	end
 	lastPhase, lastKey = phase, key
@@ -323,6 +331,9 @@ local function update()
 end
 
 function EventBanner.start()
+	Popups.addBusy(function()
+		return os.clock() < titleUntil
+	end)
 	Net.waitFor("Contest").OnClientEvent:Connect(function(state: Standings)
 		standings = state
 	end)

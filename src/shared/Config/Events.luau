@@ -13,7 +13,8 @@ export type Event = { key: string, title: string, text: string, color: string, c
 
 return table.freeze({
 	GapSeconds = 360, -- quiet time between events
-	FirstAfter = 90, -- the first event comes sooner, so a new server gets one early
+	TitleSeconds = 3.6, -- the big title is up this long (fade included); queued cards like the daily streak wait for it
+	FirstAfter = 180, -- a new server's first event: 3 minutes in, after a first player's tutorial
 	DurationSeconds = 120,
 	WarnSeconds = 20, -- the banner counts down before it starts
 	-- contests sit between the others, so two in a row never happen
