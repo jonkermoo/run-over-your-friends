@@ -164,6 +164,17 @@ local function save(player: Player, release: boolean?): boolean
 	return ok
 end
 
+-- save once any save already in flight for this player is done (a leave mid-autosave still saves and
+-- lets go of the lock). Counted in inFlight while waiting, so shutdown waits for it too.
+local function saveWhenFree(player: Player, release: boolean?): boolean
+	inFlight += 1
+	while saving[player] do
+		task.wait(0.1)
+	end
+	inFlight -= 1
+	return save(player, release) -- no yield since the loop, so nothing else can have started a save
+end
+
 -- save right away (after a Robux purchase); true when the profile is safely stored, or when this
 -- server has no DataStore at all (Studio, unpublished), where everything is session-only anyway
 function Data.saveNow(player: Player): boolean
@@ -173,10 +184,7 @@ function Data.saveNow(player: Player): boolean
 	if loadFailed[player] then
 		return false
 	end
-	while saving[player] do
-		task.wait(0.1)
-	end
-	return save(player)
+	return saveWhenFree(player)
 end
 
 local function load(player: Player)
@@ -281,7 +289,7 @@ function Data.start()
 		task.spawn(load, p)
 	end
 	Players.PlayerRemoving:Connect(function(player)
-		save(player, true)
+		saveWhenFree(player, true)
 		profiles[player] = nil
 		loadFailed[player] = nil
 	end)
@@ -296,7 +304,7 @@ function Data.start()
 	game:BindToClose(function()
 		-- PlayerRemoving may already have taken the profiles; wait for every save in flight
 		for player in profiles do
-			task.spawn(save, player, true)
+			task.spawn(saveWhenFree, player, true)
 		end
 		local deadline = os.clock() + 25
 		task.wait(0.1)
