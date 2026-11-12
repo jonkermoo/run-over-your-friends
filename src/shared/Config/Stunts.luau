@@ -4,6 +4,10 @@
 
 return table.freeze({
 	MinAir = 0.3, -- seconds in the air before a jump counts (bumps and kerbs don't; slow cars off a ramp do)
+	MaxAir = 8, -- a jump longer than this is void (no real ramp keeps a car up this long; a flying car does)
+	-- a real launch: leaving the ground at least this fast (m/s, across the ground)...
+	MinLaunchSpeed = 4,
+	MinHeight = 3, -- ...and rising this many studs over where it left the ground, or dropping this far below
 	PerSecond = 40, -- $ per second in the air
 	Spin = 100, -- $ per full turn flat (a 360)
 	TrickSlack = 60, -- degrees short of a full turn that still count as one

@@ -3,7 +3,8 @@
 -- for the jump (Rules/Stunts: air time and flat spins; slow vehicles boosted; double in the
 -- stunt park). Landing on the roof is a wipeout and pays nothing. Measured here, not on the client: a ray
 -- down from the chassis against the car's usual ride height. Jet cars don't score (they can fly), and air
--- right after a player-hit fling doesn't count.
+-- right after a player-hit fling doesn't count. A jump needs a real launch (speed and a change of height) and
+-- is void past Config MaxAir, so a car that floats or flies up earns nothing.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,7 +25,14 @@ type Track = {
 	vehicle: Model,
 	rest: number?, -- the chassis's height over the ground when sat on its wheels
 	up: boolean, -- off the ground right now
-	jump: { air: number, yaw: number, void: boolean }?,
+	jump: {
+		air: number,
+		yaw: number,
+		void: boolean,
+		speed: number, -- m/s across the ground as it left it
+		fromY: number, -- chassis height where it left the ground
+		hiY: number,
+	}?,
 	downAt: number, -- when it last touched down (the landing is judged Settle seconds later)
 	last: CFrame,
 	airLeft: number, -- fractions of a second of air not yet sent to the goals
@@ -77,8 +85,10 @@ local function land(player: Player, t: Track, chassis: BasePart, stats: Vehicles
 	if not j or j.void then
 		return
 	end
+	local y = chassis.Position.Y
 	local result = Stunts.score({
 		air = j.air,
+		launched = Stunts.launched(j.speed, j.hiY - j.fromY, j.fromY - y, Config),
 		yaw = j.yaw,
 		upright = chassis.CFrame.UpVector.Y >= Config.Upright,
 		gravity = workspace.Gravity / NORMAL_GRAVITY,
@@ -147,8 +157,13 @@ local function step(player: Player, now: number, dt: number)
 				air = 0,
 				yaw = 0,
 				void = typeof(flungAt) == "number" and now - flungAt < Config.FlungGrace,
+				speed = (chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)).Magnitude
+					/ Vehicles.StudsPerMetre,
+				fromY = cf.Position.Y,
+				hiY = cf.Position.Y,
 			}
 		t.jump = j
+		j.hiY = math.max(j.hiY, cf.Position.Y)
 		j.air += dt
 		j.yaw += turned(t.last, cf)
 	elseif wasUp then

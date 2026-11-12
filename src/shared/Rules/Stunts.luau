@@ -7,6 +7,9 @@ local Stunts = {}
 
 export type Config = {
 	MinAir: number,
+	MaxAir: number,
+	MinLaunchSpeed: number,
+	MinHeight: number,
 	PerSecond: number,
 	Spin: number,
 	TrickSlack: number,
@@ -24,6 +27,7 @@ export type Jump = {
 	gravity: number, -- the server's gravity over normal (low gravity makes air cheap)
 	topSpeed: number,
 	inPark: boolean,
+	launched: boolean, -- a real launch (Stunts.launched), not a car that was already up or floated off
 }
 
 export type Result = {
@@ -34,6 +38,12 @@ export type Result = {
 	spins: number,
 	label: string,
 }
+
+-- did the car really jump? Fast enough across the ground as it left it, and a real change of height: rising
+-- `rise` studs over where it took off, or landing `drop` studs below it
+function Stunts.launched(launchSpeed: number, rise: number, drop: number, cfg: Config): boolean
+	return launchSpeed >= cfg.MinLaunchSpeed and math.max(rise, drop) >= cfg.MinHeight
+end
 
 -- whole turns in `degrees`, a little short still counting
 function Stunts.turns(degrees: number, slack: number): number
@@ -59,7 +69,7 @@ end
 function Stunts.score(j: Jump, cfg: Config): Result
 	local air = j.air * math.min(j.gravity, 1)
 	local spins = Stunts.turns(j.yaw, cfg.TrickSlack)
-	local counts = air >= cfg.MinAir
+	local counts = air >= cfg.MinAir and j.air <= cfg.MaxAir and j.launched
 	local raw = air * cfg.PerSecond + spins * cfg.Spin
 	local pay = raw * Stunts.boost(j.topSpeed, cfg) * (if j.inPark then cfg.Park else 1)
 	pay = math.min(math.floor(pay / 10 + 0.5) * 10, cfg.MaxPay)

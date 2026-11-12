@@ -2437,8 +2437,15 @@ do
 		local StuntConfig = require("../src/shared/Config/Stunts")
 		local Stunts = require("../src/shared/Rules/Stunts")
 		local function jump(over: { [string]: any }): any
-			local j =
-				{ air = 2, yaw = 0, upright = true, gravity = 1, topSpeed = 95, inPark = false }
+			local j = {
+				air = 2,
+				yaw = 0,
+				upright = true,
+				gravity = 1,
+				topSpeed = 95,
+				inPark = false,
+				launched = true,
+			}
 			for k, v in over do
 				j[k] = v
 			end
@@ -2480,8 +2487,17 @@ do
 		check("low gravity air is worth less", math.abs(floaty.air - 1.4) < 1e-6)
 		check(
 			"one jump is capped",
-			jump({ air = 30, yaw = 7200, inPark = true }).pay == StuntConfig.MaxPay
+			jump({ air = StuntConfig.MaxAir - 0.1, yaw = 7200, inPark = true }).pay
+				== StuntConfig.MaxPay
 		)
+		local floated = jump({ air = StuntConfig.MaxAir + 0.1 })
+		check("a jump over MaxAir is void", not floated.counts and floated.pay == 0)
+		check("no real launch, no jump", not jump({ launched = false }).counts)
+		local L, H = StuntConfig.MinLaunchSpeed, StuntConfig.MinHeight
+		check("a ramp launch is real", Stunts.launched(L + 5, H + 2, 0, StuntConfig))
+		check("off a cliff is real too", Stunts.launched(L + 5, 0, H + 10, StuntConfig))
+		check("floating up from standing isn't", not Stunts.launched(0, H + 50, 0, StuntConfig))
+		check("a kerb bump isn't", not Stunts.launched(L + 20, H / 3, 0, StuntConfig))
 	end
 	checkStunts()
 	checkOnboarding()
