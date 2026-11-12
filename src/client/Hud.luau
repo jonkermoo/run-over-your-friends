@@ -12,6 +12,7 @@ local SocialService = game:GetService("SocialService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local CockpitConfig = require(ReplicatedStorage.Shared.Config.Cockpit)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
 local DriveHudConfig = require(ReplicatedStorage.Shared.Config.DriveHud)
@@ -174,24 +175,74 @@ local function popup(text: string, kind: string)
 end
 
 local shownMoney = 0
+-- coins flying up out of the cash box on a big gain
+local function sparkle()
+	for i = 1, Callouts.CashSparks do
+		local coin = Instance.new("Frame")
+		coin.BorderSizePixel = 0
+		coin.BackgroundColor3 = if i % 2 == 0 then C.yellow else C.money
+		coin.AnchorPoint = Vector2.new(0.5, 0.5)
+		coin.Rotation = 45
+		coin.Size = UDim2.fromOffset(9, 9)
+		coin.Position = UDim2.fromScale(0.3 + math.random() * 0.6, 0.6)
+		coin.ZIndex = 5
+		coin.Parent = moneyBox
+		local fly = TweenService:Create(
+			coin,
+			TweenInfo.new(0.5 + math.random() * 0.3, Enum.EasingStyle.Quad),
+			{
+				Position = UDim2.new(
+					coin.Position.X.Scale + (math.random() - 0.5) * 0.6,
+					0,
+					-0.6 - math.random() * 0.6,
+					0
+				),
+				Rotation = 45 + math.random(-180, 180),
+				BackgroundTransparency = 1,
+			}
+		)
+		fly:Play()
+		fly.Completed:Once(function()
+			coin:Destroy()
+		end)
+	end
+end
+
+local countUp: RBXScriptConnection? = nil
 local function refreshMoney()
 	local target = (player:GetAttribute("Money") or 0) :: number
 	local from = shownMoney
 	shownMoney = target
 	if target > from then
-		moneyScale.Scale = 1.12
-		TweenService:Create(moneyScale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 })
-			:Play()
+		-- every gain bumps the box; a big one bumps harder, flashes green and throws coins
+		local big = target - from >= Callouts.CashBigGain
+		moneyScale.Scale = if big then 1.3 else 1.12
+		TweenService:Create(
+			moneyScale,
+			TweenInfo.new(if big then 0.45 else 0.3, Enum.EasingStyle.Back),
+			{ Scale = 1 }
+		):Play()
+		if big then
+			moneyBox.BackgroundColor3 = C.money
+			TweenService:Create(moneyBox, TweenInfo.new(0.5), { BackgroundColor3 = C.panel }):Play()
+			sparkle()
+		end
+	end
+	if countUp then
+		countUp:Disconnect() -- a new gain carries on from what's shown now
 	end
 	local t0 = os.clock()
+	local seconds = if math.abs(target - from) >= Callouts.CashBigGain then 0.8 else 0.4
 	local conn
 	conn = RunService.RenderStepped:Connect(function()
-		local k = math.clamp((os.clock() - t0) / 0.4, 0, 1)
-		moneyLabel.Text = money(from + (target - from) * k)
+		local k = math.clamp((os.clock() - t0) / seconds, 0, 1)
+		local eased = 1 - (1 - k) ^ 3
+		moneyLabel.Text = money(from + (target - from) * eased)
 		if k >= 1 then
 			conn:Disconnect()
 		end
 	end)
+	countUp = conn
 end
 
 ---------------------------------------------------------------- speedometer

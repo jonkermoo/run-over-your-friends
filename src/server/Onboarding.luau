@@ -124,10 +124,9 @@ local function tookPart(player: Player)
 	end
 end
 
--- every vehicle bought gets its own moment; on the buy step it's also the way on
-function OnboardingService.purchased(player: Player, vehicle: Vehicles.Vehicle)
-	Net.remote("Celebrate")
-		:FireClient(player, "NEW RIDE!", vehicle.name .. " is yours. Open the GARAGE to spawn it.")
+-- every vehicle bought gets its own moment on the buyer's screen (client/NewRide, from the Owned
+-- attribute); on the buy step it's also the way on
+function OnboardingService.purchased(player: Player, _vehicle: Vehicles.Vehicle)
 	if step(player) == Steps.Buy then
 		moveOn(player, Steps.Buy)
 	end

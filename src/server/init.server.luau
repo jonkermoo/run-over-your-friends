@@ -162,6 +162,18 @@ local function inGroup(player: Player): boolean
 	return false
 end
 
+-- the background music on or off (client/Music), saved with the profile
+Net.remote("SetMusic").OnServerEvent:Connect(function(player, off)
+	if typeof(off) ~= "boolean" or not RateLimit.allow(player, "music", 0.3) then
+		return
+	end
+	local profile = Data.get(player)
+	if profile and profile.musicOff ~= off then
+		profile.musicOff = off
+		Data.changed(player)
+	end
+end)
+
 Net.remote("ClaimGroup").OnServerEvent:Connect(function(player)
 	if not RateLimit.allow(player, "group", 2) then
 		return

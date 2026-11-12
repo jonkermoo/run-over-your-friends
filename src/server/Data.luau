@@ -31,6 +31,7 @@ export type Profile = {
 	rookieDone: boolean, -- rookie pay (Config/Economy) has ended for good: they could afford the RookieUntil car
 	invited: { [string]: boolean }, -- user ids of friends this player was paid for inviting (Config/Social)
 	welcomed: boolean, -- got the welcome bonus for joining from an invite
+	musicOff: boolean, -- turned the background music off (client/Music)
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -63,6 +64,7 @@ local function default(): Profile
 		rookieDone = false,
 		invited = {},
 		welcomed = false,
+		musicOff = false,
 	}
 end
 
@@ -91,6 +93,7 @@ local function publish(player: Player, profile: Profile)
 	end
 	player:SetAttribute("Owned", table.concat(owned, ","))
 	player:SetAttribute("GroupClaimed", profile.groupClaimed)
+	player:SetAttribute("MusicOff", profile.musicOff)
 	player:SetAttribute("Tutorial", profile.tutorial)
 	local bought = {}
 	for key, yes in profile.bought do
@@ -239,6 +242,7 @@ local function load(player: Player)
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
 				profile.rookieDone = decoded.rookieDone == true
 				profile.welcomed = decoded.welcomed == true
+				profile.musicOff = decoded.musicOff == true
 				if typeof(decoded.invited) == "table" then
 					for id, yes in decoded.invited do
 						if yes == true and tonumber(id) then

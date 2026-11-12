@@ -321,6 +321,7 @@ end
 local function celebrate(title: string, subtitle: string)
 	task.delay(Style.stage(Callouts.CheerHold), showCelebrate, title, subtitle)
 end
+Guide.celebrate = celebrate -- client/NewRide's cheer after the turntable
 
 ---------------------------------------------------------------- state
 

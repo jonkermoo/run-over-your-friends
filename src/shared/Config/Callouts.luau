@@ -32,6 +32,11 @@ return table.freeze({
 	BigHold = 1.1, -- DEMOLISHED! and its amount: seconds it holds the middle (the slam and its fade)
 	CheerHold = 3.4, -- a cheer (tutorial step, SERVER GOAL, SO CLOSE, contest winners): seconds before it fades
 	CheerFade = 0.5, -- ...and the fade itself
+	NewRideHold = 1.8, -- a new car turns on its turntable this long before the NEW RIDE! cheer (client/NewRide)
+	NewRideTurn = 1.6, -- seconds for one full turn
+	PodiumHold = 4, -- the contest podium stays up this long (client/Podium)
+	CashBigGain = 1000, -- a gain this big makes the cash box bump harder, flash green and throw coins
+	CashSparks = 8, -- coins it throws
 	AirTickerSize = 28, -- the air-time count while airborne
 	LandingSize = 24, -- "120 STUDS!" over the landing spot (a world label)
 

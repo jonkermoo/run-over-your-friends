@@ -24,6 +24,7 @@ Net.Messages = table.freeze({
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
+	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
 	-- server -> client
 	FriendNames = "FriendNames", -- ({ [friendKey: string]: name }): names of this player's own friends in the crowd (FriendKey attribute)
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
@@ -41,6 +42,9 @@ Net.Messages = table.freeze({
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
+	-- ({ title: string, unit: string, top: { { id: number, name: string, score: number, prize: number } }, place: number,
+	-- score: number, prize: number }): a contest just ended; place 0 when you didn't take part
+	Podium = "Podium",
 })
 
 export type MessageName =
@@ -75,6 +79,8 @@ export type MessageName =
 	| "Contest"
 	| "Boards"
 	| "Daily"
+	| "SetMusic"
+	| "Podium"
 	| "ServerGoal"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.

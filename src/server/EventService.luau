@@ -126,17 +126,29 @@ local function finishContest()
 	if #st == 0 then
 		return
 	end
-	local lines = {}
+	-- the podium (client/Podium): the top 3 for everyone, plus each player's own place and prize
+	local top = {}
 	for i = 1, math.min(#Config.ContestPrizes, #st) do
 		local p = st[i]
 		table.insert(
-			lines,
-			`{Contest.ordinal(i)} {c.names[p.id] or "?"} ({Contest.amount(p.score, unit)})`
+			top,
+			{ id = p.id, name = c.names[p.id] or "?", score = p.score, prize = won[p.id] or 0 }
 		)
 	end
+	local placeOf = {}
+	for _, p in st do
+		placeOf[p.id] = p
+	end
 	for _, everyone in Players:GetPlayers() do
-		Net.remote("Celebrate")
-			:FireClient(everyone, c.event.title .. " WINNERS", table.concat(lines, "   "))
+		local mine = placeOf[everyone.UserId]
+		Net.remote("Podium"):FireClient(everyone, {
+			title = c.event.title,
+			unit = unit,
+			top = top,
+			place = if mine then mine.place else 0,
+			score = if mine then mine.score else 0,
+			prize = if mine then won[mine.id] or 0 else 0,
+		})
 	end
 end
 
@@ -192,6 +204,7 @@ function EventService.hurry(): boolean
 end
 
 function EventService.start()
+	Net.remote("Podium") -- made now, so screens can listen before the first contest ends
 	BuildingService.onBreak(function(player, count)
 		score(player, "Breaks", count)
 	end)
