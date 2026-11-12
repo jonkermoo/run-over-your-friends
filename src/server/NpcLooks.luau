@@ -49,6 +49,10 @@ local base: Model? = nil
 local hairs: { Accessory } = {}
 local spare: { Model } = {}
 local friendSpare: { [number]: { Model } } = {}
+-- which friend each friend character wears; kept on the server so the friend's user id never replicates
+local friendOfModel: { [Model]: number } = {}
+local friendKeys: { [number]: number } = {} -- friend user id -> a small key the clients see instead
+local nextFriendKey = 0
 local friendRigs = 0
 local descriptions: { [number]: HumanoidDescription | false } = {}
 local loading: { [number]: boolean } = {}
@@ -511,7 +515,23 @@ function NpcLooks.take(): Model?
 end
 
 -- a friend's character if one is ready; starts building one if not (returns nil meanwhile)
-function NpcLooks.takeFriend(userId: number, name: string, friendOf: string): Model?
+-- the key a friend's characters carry (attribute FriendKey); only that friend's own players learn the name
+function NpcLooks.friendKey(userId: number): number
+	local key = friendKeys[userId]
+	if not key then
+		nextFriendKey += 1
+		key = nextFriendKey
+		friendKeys[userId] = key
+	end
+	return key
+end
+
+-- the friend user id a character wears, or nil for an ordinary person
+function NpcLooks.friendId(model: Model): number?
+	return friendOfModel[model]
+end
+
+function NpcLooks.takeFriend(userId: number): Model?
 	local list = friendSpare[userId]
 	local m = list and table.remove(list)
 	if m then
@@ -533,9 +553,11 @@ function NpcLooks.takeFriend(userId: number, name: string, friendOf: string): Mo
 		if desc then
 			local model = build(desc :: HumanoidDescription)
 			if model then
-				prepare(model, `{name}  ·  friend of {friendOf}`, World.Npc.FriendNameRange)
+				-- no name on the character itself: everyone else sees a plain pedestrian
+				prepare(model, nil, World.Npc.FriendNameRange)
 				model:ScaleTo(Game.BodyScale)
-				model:SetAttribute("FriendId", userId)
+				friendOfModel[model] = userId
+				model:SetAttribute("FriendKey", NpcLooks.friendKey(userId))
 				model.Parent = storage
 				friendSpare[userId] = friendSpare[userId] or {}
 				table.insert(friendSpare[userId], model)
@@ -566,9 +588,9 @@ function NpcLooks.give(model: Model)
 	if glow then
 		glow:Destroy()
 	end
-	local friendId = model:GetAttribute("FriendId")
+	local friendId = friendOfModel[model]
 	model.Parent = storage
-	if typeof(friendId) == "number" then
+	if friendId then
 		friendSpare[friendId] = friendSpare[friendId] or {}
 		table.insert(friendSpare[friendId], model)
 	elseif #spare < Crowd.PoolSpare + Crowd.MaxActive then
@@ -579,9 +601,9 @@ function NpcLooks.give(model: Model)
 end
 
 function NpcLooks.forget(model: Model)
-	local friendId = model:GetAttribute("FriendId")
-	if typeof(friendId) == "number" then
+	if friendOfModel[model] then
 		friendRigs -= 1
+		friendOfModel[model] = nil
 	end
 end
 

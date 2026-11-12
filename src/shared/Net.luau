@@ -25,6 +25,7 @@ Net.Messages = table.freeze({
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	-- server -> client
+	FriendNames = "FriendNames", -- ({ [friendKey: string]: name }): names of this player's own friends in the crowd (FriendKey attribute)
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
 	TrafficCrash = "TrafficCrash", -- (carId, gen, fling: Vector3, hitterUserId): a traffic car is wrecked
 	Fling = "Fling", -- (kind: "Character" | "Vehicle", velocity: Vector3, spin: Vector3, seconds: number): down/no control for seconds
@@ -49,6 +50,7 @@ export type MessageName =
 	| "BuyPass"
 	| "BuyProduct"
 	| "ClaimGroup"
+	| "FriendNames"
 	| "HitNpc"
 	| "BreakAt"
 	| "KnockProp"

@@ -1,15 +1,16 @@
 --!strict
 -- Name tags over the city's friends and giants, built on this screen only so each player reads their own:
--- "friend of You" for their own friends (road yellow, big and bold), "friend of <name>" for another
--- player's friends (smaller, in one fixed colour per friend), and GIANT with the hits left. Tags keep
--- the same size on screen and fade out with distance from the camera. Your own friends also get a yellow
--- outline (only where you can see them) and stay tagged further out.
+-- "friend of You" over your own friends (road yellow, big and bold), and GIANT with the hits left.
+-- Another player's friends show no tag: to everyone else they are plain pedestrians, and only you are
+-- sent your friends' names (FriendNames). Tags keep the same size on screen and fade out with distance
+-- from the camera. Your own friends also get a yellow outline (only where you can see them).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
 local NameTags = {}
@@ -27,6 +28,7 @@ type Tag = {
 }
 
 local tags: { [Model]: Tag } = {}
+local friendNames: { [number]: string } = {} -- FriendKey -> name, for this player's own friends only
 local watching: { [Model]: { RBXScriptConnection } } = {}
 
 local function rgb(c: { number }): Color3
@@ -54,24 +56,15 @@ local function label(
 	return l
 end
 
--- whose friend this is, as this player should read it
-local function friendLine(m: Model): (string, boolean)
+-- is this one of this player's own friends?
+local function isMine(m: Model): boolean
 	local me = Players.LocalPlayer
-	local owners = tostring(m:GetAttribute("FriendOf") or "")
-	local other: string? = nil
-	for id in string.gmatch(owners, "%d+") do
-		local n = tonumber(id)
-		if n == me.UserId then
-			return "friend of You", true
-		end
-		local p = n and Players:GetPlayerByUserId(n)
-		if p and not other then
-			other = p.DisplayName
+	for id in string.gmatch(tostring(m:GetAttribute("FriendOf") or ""), "-?%d+") do
+		if tonumber(id) == me.UserId then
+			return true
 		end
 	end
-	local fallback = m:GetAttribute("FriendOfName")
-	return `friend of {other or (if typeof(fallback) == "string" then fallback else "a player")}`,
-		false
+	return false
 end
 
 local function drop(m: Model)
@@ -92,8 +85,9 @@ local function build(m: Model)
 		return
 	end
 	local hp = m:GetAttribute("GiantHp")
-	local friendName = m:GetAttribute("FriendName")
-	if typeof(hp) ~= "number" and typeof(friendName) ~= "string" then
+	local key = m:GetAttribute("FriendKey")
+	local friendName = if typeof(key) == "number" and isMine(m) then friendNames[key] else nil
+	if typeof(hp) ~= "number" and not friendName then
 		return
 	end
 	local gui = Instance.new("BillboardGui")
@@ -118,14 +112,9 @@ local function build(m: Model)
 			T.GiantSize,
 			true
 	else
-		local line
-		line, mine = friendLine(m)
-		local id = m:GetAttribute("FriendId")
-		local pick = (if typeof(id) == "number" then id else 0) % #T.Others + 1
-		name, sub = string.upper(friendName :: string), line
-		color = if mine then rgb(T.Mine) else rgb(T.Others[pick])
-		size = if mine then T.MineSize else T.OtherSize
-		bold = mine
+		mine = true
+		name, sub, color, size, bold =
+			string.upper(friendName :: string), "friend of You", rgb(T.Mine), T.MineSize, true
 	end
 	size = math.floor(size * k + 0.5)
 	local subSize = math.max(10, math.floor(size * 0.5 + 0.5))
@@ -186,8 +175,7 @@ local function watch(m: Model)
 	watching[m] = {
 		m:GetAttributeChangedSignal("GiantHp"):Connect(refresh),
 		m:GetAttributeChangedSignal("FriendOf"):Connect(refresh),
-		m:GetAttributeChangedSignal("FriendName"):Connect(refresh),
-		m:GetAttributeChangedSignal("FriendOfName"):Connect(refresh),
+		m:GetAttributeChangedSignal("FriendKey"):Connect(refresh),
 		m:GetAttributeChangedSignal("Golden"):Connect(refresh),
 		-- a character reaches this client before its parts do: build once the head arrives
 		m.ChildAdded:Connect(function(child)
@@ -255,15 +243,22 @@ function NameTags.run()
 	for _, m in folder:GetChildren() do
 		watch(m :: Model)
 	end
-	-- a player joining or leaving changes whose friend a tag names
-	local function rebuildAll()
-		for m in tags do
-			build(m)
+	-- names of this player's own friends arrive from the server; tag the ones already walking about
+	Net.waitFor("FriendNames").OnClientEvent:Connect(function(names)
+		if typeof(names) ~= "table" then
+			return
 		end
-	end
-	Players.PlayerAdded:Connect(rebuildAll)
-	Players.PlayerRemoving:Connect(function()
-		task.defer(rebuildAll)
+		for k, name in names do
+			local key = tonumber(k)
+			if key and typeof(name) == "string" then
+				friendNames[key] = name
+			end
+		end
+		for m in watching do
+			if m:GetAttribute("FriendKey") ~= nil then
+				build(m)
+			end
+		end
 	end)
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)

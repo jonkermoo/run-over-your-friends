@@ -13,6 +13,7 @@ local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Interiors = require(ReplicatedStorage.Shared.Config.Interiors)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Net = require(ReplicatedStorage.Shared.Net)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Rules = require(ReplicatedStorage.Shared.Rules.Crowd)
@@ -520,11 +521,16 @@ end
 
 -- a player's friends join the pool; a few of them become the city's familiar faces
 function CrowdService.addFriend(f: Friend)
-	-- everyone in the server they're a friend of (each player's tag says "friend of You" or a name)
+	-- everyone in the server they're a friend of; only they see the friend's name (sent to them alone)
 	local owners = friendOwners[f.userId] or {}
 	friendOwners[f.userId] = owners
 	if not table.find(owners, f.friendOfId) then
 		table.insert(owners, f.friendOfId)
+	end
+	local owner = Players:GetPlayerByUserId(f.friendOfId)
+	if owner then
+		Net.remote("FriendNames")
+			:FireClient(owner, { [tostring(NpcLooks.friendKey(f.userId))] = f.name })
 	end
 	if friendIds[f.userId] then
 		return
@@ -559,15 +565,13 @@ local function activate(p: Person, asFriend: boolean?): boolean
 			p.friend = cast[random:NextInteger(1, #cast)]
 		end
 		local f = p.friend :: Friend
-		model = NpcLooks.takeFriend(f.userId, f.name, f.friendOf)
+		model = NpcLooks.takeFriend(f.userId)
 		if model then
-			-- what each client's name tag reads
-			model:SetAttribute("FriendName", f.name)
+			-- whose friend this is: only those players' clients draw a tag (with the name they were sent)
 			model:SetAttribute(
 				"FriendOf",
 				table.concat(friendOwners[f.userId] or { f.friendOfId }, ",")
 			)
-			model:SetAttribute("FriendOfName", f.friendOf)
 		end
 	end
 	if not model then
@@ -964,7 +968,7 @@ local function refreshActive()
 	local shown, shownFriends = 0, 0
 	for m in byModel do
 		shown += 1
-		if m:GetAttribute("FriendId") then
+		if NpcLooks.friendId(m) then
 			shownFriends += 1
 		end
 	end
@@ -974,7 +978,7 @@ local function refreshActive()
 			and Rules.wantFriend(shownFriends, shown, Config.FriendEvery)
 		if activate(p, asFriend) then
 			shown += 1
-			if p.model and p.model:GetAttribute("FriendId") then
+			if p.model and NpcLooks.friendId(p.model) then
 				shownFriends += 1
 			end
 		end
@@ -1040,7 +1044,7 @@ function CrowdService.stats(): { [string]: number }
 		end
 		if p.model then
 			s.active += 1
-			if p.model:GetAttribute("FriendId") then
+			if NpcLooks.friendId(p.model) then
 				s.friendsShown += 1
 			end
 		end
