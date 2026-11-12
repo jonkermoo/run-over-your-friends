@@ -14,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 local Net = require(ReplicatedStorage.Shared.Net)
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
+local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -399,13 +400,19 @@ local function nearestBuilding(from: Vector3, current: Spot?): Spot?
 	return best
 end
 
--- the cheapest car you don't own yet, at the price the garage shows
+-- the first real step up: the cheapest car you don't own yet that costs at least the rookie-pay car (the
+-- Sedan), at the price the garage shows. The Scooter and the Cart are cheaper but slower and weaker than the
+-- free Hatchback, so they'd make a poor first buy; buying one still finishes the step.
+local FIRST_BUY_MIN = (Vehicles.ById[Economy.RookieUntil] or { price = 0 }).price
 local function cheapestCar(): (Vehicles.Vehicle?, number)
 	local owned = "," .. ((player:GetAttribute("Owned") or "") :: string) .. ","
 	local today = player:GetAttribute("CarOfDay")
 	local best, bestPrice = nil, math.huge
 	for _, v in Vehicles.List do
-		if v.price > 0 and not string.find(owned, "," .. v.id .. ",", 1, true) then
+		if
+			v.price >= math.max(FIRST_BUY_MIN, 1)
+			and not string.find(owned, "," .. v.id .. ",", 1, true)
+		then
 			local price = DailyRules.price(
 				v.id,
 				v.price,

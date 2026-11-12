@@ -97,16 +97,19 @@ function Daily.saleIds(
 	return ids
 end
 
--- a player's car of the day: the day's pick from the sale cars they don't own yet; nil if they own them all
+-- a player's car of the day: the day's pick from the sale cars they don't own yet; nil if they own them all.
+-- ahead: only the first this many of those (ids are in shop order, cheapest first), so the sale is a car
+-- they could reach soon, not one far out of reach
 function Daily.pickFor(
 	ids: { string },
 	owned: { [string]: boolean },
 	day: number,
-	salt: number
+	salt: number,
+	ahead: number?
 ): string?
 	local left = {}
 	for _, id in ids do
-		if not owned[id] then
+		if not owned[id] and (ahead == nil or #left < ahead) then
 			table.insert(left, id)
 		end
 	end

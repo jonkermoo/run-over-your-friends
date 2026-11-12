@@ -11,4 +11,5 @@ return table.freeze({
 	-- never on sale (free cars never are either)
 	DiscountSkip = table.freeze({ Roadster = true, Scooter = true, Sedan = true, Cart = true }),
 	DiscountSalt = 7121,
+	SaleAhead = 3, -- the car of the day comes from the next this many cars you don't own (shop order)
 })

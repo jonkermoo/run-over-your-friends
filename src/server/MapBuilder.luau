@@ -990,6 +990,7 @@ function MapBuilder.build(): Result
 	Lighting.ExposureCompensation = look.Exposure
 	Lighting.Ambient = rgb(look.Ambient)
 	Lighting.OutdoorAmbient = rgb(look.OutdoorAmbient)
+	Lighting.ColorShift_Top = rgb(look.SunTint)
 	Lighting.ShadowSoftness = look.ShadowSoftness
 	Lighting.EnvironmentDiffuseScale = look.DiffuseScale
 	Lighting.EnvironmentSpecularScale = look.SpecularScale
@@ -1015,6 +1016,12 @@ function MapBuilder.build(): Result
 	bloom.Size = look.BloomSize
 	bloom.Threshold = look.BloomThreshold
 	bloom.Parent = Lighting
+	local rays = (Lighting:FindFirstChild("Rays") :: SunRaysEffect?)
+		or Instance.new("SunRaysEffect")
+	rays.Name = "Rays"
+	rays.Intensity = look.SunRays
+	rays.Spread = look.SunRaysSpread
+	rays.Parent = Lighting
 
 	-- streaming: a building or prop arrives whole (smashing, collapses and rooms read all its parts)
 	for _, folder in { buildings, props } do

@@ -15,6 +15,7 @@ return table.freeze({
 	RookieMultiplier = 2, -- hits on people pay this much more for new players...
 	RookieUntil = "Sedan", -- ...until they first hold this vehicle's price in cash or own one at least as dear
 	MinHitSpeed = 6.7, -- m/s (15 mph): slower bumps don't count
+	GaragePaySpeedShare = 0.5, -- the garage's "about $N a hit" is one hit at this share of the car's top speed
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
 	-- one-time cash for joining the game's Roblox group; 0 = no group yet (the row is hidden live, a test grant in Studio)

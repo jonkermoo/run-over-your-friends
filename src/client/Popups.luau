@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cfg = require(ReplicatedStorage.Shared.Config.Popups)
 local Rules = require(ReplicatedStorage.Shared.Rules.Popups)
 local Drive = require(script.Parent.Drive)
+local Style = require(script.Parent.Style)
 
 local Popups = {}
 
@@ -97,7 +98,8 @@ local function tick()
 		if not head.isOpen() then
 			table.remove(queue, 1)
 			closedAt = now
-		elseif Rules.isMoving(s.driving, s.speedMph, Cfg) then
+		elseif Rules.isMoving(s.driving, s.speedMph, Cfg) or Style.sheetOpen() then
+			-- driving off, or the player opened the garage, store or goals: it comes back at the next stop
 			head.open = false
 			head.hide()
 		end

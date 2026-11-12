@@ -1816,6 +1816,20 @@ do
 			neverOwned = neverOwned and pick ~= nil and not ownedHalf[pick]
 		end
 		check("the car of the day is never one you own", neverOwned)
+		local nearOnly = true
+		for d = first, first + #saleIds * 4 do
+			local pick = Daily.pickFor(saleIds, {}, d, salt, 3)
+			nearOnly = nearOnly and pick ~= nil and table.find(saleIds, pick) <= 3
+		end
+		check("with ahead = 3 the sale is one of the next 3 cars", nearOnly)
+		local skipFirst = { [saleIds[1]] = true }
+		local nextThree = true
+		for d = first, first + 20 do
+			local i =
+				table.find(saleIds, Daily.pickFor(saleIds, skipFirst, d, salt, 3) :: string) :: number
+			nextThree = nextThree and i >= 2 and i <= 4
+		end
+		check("owned cars don't count toward the next 3", nextThree)
 		check(
 			"no one owns anything: the pick is the day's car",
 			Daily.pickFor(saleIds, {}, first, salt) == Daily.carOfDay(saleIds, first, salt)
@@ -1903,6 +1917,61 @@ do
 	)
 	local fx, fy = Clear.slide(100, 100, 50, 50, { card }, 1000, 600, 10)
 	check("a pointer clear of every box stays put", fx == 100 and fy == 100)
+end
+
+do
+	local Garage = require("../src/shared/Rules/Garage")
+	local Eco = require("../src/shared/Config/Economy")
+	local V = require("../src/shared/Config/Vehicles")
+	local function pay(id: string): number
+		local v = V.ById[id]
+		return Garage.hitPay(v.weight, v.topSpeed, Eco.GaragePaySpeedShare, Eco)
+	end
+	check(
+		"a heavier car shows more pay a hit",
+		pay("Monster") > pay("Hatchback") and pay("Semi") > pay("Sedan")
+	)
+	check(
+		"the joke rides show the base pay",
+		pay("Cart") == Eco.NpcBase and pay("Scooter") == Eco.NpcBase
+	)
+	local function topples(id: string): boolean
+		local v = V.ById[id]
+		return Garage.topples(v.weight, v.topSpeed, Smash, v.maxBreak)
+	end
+	check(
+		"early cars only make holes, the big ones topple buildings",
+		not topples("Hatchback")
+			and not topples("Taxi")
+			and topples("Muscle")
+			and topples("Bulldozer")
+	)
+	local list = {
+		{ id = "A", price = 0 },
+		{ id = "B", price = 200 },
+		{ id = "C", price = 3000 },
+		{ id = "R", price = 9e9 },
+	}
+	local function price(id: string): number
+		for _, v in list do
+			if v.id == id then
+				return v.price
+			end
+		end
+		return 0
+	end
+	check(
+		"next up: the cheapest car you can't afford",
+		Garage.nextUp(list, { A = true }, 500, price, { R = true }) == "C"
+	)
+	check(
+		"next up skips owned and pass cars",
+		Garage.nextUp(list, { A = true, C = true }, 500, price, { R = true }) == nil
+	)
+	check(
+		"next up skips cars under the minimum price",
+		Garage.nextUp(list, { A = true }, 100, price, { R = true }, 1000) == "C"
+	)
 end
 
 do

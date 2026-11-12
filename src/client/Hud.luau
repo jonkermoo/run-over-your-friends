@@ -17,11 +17,13 @@ local DriveHudConfig = require(ReplicatedStorage.Shared.Config.DriveHud)
 local DriveHudRules = require(ReplicatedStorage.Shared.Rules.DriveHud)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local GarageRules = require(ReplicatedStorage.Shared.Rules.Garage)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
+local SmashConfig = require(ReplicatedStorage.Shared.Config.Smash)
 local SocialConfig = require(ReplicatedStorage.Shared.Config.Social)
 local SocialRules = require(ReplicatedStorage.Shared.Rules.Social)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
@@ -581,6 +583,8 @@ type Card = {
 	picker: PaintPicker.Picker,
 	sale: TextLabel,
 	was: TextLabel,
+	strike: Frame,
+	nextUp: TextLabel,
 }
 
 -- your car of the day (Config/Daily) is cheaper: the server picks it from the cars you don't own and
@@ -599,6 +603,9 @@ local function priceOf(stats: Vehicles.Vehicle): number
 	)
 end
 local offerFor: ((Vehicles.Vehicle) -> ())? = nil -- set once the store exists
+local NOT_FOR_CASH = { Roadster = true } -- never NEXT UP: the pass is the way to it
+-- never NEXT UP under the rookie-pay car's price (the Sedan): the Scooter and Cart are a step down
+local FIRST_STEP_UP = (Vehicles.ById[Economy.RookieUntil] or { price = 0 }).price
 local cards: { Card } = {}
 local refreshCards: () -> ()
 
@@ -702,10 +709,29 @@ for _, stats in Vehicles.List do
 	blurb.TextWrapped = true
 	blurb.TextXAlignment = Enum.TextXAlignment.Left
 	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(info, 192, "SPEED", stats.topSpeed / 250, C.orange)
-	statBar(info, 208, "ACCEL", stats.launch / 15, C.blue)
-	statBar(info, 224, "HANDLING", stats.grip / 22, C.green)
-	statBar(info, 240, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	statBar(info, 190, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(info, 203, "ACCEL", stats.launch / 15, C.blue)
+	statBar(info, 216, "HANDLING", stats.grip / 22, C.green)
+	statBar(info, 229, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	-- what it earns and what it can smash: the reasons to buy the next car
+	local pay =
+		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
+	local payText = Style.label(info, `ABOUT {money(pay)} A HIT`, 12, F.heavy, C.money)
+	payText.Position = UDim2.fromOffset(14, 242)
+	payText.Size = UDim2.fromOffset(110, 14)
+	payText.TextXAlignment = Enum.TextXAlignment.Left
+	local topples = GarageRules.topples(stats.weight, stats.topSpeed, SmashConfig, stats.maxBreak)
+	local smashText = Style.label(
+		info,
+		if topples then "TOPPLES BUILDINGS" else "SMASHES HOLES",
+		12,
+		F.heavy,
+		if topples then C.orange else C.dim
+	)
+	smashText.AnchorPoint = Vector2.new(1, 0)
+	smashText.Position = UDim2.new(1, -14, 0, 242)
+	smashText.Size = UDim2.fromOffset(120, 14)
+	smashText.TextXAlignment = Enum.TextXAlignment.Right
 	local price = Style.label(
 		card,
 		if stats.price == 0 then "FREE" else money(stats.price),
@@ -728,6 +754,14 @@ for _, stats in Vehicles.List do
 	sale.Position = UDim2.new(1, -12, 0, 14)
 	sale.ZIndex = 2
 	sale.Visible = false
+	-- the car to save for (Rules/Garage.nextUp); under the sale tag when both show
+	local nextUp = Style.pill(card, "NEXT UP", C.yellow)
+	nextUp.Name = "NextUp"
+	nextUp.TextColor3 = C.ink
+	nextUp.AnchorPoint = Vector2.new(1, 0)
+	nextUp.Position = UDim2.new(1, -12, 0, 14)
+	nextUp.ZIndex = 2
+	nextUp.Visible = false
 	local was = Style.label(card, "", 13, F.heavy, C.dim)
 	was.Name = "Was"
 	was.AutomaticSize = Enum.AutomaticSize.X
@@ -782,17 +816,31 @@ for _, stats in Vehicles.List do
 		picker = picker,
 		sale = sale,
 		was = was,
+		strike = strike,
+		nextUp = nextUp,
 	})
 end
 
 function refreshCards()
 	local owned = "," .. ((player:GetAttribute("Owned") or "") :: string) .. ","
 	local cash = (player:GetAttribute("Money") or 0) :: number
+	local driving = player:GetAttribute("VehicleId")
+	local ownedSet = {}
+	for _, id in string.split(owned, ",") do
+		ownedSet[id] = true
+	end
+	local save = GarageRules.nextUp(Vehicles.List, ownedSet, cash, function(id)
+		return priceOf(Vehicles.ById[id])
+	end, NOT_FOR_CASH, FIRST_STEP_UP)
 	for _, c in cards do
 		local price = priceOf(c.stats)
+		c.strike.Visible = true
+		c.was.TextColor3 = C.dim
+		c.nextUp.Visible = c.stats.id == save
 		if string.find(owned, "," .. c.stats.id .. ",", 1, true) then
-			c.action.Text = "SPAWN"
-			Style.setKind(c.action, "green")
+			local inIt = driving == c.stats.id
+			c.action.Text = if inIt then "DRIVING" else "SPAWN"
+			Style.setKind(c.action, if inIt then "dark" else "green")
 			c.price.Text = "OWNED"
 			c.price.TextColor3 = C.dim
 			c.sale.Visible = false
@@ -803,12 +851,20 @@ function refreshCards()
 			c.sale.Visible = price < c.stats.price
 			c.was.Visible = price < c.stats.price
 			c.was.Text = money(c.stats.price)
+			-- under the sale tag when both show
+			c.nextUp.Position = UDim2.new(1, -12, 0, if c.sale.Visible then 40 else 14)
 			if cash >= price then
 				c.action.Text = "BUY"
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
+				-- a pass car: the pass is the way in; the cash price stays as a small "or"
 				c.action.Text = "GET PASS"
 				Style.setKind(c.action, "blue")
+				c.price.Text = "GAME PASS"
+				c.price.TextColor3 = C.blue
+				c.was.Text = `or {money(price)}`
+				c.was.Visible = true
+				c.strike.Visible = false
 			else
 				c.action.Text = "BUY"
 				Style.setKind(c.action, "dark")
@@ -1157,6 +1213,14 @@ local function maybeOfferStarter()
 		return
 	end
 	starterOffered = true
+	-- only a head start for someone still near the start: not once they own a car pricier than the pack's
+	local pack = Vehicles.ById[starter.vehicle or ""]
+	for _, id in string.split((player:GetAttribute("Owned") or "") :: string, ",") do
+		local v = Vehicles.ById[id]
+		if pack and v and v.price > pack.price then
+			return
+		end
+	end
 	Popups.want("Starter", 2, function()
 		if starterBought() then
 			return
@@ -1495,6 +1559,7 @@ function Hud.start()
 	refreshStore()
 	-- a new car of the day at UTC midnight
 	player:GetAttributeChangedSignal("CarOfDay"):Connect(refreshCards)
+	player:GetAttributeChangedSignal("VehicleId"):Connect(refreshCards)
 	-- first visit: open the garage so the starter car is one click away
 	task.delay(2, function()
 		while not player:GetAttribute("DataReady") do

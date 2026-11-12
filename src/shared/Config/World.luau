@@ -2,30 +2,34 @@
 -- Map layout, NPCs and destruction budgets. Studs and seconds.
 
 return table.freeze({
-	-- the world's look, "soft clean": early-afternoon neutral daylight, soft bright shadows, clear air,
-	-- true colours (a light grade) and bloom only on the brightest spots. Colours are { r, g, b }.
+	-- the world's look, "golden afternoon": a lower, warm late-afternoon sun for long readable shadows, cool
+	-- blue shade so lit sides pop, a warm light haze, a punchier grade and a touch of sun rays. Colours are
+	-- { r, g, b }. (Was "soft clean": 2 pm neutral light, grey shade, grade +0.08; it read flat and washed out.)
 	Look = table.freeze({
-		ClockTime = 14,
-		Brightness = 2.6,
-		Exposure = 0.1,
-		Ambient = table.freeze({ 125, 125, 135 }), -- indoor / no-sky fill
-		OutdoorAmbient = table.freeze({ 165, 165, 175 }), -- shade colour outdoors
-		ShadowSoftness = 0.6,
+		ClockTime = 16.4,
+		Brightness = 3,
+		Exposure = 0.15,
+		Ambient = table.freeze({ 125, 125, 140 }), -- indoor / no-sky fill
+		OutdoorAmbient = table.freeze({ 120, 130, 160 }), -- shade colour outdoors: cool, so sunlit sides stand out
+		SunTint = table.freeze({ 255, 226, 190 }), -- the sun's colour on lit faces (Lighting.ColorShift_Top)
+		ShadowSoftness = 0.25,
 		DiffuseScale = 1, -- sky light on surfaces
 		SpecularScale = 1, -- sky reflections on smooth parts (glass, paint)
-		AirDensity = 0.28, -- a light haze gives the bigger map depth and softens where far ground stops loading
+		AirDensity = 0.24, -- a light haze gives the bigger map depth and softens where far ground stops loading
 		AirOffset = 0.1,
-		AirHaze = 0.8,
-		AirGlare = 0.2,
-		AirColor = table.freeze({ 215, 230, 245 }),
-		AirDecay = table.freeze({ 190, 210, 235 }),
-		Saturation = 0.08,
-		Contrast = 0.04,
-		GradeBrightness = 0.02,
-		Tint = table.freeze({ 255, 255, 255 }),
-		BloomIntensity = 0.3,
+		AirHaze = 1,
+		AirGlare = 0.5,
+		AirColor = table.freeze({ 235, 222, 205 }), -- warm near the sun
+		AirDecay = table.freeze({ 175, 195, 230 }), -- blue away from it
+		Saturation = 0.2,
+		Contrast = 0.12,
+		GradeBrightness = 0.01,
+		Tint = table.freeze({ 255, 249, 240 }),
+		BloomIntensity = 0.35,
 		BloomSize = 24,
-		BloomThreshold = 1.8,
+		BloomThreshold = 1.6,
+		SunRays = 0.06, -- intensity of the rays round the sun
+		SunRaysSpread = 0.6,
 		PaintLift = 0.03, -- plaza paint sits this far above the paving
 	}),
 	-- subtle built-in materials on the buildings' plain plastic (the "quiet" look): light walls get soft

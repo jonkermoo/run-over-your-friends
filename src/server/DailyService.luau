@@ -33,7 +33,10 @@ local function pick(player: Player): string?
 	local day = today()
 	local sale = profile.sale
 	if not sale or sale.day ~= day or (sale.id and not table.find(saleIds, sale.id)) then
-		sale = { day = day, id = Daily.pickFor(saleIds, profile.owned, day, Config.DiscountSalt) }
+		sale = {
+			day = day,
+			id = Daily.pickFor(saleIds, profile.owned, day, Config.DiscountSalt, Config.SaleAhead),
+		}
 		profile.sale = sale
 	end
 	local id = (sale :: { day: number, id: string? }).id
