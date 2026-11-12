@@ -23,6 +23,7 @@ local World = require(ReplicatedStorage.Shared.Config.World)
 local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
 local Passes = require(script.Parent.Passes)
+local HitGuard = require(script.Parent.HitGuard)
 local VehicleService = require(script.Parent.VehicleService)
 
 local BuildingService = {}
@@ -541,12 +542,8 @@ local function onBreak(player: Player, pos: unknown, velocity: unknown)
 		return
 	end
 	local spm = Vehicles.StudsPerMetre
-	local maxStuds = stats.topSpeed
-			/ 2.237
-			* spm
-			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
-		+ 10
-	local speed = math.min(velocity.Magnitude, maxStuds)
+	-- the client's speed, capped by this vehicle's limit and what the server saw it do (HitGuard)
+	local speed = HitGuard.speed(player, stats, chassis, velocity.Magnitude)
 	local body = VehicleService.bodyNear(vehicle :: Model, pos) or chassis
 	if (pos - body.Position).Magnitude > body.Size.Magnitude / 2 + 16 + speed * 0.3 then
 		return
@@ -614,13 +611,8 @@ local function onKnockProp(player: Player, prop: unknown, velocity: unknown)
 	if not (vehicle and stats and chassis) then
 		return
 	end
-	local spm = Vehicles.StudsPerMetre
-	local maxStuds = stats.topSpeed
-			/ 2.237
-			* spm
-			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
-		+ 10
-	local speed = math.min(velocity.Magnitude, maxStuds)
+	-- the client's speed, capped by this vehicle's limit and what the server saw it do (HitGuard)
+	local speed = HitGuard.speed(player, stats, chassis, velocity.Magnitude)
 	local pivot = prop:GetPivot().Position
 	local body = VehicleService.bodyNear(vehicle, pivot) or chassis
 	if (pivot - body.Position).Magnitude > body.Size.Magnitude / 2 + 18 + speed * 0.3 then

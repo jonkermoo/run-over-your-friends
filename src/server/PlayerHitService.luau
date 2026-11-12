@@ -16,6 +16,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local SocialService = require(script.Parent.SocialService)
+local HitGuard = require(script.Parent.HitGuard)
 local VehicleService = require(script.Parent.VehicleService)
 
 local PlayerHitService = {}
@@ -135,12 +136,8 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 		return
 	end
 	local spm = Vehicles.StudsPerMetre
-	local maxStuds = stats.topSpeed
-			/ 2.237
-			* spm
-			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
-		+ 10
-	local speed = math.min(velocity.Magnitude, maxStuds)
+	-- the client's speed, capped by this vehicle's limit and what the server saw it do (HitGuard)
+	local speed = HitGuard.speed(player, stats, chassis, velocity.Magnitude)
 	if speed / spm < Economy.MinHitSpeed then
 		return
 	end

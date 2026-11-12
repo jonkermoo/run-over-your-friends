@@ -24,6 +24,7 @@ local CrowdService = require(script.Parent.CrowdService)
 local Data = require(script.Parent.Data)
 local Passes = require(script.Parent.Passes)
 local SocialService = require(script.Parent.SocialService)
+local HitGuard = require(script.Parent.HitGuard)
 local VehicleService = require(script.Parent.VehicleService)
 
 local NpcService = {}
@@ -394,13 +395,8 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 		return
 	end
 	local spm = Vehicles.StudsPerMetre
-	-- trust the client's speed only up to what this vehicle can do (plus the Roadster's jet)
-	local maxStuds = stats.topSpeed
-			/ 2.237
-			* spm
-			* (if Vehicles.has(stats, "Jet") then 1.45 else 1.2)
-		+ 10
-	local speed = math.min(velocity.Magnitude, maxStuds)
+	-- the client's speed, capped by this vehicle's limit and what the server saw it do (HitGuard)
+	local speed = HitGuard.speed(player, stats, chassis, velocity.Magnitude)
 	local giantHp = npc:GetAttribute("GiantHp")
 	local body = VehicleService.bodyNear(vehicle, root.Position) or chassis
 	local reach = body.Size.Magnitude / 2

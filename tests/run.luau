@@ -2790,6 +2790,30 @@ local function checkUnstuck()
 end
 checkUnstuck()
 
+local function checkHitGuard()
+	local Rules = require("../src/shared/Rules/HitGuard")
+	local Cfg = require("../src/shared/Config/HitGuard")
+	local spm = require("../src/shared/Config/Vehicles").StudsPerMetre
+	local max = Rules.maxStuds(100, false, spm, Cfg)
+	check("hit guard: top speed with slack", max > 100 / Cfg.MphPerMs * spm)
+	check("hit guard: the jet allows more", Rules.maxStuds(100, true, spm, Cfg) > max)
+	check("hit guard: an honest claim is paid as is", Rules.speed(60, max, 58, Cfg) == 60)
+	check(
+		"hit guard: a parked car can't claim top speed",
+		Rules.speed(max, max, 0, Cfg) == Cfg.ClaimMargin
+	)
+	check(
+		"hit guard: never over the vehicle's limit",
+		Rules.speed(max * 3, max, max * 3, Cfg) == max
+	)
+	check(
+		"hit guard: driving at top speed is no teleport",
+		not Rules.teleported(max * 0.2, 0.2, max, Cfg)
+	)
+	check("hit guard: a long jump is", Rules.teleported(500, 0.2, max, Cfg))
+end
+checkHitGuard()
+
 -- player hits: big cars skip repeat falloff and get a shorter shield; repeats fall off to a floor
 do
 	local HitConfig = require("../src/shared/Config/PlayerHits")
