@@ -8,6 +8,7 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SocialService = game:GetService("SocialService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -511,12 +512,16 @@ local storeButton = tab("STORE", 2)
 local goalsButton = tab("GOALS", 3)
 goalsButton.Name = "GoalsButton"
 goalsButton.Visible = false
+-- invite friends (Config/Social): Roblox's invite prompt; a friend who joins from it pays you a bonus
+local inviteButton = tab("INVITE", 4)
+inviteButton.Name = "InviteButton"
+inviteButton.TextColor3 = C.pink
 
 -- the open tab is painted yellow
 local function markTab(active: TextButton?)
 	for _, b in tabs do
 		b.BackgroundTransparency = if b == active then 0 else 1
-		b.TextColor3 = if b == active then C.ink else C.text
+		b.TextColor3 = if b == active then C.ink elseif b == inviteButton then C.pink else C.text
 	end
 end
 
@@ -1269,6 +1274,28 @@ goalsButton.Activated:Connect(function()
 	if Hud.onGoals then
 		Hud.onGoals()
 	end
+end)
+-- Roblox's own invite prompt, carrying who invited (SocialService pays the bonus when the friend joins)
+local inviting = false
+inviteButton.Activated:Connect(function()
+	if inviting then
+		return
+	end
+	inviting = true
+	local ok, can = pcall(function()
+		return SocialService:CanSendGameInviteAsync(player)
+	end)
+	if ok and can then
+		local options = Instance.new("ExperienceInviteOptions")
+		options.PromptMessage = SocialConfig.InviteMessage
+		options.LaunchData = `invite:{player.UserId}`
+		pcall(function()
+			SocialService:PromptGameInvite(player, options)
+		end)
+	else
+		popup("Invites can't be sent from here right now", "info")
+	end
+	inviting = false
 end)
 for _, p in { garage, store } do
 	p:GetPropertyChangedSignal("Visible"):Connect(function()

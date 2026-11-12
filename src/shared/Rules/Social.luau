@@ -69,4 +69,36 @@ function Social.toastText(hitterName: string, victimName: string, studs: number)
 	return `You launched {victimName} {n} studs!`, `{hitterName} launched you {n} studs!`
 end
 
+-- who invited a player who just joined: Roblox's referrer when the join came from an invite, else the
+-- "invite:<userId>" launch data our invite prompt sets; nil for themselves, nonsense or no one
+function Social.inviter(referredBy: number?, launchData: string?, selfId: number): number?
+	local id = if typeof(referredBy) == "number" and referredBy > 0 then referredBy else nil
+	if not id and typeof(launchData) == "string" then
+		id = tonumber(string.match(launchData, "^invite:(%d+)$"))
+	end
+	if id and id ~= selfId then
+		return id
+	end
+	return nil
+end
+
+-- what an invite pays when the invited friend joins the inviter's server: the inviter once per friend, up to
+-- maxPaid friends ever (so alt accounts can't farm it), and the newcomer one welcome bonus ever
+function Social.inviteReward(
+	paidFor: { [string]: boolean },
+	friendId: number,
+	newcomerWelcomed: boolean,
+	reward: number,
+	welcome: number,
+	maxPaid: number
+): (number, number)
+	local paid = 0
+	for _ in paidFor do
+		paid += 1
+	end
+	local forInviter = if paidFor[tostring(friendId)] or paid >= maxPaid then 0 else reward
+	local forNewcomer = if newcomerWelcomed then 0 else welcome
+	return forInviter, forNewcomer
+end
+
 return Social

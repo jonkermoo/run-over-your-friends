@@ -9,6 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config.Social)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Social = require(ReplicatedStorage.Shared.Rules.Social)
+local Analytics = require(script.Parent.Analytics)
+local Data = require(script.Parent.Data)
 
 local SocialService = {}
 
@@ -90,10 +92,66 @@ function SocialService.launched(by: Player?, victim: Player?, part: BasePart?)
 	end)
 end
 
+local function waitReady(player: Player): boolean
+	local t = os.clock()
+	while player.Parent and not player:GetAttribute("DataReady") and os.clock() - t < 60 do
+		task.wait(0.5)
+	end
+	return player.Parent ~= nil and player:GetAttribute("DataReady") == true
+end
+
+local function grant(player: Player, amount: number, text: string)
+	local profile = Data.get(player)
+	if not profile or amount <= 0 then
+		return
+	end
+	profile.money += amount -- not Data.addMoney: rewards don't count toward "Earn" goals
+	Data.changed(player)
+	Analytics.source(player, amount, Enum.AnalyticsEconomyTransactionType.TimedReward, "Invite")
+	Net.remote("Popup"):FireClient(player, text, "social")
+end
+
+-- a player who joined from an invite: once both profiles are loaded, pay the inviter (if they're here) and
+-- welcome the newcomer (Rules/Social.inviteReward)
+local function checkInvite(newcomer: Player)
+	local ok, join = pcall(function()
+		return newcomer:GetJoinData()
+	end)
+	if not ok or typeof(join) ~= "table" then
+		return
+	end
+	local id = Social.inviter(join.ReferredByPlayerId, join.LaunchData, newcomer.UserId)
+	local inviter = id and Players:GetPlayerByUserId(id)
+	if not inviter or not waitReady(newcomer) or not waitReady(inviter) then
+		return
+	end
+	local mine, theirs = Data.get(inviter), Data.get(newcomer)
+	if not (mine and theirs) then
+		return
+	end
+	local forInviter, forNewcomer = Social.inviteReward(
+		mine.invited,
+		newcomer.UserId,
+		theirs.welcomed,
+		Config.InviteReward,
+		Config.InviteWelcome,
+		Config.InviteMaxPaid
+	)
+	if forInviter > 0 then
+		mine.invited[tostring(newcomer.UserId)] = true
+		grant(inviter, forInviter, `{newcomer.DisplayName} CAME!  +${forInviter}`)
+	end
+	if forNewcomer > 0 then
+		theirs.welcomed = true
+		grant(newcomer, forNewcomer, `WELCOME BONUS  +${forNewcomer}`)
+	end
+end
+
 function SocialService.start()
 	local function onAdded(player: Player)
 		friends[player] = {}
 		publish(player)
+		task.spawn(checkInvite, player)
 		for _, other in Players:GetPlayers() do
 			if other ~= player and friends[other] then
 				task.spawn(checkPair, player, other)

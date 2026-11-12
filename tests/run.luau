@@ -1975,6 +1975,36 @@ do
 end
 
 do
+	local Social = require("../src/shared/Rules/Social")
+	check(
+		"the inviter comes from Roblox's referrer, else our launch data",
+		Social.inviter(42, nil, 7) == 42
+			and Social.inviter(0, "invite:99", 7) == 99
+			and Social.inviter(nil, "invite:99", 7) == 99
+	)
+	check(
+		"no inviter for yourself, nonsense or nothing",
+		Social.inviter(7, nil, 7) == nil
+			and Social.inviter(0, "invite:7", 7) == nil
+			and Social.inviter(0, "hello", 7) == nil
+			and Social.inviter(nil, nil, 7) == nil
+	)
+	local pay1, pay2 = Social.inviteReward({}, 5, false, 2500, 1000, 10)
+	check("a first invite pays both", pay1 == 2500 and pay2 == 1000)
+	pay1, pay2 = Social.inviteReward({ ["5"] = true }, 5, true, 2500, 1000, 10)
+	check("the same friend again pays no one", pay1 == 0 and pay2 == 0)
+	local ten = {}
+	for i = 1, 10 do
+		ten[tostring(i)] = true
+	end
+	pay1, pay2 = Social.inviteReward(ten, 50, false, 2500, 1000, 10)
+	check(
+		"past the cap the inviter gets nothing, a new friend still gets the welcome",
+		pay1 == 0 and pay2 == 1000
+	)
+end
+
+do
 	local function checkContest()
 		local Contest = require("../src/shared/Rules/Contest")
 		local scores = {}

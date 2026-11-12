@@ -11,4 +11,10 @@ return table.freeze({
 	ToastPairGap = 8, -- seconds between toasts for the same two players (either way round)
 	FlightSamples = 20, -- how long a flight is watched: samples x seconds apart (3 s)
 	FlightSampleEvery = 0.15,
+	-- invites (the INVITE tab): when a friend you invited joins your server you get InviteReward, once per
+	-- friend and for at most InviteMaxPaid friends ever; they get InviteWelcome, once ever
+	InviteReward = 2500,
+	InviteWelcome = 1000,
+	InviteMaxPaid = 10,
+	InviteMessage = "Come run me over!", -- shown in the Roblox invite
 })

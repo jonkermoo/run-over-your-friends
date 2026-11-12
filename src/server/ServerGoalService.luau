@@ -51,7 +51,8 @@ local function send(player: Player?)
 	end
 end
 
-local function payHelper(player: Player, amount: number, text: string)
+-- kind: the feed plate ("goal" reads GOAL DONE first, so a goal that ran out uses "big")
+local function payHelper(player: Player, amount: number, text: string, kind: string)
 	local profile = Data.get(player)
 	if not profile then
 		return
@@ -59,7 +60,7 @@ local function payHelper(player: Player, amount: number, text: string)
 	profile.money += amount -- not Data.addMoney: rewards don't count toward "Earn" goals
 	Data.changed(player)
 	Analytics.source(player, amount, Enum.AnalyticsEconomyTransactionType.TimedReward, "ServerGoal")
-	Net.remote("Popup"):FireClient(player, text, "goal")
+	Net.remote("Popup"):FireClient(player, text, kind)
 end
 
 local function finish(g: Rules.Goal)
@@ -67,7 +68,7 @@ local function finish(g: Rules.Goal)
 	local early = EventService.hurry()
 	for _, player in Players:GetPlayers() do
 		if g.helpers[player.UserId] then
-			payHelper(player, Config.Reward, `SERVER GOAL!  +${Config.Reward}`)
+			payHelper(player, Config.Reward, `SERVER GOAL!  +${Config.Reward}`, "goal")
 		end
 		Net.remote("Celebrate"):FireClient(
 			player,
@@ -88,7 +89,7 @@ local function timeUp(g: Rules.Goal)
 	for _, player in Players:GetPlayers() do
 		local helped = g.helpers[player.UserId] == true
 		if pay > 0 and helped then
-			payHelper(player, pay, `SO CLOSE!  +${pay}`)
+			payHelper(player, pay, `SO CLOSE!  +${pay}`, "big")
 		end
 		Net.remote("Celebrate"):FireClient(
 			player,

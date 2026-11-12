@@ -29,6 +29,8 @@ export type Profile = {
 	daily: { day: number, streak: number }?, -- last UTC day the login streak was collected, checked by DailyService
 	sale: { day: number, id: string? }?, -- this player's car of the day and the UTC day it was picked, by DailyService
 	rookieDone: boolean, -- rookie pay (Config/Economy) has ended for good: they could afford the RookieUntil car
+	invited: { [string]: boolean }, -- user ids of friends this player was paid for inviting (Config/Social)
+	welcomed: boolean, -- got the welcome bonus for joining from an invite
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -59,6 +61,8 @@ local function default(): Profile
 		paint = {},
 		paints = {},
 		rookieDone = false,
+		invited = {},
+		welcomed = false,
 	}
 end
 
@@ -234,6 +238,14 @@ local function load(player: Player)
 				profile.groupClaimed = decoded.groupClaimed == true
 				profile.roadsterPassPaid = decoded.roadsterPassPaid == true
 				profile.rookieDone = decoded.rookieDone == true
+				profile.welcomed = decoded.welcomed == true
+				if typeof(decoded.invited) == "table" then
+					for id, yes in decoded.invited do
+						if yes == true and tonumber(id) then
+							profile.invited[tostring(id)] = true
+						end
+					end
+				end
 				-- saves from before the tutorial skip it, and so do saves past its old end
 				profile.tutorial =
 					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)
