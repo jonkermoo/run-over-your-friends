@@ -90,44 +90,55 @@ function PaintPicker.attach(
 
 	local swatches: { [string]: { button: TextButton, edge: UIStroke } } = {}
 
-	for i, p in Config.List do
-		local b = Instance.new("TextButton")
-		b.Name = "Paint" .. p.id
-		b.AutoButtonColor = false
-		b.BorderSizePixel = 0
-		local rgb = PaintRules.colour(vehicleId, p.id) or { 128, 128, 128 }
-		b.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
-		b.Position = UDim2.fromOffset(
-			((i - 1) % PER_ROW) * (SWATCH + GAP),
-			(i - 1) // PER_ROW * (SWATCH + GAP)
-		)
-		b.Size = UDim2.fromOffset(SWATCH, SWATCH)
-		b.FontFace = F.display
-		b.TextSize = 13
-		b.TextColor3 = C.text
-		b.Text = ""
-		b.Parent = sheet
-		local edge = Style.stroke(b, C.ink, 2, 0)
-		Style.outline(b, 1.5)
-		swatches[p.id] = { button = b, edge = edge }
-		b.Activated:Connect(function()
-			selected = p.id
-			show(p.id)
-			sendToken += 1
-			local token = sendToken
-			if PaintRules.isOpen(bought(), p.id) and p.id ~= saved(vehicleId) then
-				task.delay(SEND_AFTER, function()
-					if token == sendToken then
-						Net.waitFor("SetPaint"):FireServer(vehicleId, p.id)
-					end
-				end)
-			end
-			changed()
-		end)
+	-- the swatches are built the first time PAINT is opened (13 cards x 18 swatches up front cost phones)
+	local built = false
+	local function buildSwatches()
+		if built then
+			return
+		end
+		built = true
+		for i, p in Config.List do
+			local b = Instance.new("TextButton")
+			b.Name = "Paint" .. p.id
+			b.AutoButtonColor = false
+			b.BorderSizePixel = 0
+			local rgb = PaintRules.colour(vehicleId, p.id) or { 128, 128, 128 }
+			b.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+			b.Position = UDim2.fromOffset(
+				((i - 1) % PER_ROW) * (SWATCH + GAP),
+				(i - 1) // PER_ROW * (SWATCH + GAP)
+			)
+			b.Size = UDim2.fromOffset(SWATCH, SWATCH)
+			b.FontFace = F.display
+			b.TextSize = 13
+			b.TextColor3 = C.text
+			b.Text = ""
+			b.Parent = sheet
+			local edge = Style.stroke(b, C.ink, 2, 0)
+			Style.outline(b, 1.5)
+			swatches[p.id] = { button = b, edge = edge }
+			b.Activated:Connect(function()
+				selected = p.id
+				show(p.id)
+				sendToken += 1
+				local token = sendToken
+				if PaintRules.isOpen(bought(), p.id) and p.id ~= saved(vehicleId) then
+					task.delay(SEND_AFTER, function()
+						if token == sendToken then
+							Net.waitFor("SetPaint"):FireServer(vehicleId, p.id)
+						end
+					end)
+				end
+				changed()
+			end)
+		end
 	end
 
 	local function setOpen(on: boolean)
 		isOpen = on
+		if on then
+			buildSwatches()
+		end
 		sheet.Visible = on
 		info.Visible = not on
 		toggle.Text = if on then "BACK" else "PAINT"
