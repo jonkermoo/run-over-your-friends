@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Buildings = require(ReplicatedStorage.Shared.Config.Buildings)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
+local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
 local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
@@ -71,7 +72,7 @@ function Places.sign(
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
 		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-		gui.PixelsPerStud = 20
+		gui.PixelsPerStud = Streets.SignPixelsPerStud
 		gui.LightInfluence = 0.2
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)

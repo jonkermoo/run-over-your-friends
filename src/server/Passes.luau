@@ -19,7 +19,7 @@ function Passes.has(player: Player, name: string): boolean
 	return player:GetAttribute("Pass" .. name) == true
 end
 
--- the Roadster pass gives the car and a one-time $1M
+-- the Roadster pass gives the car and a one-time Economy.RoadsterPassMoney
 local function grant(player: Player, name: string)
 	player:SetAttribute("Pass" .. name, true)
 	if name == "Roadster" then
@@ -35,7 +35,8 @@ local function grant(player: Player, name: string)
 					Enum.AnalyticsEconomyTransactionType.IAP,
 					"RoadsterPass"
 				)
-				Net.remote("Popup"):FireClient(player, "+$1,000,000  Roadster unlocked!", "big")
+				Net.remote("Popup")
+					:FireClient(player, `+${Economy.RoadsterPassMoney}  Roadster unlocked!`, "big")
 			end
 			Data.changed(player)
 		end

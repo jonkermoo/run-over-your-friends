@@ -44,6 +44,9 @@ return table.freeze({
 	SignalSeconds = 9, -- traffic lights: green this long each way
 	AmberSeconds = 2,
 	PropRebuildSeconds = 45, -- knocked props stand back up after this
+	-- text resolution of signs and billboards (Places.sign); they're big, so a low one keeps them inside the
+	-- engine's SurfaceGui texture budget (over it, far boards can draw as blank white)
+	SignPixelsPerStud = 10,
 	HydrantSpraySeconds = 5,
 	Billboards = table.freeze({
 		"SNAKKO CHIPS",

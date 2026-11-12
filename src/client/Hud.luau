@@ -892,7 +892,9 @@ local PASSES = {
 		name = "Roadster",
 		title = "ROADSTER",
 		accent = C.red,
-		text = "The dream car: rear jet, air control and a thruster. Plus $1,000,000 in game.",
+		text = `The dream car: rear jet, air control and a thruster. Plus {money(
+			Economy.RoadsterPassMoney
+		)} in game.`,
 	},
 	{
 		name = "DoubleMoney",
