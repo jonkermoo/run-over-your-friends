@@ -9,7 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cfg = require(ReplicatedStorage.Shared.Config.Suburbs)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Lots = require(ReplicatedStorage.Shared.Config.Lots)
-local Streets = require(ReplicatedStorage.Shared.Config.Streets)
+local RoadMeshes = require(ReplicatedStorage.Shared.Config.RoadMeshes)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
@@ -30,6 +31,7 @@ type Street = { pts: { Vector3 }, bulb: boolean }
 type Lot = { c: Vector3, out: Vector3, w: number, depth: number }
 
 local ASPHALT = Color3.fromRGB(64, 66, 70)
+local TERRAIN_TOP = RoadMeshes.TerrainY
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -62,49 +64,78 @@ local function prop(folder: Instance, kind: string): Model
 	return m
 end
 
-local function disc(
-	parent: Instance,
-	at: Vector3,
-	dia: number,
-	thick: number,
-	color: Color3,
-	material: Enum.Material
+-- paint the terrain's top voxels Asphalt under the streets (the terrain is what cars drive on here; the road
+-- meshes lie just above it). Only voxels whose middle is well inside a road are painted, so no grey shows at
+-- the edges. `segs` are { a, b, half-width }, `discs` { centre, radius }; `r` the rect to work in.
+local VOXEL = 4
+local function paveTerrain(
+	r: Rect,
+	segs: { { a: Vector3, b: Vector3, half: number } },
+	discs: { { c: Vector3, r: number } }
 )
-	local d = part(
-		parent,
-		Vector3.new(thick, dia, dia),
-		CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2),
-		color,
-		material
-	)
-	d.Shape = Enum.PartType.Cylinder
-	return d
-end
-
--- a strip along a polyline at height `y`: straight pieces, round joints between them
-local function lay(
-	parent: Instance,
-	pts: { Vector3 },
-	width: number,
-	y: number,
-	thick: number,
-	color: Color3,
-	material: Enum.Material
-)
-	local lift = Vector3.new(0, y, 0)
-	for i = 1, #pts - 1 do
-		local a, b = pts[i], pts[i + 1]
-		part(
-			parent,
-			Vector3.new(width, thick, (b - a).Magnitude),
-			CFrame.lookAt((a + b) / 2 + lift, b + lift),
-			color,
-			material
+	local region = Region3.new(
+		Vector3.new(r.x - r.w / 2, -8, r.z - r.d / 2),
+		Vector3.new(r.x + r.w / 2, 0, r.z + r.d / 2)
+	):ExpandToGrid(VOXEL)
+	local mats, occ = workspace.Terrain:ReadVoxels(region, VOXEL)
+	local size = mats.Size
+	local lo = region.CFrame.Position - region.Size / 2
+	local function paint(ix: number, iz: number)
+		if ix < 1 or iz < 1 or ix > size.X or iz > size.Z then
+			return
+		end
+		for iy = 1, size.Y do
+			if occ[ix][iy][iz] > 0 then
+				mats[ix][iy][iz] = Enum.Material.Asphalt
+			end
+		end
+	end
+	local function cellRange(
+		x0: number,
+		x1: number,
+		z0: number,
+		z1: number
+	): (number, number, number, number)
+		return math.floor((x0 - lo.X) / VOXEL) + 1,
+			math.floor((x1 - lo.X) / VOXEL) + 1,
+			math.floor((z0 - lo.Z) / VOXEL) + 1,
+			math.floor((z1 - lo.Z) / VOXEL) + 1
+	end
+	for _, sg in segs do
+		local a, b, half = sg.a, sg.b, sg.half
+		local ab = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+		local len2 = ab:Dot(ab)
+		local i0, i1, k0, k1 = cellRange(
+			math.min(a.X, b.X) - half,
+			math.max(a.X, b.X) + half,
+			math.min(a.Z, b.Z) - half,
+			math.max(a.Z, b.Z) + half
 		)
+		for ix = math.max(i0, 1), math.min(i1, size.X) do
+			for iz = math.max(k0, 1), math.min(k1, size.Z) do
+				local p = Vector3.new(lo.X + (ix - 0.5) * VOXEL, 0, lo.Z + (iz - 0.5) * VOXEL)
+				local ap = Vector3.new(p.X - a.X, 0, p.Z - a.Z)
+				local t = if len2 > 0 then math.clamp(ap:Dot(ab) / len2, 0, 1) else 0
+				local d = ap - ab * t
+				if d.Magnitude <= half then
+					paint(ix, iz)
+				end
+			end
+		end
 	end
-	for i = 2, #pts - 1 do
-		disc(parent, pts[i] + lift, width, thick, color, material)
+	for _, dc in discs do
+		local i0, i1, k0, k1 = cellRange(dc.c.X - dc.r, dc.c.X + dc.r, dc.c.Z - dc.r, dc.c.Z + dc.r)
+		for ix = math.max(i0, 1), math.min(i1, size.X) do
+			for iz = math.max(k0, 1), math.min(k1, size.Z) do
+				local dx = lo.X + (ix - 0.5) * VOXEL - dc.c.X
+				local dz = lo.Z + (iz - 0.5) * VOXEL - dc.c.Z
+				if dx * dx + dz * dz <= dc.r * dc.r then
+					paint(ix, iz)
+				end
+			end
+		end
 	end
+	workspace.Terrain:WriteVoxels(region, VOXEL, mats, occ)
 end
 
 -- the unit way along a polyline at point i, and the unit way to its right
@@ -268,64 +299,46 @@ local function hood(
 	table.insert(out.rects, feeder)
 	table.insert(out.rects, area)
 
-	-- the feeder road with a double yellow
-	local a, b = origin + dir * (ringOuter - 5), origin + dir * (h.start + 2)
-	local len = (b - a).Magnitude
-	part(
+	-- the feeder road: the road you see is a mesh (RoadKit); cars drive on one invisible ramp part from the
+	-- ring's height down to the terrain, then on the terrain itself (painted Asphalt below)
+	local b = origin + dir * (h.start + 2)
+	local rampFrom = origin + dir * ringOuter + Vector3.new(0, 0.1, 0)
+	local rampTo = origin + dir * (ringOuter + RoadMeshes.Ramp) + Vector3.new(0, TERRAIN_TOP, 0)
+	local ramp = part(
 		folder,
-		Vector3.new(F.width, 1, len),
-		CFrame.lookAt((a + b) / 2, b) - Vector3.new(0, 0.4, 0),
+		Vector3.new(F.width, 1, (rampTo - rampFrom).Magnitude + 2),
+		CFrame.lookAt((rampFrom + rampTo) / 2, rampTo) * CFrame.new(0, -0.5, 0),
 		ASPHALT,
 		Enum.Material.Asphalt
 	)
-	for _, o in { -0.55, 0.55 } do
-		part(
-			folder,
-			Vector3.new(F.line, Streets.PaintThick, len),
-			CFrame.lookAt((a + b) / 2, b) + perp * o + Vector3.new(0, Streets.PaintHeight, 0),
-			Color3.fromRGB(240, 196, 60)
-		)
-	end
+	ramp.Transparency = 1
 	sign(folder, b - dir * 30 + perp * (F.width / 2 + 10), -dir, h.name)
 
-	-- the streets: the spine, then side streets off both sides
+	-- the streets (Rules/RoadLayout: the spine, then side streets off both sides), as the road meshes have them
 	local streets: { Street } = {}
-	local wave = random:NextNumber(Cfg.SpineWave[1], Cfg.SpineWave[2])
-	local spine: { Vector3 } = {}
-	local u = 0
-	while u <= h.length do
-		local v = wave * math.sin(u / h.length * math.pi * 1.6)
-		table.insert(spine, origin + dir * (h.start + u) + perp * v)
-		u += Cfg.Step
-	end
-	table.insert(streets, { pts = spine, bulb = true })
-	for _, s in { -1, 1 } do
-		local at = Cfg.BranchFirst
-			+ (
-				if s > 0
-					then 0
-					else random:NextNumber(Cfg.BranchStagger[1], Cfg.BranchStagger[2])
-						* Cfg.BranchGap[1]
-			)
-		while at < h.length - 140 do
-			local i = math.floor(at / Cfg.Step) + 1
-			local base = spine[i]
-			local v0 = (base - origin):Dot(perp)
-			local reach = h.half - Cfg.BranchEnd - s * v0
-			local bend = random:NextNumber(-1, 1) * Cfg.BranchBend
-			local pts: { Vector3 } = {}
-			local t = 0
-			while t <= reach do
-				local k = t / reach
-				table.insert(pts, base + perp * (s * t) + dir * (bend * k * k))
-				t += Cfg.Step
+	for _, sub in RoadLayout.fromConfig().suburbs do
+		if sub.name == h.name then
+			for _, st in sub.streets do
+				local pts = {}
+				for _, p in st.pts do
+					table.insert(pts, Vector3.new(p[1], 0, p[2]))
+				end
+				table.insert(streets, { pts = pts, bulb = st.bulb })
 			end
-			if #pts >= 4 then
-				table.insert(streets, { pts = pts, bulb = true })
-			end
-			at += random:NextNumber(Cfg.BranchGap[1], Cfg.BranchGap[2])
 		end
 	end
+	local segs = { { a = rampTo, b = b, half = F.width / 2 - 2 } }
+	local discs = {}
+	for _, st in streets do
+		for i = 1, #st.pts - 1 do
+			table.insert(segs, { a = st.pts[i], b = st.pts[i + 1], half = Cfg.Road / 2 - 2 })
+		end
+		if st.bulb then
+			table.insert(discs, { c = st.pts[#st.pts], r = Cfg.Bulb - 2 })
+		end
+	end
+	paveTerrain(feeder, segs, discs)
+	paveTerrain(area, segs, discs)
 
 	-- dense points along every street, for keeping lots and sidewalks off them
 	local dense: { { p: Vector3, street: number } } = {}
@@ -352,45 +365,23 @@ local function hood(
 		return math.sqrt(best)
 	end
 
-	-- lay the streets: asphalt, a cul-de-sac bulb at the end, sidewalks that stop at other streets' mouths
-	local concrete = rgb(Cfg.Concrete)
+	-- the streets and sidewalks themselves are meshes (RoadKit); here only the sidewalks' walk points
 	local sideOff = roadHalf + Cfg.Verge + Cfg.Sidewalk / 2
 	local clearMouth = roadHalf + Cfg.Verge + Cfg.Sidewalk + 3
 	local lampSide = 1
 	for n, st in streets do
-		lay(folder, st.pts, Cfg.Road, -0.4, 1, ASPHALT, Enum.Material.Asphalt)
 		local last = st.pts[#st.pts]
-		if st.bulb then
-			disc(
-				folder,
-				last - Vector3.new(0, 0.4, 0),
-				Cfg.Bulb * 2,
-				1,
-				ASPHALT,
-				Enum.Material.Asphalt
-			)
-		end
 		for _, side in { -1, 1 } do
-			local run: { Vector3 } = {}
-			local function flush()
-				if #run >= 2 then
-					lay(folder, run, Cfg.Sidewalk, 0, 0.6, concrete, Enum.Material.Concrete)
-				end
-				run = {}
-			end
 			for i = 1, #st.pts do
 				local _, right = frame(st.pts, i)
 				local p = st.pts[i] + right * side * sideOff
-				local clear = nearest(p, n) > clearMouth
+				if
+					nearest(p, n) > clearMouth
 					and (not st.bulb or (p - last).Magnitude > Cfg.Bulb + Cfg.Sidewalk)
-				if clear then
-					table.insert(run, p)
+				then
 					table.insert(out.walkPoints, p)
-				else
-					flush()
 				end
 			end
-			flush()
 		end
 		-- lamps along the sidewalk, sides taking turns
 		local walked = Cfg.LampEvery / 2
@@ -412,6 +403,7 @@ local function hood(
 	end
 
 	-- the lots: houses along both sides of every street and round each cul-de-sac
+	local concrete = rgb(Cfg.Concrete)
 	local lots: { Lot } = {}
 	local lastPalette: number? = nil
 	local function inArea(p: Vector3): boolean
@@ -470,7 +462,7 @@ local function hood(
 		part(
 			folder,
 			Vector3.new(Cfg.Driveway, 0.6, driveLen + 0.5),
-			CFrame.lookAt(drive, drive + face),
+			CFrame.lookAt(drive, drive + face) + Vector3.new(0, -0.29, 0), -- top just over the sidewalk mesh
 			concrete,
 			Enum.Material.Concrete
 		)

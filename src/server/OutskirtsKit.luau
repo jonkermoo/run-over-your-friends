@@ -223,6 +223,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	terrain:Clear()
 	-- terrain grass draws lighter than the ground part's Grass, so it gets a darker tint to blend in
 	terrain:SetMaterialColor(Enum.Material.Grass, rgb(Country.TerrainGrass))
+	-- terrain Asphalt lies only under the suburb road meshes (what cars drive on there); grass-coloured, so far
+	-- terrain detail, which spreads it past the road's edge, still reads as grass
+	terrain:SetMaterialColor(Enum.Material.Asphalt, rgb(Country.TerrainGrass))
 	terrain:SetMaterialColor(Enum.Material.LeafyGrass, rgb(Country.TerrainLeafy))
 	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
@@ -327,36 +330,25 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		)
 	end
 
-	-- highway ring, joined to every grid road, a double yellow down the middle
+	-- highway ring, joined to every grid road: the road you see is the road meshes (RoadKit); these invisible
+	-- parts are what cars drive on, every top at 0.10
 	for _, s in { 1, -1 } do
 		part(
 			static,
 			Vector3.new(RW, 1, ring * 2 + RW),
 			CFrame.new(s * ring, -0.4, 0),
 			COLORS.road,
-			Enum.Material.Asphalt
+			Enum.Material.Asphalt,
+			1
 		)
 		part(
 			static,
 			Vector3.new(ring * 2 + RW, 1, RW),
-			CFrame.new(0, -0.38, s * ring),
+			CFrame.new(0, -0.4, s * ring),
 			COLORS.road,
-			Enum.Material.Asphalt
+			Enum.Material.Asphalt,
+			1
 		)
-		for _, o in { -0.55, 0.55 } do
-			paint(
-				static,
-				Vector3.new(RG.CentreLine, Streets.PaintThick, ring * 2),
-				CFrame.new(s * ring + o, Streets.PaintHeight, 0),
-				COLORS.yellow
-			)
-			paint(
-				static,
-				Vector3.new(ring * 2, Streets.PaintThick, RG.CentreLine),
-				CFrame.new(0, Streets.PaintHeight, s * ring + o),
-				COLORS.yellow
-			)
-		end
 	end
 	local roadX, roadZ = {}, {}
 	for i = 0, ctx.blocksX do
@@ -369,7 +361,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				Vector3.new(R, 1, len),
 				CFrame.new(x, -0.4, s * (ctx.spanZ / 2 + len / 2)),
 				COLORS.road,
-				Enum.Material.Asphalt
+				Enum.Material.Asphalt,
+				1
 			)
 		end
 	end
@@ -381,9 +374,10 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			part(
 				static,
 				Vector3.new(len, 1, R),
-				CFrame.new(s * (ctx.spanX / 2 + len / 2), -0.38, z),
+				CFrame.new(s * (ctx.spanX / 2 + len / 2), -0.4, z),
 				COLORS.road,
-				Enum.Material.Asphalt
+				Enum.Material.Asphalt,
+				1
 			)
 		end
 	end
@@ -401,9 +395,10 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		part(
 			static,
 			Vector3.new(rect.w, 1, rect.d),
-			CFrame.new(rect.x, -0.41, rect.z),
+			CFrame.new(rect.x, -0.4, rect.z),
 			COLORS.road,
-			Enum.Material.Asphalt
+			Enum.Material.Asphalt,
+			1
 		)
 	end
 

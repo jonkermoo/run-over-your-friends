@@ -10,13 +10,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
-local PaintKit = require(script.Parent.PaintKit)
 local Places = require(script.Parent.Places)
 
 local StreetKit = {}
 
-local WHITE = Color3.fromRGB(240, 240, 236)
-local YELLOW = Color3.fromRGB(242, 206, 70)
 local DARK = Color3.fromRGB(34, 36, 40)
 local METAL = Color3.fromRGB(70, 74, 80)
 local Y0 = 0.08
@@ -70,57 +67,6 @@ local function cylinder(
 end
 
 export type Grid = Routes.Grid
-
--- paint one road segment between two crossings; `alongX` for east-west roads. All of a segment's paint is one
--- PaintKit patch (one part instead of twenty).
-local function segment(parent: Instance, grid: Grid, centre: Vector3, alongX: boolean)
-	local B, R = grid.block, grid.road
-	local draw = PaintKit.patch(
-		parent,
-		Vector3.new(centre.X, S.PaintHeight, centre.Z),
-		if alongX then B else R,
-		if alongX then R else B
-	)
-	local function put(
-		along: number,
-		across: number,
-		lenAlong: number,
-		lenAcross: number,
-		color: Color3
-	)
-		if alongX then
-			draw(along, across, lenAlong, lenAcross, color)
-		else
-			draw(across, along, lenAcross, lenAlong, color)
-		end
-	end
-	local len = B - 2 * S.EndClear
-	put(0, -0.55, len, S.LineWidth, YELLOW)
-	put(0, 0.55, len, S.LineWidth, YELLOW)
-	local t = -len / 2
-	while t + S.DashLength <= len / 2 do
-		put(t + S.DashLength / 2, -R / 4, S.DashLength, S.LineWidth, WHITE)
-		put(t + S.DashLength / 2, R / 4, S.DashLength, S.LineWidth, WHITE)
-		t += S.DashLength + S.DashGap
-	end
-	-- zebras where the sidewalk crossings run, one at each end
-	for _, e in { -1, 1 } do
-		local at = e * (B / 2 - S.ZebraInset)
-		for s = 0, S.ZebraStripes - 1 do
-			put(
-				at,
-				-R / 2 + (s + 0.5) * R / S.ZebraStripes,
-				S.ZebraLength,
-				R / S.ZebraStripes * 0.55,
-				WHITE
-			)
-		end
-	end
-	-- stop lines on the half where traffic arrives (keep right): heading +along stops on one side, -along the other
-	local right = if alongX then 1 else -1
-	put(B / 2 - S.StopLineInset, right * R / 4, 1.2, R / 2 - 2, WHITE)
-	put(-(B / 2 - S.StopLineInset), -right * R / 4, 1.2, R / 2 - 2, WHITE)
-end
 
 local function lamp(folder: Instance, foot: Vector3, out: Vector3, color: Color3)
 	local m = prop(folder, "Lamp")
@@ -308,9 +254,7 @@ function StreetKit.build(
 	kinds: { [number]: { [number]: string } },
 	random: Random
 ): Result
-	local paintFolder = Instance.new("Folder")
-	paintFolder.Name = "RoadPaint"
-	paintFolder.Parent = static
+	-- the road paint and manholes are part of the road meshes now (RoadKit)
 	local B, R = grid.block, grid.road
 	local pitch = B + R
 	local N, M = grid.blocksX, grid.blocksZ
@@ -322,30 +266,6 @@ function StreetKit.build(
 	end
 	local function district(i: number, j: number): Districts.Key
 		return Districts.of(math.clamp(i, 0, N - 1), math.clamp(j, 0, M - 1), N, M)
-	end
-	-- paint every segment, a manhole at every crossing
-	for k = 0, N do
-		for m = 0, M - 1 do
-			segment(paintFolder, grid, Vector3.new(rx(k), 0, rz(m) + R / 2 + B / 2), false)
-		end
-	end
-	for m = 0, M do
-		for k = 0, N - 1 do
-			segment(paintFolder, grid, Vector3.new(rx(k) + R / 2 + B / 2, 0, rz(m)), true)
-		end
-	end
-	for k = 0, N do
-		for m = 0, M do
-			local hole = cylinder(
-				paintFolder,
-				0.06,
-				4,
-				Vector3.new(rx(k) + 9, S.PaintHeight, rz(m) + 9),
-				DARK
-			)
-			hole.CanCollide = false
-			hole.CanQuery = false
-		end
 	end
 	-- traffic lights at crossings that touch a district with signals (not on the city's outer edge)
 	for k = 1, N - 1 do

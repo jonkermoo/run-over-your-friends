@@ -2992,6 +2992,59 @@ local function checkLand()
 end
 checkLand()
 
+-- the road meshes were built from this exact layout (rebuild them with tools/roads when it changes)
+local function checkRoads()
+	local RoadLayout = require("../src/shared/Rules/RoadLayout")
+	local RoadMeshes = require("../src/shared/Config/RoadMeshes")
+	local Suburbs = require("../src/shared/Config/Suburbs")
+	local layout = RoadLayout.fromConfig()
+	check(
+		"the road meshes match the road layout (else run tools/roads, see build_roads.py)",
+		RoadLayout.hash(layout) == RoadMeshes.Hash
+	)
+	local streamA, streamB = RoadLayout.stream(7), RoadLayout.stream(7)
+	local repeats, inUnit, spread = true, true, {} :: { [number]: boolean }
+	for _ = 1, 200 do
+		local x = streamA()
+		repeats = repeats and x == streamB()
+		inUnit = inUnit and x >= 0 and x < 1
+		spread[math.floor(x * 10)] = true
+	end
+	local buckets = 0
+	for _ in spread do
+		buckets += 1
+	end
+	check("the layout's random stream repeats and spreads", repeats and inUnit and buckets == 10)
+	local streetsOk = #layout.suburbs == #Suburbs.Hoods
+	for _, sub in layout.suburbs do
+		streetsOk = streetsOk and #sub.streets >= 3
+		for _, street in sub.streets do
+			streetsOk = streetsOk and #street.pts >= 4
+		end
+	end
+	check("every suburb has a spine and side streets", streetsOk)
+	local named = true
+	local seen = {}
+	for _, m in RoadMeshes.Meshes do
+		named = named
+			and not seen[m.name]
+			and (m.layer == "Asphalt" or m.layer == "Concrete" or m.layer == "Trim")
+		seen[m.name] = true
+	end
+	check("road meshes have unique names and known layers", named and #RoadMeshes.Meshes > 0)
+	-- the same paint as the old StreetKit: lines stop short of crossings, zebras inside the stop lines
+	local S = require("../src/shared/Config/Streets")
+	local strokes = RoadLayout.segmentStrokes(220, 64, S, true)
+	local zebras = 0
+	for _, stroke in strokes do
+		if stroke.w == S.ZebraLength then
+			zebras += 1
+		end
+	end
+	check("a segment has two zebras", zebras == 2 * S.ZebraStripes)
+end
+checkRoads()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

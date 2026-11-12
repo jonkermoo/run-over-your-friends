@@ -29,6 +29,7 @@ local Lots = require(ReplicatedStorage.Shared.Config.Lots)
 local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
+local RoadKit = require(script.Parent.RoadKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
 
@@ -334,7 +335,8 @@ function MapBuilder.build(): Result
 		end
 	end
 
-	-- city grid
+	-- city grid: the roads you see are meshes (RoadKit); these plain parts under them are what cars drive on,
+	-- all with their top at 0.10, invisible
 	local B, R = M.BlockSize, M.RoadWidth
 	local pitch = B + R
 	local spanX, spanZ = M.BlocksX * pitch + R, M.BlocksZ * pitch + R
@@ -346,7 +348,8 @@ function MapBuilder.build(): Result
 			Vector3.new(R, 1, spanZ),
 			CFrame.new(x, -0.4, 0),
 			COLORS.road,
-			Enum.Material.Asphalt
+			Enum.Material.Asphalt,
+			1
 		)
 	end
 	for j = 0, M.BlocksZ do
@@ -354,9 +357,10 @@ function MapBuilder.build(): Result
 		part(
 			static,
 			Vector3.new(spanX, 1, R),
-			CFrame.new(0, -0.38, z),
+			CFrame.new(0, -0.4, z),
 			COLORS.road,
-			Enum.Material.Asphalt
+			Enum.Material.Asphalt,
+			1
 		)
 		for i = 0, M.BlocksX do
 			table.insert(spawnPoints, Vector3.new(x0 + R / 2 + i * pitch, 0.2, z))
@@ -902,7 +906,10 @@ function MapBuilder.build(): Result
 		end
 	end
 
-	-- the street kit: paint, furniture, bus stops
+	-- the road meshes over the whole map (the city, the ring, the suburbs)
+	RoadKit.build(static)
+
+	-- the street kit: furniture, bus stops
 	local kit = StreetKit.build(static, props, {
 		blocksX = M.BlocksX,
 		blocksZ = M.BlocksZ,
