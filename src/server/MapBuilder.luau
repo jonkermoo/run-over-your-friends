@@ -431,11 +431,13 @@ function MapBuilder.build(): Result
 					local sp = Instance.new("SpawnLocation")
 					sp.Anchored = true
 					sp.Size = Vector3.new(10, 1, 10)
+					-- each pad faces out to the side street nearest it (west pads west, east pads east), so
+					-- a first drive heads straight for the road, not into the leaderboard stands on the north side
 					sp.CFrame = CFrame.new(
 						cx + (s % 2 - 0.5) * 60,
 						-0.36,
 						cz + (math.floor(s / 2) - 0.5) * 60
-					)
+					) * CFrame.Angles(0, if s % 2 == 0 then math.pi / 2 else -math.pi / 2, 0)
 					sp.Color = COLORS.ramp
 					sp.Material = Enum.Material.SmoothPlastic
 					sp.Duration = 0

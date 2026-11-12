@@ -2764,6 +2764,29 @@ local function checkUnstuck()
 	check("unstuck: not at speed", Rules.action(1, false, false, Cfg.MaxMph + 1, 0, 10, Cfg) == nil)
 	check("unstuck: not while flying", Rules.action(1, true, false, 0, 0, 10, Cfg) == nil)
 	check("unstuck: not while flung", Rules.action(1, false, true, 0, 0, 10, Cfg) == nil)
+	local roads = { { { 0, 0 }, { 100, 0 } }, { { 200, -50 }, { 200, 50 } } }
+	local rx, rz, dx, dz, d = Rules.nearestRoad(roads, 30, 12)
+	check(
+		"unstuck: nearest road point",
+		rx == 30 and rz == 0 and math.abs(dx :: number) == 1 and dz == 0 and d == 12
+	)
+	rx, rz, _, dz, d = Rules.nearestRoad(roads, 190, 80)
+	check(
+		"unstuck: nearest road clamps to its end",
+		rx == 200 and rz == 50 and dz ~= 0 and (d :: number) > 30
+	)
+	check("unstuck: no roads, no point", Rules.nearestRoad({}, 0, 0) == nil)
+	local RoadLayout = require("../src/shared/Rules/RoadLayout")
+	local L = RoadLayout.fromConfig()
+	local lines = {}
+	for _, r in L.roads do
+		table.insert(lines, r.pts)
+	end
+	local gx, gz = Rules.nearestRoad(lines, 0, 0)
+	check(
+		"unstuck: the spawn plaza has a road within reach",
+		gx ~= nil and math.sqrt((gx :: number) ^ 2 + (gz :: number) ^ 2) <= Cfg.RoadMax
+	)
 end
 checkUnstuck()
 

@@ -24,6 +24,7 @@ local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Unstuck = require(ReplicatedStorage.Shared.Config.Unstuck)
 local UnstuckRules = require(ReplicatedStorage.Shared.Rules.Unstuck)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local CFG = require(ReplicatedStorage.Shared.Config.World)
@@ -1048,6 +1049,49 @@ local function roomAt(s: CarState, pivot: CFrame): boolean
 	return #workspace:GetPartBoundsInBox(at, size - Vector3.new(1, 2, 1), params) == 0
 end
 
+-- every road and suburb street centreline, for the unstuck button with no trail to go back along
+local roadLines: { { { number } } }? = nil
+local function allRoadLines(): { { { number } } }
+	if not roadLines then
+		local lines = {}
+		local L = RoadLayout.fromConfig()
+		for _, r in L.roads do
+			table.insert(lines, r.pts)
+		end
+		for _, sub in L.suburbs do
+			for _, st in sub.streets do
+				table.insert(lines, st.pts)
+			end
+		end
+		roadLines = lines
+	end
+	return roadLines :: { { { number } } }
+end
+
+-- the nearest road, facing along it the way the car already points; nil if none is near or loaded
+local function roadSpot(s: CarState, flatLook: Vector3): CFrame?
+	local here = s.chassis.Position
+	local x, z, dx, dz, d = UnstuckRules.nearestRoad(allRoadLines(), here.X, here.Z)
+	if not (x and z and dx and dz and d) or d > Unstuck.RoadMax then
+		return nil
+	end
+	groundParams.FilterDescendantsInstances = { s.car, player.Character :: Instance }
+	local hit = workspace:Raycast(
+		Vector3.new(x, here.Y + Unstuck.RoadRay, z),
+		Vector3.new(0, -2 * Unstuck.RoadRay, 0),
+		groundParams
+	)
+	if not hit then
+		return nil
+	end
+	local dir = Vector3.new(dx, 0, dz)
+	if dir:Dot(flatLook) < 0 then
+		dir = -dir
+	end
+	local at = hit.Position + Vector3.new(0, 0.5, 0)
+	return CFrame.lookAt(at, at + dir)
+end
+
 -- T / pad D-pad left / the phone's STUCK? button
 function Drive.unstuck()
 	local s = driving
@@ -1085,6 +1129,13 @@ function Drive.unstuck()
 				stillNow(s)
 				return
 			end
+		end
+		-- no trail yet (just spawned) or none of it has room: the nearest road
+		local spot = roadSpot(s, flatLook)
+		if spot and roomAt(s, spot) then
+			s.car:PivotTo(spot)
+			stillNow(s)
+			return
 		end
 	end
 	putUpright(s, flatLook)
