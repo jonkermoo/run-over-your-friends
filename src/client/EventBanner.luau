@@ -152,8 +152,7 @@ local function fmt(seconds: number): string
 end
 
 local titleUntil = 0 -- the big title is on screen until then: queued cards (daily streak) wait for it
-local function bigTitle(event: Config.Event)
-	titleUntil = os.clock() + Config.TitleSeconds
+local function showTitle(event: Config.Event)
 	sting:Play()
 	local color = Style.colors[event.color] or C.gold
 	local holder = Instance.new("Frame")
@@ -200,6 +199,13 @@ local function bigTitle(event: Config.Event)
 			holder:Destroy()
 		end)
 	end)
+end
+
+-- waits its turn for the middle of the screen (Style.stage) behind a tutorial cheer or DEMOLISHED!
+local function bigTitle(event: Config.Event)
+	local wait = Style.stage(Config.TitleSeconds)
+	titleUntil = os.clock() + wait + Config.TitleSeconds
+	task.delay(wait, showTitle, event)
 end
 
 local lastPhase, lastKey = "", ""

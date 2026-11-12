@@ -58,6 +58,16 @@ function ServerGoals.add(goal: Goal, kind: string, amount: number, id: number, n
 	return false
 end
 
+-- what each helper gets when the goal runs out of time: nothing under `minShare` of the target, else the
+-- reward times the share done, rounded to $10 (a finished goal pays the full reward instead)
+function ServerGoals.partialPay(goal: Goal, reward: number, minShare: number): number
+	local share = if goal.target > 0 then goal.progress / goal.target else 0
+	if share < minShare then
+		return 0
+	end
+	return math.floor(reward * math.min(share, 1) / 10 + 0.5) * 10
+end
+
 -- the next goal kind in turn
 function ServerGoals.nextIndex(index: number, count: number): number
 	return index % math.max(count, 1) + 1

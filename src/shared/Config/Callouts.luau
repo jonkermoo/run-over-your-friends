@@ -27,6 +27,11 @@ return table.freeze({
 	CheerTop = 250,
 	CheerSubSize = 16,
 
+	-- the middle of the screen is shared (client/Style.stage): big callouts wait their turn, one after another
+	StageGap = 0.4, -- seconds between one big callout going and the next
+	BigHold = 1.1, -- DEMOLISHED! and its amount: seconds it holds the middle (the slam and its fade)
+	CheerHold = 3.4, -- a cheer (tutorial step, SERVER GOAL, SO CLOSE, contest winners): seconds before it fades
+	CheerFade = 0.5, -- ...and the fade itself
 	AirTickerSize = 28, -- the air-time count while airborne
 	LandingSize = 24, -- "120 STUDS!" over the landing spot (a world label)
 

@@ -109,7 +109,8 @@ local function finishContest()
 		return
 	end
 	local st = Contest.standings(c.scores)
-	local won = Contest.prizes(st, Config.ContestPrizes, Config.ContestTakePart)
+	local won =
+		Contest.prizes(st, Config.ContestPrizes, Config.ContestTakePart, Config.ContestFullField)
 	local unit = c.event.contest.unit
 	for _, p in st do
 		local player = Players:GetPlayerByUserId(p.id)

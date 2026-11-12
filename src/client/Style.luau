@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 
@@ -48,6 +49,66 @@ watchCamera()
 
 function Style.scale(): number
 	return currentScale
+end
+
+-- the HUD pieces at the screen's edges that pointers must stay off (Rules/Clear), as real-pixel boxes in
+-- the inset-adjusted space of a ScreenGui that doesn't ignore the inset; pieces that aren't showing are left out
+local KEEP_CLEAR = { "Controls", "KeysChip", "Speedometer" }
+function Style.keepClear(): { { x: number, y: number, w: number, h: number } }
+	local out = {}
+	local player = game:GetService("Players").LocalPlayer
+	local hud = player
+		and player:FindFirstChild("PlayerGui")
+		and player.PlayerGui:FindFirstChild("Hud")
+	if not hud then
+		return out
+	end
+	for _, name in KEEP_CLEAR do
+		local g = hud:FindFirstChild(name)
+		if g and g:IsA("GuiObject") and g.Visible and g.AbsoluteSize.X > 0 then
+			local p, s = g.AbsolutePosition, g.AbsoluteSize
+			table.insert(out, { x = p.X, y = p.Y, w = s.X, h = s.Y })
+		end
+	end
+	return out
+end
+
+-- a sheet (Garage, Store or Goals) is open over the screen
+function Style.sheetOpen(): boolean
+	local player = game:GetService("Players").LocalPlayer
+	local pg = player and player:FindFirstChild("PlayerGui")
+	if not pg then
+		return false
+	end
+	local hud = pg:FindFirstChild("Hud")
+	local goals = pg:FindFirstChild("Goals")
+	for _, g in
+		{
+			hud and hud:FindFirstChild("Garage"),
+			hud and hud:FindFirstChild("Store"),
+			goals and goals:FindFirstChild("GoalsSheet"),
+		}
+	do
+		if g and g:IsA("GuiObject") and g.Visible then
+			return true
+		end
+	end
+	return false
+end
+
+-- The middle of the screen is shared by the big callouts (tutorial cheers, SERVER GOAL, DEMOLISHED!, contest
+-- winners). Each one asks for the stage for `hold` seconds and is told how long to wait, so they come one
+-- after another instead of landing on top of each other; combo shouts skip while one is up.
+local stageFree = 0
+function Style.stage(hold: number): number
+	local now = os.clock()
+	local start = math.max(now, stageFree)
+	stageFree = start + hold + Callouts.StageGap
+	return start - now
+end
+
+function Style.stageBusy(): boolean
+	return os.clock() < stageFree
 end
 
 -- the scale for world labels (BillboardGuis): they shrink with the UI but stay readable

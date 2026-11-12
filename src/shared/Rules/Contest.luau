@@ -55,15 +55,23 @@ function Contest.standings(scores: Scores): { Place }
 	return list
 end
 
--- what each player wins: prizes[place] for the top places, takePart for everyone else who scored
+-- what each player wins: prizes[place] for the top places, takePart for everyone else who scored.
+-- fullField: with fewer players than this taking part, the place prizes shrink in step (1 of 4 taking part
+-- gets a quarter), so a contest you're alone in isn't free money; a prize never drops under takePart.
+-- Prizes round to $10.
 function Contest.prizes(
 	standings: { Place },
 	prizes: { number },
-	takePart: number
+	takePart: number,
+	fullField: number?
 ): { [number]: number }
+	local share = math.min(1, #standings / math.max(fullField or 1, 1))
 	local out = {}
 	for _, p in standings do
-		out[p.id] = prizes[p.place] or takePart
+		local prize = prizes[p.place]
+		out[p.id] = if prize
+			then math.max(takePart, math.floor(prize * share / 10 + 0.5) * 10)
+			else takePart
 	end
 	return out
 end

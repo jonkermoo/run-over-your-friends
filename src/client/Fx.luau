@@ -61,9 +61,10 @@ local SOUNDS: { [string]: { id: { number }, volume: number, pitch: { number }, p
 		pool = 3,
 	},
 }
-local COMBO_WORDS =
-	{ "", "DOUBLE!", "TRIPLE!", "MULTI!", "MEGA!", "ULTRA!", "MONSTER!", "RAMPAGE!" }
-local COMBO_COLORS = { C.text, C.money, C.yellow, C.orange, C.red, C.pink, C.blue, C.yellow }
+-- the shout after a combo hit: the number of hits (the money multiplier is in the feed; words like DOUBLE
+-- would read as 2x money), with a hype word from the 4th hit
+local COMBO_WORDS = { "", "", "", "MEGA!", "ULTRA!", "MONSTER!", "RAMPAGE!" }
+local COMBO_COLORS = { C.text, C.money, C.yellow, C.orange, C.red, C.pink, C.blue }
 
 ---------------------------------------------------------------- sound pool
 
@@ -339,11 +340,13 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 			shake(0.25 + 0.5 * strength)
 			impactFlash(strength)
 			task.delay(0.12, play, "Cash", nil, 1 + math.min(b, 8) * 0.06)
-			if b >= 2 then
+			-- a cheer or DEMOLISHED! has the middle of the screen: the till and the sting still say it
+			if b >= 2 and not Style.stageBusy() then
 				local i = math.min(b, #COMBO_WORDS)
 				local hits = math.min(b, Callouts.ComboMaxHits) - 2
+				local word = COMBO_WORDS[i]
 				announce(
-					COMBO_WORDS[i],
+					if word ~= "" then `{b} HITS! {word}` else `{b} HITS!`,
 					COMBO_COLORS[i],
 					math.floor(Callouts.ComboSize + hits * Callouts.ComboStep + 0.5)
 				)
@@ -398,10 +401,12 @@ end
 
 -- the money shot, in the middle of the screen, with the till
 function Fx.announceBig(word: string, amount: string)
-	announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigTop)
-	announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountTop)
-	play("Sting", nil, 0.85)
-	play("Cash", nil, 0.9)
+	task.delay(Style.stage(Callouts.BigHold), function()
+		announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigTop)
+		announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountTop)
+		play("Sting", nil, 0.85)
+		play("Cash", nil, 0.9)
+	end)
 end
 
 function Fx.start()

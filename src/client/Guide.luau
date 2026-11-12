@@ -18,6 +18,7 @@ local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Rules = require(ReplicatedStorage.Shared.Rules.Onboarding)
+local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -47,7 +48,8 @@ Style.fit(gui)
 -- a lane-line progress bar. Its yellow edge pulses when the goal needs your attention.
 local card = Style.panel(gui)
 card.Name = "JobCard"
-card.Position = UDim2.fromOffset(14, 68)
+local CARD_TOP, HINT_TOP = 68, 146 -- layout px under the menu strip
+card.Position = UDim2.fromOffset(14, CARD_TOP)
 card.Size = UDim2.fromOffset(420, 68)
 card.Visible = false
 local stroke = Style.stroke(card, GOLD, 3, 1)
@@ -81,7 +83,7 @@ barBack.Size = UDim2.new(1, -32, 0, 6)
 Style.laneGaps(barBack, C.panel)
 -- the "what to do now" nudge sits right under the card
 local hintText = label(gui, "", 17, F.display, GOLD)
-hintText.Position = UDim2.fromOffset(18, 146)
+hintText.Position = UDim2.fromOffset(18, HINT_TOP)
 hintText.Size = UDim2.fromOffset(420, 22)
 hintText.TextXAlignment = Enum.TextXAlignment.Left
 Style.outline(hintText, 2)
@@ -258,7 +260,7 @@ cheer.SoundId = "rbxasset://sounds/electronicpingshort.wav"
 cheer.Volume = 0.8
 cheer.Parent = gui
 
-local function celebrate(title: string, subtitle: string)
+local function showCelebrate(title: string, subtitle: string)
 	cheer:Play()
 	local t = label(gui, title, Callouts.CheerSize, BOLD, GOLD)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -299,17 +301,24 @@ local function celebrate(title: string, subtitle: string)
 			c:Destroy()
 		end)
 	end
-	task.delay(3.2, function()
+	task.delay(Callouts.CheerHold - Callouts.CheerFade, function()
 		for _, l in { t, s } do
-			TweenService
-				:Create(l, TweenInfo.new(0.5), { TextTransparency = 1, BackgroundTransparency = 1 })
-				:Play()
+			TweenService:Create(
+				l,
+				TweenInfo.new(Callouts.CheerFade),
+				{ TextTransparency = 1, BackgroundTransparency = 1 }
+			):Play()
 		end
 		task.delay(0.6, function()
 			t:Destroy()
 			s:Destroy()
 		end)
 	end)
+end
+
+-- waits its turn for the middle of the screen (Style.stage) so two moments never land at once
+local function celebrate(title: string, subtitle: string)
+	task.delay(Style.stage(Callouts.CheerHold), showCelebrate, title, subtitle)
 end
 
 ---------------------------------------------------------------- state
@@ -480,7 +489,14 @@ local function showTarget(target: Target?, root: BasePart?)
 	local e = Rules.edgePoint(p.X / k, p.Y / k, p.Z, size.X, size.Y, Onboarding.EdgeMargins)
 	edge.Visible = not e.onScreen
 	if edge.Visible then
-		edge.Position = UDim2.fromOffset(e.x, e.y)
+		-- off the controls card and the speedometer, sliding along the edge it's on
+		local keep = Style.keepClear()
+		for _, r in keep do
+			r.x, r.y, r.w, r.h = r.x / k, r.y / k, r.w / k, r.h / k
+		end
+		local box = Onboarding.EdgeBox
+		local ex, ey = Clear.slide(e.x, e.y, box, box, keep, size.X, size.Y, Onboarding.ClearGap)
+		edge.Position = UDim2.fromOffset(ex, ey)
 		edgeTurn.Rotation = e.angle
 		-- the label sits on the screen side of the arrow, clear of its tip
 		local away = math.rad(e.angle + 90)
@@ -807,6 +823,13 @@ local function update()
 	end
 	showTarget(target, root)
 	showPress(pressTarget, pressFromSide)
+	-- an arrow under a menu tab lands on the card: the card (and its hint) step down out of its way
+	local drop = if press.Visible
+			and (pressTarget == garageButton or pressTarget == goalsButton)
+		then Onboarding.TabArrowDrop
+		else 0
+	card.Position = UDim2.fromOffset(14, CARD_TOP + drop)
+	hintText.Position = UDim2.fromOffset(18, HINT_TOP + drop)
 
 	local id = Drive.state.vehicleId
 	if Drive.state.driving and id ~= lastVehicle then

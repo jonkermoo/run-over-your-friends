@@ -53,7 +53,7 @@ return table.freeze({
 			t({
 				kind = "Combo",
 				mode = "max",
-				text = "Hit a x{n} combo",
+				text = "Hit {n} people in one combo",
 				min = 4,
 				max = 6,
 				step = 1,
@@ -131,7 +131,7 @@ return table.freeze({
 			t({
 				kind = "Combo",
 				mode = "max",
-				text = "Hit a x{n} combo",
+				text = "Hit {n} people in one combo",
 				min = 8,
 				max = 12,
 				step = 1,

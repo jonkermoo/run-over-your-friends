@@ -51,26 +51,52 @@ local function send(player: Player?)
 	end
 end
 
+local function payHelper(player: Player, amount: number, text: string)
+	local profile = Data.get(player)
+	if not profile then
+		return
+	end
+	profile.money += amount -- not Data.addMoney: rewards don't count toward "Earn" goals
+	Data.changed(player)
+	Analytics.source(player, amount, Enum.AnalyticsEconomyTransactionType.TimedReward, "ServerGoal")
+	Net.remote("Popup"):FireClient(player, text, "goal")
+end
+
 local function finish(g: Rules.Goal)
 	nextAt = os.time() + Config.Pause
 	local early = EventService.hurry()
 	for _, player in Players:GetPlayers() do
-		local profile = Data.get(player)
-		if g.helpers[player.UserId] and profile then
-			profile.money += Config.Reward -- not Data.addMoney: rewards don't count toward "Earn" goals
-			Data.changed(player)
-			Analytics.source(
-				player,
-				Config.Reward,
-				Enum.AnalyticsEconomyTransactionType.TimedReward,
-				"ServerGoal"
-			)
-			Net.remote("Popup"):FireClient(player, `SERVER GOAL!  +${Config.Reward}`, "goal")
+		if g.helpers[player.UserId] then
+			payHelper(player, Config.Reward, `SERVER GOAL!  +${Config.Reward}`)
 		end
 		Net.remote("Celebrate"):FireClient(
 			player,
 			"SERVER GOAL DONE!",
 			if early then "The next event starts now!" else "Everyone who helped gets a bonus!"
+		)
+	end
+end
+
+-- out of time: past PartialShare each helper gets that share of the reward and everyone sees how close it
+-- came; under it, just how far it got (nothing at all when nobody helped)
+local function timeUp(g: Rules.Goal)
+	if g.progress <= 0 then
+		return
+	end
+	local pay = Rules.partialPay(g, Config.Reward, Config.PartialShare)
+	local score = `{g.progress} / {g.target}`
+	for _, player in Players:GetPlayers() do
+		local helped = g.helpers[player.UserId] == true
+		if pay > 0 and helped then
+			payHelper(player, pay, `SO CLOSE!  +${pay}`)
+		end
+		Net.remote("Celebrate"):FireClient(
+			player,
+			if pay > 0 then "SO CLOSE!" else "TIME'S UP!",
+			if pay > 0 and helped
+				then `Server goal {score}. You still get +${pay} for helping!`
+				elseif pay > 0 then `Server goal {score}. Helpers get +${pay}. Join the next one!`
+				else `Server goal {score}. The next one starts soon!`
 		)
 	end
 end
@@ -108,9 +134,12 @@ function ServerGoalService.start()
 			local now = os.time()
 			local players = #Players:GetPlayers()
 			if goal and not goal.done and now >= goal.endsAt then
-				goal = nil -- ran out of time: no reward; it leaves the sheet and the next comes after the pause
+				-- ran out of time: it leaves the sheet and the next comes after the pause
+				local g = goal
+				goal = nil
 				nextAt = now + Config.Pause
 				dirty = true
+				timeUp(g)
 			end
 			if (not goal or goal.done) and now >= nextAt and players > 0 then
 				index = Rules.nextIndex(index, #Config.Kinds)

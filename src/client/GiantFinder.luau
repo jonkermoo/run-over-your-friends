@@ -5,12 +5,14 @@
 -- tag (client/NameTags) takes over. Gone once the giant is toppled or walks off. Numbers: Config/Events
 -- GiantFinder.
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
+local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
 local Style = require(script.Parent.Style)
 
 local GiantFinder = {}
@@ -126,7 +128,8 @@ local function update()
 	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character.PrimaryPart
 	local from = if root then root.Position else cam.CFrame.Position
 	local studs = (Vector3.new(top.X, 0, top.Z) - Vector3.new(from.X, 0, from.Z)).Magnitude
-	if studs < G.HideWithin then
+	-- close by the name tag takes over; an open sheet (garage, store, goals) has the screen
+	if studs < G.HideWithin or Style.sheetOpen() then
 		gui.Enabled = false
 		return
 	end
@@ -166,6 +169,24 @@ local function update()
 		math.clamp(at.X, margin, vp.X - margin),
 		math.clamp(at.Y, margin, vp.Y - margin)
 	)
+	-- off the controls card and the speedometer (they're in inset space; this screen ignores the inset)
+	local inset = GuiService:GetGuiInset()
+	local keep = Style.keepClear()
+	for _, r in keep do
+		r.x += inset.X
+		r.y += inset.Y
+	end
+	local cx, cy = Clear.slide(
+		at.X,
+		at.Y,
+		(G.PlateWidth + G.Pointer * 2) * s,
+		(G.PlateHeight + G.Pointer * 2) * s,
+		keep,
+		vp.X,
+		vp.Y,
+		G.ClearGap * s
+	)
+	at = Vector2.new(cx, cy)
 	local pos = at / s
 	plate.Position = UDim2.fromOffset(pos.X, pos.Y)
 	-- the pointer sits where the plate's edge meets the way to the giant

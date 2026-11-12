@@ -1888,6 +1888,24 @@ do
 end
 
 do
+	local Clear = require("../src/shared/Rules/Clear")
+	local card = { x = 800, y = 400, w = 200, h = 180 } -- bottom right of a 1000 x 600 screen
+	local x, y = Clear.slide(930, 480, 100, 100, { card }, 1000, 600, 10)
+	check(
+		"a pointer on the right edge slides up off the corner card",
+		x == 930 and y == 400 - 10 - 50
+	)
+	local bx, by =
+		Clear.slide(520, 560, 100, 60, { { x = 400, y = 520, w = 200, h = 80 } }, 1000, 600, 10)
+	check(
+		"a pointer on the bottom edge slides sideways off the speedometer, to the nearer side",
+		by == 560 and bx == 600 + 10 + 50
+	)
+	local fx, fy = Clear.slide(100, 100, 50, 50, { card }, 1000, 600, 10)
+	check("a pointer clear of every box stays put", fx == 100 and fy == 100)
+end
+
+do
 	local function checkContest()
 		local Contest = require("../src/shared/Rules/Contest")
 		local scores = {}
@@ -1937,7 +1955,32 @@ do
 			EventConfig.ContestPrizes,
 			500
 		)
-		check("a lone player still wins first", alone[9] == EventConfig.ContestPrizes[1])
+		check(
+			"without a full field a lone player wins full first",
+			alone[9] == EventConfig.ContestPrizes[1]
+		)
+		local solo = Contest.prizes(
+			Contest.standings({ [9] = { score = 1, at = 0 } }),
+			{ 5000, 3000, 2000 },
+			500,
+			4
+		)
+		check("alone in a field of 4: a quarter of first", solo[9] == 1250)
+		local pair = Contest.prizes(
+			Contest.standings({ [1] = { score = 5, at = 0 }, [2] = { score = 3, at = 0 } }),
+			{ 5000, 3000, 2000 },
+			500,
+			4
+		)
+		check("two taking part: half prizes", pair[1] == 2500 and pair[2] == 1500)
+		local small =
+			Contest.prizes(Contest.standings({ [1] = { score = 5, at = 0 } }), { 1000 }, 500, 4)
+		check("a shrunk prize never drops under the take-part pay", small[1] == 500)
+		local full = Contest.prizes(Contest.standings(best), { 5000, 3000, 2000 }, 500, 4)
+		check(
+			"a full field gets the full prizes",
+			full[3] == 5000 and full[2] == 2000 and full[4] == 500
+		)
 		check(
 			"no scores, no prizes",
 			next(Contest.prizes(Contest.standings({}), EventConfig.ContestPrizes, 500)) == nil
@@ -2076,6 +2119,22 @@ do
 		check(
 			"everyone who added is a helper",
 			goal.helpers[1] and goal.helpers[2] and not goal.helpers[3]
+		)
+		local half = Sg.make(def, 1, 1, 0, 600)
+		Sg.add(half, def.kind, math.floor(half.target * 0.6), 1, 1)
+		check(
+			"out of time past the share: helpers get that share of the reward",
+			Sg.partialPay(half, 1000, 0.5)
+					== math.floor(1000 * half.progress / half.target / 10 + 0.5) * 10
+				and Sg.partialPay(half, 1000, 0.5) > 0
+		)
+		local little = Sg.make(def, 1, 1, 0, 600)
+		Sg.add(little, def.kind, 1, 1, 1)
+		check("out of time under the share: nothing", Sg.partialPay(little, 1000, 0.5) == 0)
+		check(
+			"a lone player's server goal is sized for one",
+			SgConfig.MinPlayers == 1
+				and Sg.make(def, 1, SgConfig.MinPlayers, 0, 600).target == def.perPlayer
 		)
 		check("server goal kinds take turns", Sg.nextIndex(1, 2) == 2 and Sg.nextIndex(2, 2) == 1)
 		local goalKinds = {}

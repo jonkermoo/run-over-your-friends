@@ -22,8 +22,8 @@ return table.freeze({
 		table.freeze({
 			key = "Combo",
 			title = "BIGGEST COMBO",
-			prefix = "x",
-			suffix = "",
+			prefix = "",
+			suffix = " hits",
 			color = "purple",
 		}),
 	}),

@@ -94,6 +94,7 @@ return table.freeze({
 		PlateWidth = 104, -- layout px
 		PlateHeight = 50,
 		Pointer = 22, -- layout px: the diamond that points the way
+		ClearGap = 10, -- layout px kept between the plate and the controls card or speedometer (Rules/Clear)
 		ScanSeconds = 0.5, -- how often to look for the giant in the crowd
 		Unit = "m", -- distance label: one stud is one of these
 	}),
@@ -104,6 +105,7 @@ return table.freeze({
 	-- contests: places 1, 2, 3, then everyone else who scored at least once
 	ContestPrizes = table.freeze({ 5000, 3000, 2000 }),
 	ContestTakePart = 500,
+	ContestFullField = 4, -- with fewer taking part, the top-3 prizes shrink in step (Rules/Contest.prizes)
 	ContestShown = 3, -- standings sent to each player (the banner shows the leader and you)
 	-- the event sign (top centre, src/client/EventBanner): one line (LIVE pill, title, timer) sitting in the
 	-- empty middle of Roblox's top bar, plus one slim line under it during a contest. Layout px.

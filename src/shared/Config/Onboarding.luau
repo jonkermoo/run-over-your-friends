@@ -46,6 +46,9 @@ return table.freeze({
 	EventWait = 45, -- seconds the event step waits while no event is live or about to start, then ends itself
 	-- markers: GUI pixels kept clear for the off-screen pointer (menu strip on top, speedometer below)
 	EdgeMargins = table.freeze({ left = 70, top = 150, right = 70, bottom = 130 }),
+	EdgeBox = 120, -- layout px: the edge pointer's size, kept off the controls card and speedometer (Rules/Clear)
+	ClearGap = 10, -- layout px between it and them
+	TabArrowDrop = 96, -- layout px the job card steps down while the arrow points at a menu tab above it
 	BeaconHeight = 500, -- studs: the light column over a ramp or a building
 	BeaconWidth = 14,
 	BeaconNear = 70, -- studs: closer than this the column thins out
