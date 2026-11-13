@@ -17,7 +17,9 @@ end
 
 -- Vehicles pass through players, NPCs, debris and each other: NPC and player hits are found by overlap.
 -- The one exception: player cars' collider boxes (CarBodies) bump into each other and the world.
-for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture", "CarBodies" } do
+for _, g in
+	{ "Vehicles", "Characters", "Npcs", "Debris", "Furniture", "CarBodies", "Props", "Giant" }
+do
 	PhysicsService:RegisterCollisionGroup(g)
 end
 for _, g in { "Vehicles", "Characters", "Npcs", "Debris", "Furniture" } do
@@ -34,6 +36,16 @@ PhysicsService:CollisionGroupSetCollidable("Vehicles", "Debris", false)
 PhysicsService:CollisionGroupSetCollidable("Npcs", "Characters", false)
 -- people walk through each other instead of shoving into clumps
 PhysicsService:CollisionGroupSetCollidable("Npcs", "Npcs", false)
+-- the giant (Giant in Town) collides like a person, but strides through street props (Props: lamps, signals,
+-- trees, benches...), which stopped it dead at every corner; everything else meets props as it always did
+for _, g in PhysicsService:GetRegisteredCollisionGroups() do
+	PhysicsService:CollisionGroupSetCollidable(
+		"Giant",
+		g.name,
+		PhysicsService:CollisionGroupsAreCollidable("Npcs", g.name)
+	)
+end
+PhysicsService:CollisionGroupSetCollidable("Giant", "Props", false)
 
 local Data = require(script.Data)
 local Passes = require(script.Passes)

@@ -32,7 +32,7 @@ local CFG = World.Debris
 local COLLAPSE = Smash.Collapse
 local CRUMBLE = Smash.Crumble
 
-type Chunk = { cf: CFrame, transparency: number, glass: boolean }
+type Chunk = { cf: CFrame, transparency: number, glass: boolean, group: string? }
 local chunks: { [BasePart]: Chunk } = {}
 -- whole buildings that can come down: their Fixed floors and roofs, every part, and which are down right now
 local structure: { [BasePart]: Chunk } = {}
@@ -85,7 +85,16 @@ function BuildingService.registerProps(folder: Folder)
 	propsFolder = folder
 	for _, p in folder:GetDescendants() do
 		if p:IsA("BasePart") then
-			chunks[p] = { cf = p.CFrame, transparency = p.Transparency, glass = false }
+			-- street props have their own collision group: the giant strides through them (init.server)
+			if p.CollisionGroup == "Default" then
+				p.CollisionGroup = "Props"
+			end
+			chunks[p] = {
+				cf = p.CFrame,
+				transparency = p.Transparency,
+				glass = false,
+				group = p.CollisionGroup,
+			}
 		end
 	end
 end
@@ -130,7 +139,7 @@ local function restore(part: BasePart, always: boolean?)
 	part.Anchored = true
 	part.AssemblyLinearVelocity = Vector3.zero
 	part.CFrame = c.cf
-	part.CollisionGroup = "Default"
+	part.CollisionGroup = c.group or "Default"
 	part.Transparency = c.transparency
 	part.CanCollide = true
 	part.CanQuery = true

@@ -6,6 +6,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
+local Game = require(ReplicatedStorage.Shared.Config.Game)
+local Rules = require(ReplicatedStorage.Shared.Rules.Crowd)
 local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
 
 local Crowd = {}
@@ -105,11 +107,14 @@ local function update(folder: Instance)
 		end
 		local d = (root.Position - eye).Magnitude
 		local rig = rigs[model]
+		-- how many times an everyday person this one is (a giant is several)
+		local size = model:GetScale() / Game.BodyScale
+		local radius = Rules.animRadius(size, Config)
 		if model:GetAttribute("Down") then
 			if rig then
 				stopAll(rig)
 			end
-		elseif d < Config.AnimRadius then
+		elseif d < radius then
 			rig = rig or load(model)
 			if rig then
 				local gait = model:GetAttribute("Gait")
@@ -131,13 +136,11 @@ local function update(folder: Instance)
 				if want == "walk" and track then
 					local humanoid = model:FindFirstChildOfClass("Humanoid")
 					if humanoid then
-						track:AdjustSpeed(
-							math.clamp(humanoid.WalkSpeed / Config.WalkAnimSpeed, 0.6, 1.6)
-						)
+						track:AdjustSpeed(Rules.walkAnimSpeed(humanoid.WalkSpeed, size, Config))
 					end
 				end
 			end
-		elseif rig and d > Config.AnimRadius * 1.4 then
+		elseif rig and d > radius * 1.4 then
 			drop(model)
 		elseif rig then
 			stopAll(rig)

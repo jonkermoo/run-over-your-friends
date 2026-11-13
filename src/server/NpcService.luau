@@ -161,7 +161,7 @@ function NpcService.spawnGiant(at: Vector3): Model?
 	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid then
-		humanoid.WalkSpeed = 14
+		humanoid.WalkSpeed = EventConfig.GiantWalkSpeed
 		humanoid.DisplayName = `GIANT {humanoid.DisplayName}   ({EventConfig.GiantHits} hits)`
 		humanoid.NameDisplayDistance = 400
 	end

@@ -84,6 +84,7 @@ return table.freeze({
 	-- spot (clear of kerbs, under lamps and trees) to Down studs below it; the feet start GiantSpawnLift over it
 	GiantGroundProbe = table.freeze({ Up = 6, Down = 60 }),
 	GiantSpawnLift = 0.5,
+	GiantWalkSpeed = 24, -- studs/s; its walk animation slows to match its size (Rules/Crowd.walkAnimSpeed)
 	-- finding the giant from anywhere (client/GiantFinder): a light column over it and a pointer on the
 	-- screen edge with the distance. Colour: Config/Crowd Tags.Giant.
 	GiantFinder = table.freeze({

@@ -3285,6 +3285,31 @@ local function checkGiant()
 			and G.BeamGap > 0
 			and G.BeamGap < G.BeamHeight / 10
 	)
+	-- walking: an everyday person's legs keep their old pace; the giant's swing slower for its size
+	local everyday = true
+	for _, k in { CrowdConfig.SpeedMin, 1, CrowdConfig.SpeedMax } do
+		local ws = 9 * k
+		local old = math.clamp(ws / CrowdConfig.WalkAnimSpeed, 0.6, 1.6)
+		if math.abs(CrowdRules.walkAnimSpeed(ws, 1, CrowdConfig) - old) > 1e-6 then
+			everyday = false
+		end
+	end
+	check("an everyday person's walk animation plays as before", everyday)
+	local giantAnim =
+		CrowdRules.walkAnimSpeed(EventConfig.GiantWalkSpeed, EventConfig.GiantScale, CrowdConfig)
+	local natural = EventConfig.GiantWalkSpeed
+		/ (CrowdConfig.WalkAnimSpeed * EventConfig.GiantScale)
+	check(
+		"the giant's legs swing at about the pace its speed needs (feet barely slide) and slower than before",
+		math.abs(giantAnim - natural) < 0.1
+			and giantAnim
+				< math.clamp(EventConfig.GiantWalkSpeed / CrowdConfig.WalkAnimSpeed, 0.6, 1.6)
+	)
+	check(
+		"the giant animates from further away than an everyday person, everyone else as before",
+		CrowdRules.animRadius(EventConfig.GiantScale, CrowdConfig) > CrowdConfig.AnimRadius
+			and CrowdRules.animRadius(1, CrowdConfig) == CrowdConfig.AnimRadius
+	)
 end
 checkGiant()
 

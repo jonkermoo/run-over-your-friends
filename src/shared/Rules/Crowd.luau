@@ -180,6 +180,25 @@ function Crowd.isStaff(role: Role): boolean
 	return role == "food" or role == "warehouse" or role == "shopkeeper" or role == "reception"
 end
 
+-- how fast the walk animation plays for someone walking at `walkSpeed` who is `size` times an everyday person:
+-- a bigger body covers more ground per step, so a giant's legs swing slower for the same speed
+function Crowd.walkAnimSpeed(
+	walkSpeed: number,
+	size: number,
+	cfg: { WalkAnimSpeed: number, WalkAnimMin: number, WalkAnimMax: number }
+): number
+	return math.clamp(
+		walkSpeed / (cfg.WalkAnimSpeed * math.max(size, 0.1)),
+		cfg.WalkAnimMin,
+		cfg.WalkAnimMax
+	)
+end
+
+-- how close the camera must be for someone to animate: a giant is seen from much further away
+function Crowd.animRadius(size: number, cfg: { AnimRadius: number }): number
+	return cfg.AnimRadius * math.max(1, size)
+end
+
 -- where someone goes when they finish; `atHome` means they're inside their own home or workplace
 function Crowd.nextGoal(role: Role, atHome: boolean, rng: () -> number, cfg: GoalConfig): Goal
 	if role == "giant" then

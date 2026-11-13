@@ -595,6 +595,12 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		-- scaled while still in storage (a rig scaled in the workspace reached clients half done); its joints
 		-- are made to re-read their scaled attachments once it is in the world (Shared/Joints)
 		m:ScaleTo(EventConfig.GiantScale * Game.BodyScale)
+		-- strides through street props instead of jamming on every lamp, signal and tree (init.server)
+		for _, d in m:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CollisionGroup = "Giant"
+			end
+		end
 	end
 	humanoid.WalkSpeed = p.speed
 	humanoid.PlatformStand = false

@@ -86,7 +86,9 @@ return table.freeze({
 	RthroWalk = 2510202577,
 	RthroRun = 2510198475,
 	RthroFall = 2510195892,
-	WalkAnimSpeed = 9, -- WalkSpeed at which the walk animation plays at normal speed
+	WalkAnimSpeed = 9, -- WalkSpeed at which the walk animation plays at normal speed (for an everyday-sized person)
+	WalkAnimMin = 0.5, -- the walk animation's speed is held between these (Rules/Crowd.walkAnimSpeed)
+	WalkAnimMax = 1.6,
 
 	-- clothes
 	Skin = table.freeze({
