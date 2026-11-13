@@ -33,6 +33,7 @@ local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
 local PaintPicker = require(script.Parent.PaintPicker)
 local Popups = require(script.Parent.Popups)
+local StarterCard = require(script.Parent.StarterCard)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -971,7 +972,7 @@ local function storeRow(
 	accent: Color3,
 	kind: string,
 	onClick: () -> ()
-): TextButton
+): (TextButton, TextLabel)
 	local row = Style.card(storeList)
 	row.Size = UDim2.new(1, -12, 0, 88)
 	row.LayoutOrder = order
@@ -996,7 +997,7 @@ local function storeRow(
 	b.Position = UDim2.new(1, -16, 0.5, 0)
 	b.Size = UDim2.fromOffset(170, 48)
 	b.Activated:Connect(onClick)
-	return b
+	return b, d
 end
 
 local PASSES = {
@@ -1015,20 +1016,21 @@ local PASSES = {
 		text = "Double money from every hit.",
 	},
 }
-header(1, "SPECIAL OFFER")
-local starter = Products.Starter
-local starterButton = storeRow(
+-- the Starter Pack row: client/StarterCard keeps its text and price in step with the deal
+local starterHeader = header(1, "SPECIAL OFFER")
+local starterButton, starterText = storeRow(
 	2,
-	string.upper(starter.title),
-	`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}. Once per account.`,
+	string.upper(Products.Starter.title),
+	"",
 	"",
 	C.gold,
 	"gold",
 	function()
-		Net.waitFor("BuyProduct"):FireServer(starter.key)
+		Net.waitFor("BuyProduct"):FireServer(StarterCard.current().key)
 	end
 )
-robuxText(starter, starterButton)
+StarterCard.bindStore(starterButton.Parent :: GuiObject, starterText, starterButton, starterHeader)
+StarterCard.start(gui, preview)
 
 header(3, "MONEY")
 local packs = Instance.new("Frame")
@@ -1114,19 +1116,6 @@ local function refreshStore()
 		else
 			b.Text = if test then "TEST TOGGLE" else "GET"
 			Style.setKind(b, "gold")
-		end
-	end
-	local bought = string.find(
-		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
-		",Starter,",
-		1,
-		true
-	) ~= nil
-	local starterRow = starterButton.Parent :: GuiObject
-	starterRow.Visible = not bought
-	for _, h in storeList:GetChildren() do
-		if h:IsA("TextLabel") and h.LayoutOrder == 1 then
-			h.Visible = not bought
 		end
 	end
 	local claimed = player:GetAttribute("GroupClaimed") == true
@@ -1224,6 +1213,12 @@ end
 
 -- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
 offerFor = function(stats: Vehicles.Vehicle)
+	-- still near the start: the Starter Pack is the better buy than any cash pack (at the deal or full price)
+	if StarterCard.eligible() then
+		offer.Visible = false
+		StarterCard.show()
+		return
+	end
 	local cash = (player:GetAttribute("Money") or 0) :: number
 	local gap = priceOf(stats) - cash
 	local pick = Products.MoneyPacks[#Products.MoneyPacks]
@@ -1245,23 +1240,15 @@ end
 
 -- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds
 -- of play, the tutorial done; then it queues behind the streak card (src/client/Popups). Once per session,
--- never once bought.
+-- only for a player still near the start (client/StarterCard), and only until its discount window has run out.
 local joinedAt = os.clock()
 local starterOffered = false
-local function starterBought(): boolean
-	return string.find(
-		"," .. ((player:GetAttribute("Bought") or "") :: string) .. ",",
-		",Starter,",
-		1,
-		true
-	) ~= nil
-end
 local function maybeOfferStarter()
 	if starterOffered then
 		return
 	end
 	local step = (player:GetAttribute("Tutorial") or 0) :: number
-	if starterBought() then
+	if not StarterCard.eligible() or StarterCard.dealState() == "over" then
 		starterOffered = true
 		return
 	end
@@ -1269,36 +1256,21 @@ local function maybeOfferStarter()
 		return
 	end
 	starterOffered = true
-	-- only a head start for someone still near the start: not once they own a car pricier than the pack's
-	local pack = Vehicles.ById[starter.vehicle or ""]
-	for _, id in string.split((player:GetAttribute("Owned") or "") :: string, ",") do
-		local v = Vehicles.ById[id]
-		if pack and v and v.price > pack.price then
-			return
-		end
-	end
 	Popups.want("Starter", 2, function()
-		if starterBought() then
-			return
+		if StarterCard.eligible() then
+			offer.Visible = false
+			StarterCard.show()
 		end
-		offerIsUpsell = false
-		showOffer(
-			"STARTER PACK",
-			`{money(starter.money)} + the {Vehicles.ById[starter.vehicle or ""].name}, once per account. A big head start!`,
-			starter,
-			"GET IT",
-			"NO THANKS"
-		)
-	end, function()
-		offer.Visible = false
-	end, function()
-		return offer.Visible and offerKey == starter.key
-	end)
+	end, StarterCard.hide, StarterCard.isOpen)
 end
 Popups.addBusy(function()
 	local goalsGui = playerGui:FindFirstChild("Goals")
 	local sheet = goalsGui and goalsGui:FindFirstChild("GoalsSheet") :: GuiObject?
-	return garage.Visible or store.Visible or offer.Visible or (sheet ~= nil and sheet.Visible)
+	return garage.Visible
+		or store.Visible
+		or offer.Visible
+		or StarterCard.isOpen()
+		or (sheet ~= nil and sheet.Visible)
 end)
 
 garageButton.Activated:Connect(function()
