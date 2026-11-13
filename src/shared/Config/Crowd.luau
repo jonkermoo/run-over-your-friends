@@ -89,6 +89,13 @@ return table.freeze({
 	WalkAnimSpeed = 9, -- WalkSpeed at which the walk animation plays at normal speed (for an everyday-sized person)
 	WalkAnimMin = 0.5, -- the walk animation's speed is held between these (Rules/Crowd.walkAnimSpeed)
 	WalkAnimMax = 1.6,
+	-- rigs bigger than everyday size (the giant): their animation's hip sway is scaled twice by the engine,
+	-- so it's cut back to scale with the body, and the body lifted so the feet stay on the ground
+	-- (client/Crowd, Rules/Crowd.bigSway)
+	BigRig = table.freeze({
+		MinSize = 1.5, -- times an everyday person; smaller rigs are left alone
+		LiftPerSize = 0.32, -- studs the hips go up per size step: an everyday person's feet dip about this far
+	}),
 
 	-- clothes
 	Skin = table.freeze({

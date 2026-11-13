@@ -3310,6 +3310,14 @@ local function checkGiant()
 		CrowdRules.animRadius(EventConfig.GiantScale, CrowdConfig) > CrowdConfig.AnimRadius
 			and CrowdRules.animRadius(1, CrowdConfig) == CrowdConfig.AnimRadius
 	)
+	-- a big rig's hip sway is cut back to its own size (from 25x to 5x an everyday person's) and lifted
+	local k1, l1 = CrowdRules.bigSway(1, CrowdConfig.BigRig)
+	local kg, lg = CrowdRules.bigSway(EventConfig.GiantScale, CrowdConfig.BigRig)
+	check("an everyday person's hip sway is left alone", k1 == 1 and l1 == 0)
+	check(
+		"the giant sways like a person its size, lifted a stud or two onto its feet",
+		math.abs(kg * EventConfig.GiantScale - 1) < 1e-6 and lg > 0.5 and lg < 3
+	)
 end
 checkGiant()
 

@@ -4,6 +4,7 @@
 -- attributes. Only characters near the camera animate; further ones hold still and drop their tracks.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
@@ -15,6 +16,8 @@ local Crowd = {}
 type Rig = {
 	tracks: { [string]: AnimationTrack },
 	playing: string?,
+	size: number, -- times an everyday person
+	root: Instance?, -- the Root joint (hips to root), whose sway a big rig tones down
 }
 
 local rigs: { [Model]: Rig } = {}
@@ -53,7 +56,13 @@ local function load(model: Model): Rig?
 		run = idOf(model, "AnimRun", Config.RthroRun),
 		sit = idOf(model, "AnimSit", InteriorConfig.SitAnim),
 	}
-	local rig: Rig = { tracks = {}, playing = nil }
+	local rig: Rig = {
+		tracks = {},
+		playing = nil,
+		size = model:GetScale() / Game.BodyScale,
+		root = model:FindFirstChild("LowerTorso")
+			and (model :: any).LowerTorso:FindFirstChild("Root"),
+	}
 	for name, id in ids do
 		local ok, track = pcall(function()
 			return (animator :: Animator):LoadAnimation(animation(id))
@@ -148,7 +157,28 @@ local function update(folder: Instance)
 	end
 end
 
+-- a rig scaled past everyday size gets its animation's sway scaled twice (a giant bobbed 7 studs a step and
+-- sank its feet up to 9 into the street): after the Animator, cut the Root joint's sway back to the rig's
+-- own size and lift it onto its feet (Rules/Crowd.bigSway, Config/Crowd BigRig)
+local function tameBigRigs()
+	for model, rig in rigs do
+		local joint = rig.root
+		if
+			rig.size > Config.BigRig.MinSize
+			and rig.playing
+			and joint
+			and not model:GetAttribute("Down")
+		then
+			local t = (joint :: any).Transform :: CFrame
+			local k, lift = Rules.bigSway(rig.size, Config.BigRig);
+			(joint :: any).Transform = CFrame.new(t.Position * k + Vector3.new(0, lift, 0))
+				* t.Rotation
+		end
+	end
+end
+
 function Crowd.start()
+	RunService.PreSimulation:Connect(tameBigRigs)
 	task.spawn(function()
 		local folder = workspace:WaitForChild("Npcs")
 		folder.ChildRemoved:Connect(function(child)

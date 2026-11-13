@@ -194,6 +194,18 @@ function Crowd.walkAnimSpeed(
 	)
 end
 
+-- a rig `size` times an everyday person: the engine scales its animation's hip sway by the size twice, so it is
+-- multiplied by `k` to scale once, and lifted `lift` studs so the dip of its steps doesn't sink its feet
+function Crowd.bigSway(
+	size: number,
+	cfg: { MinSize: number, LiftPerSize: number }
+): (number, number)
+	if size <= cfg.MinSize then
+		return 1, 0
+	end
+	return 1 / size, cfg.LiftPerSize * size
+end
+
 -- how close the camera must be for someone to animate: a giant is seen from much further away
 function Crowd.animRadius(size: number, cfg: { AnimRadius: number }): number
 	return cfg.AnimRadius * math.max(1, size)
