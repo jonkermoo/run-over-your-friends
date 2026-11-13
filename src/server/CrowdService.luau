@@ -558,6 +558,22 @@ local function rootOf(m: Model): BasePart?
 	return m:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
+-- an AnimationConstraint's offsets (read-only) follow its attachments only when an attachment moves, so
+-- nudge each one there and back
+local function refreshJoints(m: Model)
+	for _, c in m:GetDescendants() do
+		if c:IsA("AnimationConstraint") then
+			for _, a in { c.Attachment0, c.Attachment1 } do
+				if a then
+					local cf = a.CFrame
+					a.CFrame = cf * CFrame.new(0, 1e-3, 0)
+					a.CFrame = cf
+				end
+			end
+		end
+	end
+end
+
 local function activate(p: Person, asFriend: boolean?): boolean
 	local model: Model? = nil
 	if asFriend and #cast > 0 then
@@ -591,9 +607,12 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		return false
 	end
 	if p.giant then
-		-- scaled while still in storage: joints scaled after the model is in the workspace never reached
-		-- clients, so every screen drew the giant's 6x limbs on ordinary-sized joints (a heap round its root)
+		-- scaled while still in storage (joints scaled in the workspace never reached clients), then every
+		-- joint made to re-read its scaled attachments: ScaleTo moves the attachments, but about half the
+		-- time the rig's AnimationConstraints kept their ordinary-sized offsets, so the giant's 6x limbs
+		-- were drawn heaped round its root (sunk to the chest, floating, or folded up)
 		m:ScaleTo(EventConfig.GiantScale * Game.BodyScale)
+		refreshJoints(m)
 	end
 	humanoid.WalkSpeed = p.speed
 	humanoid.PlatformStand = false
