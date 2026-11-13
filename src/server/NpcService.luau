@@ -136,10 +136,29 @@ function NpcService.spawnGiant(at: Vector3): Model?
 	if not npc then
 		return nil
 	end
-	npc:ScaleTo(EventConfig.GiantScale * Game.BodyScale) -- GiantScale times an ordinary person
-	npc:PivotTo(CFrame.new(at + Vector3.new(0, 4 * EventConfig.GiantScale, 0)))
+	-- CrowdService built it GiantScale times an ordinary person before it entered the world
+	-- stand it on whatever is really under the spot (street, sidewalk or island terrain), feet first
+	local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local hum = npc:FindFirstChildOfClass("Humanoid")
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	params.FilterDescendantsInstances = {
+		CrowdService.folder,
+		workspace:FindFirstChild("Vehicles") or CrowdService.folder,
+	}
+	local hit = workspace:Raycast(
+		at + Vector3.new(0, EventConfig.GiantGroundProbe.Up, 0),
+		Vector3.new(0, -(EventConfig.GiantGroundProbe.Up + EventConfig.GiantGroundProbe.Down), 0),
+		params
+	)
+	local feet = if hit then hit.Position.Y else at.Y
+	local up = if root and hum then hum.HipHeight + root.Size.Y / 2 else 4 * EventConfig.GiantScale
+	npc:PivotTo(
+		CFrame.new(Vector3.new(at.X, feet + up + EventConfig.GiantSpawnLift, at.Z))
+			* npc:GetPivot().Rotation
+	)
 	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
-	npc.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- every screen points at it (GiantFinder)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.WalkSpeed = 14

@@ -80,10 +80,15 @@ return table.freeze({
 	GiantHits = 5,
 	GiantHitPay = 1500,
 	GiantToppleBonus = 5000,
+	-- the giant is stood on the real (colliding) ground under its spawn spot: a ray from Up studs over the
+	-- spot (clear of kerbs, under lamps and trees) to Down studs below it; the feet start GiantSpawnLift over it
+	GiantGroundProbe = table.freeze({ Up = 6, Down = 60 }),
+	GiantSpawnLift = 0.5,
 	-- finding the giant from anywhere (client/GiantFinder): a light column over it and a pointer on the
 	-- screen edge with the distance. Colour: Config/Crowd Tags.Giant.
 	GiantFinder = table.freeze({
 		BeamHeight = 900, -- studs above the giant's head
+		BeamGap = 12, -- studs of clear air between the top of its head and the column's foot
 		BeamWidth = 10, -- studs
 		BeamMinPixels = 6, -- added on screen, so it stays a few pixels wide from across the map
 		BeamTransparency = 0.15,

@@ -3266,6 +3266,31 @@ local function checkRoads()
 end
 checkRoads()
 
+-- the giant keeps to the streets (no doors, desks or benches) and its finder column hovers clear of it
+local function checkGiant()
+	local onlyWander = true
+	for _ = 1, 300 do
+		for _, atHome in { true, false } do
+			if CrowdRules.nextGoal("giant", atHome, math.random, CrowdConfig) ~= "wander" then
+				onlyWander = false
+			end
+		end
+	end
+	check("the giant only ever wanders the streets", onlyWander and not CrowdRules.isStaff("giant"))
+	local G = EventConfig.GiantFinder
+	check(
+		"the giant is stood on the ground from a probe that reaches it, and its column hovers over its head",
+		EventConfig.GiantGroundProbe.Up > 1
+			and EventConfig.GiantGroundProbe.Up < 10
+			and EventConfig.GiantGroundProbe.Down >= 20
+			and EventConfig.GiantSpawnLift >= 0
+			and EventConfig.GiantSpawnLift < 2
+			and G.BeamGap > 0
+			and G.BeamGap < G.BeamHeight / 10
+	)
+end
+checkGiant()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

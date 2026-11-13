@@ -1,6 +1,6 @@
 --!strict
 -- Finding the giant (Giant in Town) from anywhere on the map, on this screen only: a tall light column
--- rises from its head, and a red plate with GIANT and the distance pins to the screen edge pointing the
+-- rises just over its head, and a red plate with GIANT and the distance pins to the screen edge pointing the
 -- way. Once the giant is in view the plate floats over its head instead; up close it hides and the name
 -- tag (client/NameTags) takes over. Gone once the giant is toppled or walks off. Numbers: Config/Events
 -- GiantFinder.
@@ -57,7 +57,7 @@ dist.Size = UDim2.new(1, 0, 0, 18)
 dist.ZIndex = 3
 Style.outline(dist, 2)
 
--- the light column: a billboard (drawn like screen UI, so the air's haze can't wash it out from across
+-- the light column, hovering BeamGap studs over its head: a billboard (drawn like screen UI, so the air's haze can't wash it out from across
 -- the map), a fixed number of studs wide plus a few pixels so it never thins to nothing
 local beam = Instance.new("BillboardGui")
 beam.Name = "GiantBeam"
@@ -65,7 +65,7 @@ beam.ResetOnSpawn = false
 beam.LightInfluence = 0
 beam.AlwaysOnTop = false -- buildings in front still hide its foot
 beam.Size = UDim2.new(G.BeamWidth, G.BeamMinPixels, G.BeamHeight, 0)
--- its foot on the giant's head, rising straight up the screen (a billboard stays upright on screen, so
+-- its foot just over the giant's head, rising straight up the screen (a billboard stays upright on screen, so
 -- centring it high in the sky would lean it away from the giant)
 beam.SizeOffset = Vector2.new(0, 0.5)
 beam.Enabled = false
@@ -121,7 +121,8 @@ local function update()
 	local top = head.Position + Vector3.new(0, head.Size.Y / 2, 0)
 	if beam.Adornee ~= head then
 		beam.Adornee = head
-		beam.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2, 0)
+		-- the column's foot hovers a little over the head, so it never covers the giant itself
+		beam.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + G.BeamGap, 0)
 	end
 	beam.Enabled = true
 

@@ -590,6 +590,11 @@ local function activate(p: Person, asFriend: boolean?): boolean
 		m:Destroy()
 		return false
 	end
+	if p.giant then
+		-- scaled while still in storage: joints scaled after the model is in the workspace never reached
+		-- clients, so every screen drew the giant's 6x limbs on ordinary-sized joints (a heap round its root)
+		m:ScaleTo(EventConfig.GiantScale * Game.BodyScale)
+	end
 	humanoid.WalkSpeed = p.speed
 	humanoid.PlatformStand = false
 	local target = p.route[p.step]
@@ -613,7 +618,10 @@ local function activate(p: Person, asFriend: boolean?): boolean
 	p.gait = nil
 	p.model = m
 	byModel[m] = p
-	m.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	-- the giant is in every world from the start: every screen points at it (client/GiantFinder)
+	m.ModelStreamingMode = if p.giant
+		then Enum.ModelStreamingMode.Persistent
+		else Enum.ModelStreamingMode.Atomic
 	m.Parent = folder
 	pcall(function()
 		root:SetNetworkOwner(nil)
@@ -757,7 +765,7 @@ end
 
 -- a giant (Giant in Town): a casual passer-by built just for the event, always in the world
 function CrowdService.spawnGiant(at: Vector3): Model?
-	local p = newPerson("walker", "casual", nil, false)
+	local p = newPerson("giant", "casual", nil, false)
 	p.giant = true
 	p.pos = flat(at)
 	p.mode = "idle"

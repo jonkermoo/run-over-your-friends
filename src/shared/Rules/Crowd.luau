@@ -15,6 +15,7 @@ export type Role =
 	| "warehouse"
 	| "crowd"
 	| "spectator"
+	| "giant"
 export type Outfit = "casual" | "food" | "warehouse" | "office" | "shop"
 export type Person = { role: Role, home: number?, outfit: Outfit, friend: boolean }
 export type PlaceKind =
@@ -181,7 +182,10 @@ end
 
 -- where someone goes when they finish; `atHome` means they're inside their own home or workplace
 function Crowd.nextGoal(role: Role, atHome: boolean, rng: () -> number, cfg: GoalConfig): Goal
-	if Crowd.isStaff(role) then
+	if role == "giant" then
+		-- the giant (Giant in Town) keeps to the streets: it can't fit through a door or sit on a bench
+		return "wander"
+	elseif Crowd.isStaff(role) then
 		return "spot"
 	elseif role == "crowd" then
 		return "crowd"
