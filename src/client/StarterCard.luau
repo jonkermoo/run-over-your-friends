@@ -234,6 +234,8 @@ local function build(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Mo
 	Style.outline(priceNow, 2)
 	offPill = Style.pill(left, "", C.red)
 	offPill.TextColor3 = C.text
+	offPill.TextSize = 16
+	offPill.Size = UDim2.fromOffset(0, 24)
 	offPill.LayoutOrder = 3
 	timer = Style.label(priceRow, "", 16, F.heavy, C.text)
 	timer.AnchorPoint = Vector2.new(1, 0)
