@@ -1339,7 +1339,12 @@ local function keep(
 )
 	local near: { { model: Model, d: number } } = {}
 	for _, model in models do
-		local d = (model.WorldPivot.Position - eye).Magnitude
+		-- from the nearest wall, not the middle: a big office tower counts as near once its side is
+		local p = model.WorldPivot:PointToObjectSpace(eye)
+		local w, dp = model:GetAttribute("W"), model:GetAttribute("D")
+		local dx = if typeof(w) == "number" then math.max(0, math.abs(p.X) - w / 2) else p.X
+		local dz = if typeof(dp) == "number" then math.max(0, math.abs(p.Z) - dp / 2) else p.Z
+		local d = math.sqrt(dx * dx + p.Y * p.Y + dz * dz)
 		if d < radius and not model:GetAttribute("Collapsed") then
 			table.insert(near, { model = model, d = d })
 		end

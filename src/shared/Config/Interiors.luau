@@ -54,8 +54,10 @@ return table.freeze({
 
 	-- offices, shops, the burger place and the warehouse (layouts in Rules/Interiors, from each one's size)
 	Town = table.freeze({
-		Radius = 240, -- clients furnish town buildings this close to the camera...
-		MaxFurnished = 6, -- ...at most this many at once, nearest first
+		-- clients furnish town buildings whose nearest wall is this close to the camera (studs, past the haze
+		-- most windows read as dark glass)...
+		Radius = 520,
+		MaxFurnished = 14, -- ...at most this many at once, nearest first (far ones get one-block furniture)
 		-- every office floor above the lobby has desks along its windows (and people at them); its middle follows
 		-- these plans in turn up the tower: desk pods, pods behind cubicle screens, a break room
 		FloorPlans = { "Open", "Cubicles", "Break" },
