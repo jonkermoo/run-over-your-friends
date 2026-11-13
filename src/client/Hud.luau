@@ -1359,13 +1359,22 @@ end
 
 ---------------------------------------------------------------- phone driving buttons
 
+-- their own screen, so they stay up while the UI ON/OFF button hides the rest (client/HideUi)
+local touchGui = Instance.new("ScreenGui")
+touchGui.Name = "HudTouch"
+touchGui.ResetOnSpawn = false
+touchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+touchGui.Parent = playerGui
+Style.fit(touchGui)
+
 local touch = Instance.new("Frame")
 touch.BackgroundTransparency = 1
 touch.AnchorPoint = Vector2.new(1, 1)
 touch.Position = UDim2.new(1, -20, 1, -LayoutConfig.TouchClearLarge)
 touch.Size = UDim2.fromOffset(240, 154)
+touch.Name = "TouchRack"
 touch.Visible = false
-touch.Parent = gui
+touch.Parent = touchGui
 local touchFit = Instance.new("UIScale")
 touchFit.Parent = touch
 
@@ -1389,9 +1398,9 @@ local function placeTouch()
 	touchFit.Scale = boost
 	local clear = LayoutRules.touchClear(cam.ViewportSize.X, cam.ViewportSize.Y, LayoutConfig)
 	touch.Position = UDim2.new(1, -20, 1, -clear / s)
-	local top = gui.AbsolutePosition.Y
+	local top = touchGui.AbsolutePosition.Y
 	local wide = LayoutRules.touchWide(
-		gui.AbsoluteSize.Y,
+		touchGui.AbsoluteSize.Y,
 		clear,
 		s * boost,
 		moneyBox.AbsolutePosition.Y + moneyBox.AbsoluteSize.Y - top,
