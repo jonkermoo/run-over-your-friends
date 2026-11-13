@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
+local Joints = require(ReplicatedStorage.Shared.Joints)
 local Style = require(script.Parent.Style)
 
 local GiantFinder = {}
@@ -110,6 +111,10 @@ local function update()
 	if now >= scanAt or (giant and not giant.Parent) then
 		scanAt = now + G.ScanSeconds
 		giant = findGiant()
+		-- this screen's copy of a rescaled rig can keep ordinary-sized joints: put them right (Shared/Joints)
+		if giant and Joints.stale(giant) > 0 then
+			Joints.refresh(giant)
+		end
 	end
 	local m = giant
 	local cam = workspace.CurrentCamera
