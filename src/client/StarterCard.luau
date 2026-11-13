@@ -204,24 +204,37 @@ local function build(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Mo
 	priceRow.Position = UDim2.fromOffset(23, 326)
 	priceRow.Size = UDim2.new(1, -46, 0, 40)
 	priceRow.Parent = card
-	priceWas = Style.label(priceRow, "", 20, F.display, C.dim)
-	priceWas.Size = UDim2.fromOffset(110, 40)
-	priceWas.TextXAlignment = Enum.TextXAlignment.Left
+	-- the struck price, the price and the % off sit in a row that sizes itself (TextBounds are screen pixels)
+	local left = Instance.new("Frame")
+	left.BackgroundTransparency = 1
+	left.Size = UDim2.fromScale(0.62, 1)
+	left.Parent = priceRow
+	local list = Instance.new("UIListLayout")
+	list.FillDirection = Enum.FillDirection.Horizontal
+	list.VerticalAlignment = Enum.VerticalAlignment.Center
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Padding = UDim.new(0, 10)
+	list.Parent = left
+	priceWas = Style.label(left, "", 22, F.display, C.dim)
+	priceWas.AutomaticSize = Enum.AutomaticSize.X
+	priceWas.Size = UDim2.fromOffset(0, 40)
+	priceWas.LayoutOrder = 1
 	strike = Instance.new("Frame")
 	strike.BackgroundColor3 = C.red
 	strike.BorderSizePixel = 0
-	strike.AnchorPoint = Vector2.new(0, 0.5)
-	strike.Position = UDim2.new(0, -2, 0.5, 0)
-	strike.Size = UDim2.fromOffset(0, 3)
+	strike.AnchorPoint = Vector2.new(0.5, 0.5)
+	strike.Position = UDim2.fromScale(0.5, 0.5)
+	strike.Size = UDim2.new(1, 0, 0, 3)
 	strike.Rotation = -8
 	strike.Parent = priceWas
-	priceNow = Style.label(priceRow, "", 30, F.display, C.yellow)
-	priceNow.Size = UDim2.fromOffset(160, 40)
-	priceNow.TextXAlignment = Enum.TextXAlignment.Left
+	priceNow = Style.label(left, "", 30, F.display, C.yellow)
+	priceNow.AutomaticSize = Enum.AutomaticSize.X
+	priceNow.Size = UDim2.fromOffset(0, 40)
+	priceNow.LayoutOrder = 2
 	Style.outline(priceNow, 2)
-	offPill = Style.pill(priceRow, "", C.red)
+	offPill = Style.pill(left, "", C.red)
 	offPill.TextColor3 = C.text
-	offPill.AnchorPoint = Vector2.new(0, 0.5)
+	offPill.LayoutOrder = 3
 	timer = Style.label(priceRow, "", 16, F.heavy, C.text)
 	timer.AnchorPoint = Vector2.new(1, 0)
 	timer.Position = UDim2.fromScale(1, 0)
@@ -253,20 +266,14 @@ local function refresh()
 	local deal = product == DEAL
 	local times = Offer.valueTimes(WORTH, robuxShown[product.key], Products.MoneyPacks)
 	valueText.Text = `WORTH {Style.money(WORTH)}  ·  {times}x VALUE`
-	priceNow.Text = rs(product)
+	priceNow.Text = "R$ " .. robuxShown[product.key]
 	priceWas.Visible = deal
 	offPill.Visible = deal
 	timer.Visible = deal
 	if deal then
 		priceWas.Text = "R$ " .. robuxShown[FULL.key]
-		strike.Size = UDim2.fromOffset(priceWas.TextBounds.X + 4, 3)
-		local wasW = priceWas.TextBounds.X + 14
-		priceNow.Position = UDim2.fromOffset(wasW, 0)
 		offPill.Text = `{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}% OFF`
-		offPill.Position = UDim2.new(0, wasW + priceNow.TextBounds.X + 10, 0.5, 0)
 		timer.Text = "DEAL ENDS IN " .. Offer.clock(dealEnds() - now())
-	else
-		priceNow.Position = UDim2.fromOffset(0, 0)
 	end
 	buy.Text = "GET IT  ·  " .. rs(product)
 end
