@@ -3313,6 +3313,37 @@ local function checkGiant()
 end
 checkGiant()
 
+-- the UI ON/OFF button
+local function checkHideUi()
+	local Cfg = require("../src/shared/Config/HideUi")
+	local H = require("../src/shared/Rules/HideUi")
+	check("hide ui: the HUD hides", H.hides("ScreenGui", "Hud", Cfg))
+	check("hide ui: name tags hide", H.hides("BillboardGui", "NameTag", Cfg))
+	check("hide ui: its own button stays", not H.hides("ScreenGui", "HideUi", Cfg))
+	check("hide ui: the music button stays", not H.hides("ScreenGui", "Music", Cfg))
+	check("hide ui: phone drive buttons stay", not H.hides("ScreenGui", "HudTouch", Cfg))
+	check("hide ui: Roblox's touch stick stays", not H.hides("ScreenGui", "TouchGui", Cfg))
+	check("hide ui: shop signs stay", not H.hides("SurfaceGui", "Sign", Cfg))
+	check("hide ui: key is a single letter", #Cfg.Key == 1)
+
+	-- a screen that was up comes back up; our own switch-off isn't taken for the game's
+	local e, off = H.hide(true)
+	check("hide ui: a shown screen is switched off", off)
+	check("hide ui: our switch-off is an echo", not H.changed(e, false))
+	check("hide ui: a shown screen comes back", H.restore(e))
+	-- a screen that was down stays down, unless the game opens it meanwhile (then it stays hidden till back)
+	local d, off2 = H.hide(false)
+	check("hide ui: a hidden screen isn't touched", not off2)
+	check("hide ui: not shown when it was hidden", not H.restore(d))
+	check("hide ui: opened while hidden is switched off", H.changed(d, true))
+	check("hide ui: the echo of that is ignored", not H.changed(d, false))
+	check("hide ui: opened while hidden comes back", H.restore(d))
+	-- the game closes it again while hidden
+	check("hide ui: closed while hidden needs nothing", not H.changed(d, false))
+	check("hide ui: closed while hidden stays closed", not H.restore(d))
+end
+checkHideUi()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

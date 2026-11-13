@@ -88,6 +88,22 @@ core.Parent = beam
 local giant: Model? = nil
 local scanAt = 0
 
+-- what this module wants shown; Enabled is written only when that changes, so the UI OFF button
+-- (client/HideUi) can hold these off and bring them back as they should be
+local want = { gui = false, beam = false }
+local function showGui(on: boolean)
+	if want.gui ~= on then
+		want.gui = on
+		gui.Enabled = on
+	end
+end
+local function showBeam(on: boolean)
+	if want.beam ~= on then
+		want.beam = on
+		beam.Enabled = on
+	end
+end
+
 local function findGiant(): Model?
 	local folder = workspace:FindFirstChild("Npcs")
 	if not folder then
@@ -102,8 +118,8 @@ local function findGiant(): Model?
 end
 
 local function hide()
-	gui.Enabled = false
-	beam.Enabled = false
+	showGui(false)
+	showBeam(false)
 end
 
 local function update()
@@ -129,17 +145,17 @@ local function update()
 		-- the column's foot hovers a little over the head, so it never covers the giant itself
 		beam.StudsOffsetWorldSpace = Vector3.new(0, head.Size.Y / 2 + G.BeamGap, 0)
 	end
-	beam.Enabled = true
+	showBeam(true)
 
 	local root = Players.LocalPlayer.Character and Players.LocalPlayer.Character.PrimaryPart
 	local from = if root then root.Position else cam.CFrame.Position
 	local studs = (Vector3.new(top.X, 0, top.Z) - Vector3.new(from.X, 0, from.Z)).Magnitude
 	-- close by the name tag takes over; an open sheet (garage, store, goals) has the screen
 	if studs < G.HideWithin or Style.sheetOpen() then
-		gui.Enabled = false
+		showGui(false)
 		return
 	end
-	gui.Enabled = true
+	showGui(true)
 	dist.Text = `{math.floor(studs + 0.5)}{G.Unit}`
 
 	-- everything below in real pixels, then divided by the shared scale for offsets
