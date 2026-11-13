@@ -25,6 +25,7 @@ Net.Messages = table.freeze({
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
+	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
 	-- server -> client
 	FriendNames = "FriendNames", -- ({ [friendKey: string]: name }): names of this player's own friends in the crowd (FriendKey attribute)
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
