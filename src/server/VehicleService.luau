@@ -218,14 +218,40 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		end
 	end)
 
+	-- only the owner sits: a seat holds whoever its SeatWeld holds, and Sit = false can't undo that weld
+	-- (seat:Sit even seats a crowd NPC whose Seated state is off), so any weld to someone else is cut.
+	-- Occupant changes before the weld is made, so this watches the welds themselves.
+	local function unseat(w: Instance)
+		if not w:IsA("Weld") then
+			return
+		end
+		task.defer(function()
+			local part = w.Part1
+			local mine = player.Character
+			if w.Parent == seat and part and not (mine and part:IsDescendantOf(mine)) then
+				w:Destroy()
+				-- the cut weld leaves SeatPart stuck on (Sit is already false), and Bodies never hits a humanoid
+				-- with a SeatPart: sitting it for a frame and standing it again clears it
+				local body = part.Parent
+				local h = body and body:FindFirstChildOfClass("Humanoid")
+				task.wait()
+				if h and h.Parent and h.SeatPart == seat then
+					h.Sit = true
+					task.wait()
+					h.Sit = false
+				end
+			end
+		end)
+	end
+	seat.ChildAdded:Connect(unseat)
+
 	local driver: Humanoid? = nil
 	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
 		local now = seat.Occupant
 		if now then
 			local who = Players:GetPlayerFromCharacter(now.Parent)
 			if who ~= player then
-				now.Sit = false -- only the owner drives
-				return
+				return -- only the owner drives: unseat cuts the weld and stands them up
 			end
 			driver = now
 			prompt.Enabled = false
