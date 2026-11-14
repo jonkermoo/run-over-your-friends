@@ -11,6 +11,8 @@ return table.freeze({
 	-- the middle of the screen when they're shorter than that (Rules/Layout.sheetCentre)
 	SheetTop = 68,
 	SheetBottom = 18,
+	SheetMaxWidth = 1100, -- the garage and store sheet never grows past this on big screens
+	SheetMaxHeight = 760,
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,

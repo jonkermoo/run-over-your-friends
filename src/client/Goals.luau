@@ -160,6 +160,14 @@ local function height(): number
 	return h + 6
 end
 
+-- centre the sheet on the screen's GUI area (layout px, so the drawn scale is undone first)
+local function place()
+	local fit = gui:FindFirstChild("ScreenFit") :: UIScale?
+	local guiH = gui.AbsoluteSize.Y / (if fit then fit.Scale else Style.scale())
+	local y = LayoutRules.sheetCentre(guiH, panel.Size.Y.Offset, TOP, BOTTOM_MARGIN)
+	panel.Position = UDim2.new(0.5, 0, 0, y)
+end
+
 local function rebuild()
 	builtShape = shape()
 	body:ClearAllChildren()
@@ -271,8 +279,7 @@ local function rebuild()
 	body.CanvasSize = UDim2.fromOffset(0, y)
 	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 6)
 	panel.Size = UDim2.fromOffset(SHEET_W, sheetH)
-	local guiH = gui.AbsoluteSize.Y / Style.scale()
-	panel.Position = UDim2.new(0.5, 0, 0, LayoutRules.sheetCentre(guiH, sheetH, TOP, BOTTOM_MARGIN))
+	place()
 end
 
 function Goals.toggle()
@@ -350,6 +357,9 @@ function Goals.start()
 			return
 		end
 		last = now
+		if open and shape() ~= builtShape then
+			rebuild() -- the screen changed size: refit and re-centre the sheet
+		end
 		tickCountdowns()
 		if now < fullUntil then
 			countPill.Text = `MAX {QuestConfig.Pins.Max} PINNED`

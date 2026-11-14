@@ -579,13 +579,15 @@ end
 
 -- the garage and the store share one sheet in the middle of the screen, never over the menu strip (the
 -- strip's tabs switch between them): a big title, a dashed lane line, a yellow X, and a scrolling list
-local SHEET_MAX = Vector2.new(1100, 760)
+local SHEET_MAX = Vector2.new(LayoutConfig.SheetMaxWidth, LayoutConfig.SheetMaxHeight)
 local TOP, BOTTOM = LayoutConfig.SheetTop, LayoutConfig.SheetBottom
 local sheets: { Frame } = {}
 
--- centre the sheets on the screen's GUI area (layout px, so the shared scale is undone first)
+local screenFit = gui:FindFirstChild("ScreenFit") :: UIScale?
+
+-- centre the sheets on the screen's GUI area (layout px, so the drawn scale is undone first)
 local function placeSheets()
-	local h = gui.AbsoluteSize.Y / Style.scale()
+	local h = gui.AbsoluteSize.Y / (if screenFit then screenFit.Scale else Style.scale())
 	local y = LayoutRules.sheetCentre(h, SHEET_MAX.Y, TOP, BOTTOM)
 	for _, p in sheets do
 		p.Position = UDim2.new(0.5, 0, 0, y)
@@ -594,6 +596,9 @@ end
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 	task.defer(placeSheets) -- after Style.fit has picked up the new scale
 end)
+if screenFit then
+	screenFit:GetPropertyChangedSignal("Scale"):Connect(placeSheets)
+end
 
 local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	local p = Style.panel(gui)
