@@ -119,7 +119,8 @@ local function update(folder: Instance)
 		-- how many times an everyday person this one is (a giant is several)
 		local size = model:GetScale() / Game.BodyScale
 		local radius = Rules.animRadius(size, Config)
-		if model:GetAttribute("Down") then
+		-- knocked down, or the giant flung (it gets up and walks on: server/NpcService)
+		if model:GetAttribute("Down") or model:GetAttribute("Flung") then
 			if rig then
 				stopAll(rig)
 			end
@@ -168,6 +169,7 @@ local function tameBigRigs()
 			and rig.playing
 			and joint
 			and not model:GetAttribute("Down")
+			and not model:GetAttribute("Flung")
 		then
 			local t = (joint :: any).Transform :: CFrame
 			local k, lift = Rules.bigSway(rig.size, Config.BigRig);

@@ -96,6 +96,26 @@ return table.freeze({
 		MinSize = 1.5, -- times an everyday person; smaller rigs are left alone
 		LiftPerSize = 0.32, -- studs the hips go up per size step: an everyday person's feet dip about this far
 	}),
+	-- a car hitting the giant (Giant in Town, server/NpcService): a hit softer than Energy only shoves it; a
+	-- harder one knocks it flat and throws it, faster the more energy (half weight x speed squared, on a log
+	-- scale like everyone else's launch), then it gets up on the street and walks on (Rules/Crowd.giantFling)
+	GiantFling = table.freeze({
+		Energy = 60000, -- joules: about a sedan at 23 mph; softer hits only shove it
+		EnergyHigh = 10000000, -- joules: about a bus at full speed; harder hits throw it no further
+		ShoveSpeed = 25, -- studs/s along the ground for a hit too soft to fling it
+		MinSpeed = 45, -- studs/s it's thrown at by the softest fling...
+		MaxSpeed = 160, -- ...and by the hardest
+		Lift = 0.6, -- upward part of the throw against 1 along the ground
+		Spin = 1.2, -- rad/s it tumbles at most
+		DownMin = 2.5, -- seconds it lies there after the softest fling...
+		DownMax = 5, -- ...and after the hardest
+		Probe = 80, -- studs: the ground it gets up on is looked for this far down from just over its body
+		ProbeUp = 6, -- studs over its body the look starts
+		-- ground found more than this above where it was hit (a roof), more than this below it (under the map),
+		-- or none at all: it gets up back where it was hit instead
+		MaxRise = 12,
+		MaxDrop = 12,
+	}),
 
 	-- clothes
 	Skin = table.freeze({

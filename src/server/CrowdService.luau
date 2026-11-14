@@ -725,6 +725,22 @@ function CrowdService.down(m: Model)
 	end
 end
 
+-- back on its feet after being flung (the giant): it picks where to go next from where it stands
+function CrowdService.rise(m: Model)
+	local p = byModel[m]
+	if not p or p.mode ~= "down" then
+		return
+	end
+	local root = rootOf(m)
+	if root then
+		p.pos = flat(root.Position)
+	end
+	p.route, p.routeAt, p.step = {}, {}, 1
+	p.at, p.goingTo, p.goingSpot, p.spotPath = nil, nil, nil, nil
+	p.mode, p.untilT = "idle", 0
+	setGait(p, "idle")
+end
+
 -- after a knock-down: the character goes back to the pool and the person turns up again somewhere sensible
 function CrowdService.recycle(m: Model)
 	local p = byModel[m]
