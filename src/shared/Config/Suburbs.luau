@@ -89,4 +89,10 @@ return table.freeze({
 	LampEvery = 150,
 	Sign = table.freeze({ 46, 9 }), -- the name board at the entrance, wide and tall
 	SignColour = { 46, 92, 60 } :: RGB,
+	SignStone = { 168, 160, 148 } :: RGB, -- its wall and pillars
+	SignBase = 3, -- the stone wall under the board
+	SignBack = 80, -- it stands this far before the first street (clear of the first houses)...
+	SignClear = 10, -- ...with its near pillar this far off the feeder road's edge
+	-- the terrain is paved this far past the sidewalks' outer edge, so no grass blades poke through them
+	Pave = 2,
 })

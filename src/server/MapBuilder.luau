@@ -1364,15 +1364,58 @@ function MapBuilder.build(): Result
 				+ math.abs(cf.ZVector.Z) * size.Z
 		) / 2
 		local lo, hi = cf.Position - half, cf.Position + half
-		if lo.Y > GU.MaxBottom or hi.Y > GU.MaxTop or math.min(half.X, half.Z) * 2 < GU.MinSize then
+		if lo.Y > GU.MaxBottom or hi.Y > GU.MaxTop then
 			continue
 		end
-		terrain:ReplaceMaterial(
-			Region3.new(Vector3.new(lo.X, -12, lo.Z), Vector3.new(hi.X, 4, hi.Z)):ExpandToGrid(4),
-			4,
-			Enum.Material.Grass,
-			Enum.Material.Asphalt
-		)
+		if
+			lo.X >= x0 - edge
+			and hi.X <= x0 + spanX + edge
+			and lo.Z >= z0 - edge
+			and hi.Z <= z0 + spanZ + edge
+		then
+			continue -- the city grid is done above
+		end
+		-- only the voxel columns whose middle is under the part (grown by GU.Grow), so a turned driveway or a
+		-- narrow path clears its own shape, not its whole bounding box in 4-stud blocks; a part too small to
+		-- cover any middle clears the one column under its centre
+		local region = Region3.new(
+			Vector3.new(lo.X - GU.Grow, -12, lo.Z - GU.Grow),
+			Vector3.new(hi.X + GU.Grow, 4, hi.Z + GU.Grow)
+		):ExpandToGrid(4)
+		local vox, occ = terrain:ReadVoxels(region, 4)
+		local n = vox.Size
+		local base = region.CFrame.Position - region.Size / 2
+		local lim = size / 2 + Vector3.one * GU.Grow
+		local function clear(ix: number, iz: number): boolean
+			local hit = false
+			for iy = 1, n.Y do
+				if vox[ix][iy][iz] == Enum.Material.Grass and occ[ix][iy][iz] > 0 then
+					vox[ix][iy][iz] = Enum.Material.Asphalt
+					hit = true
+				end
+			end
+			return hit
+		end
+		local changed, any = false, false
+		for ix = 1, n.X do
+			for iz = 1, n.Z do
+				local q = cf:PointToObjectSpace(
+					Vector3.new(base.X + (ix - 0.5) * 4, cf.Position.Y, base.Z + (iz - 0.5) * 4)
+				)
+				if math.abs(q.X) <= lim.X and math.abs(q.Y) <= lim.Y and math.abs(q.Z) <= lim.Z then
+					any = true
+					changed = clear(ix, iz) or changed
+				end
+			end
+		end
+		if not any then
+			local ix = math.clamp(math.floor((cf.Position.X - base.X) / 4) + 1, 1, n.X)
+			local iz = math.clamp(math.floor((cf.Position.Z - base.Z) / 4) + 1, 1, n.Z)
+			changed = clear(ix, iz)
+		end
+		if changed then
+			terrain:WriteVoxels(region, 4, vox, occ)
+		end
 		cleared += 1
 		if cleared % GU.Batch == 0 then
 			task.wait()

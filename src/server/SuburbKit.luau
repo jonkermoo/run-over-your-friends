@@ -174,20 +174,36 @@ end
 local function sign(parent: Instance, at: Vector3, face: Vector3, text: string)
 	local W, H = Cfg.Sign[1], Cfg.Sign[2]
 	local cf = CFrame.lookAt(at, at + face)
-	local wood = rgb(Cfg.Fence)
-	for _, x in { -W / 2 + 2, W / 2 - 2 } do
+	local stone = rgb(Cfg.SignStone)
+	local base = Cfg.SignBase
+	-- a low stone wall the board stands on, capped, with a stone pillar at each end
+	part(
+		parent,
+		Vector3.new(W, base, 3),
+		cf * CFrame.new(0, base / 2 - 0.5, 0),
+		stone,
+		Enum.Material.Cobblestone
+	)
+	part(parent, Vector3.new(W + 1, 0.6, 3.6), cf * CFrame.new(0, base - 0.2, 0), rgb(Cfg.Concrete))
+	for _, x in { -W / 2 - 1.5, W / 2 + 1.5 } do
 		part(
 			parent,
-			Vector3.new(1.2, H + 5, 1.2),
-			cf * CFrame.new(x, (H + 5) / 2, 0),
-			wood,
-			Enum.Material.Wood
+			Vector3.new(3, base + H + 0.5, 3.6),
+			cf * CFrame.new(x, (base + H + 0.5) / 2 - 0.5, 0),
+			stone,
+			Enum.Material.Cobblestone
+		)
+		part(
+			parent,
+			Vector3.new(3.8, 0.6, 4.4),
+			cf * CFrame.new(x, base + H + 0.3, 0),
+			rgb(Cfg.Concrete)
 		)
 	end
 	local board = part(
 		parent,
 		Vector3.new(W, H, 1),
-		cf * CFrame.new(0, 5 + H / 2, 0),
+		cf * CFrame.new(0, base + H / 2, 0),
 		rgb(Cfg.SignColour),
 		Enum.Material.Wood
 	)
@@ -312,7 +328,12 @@ local function hood(
 		Enum.Material.Asphalt
 	)
 	ramp.Transparency = 1
-	sign(folder, b - dir * 30 + perp * (F.width / 2 + 10), -dir, h.name)
+	-- the name board stands on the verge before the first houses, its near end SignClear off the road and its
+	-- face square to the traffic coming in
+	local signAt = b
+		- dir * Cfg.SignBack
+		+ perp * (F.width / 2 + Cfg.SignClear + Cfg.Sign[1] / 2 + 3)
+	sign(folder, signAt + Vector3.new(0, TERRAIN_TOP, 0), -dir, h.name)
 
 	-- the streets (Rules/RoadLayout: the spine, then side streets off both sides), as the road meshes have them
 	local streets: { Street } = {}
@@ -327,14 +348,17 @@ local function hood(
 			end
 		end
 	end
-	local segs = { { a = rampTo, b = b, half = F.width / 2 - 2 } }
+	-- painted out to past the sidewalks' outer edge, so no decoration grass pokes up through the kerbs, verges
+	-- or sidewalks (the Asphalt is tinted the grass's colour; Config/Suburbs Pave)
+	local walk = roadHalf + Cfg.Verge + Cfg.Sidewalk + Cfg.Pave
+	local segs = { { a = rampTo, b = b, half = F.width / 2 + Cfg.Pave } }
 	local discs = {}
 	for _, st in streets do
 		for i = 1, #st.pts - 1 do
-			table.insert(segs, { a = st.pts[i], b = st.pts[i + 1], half = Cfg.Road / 2 - 2 })
+			table.insert(segs, { a = st.pts[i], b = st.pts[i + 1], half = walk })
 		end
 		if st.bulb then
-			table.insert(discs, { c = st.pts[#st.pts], r = Cfg.Bulb - 2 })
+			table.insert(discs, { c = st.pts[#st.pts], r = walk - roadHalf + Cfg.Bulb })
 		end
 	end
 	paveTerrain(feeder, segs, discs)

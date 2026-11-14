@@ -105,12 +105,12 @@ return table.freeze({
 		}), -- UI colours
 	}),
 	-- no decoration grass in the city grid (and CityMargin past its outer sidewalk) or under flat ground parts
-	-- elsewhere (MapBuilder): parts whose bottom is at most MaxBottom and top at most MaxTop, at least MinSize
-	-- across, get Asphalt terrain (grass-tinted, no blades) under them
+	-- elsewhere (MapBuilder): parts whose bottom is at most MaxBottom and top at most MaxTop get Asphalt terrain
+	-- (grass-tinted, no blades) under their own footprint
 	GrassUnder = table.freeze({
 		MaxBottom = 0.2,
 		MaxTop = 1.5,
-		MinSize = 4,
+		Grow = 1, -- a voxel column is cleared when its middle is this close to a part's footprint
 		Batch = 300,
 		CityMargin = 8,
 	}),
