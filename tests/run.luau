@@ -3335,6 +3335,45 @@ local function checkGiant()
 		"the giant sways like a person its size, lifted a stud or two onto its feet",
 		math.abs(kg * EventConfig.GiantScale - 1) < 1e-6 and lg > 0.5 and lg < 3
 	)
+	-- a car hit flings the giant, harder the more energy; slow taps only shove it
+	local F = CrowdConfig.GiantFling
+	local function hit(weight: number, mph: number): (number, number)
+		return CrowdRules.giantFling(0.5 * weight * (mph * 0.447) ^ 2, F)
+	end
+	local tapSpeed, tapDown = hit(80, 15) -- the golf cart at hit speed
+	local slowCar = hit(1100, 15) -- a sedan at the slowest counted hit
+	check("a slow tap only shoves the giant", tapSpeed == 0 and tapDown == 0 and slowCar == 0)
+	local sedan, sedanDown = hit(1100, 40)
+	local fast = hit(1500, 110)
+	local bus, busDown = hit(15000, 80)
+	local beyond = CrowdRules.giantFling(F.EnergyHigh * 100, F)
+	check(
+		"a real hit flings the giant, harder and for longer the heavier and faster the car",
+		sedan >= F.MinSpeed
+			and sedan < fast
+			and fast < bus
+			and bus <= F.MaxSpeed
+			and sedanDown >= F.DownMin
+			and sedanDown < busDown
+			and busDown <= F.DownMax
+	)
+	check(
+		"the hardest hit throws it no further than MaxSpeed, the softest fling at MinSpeed",
+		beyond == F.MaxSpeed and CrowdRules.giantFling(F.Energy, F) == F.MinSpeed
+	)
+	-- its flight (no drag) stays within a couple of blocks, so it can't leave the island
+	local up = F.Lift / math.sqrt(1 + F.Lift * F.Lift)
+	local along = 1 / math.sqrt(1 + F.Lift * F.Lift)
+	local range = 2 * (F.MaxSpeed * along) * (F.MaxSpeed * up) / 196.2
+	check("the hardest fling lands within a couple of blocks", range > 40 and range < 300)
+	check(
+		"it gets up where it lands, unless that's a roof, under the map or nowhere",
+		CrowdRules.giantLandsHere(0, 0.5, F)
+			and CrowdRules.giantLandsHere(0, -3, F)
+			and not CrowdRules.giantLandsHere(0, 40, F)
+			and not CrowdRules.giantLandsHere(0, -60, F)
+			and not CrowdRules.giantLandsHere(0, nil, F)
+	)
 end
 checkGiant()
 
