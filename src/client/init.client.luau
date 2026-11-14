@@ -1,6 +1,7 @@
 --!strict
 -- Client entry.
 local Boards = require(script.Boards)
+local CamLock = require(script.CamLock)
 local Cockpit = require(script.Cockpit)
 local Collapse = require(script.Collapse)
 local Crowd = require(script.Crowd)
@@ -55,5 +56,6 @@ Stunts.start()
 Sfx.start()
 task.spawn(Music.start)
 task.spawn(HideUi.start)
+task.spawn(CamLock.start)
 task.spawn(NewRide.start)
 task.spawn(Podium.start)
