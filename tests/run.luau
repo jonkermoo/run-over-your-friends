@@ -2806,6 +2806,23 @@ do
 	check("layout: a tiny screen stops at the minimum", Layout.scale(300, 200, cfg) == cfg.MinScale)
 	check("layout: a narrow screen scales by width", Layout.scale(800, 900, cfg) == 0.8)
 	check("layout: garage row fits the phone canvas", 395 / phone - 86 - 84 >= 310)
+	local top, bottom = cfg.SheetTop, cfg.SheetBottom
+	check(
+		"layout: a short sheet sits mid-screen",
+		Layout.sheetCentre(1382, 760, top, bottom) == 691
+	)
+	check(
+		"layout: a full-height sheet fills under the strip",
+		Layout.sheetCentre(560, 560 - top - bottom, top, bottom) == top + (560 - top - bottom) / 2
+	)
+	check(
+		"layout: a sheet nearly as tall as the room keeps its top under the strip",
+		Layout.sheetCentre(860, 760, top, bottom) - 380 >= top
+	)
+	check(
+		"layout: a too-tall sheet never pokes above the strip",
+		Layout.sheetCentre(500, 900, top, bottom) - (500 - top - bottom) / 2 == top
+	)
 	check(
 		"layout: touch buttons keep their minimum size",
 		math.abs(phone * Layout.touchBoost(phone, cfg.TouchMinScale) - cfg.TouchMinScale) < 1e-6

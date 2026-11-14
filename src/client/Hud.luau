@@ -577,19 +577,41 @@ local function markTab(active: TextButton?)
 	end
 end
 
--- the garage and the store share one full-height sheet under the menu strip (the strip's tabs switch
--- between them): a big title, a dashed lane line, a yellow X, and a scrolling list
+-- the garage and the store share one sheet in the middle of the screen, never over the menu strip (the
+-- strip's tabs switch between them): a big title, a dashed lane line, a yellow X, and a scrolling list
+local SHEET_MAX = Vector2.new(LayoutConfig.SheetMaxWidth, LayoutConfig.SheetMaxHeight)
+local TOP, BOTTOM = LayoutConfig.SheetTop, LayoutConfig.SheetBottom
+local sheets: { Frame } = {}
+
+local screenFit = gui:FindFirstChild("ScreenFit") :: UIScale?
+
+-- centre the sheets on the screen's GUI area (layout px, so the drawn scale is undone first)
+local function placeSheets()
+	local h = gui.AbsoluteSize.Y / (if screenFit then screenFit.Scale else Style.scale())
+	local y = LayoutRules.sheetCentre(h, SHEET_MAX.Y, TOP, BOTTOM)
+	for _, p in sheets do
+		p.Position = UDim2.new(0.5, 0, 0, y)
+	end
+end
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+	task.defer(placeSheets) -- after Style.fit has picked up the new scale
+end)
+if screenFit then
+	screenFit:GetPropertyChangedSignal("Scale"):Connect(placeSheets)
+end
+
 local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	local p = Style.panel(gui)
-	p.AnchorPoint = Vector2.new(0.5, 0)
-	p.Position = UDim2.new(0.5, 0, 0, 68)
-	p.Size = UDim2.new(1, -28, 1, -86)
+	p.AnchorPoint = Vector2.new(0.5, 0.5)
+	p.Size = UDim2.new(1, -28, 1, -(TOP + BOTTOM))
 	p.Visible = false
 	p.ZIndex = 5
 	Style.setShadow(p, accent)
 	local limit = Instance.new("UISizeConstraint")
-	limit.MaxSize = Vector2.new(1100, 760)
+	limit.MaxSize = SHEET_MAX
 	limit.Parent = p
+	table.insert(sheets, p)
+	placeSheets()
 	-- the title sits on the right, by the X: the job card can cover the sheet's top-left corner
 	local t = Style.label(p, title, 36, F.display, C.text)
 	t.AnchorPoint = Vector2.new(1, 0)
@@ -1128,6 +1150,7 @@ local function refreshStore()
 end
 
 local function open(p: Frame)
+	placeSheets()
 	local scale = p:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
 	scale.Parent = p
 	scale.Scale = 0.85

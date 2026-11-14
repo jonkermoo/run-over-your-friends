@@ -21,6 +21,18 @@ function Layout.scale(width: number, height: number, cfg: Config): number
 	return math.clamp(math.min(width / cfg.RefWidth, height / cfg.RefHeight), cfg.MinScale, 1)
 end
 
+-- where a menu sheet's middle goes, from the GUI's top (layout px): the middle of the screen, nudged down
+-- just enough to keep its top under the menu strip (top) and up to keep its bottom above the margin (bottom)
+function Layout.sheetCentre(
+	guiHeight: number,
+	sheetHeight: number,
+	top: number,
+	bottom: number
+): number
+	local h = math.min(sheetHeight, guiHeight - top - bottom)
+	return math.clamp(guiHeight / 2, top + h / 2, math.max(top + h / 2, guiHeight - bottom - h / 2))
+end
+
 -- the extra scale that keeps the touch buttons at minScale when the whole UI is drawn at scale
 function Layout.touchBoost(scale: number, minScale: number): number
 	return math.max(scale, minScale) / scale

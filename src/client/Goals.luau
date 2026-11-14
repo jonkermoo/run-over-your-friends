@@ -9,6 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local PinnedGoals = require(script.Parent.PinnedGoals)
@@ -35,11 +37,12 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 Style.fit(gui)
 
-local TOP, BOTTOM_MARGIN = 68, 18
+local TOP, BOTTOM_MARGIN = LayoutConfig.SheetTop, LayoutConfig.SheetBottom
 
+-- the sheet sits in the middle of the screen, never over the menu strip (Rules/Layout.sheetCentre)
 local panel = Style.panel(gui)
 panel.Name = "GoalsSheet"
-panel.Position = UDim2.fromOffset(14, TOP)
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
 Style.setShadow(panel, C.blue)
@@ -100,9 +103,15 @@ local function claiming(): boolean
 	return player:GetAttribute("Tutorial") == Onboarding.Steps.Goal
 end
 
+-- the screen's GUI height in layout pixels (the drawn scale undone)
+local function guiHeight(): number
+	local fit = gui:FindFirstChild("ScreenFit") :: UIScale?
+	return gui.AbsoluteSize.Y / (if fit then fit.Scale else Style.scale())
+end
+
 -- layout pixels the whole sheet may take on this screen
 local function maxHeight(): number
-	return math.floor(gui.AbsoluteSize.Y / Style.scale()) - TOP - BOTTOM_MARGIN
+	return math.floor(guiHeight()) - TOP - BOTTOM_MARGIN
 end
 
 local function shape(): string
@@ -155,6 +164,12 @@ local function height(): number
 		end
 	end
 	return h + 6
+end
+
+-- centre the sheet on the screen's GUI area (layout px, so the drawn scale is undone first)
+local function place()
+	local y = LayoutRules.sheetCentre(guiHeight(), panel.Size.Y.Offset, TOP, BOTTOM_MARGIN)
+	panel.Position = UDim2.new(0.5, 0, 0, y)
 end
 
 local function rebuild()
@@ -268,6 +283,7 @@ local function rebuild()
 	body.CanvasSize = UDim2.fromOffset(0, y)
 	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 6)
 	panel.Size = UDim2.fromOffset(SHEET_W, sheetH)
+	place()
 end
 
 function Goals.toggle()
@@ -345,6 +361,9 @@ function Goals.start()
 			return
 		end
 		last = now
+		if open and shape() ~= builtShape then
+			rebuild() -- the screen changed size: refit and re-centre the sheet
+		end
 		tickCountdowns()
 		if now < fullUntil then
 			countPill.Text = `MAX {QuestConfig.Pins.Max} PINNED`

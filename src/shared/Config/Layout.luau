@@ -7,6 +7,13 @@ return table.freeze({
 	RefHeight = 560, -- shorter than this and the UI shrinks: the garage's SPAWN row needs this much
 	MinScale = 0.6, -- never smaller, so text stays readable
 
+	-- the menu sheets (Garage, Store, Goals) stay between the menu strip and the bottom margin and sit in
+	-- the middle of the screen when they're shorter than that (Rules/Layout.sheetCentre)
+	SheetTop = 68,
+	SheetBottom = 18,
+	SheetMaxWidth = 1100, -- the garage and store sheet never grows past this on big screens
+	SheetMaxHeight = 760,
+
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,
 	-- they sit above Roblox's jump button, which is smaller on small screens

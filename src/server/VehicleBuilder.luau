@@ -424,6 +424,9 @@ function VehicleBuilder.build(id: string): Model
 	seat.MaxSpeed = 0
 	seat.Torque = 0
 	seat.HeadsUpDisplay = false
+	-- nobody sits by touching it (a pedestrian walking into a parked car took the wheel): the owner is sat
+	-- in with seat:Sit() from the Drive prompt or on spawn (VehicleService)
+	seat.Disabled = true
 	seat.Parent = model
 	weld("SeatWeld", chassis, seat)
 
