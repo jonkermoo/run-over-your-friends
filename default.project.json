@@ -23,6 +23,12 @@
         "StreamingTargetRadius": 2048,
         "StreamOutBehavior": "Default",
         "ModelStreamingBehavior": "Improved"
+      },
+      "Terrain": {
+        "$properties": {
+          "Decoration": true,
+          "GrassLength": 0.55
+        }
       }
     },
     "Lighting": {
