@@ -418,6 +418,19 @@ function NpcService.inRadius(pos: Vector3, radius: number): { Model }
 	return out
 end
 
+-- the giant goes limp (Shared/Ragdoll.limp) and every part of it flies off at `velocity`, tumbling over
+-- forwards along `along` (a limp body's parts move apart, so each is thrown, not just its root)
+local function throwLimp(npc: Model, velocity: Vector3, along: Vector3)
+	Ragdoll.limp(npc, true)
+	local spin = along:Cross(Vector3.yAxis) * -GIANT.Spin * random:NextNumber(0.5, 1)
+	for _, p in npc:GetChildren() do
+		if p:IsA("BasePart") then
+			p.AssemblyLinearVelocity = velocity
+			p.AssemblyAngularVelocity = spin
+		end
+	end
+end
+
 -- the giant back on its feet after a fling: where it landed, or back where it was hit when it came down on a
 -- roof, under the map or nowhere (Rules/Crowd.giantLandsHere); then it walks on
 local function giantGetUp(npc: Model, token: number)
@@ -440,7 +453,7 @@ local function giantGetUp(npc: Model, token: number)
 	local hitGround =
 		groundUnder(hitAt + Vector3.new(0, GIANT.ProbeUp, 0), GIANT.ProbeUp + GIANT.Probe)
 	local hitY = hitGround or hitAt.Y
-	Ragdoll.disable(npc)
+	Ragdoll.limp(npc, false)
 	if CrowdRules.giantLandsHere(hitY, ground, GIANT) then
 		standGiant(npc, root.Position, ground :: number, look)
 	else
@@ -466,11 +479,7 @@ local function flingGiant(npc: Model, root: BasePart, dir: Vector3, energy: numb
 	giantFlings[npc] = { token = flingCount, hitAt = if was then was.hitAt else root.Position }
 	npc:SetAttribute("Flung", true)
 	CrowdService.down(npc)
-	Ragdoll.enable(npc)
-	root.AssemblyLinearVelocity = (along + Vector3.new(0, GIANT.Lift, 0)).Unit * speed
-	root.AssemblyAngularVelocity = along:Cross(Vector3.yAxis)
-		* -GIANT.Spin
-		* random:NextNumber(0.5, 1)
+	throwLimp(npc, (along + Vector3.new(0, GIANT.Lift, 0)).Unit * speed, along)
 	task.delay(down, giantGetUp, npc, flingCount)
 end
 
@@ -558,13 +567,12 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 		giantFlings[npc] = nil -- no getting up from this one
 		npc:SetAttribute("Flung", nil)
 	end
-	NpcService.knock(
-		npc,
-		(dir * Vector3.new(1, 0, 1) + Vector3.new(0, lift, 0)).Unit * launch,
-		energy,
-		player,
-		1
-	)
+	local throw = (dir * Vector3.new(1, 0, 1) + Vector3.new(0, lift, 0)).Unit * launch
+	NpcService.knock(npc, throw, energy, player, 1)
+	if typeof(giantHp) == "number" then
+		-- limp, so it lies on the street instead of sinking its legs into it
+		throwLimp(npc, throw, (throw * Vector3.new(1, 0, 1)).Unit)
+	end
 end
 
 local function bubble(part: BasePart, text: string)

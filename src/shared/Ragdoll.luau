@@ -66,4 +66,32 @@ function Ragdoll.disable(character: Model)
 	end
 end
 
+-- a rig jointed with AnimationConstraints (each with a ball socket beside it) goes fully limp, or back together.
+-- Limp: the Humanoid is put in its Physics state, which keeps every limb solid (in any other state it turns the
+-- limbs' collisions off, so a falling body's legs sank into the street), and every joint but the Root lets go
+-- to its ball socket. Back: the joints take hold again and the Humanoid stands; stand it upright first.
+-- Used for the giant (server/NpcService).
+function Ragdoll.limp(character: Model, on: boolean)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+	humanoid.PlatformStand = on
+	for _, d in character:GetDescendants() do
+		if d:IsA("AnimationConstraint") and d.Name ~= "Root" then
+			d.Enabled = not on
+		end
+	end
+	if on then
+		humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		for _, p in character:GetChildren() do
+			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+				p.CanCollide = true
+			end
+		end
+	else
+		humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+	end
+end
+
 return Ragdoll
