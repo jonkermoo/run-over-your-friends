@@ -357,9 +357,74 @@ local function edges(ctx: Ctx)
 			- between(random, E.IslandOut)
 		local radius = between(random, E.IslandRadius)
 		local height = between(random, E.IslandHeight)
-		-- smooth bells from the sea bed: a sand skirt, then the grassy hill
-		bell(x, z, radius * E.BeachSpread, height * E.BeachRise, Enum.Material.Sand, -SEA_DEPTH - 4)
-		bell(x, z, radius, height, Enum.Material.Grass, -SEA_DEPTH - 4)
+		local floor = -LandCfg.DeepDepth - 4
+		-- smooth bells from the sea bed: a sand skirt, then the grassy hill and one or two lower shoulders off
+		-- it, so an island has a ridge and a saddle, not one round pancake
+		local humps = { { x = x, z = z, r = radius, h = height } }
+		for _ = 1, random:NextInteger(E.Shoulders[1], E.Shoulders[2]) do
+			local a = random:NextNumber(0, math.pi * 2)
+			local off = radius * random:NextNumber(0.45, 0.75)
+			table.insert(humps, {
+				x = x + math.cos(a) * off,
+				z = z + math.sin(a) * off,
+				r = radius * random:NextNumber(0.5, 0.75),
+				h = height * random:NextNumber(0.45, 0.75),
+			})
+		end
+		for _, b in humps do
+			bell(b.x, b.z, b.r * E.BeachSpread, b.h * E.BeachRise, Enum.Material.Sand, floor)
+		end
+		for _, b in humps do
+			bell(b.x, b.z, b.r, b.h, Enum.Material.Grass, floor)
+		end
+		-- rocks at the waterline
+		for _ = 1, random:NextInteger(E.IslandRocks[1], E.IslandRocks[2]) do
+			local a = random:NextNumber(0, math.pi * 2)
+			local off = radius * E.BeachSpread * random:NextNumber(0.85, 1.0)
+			local size = between(random, E.RockSize)
+			bell(
+				x + math.cos(a) * off,
+				z + math.sin(a) * off,
+				size,
+				size * 0.7,
+				Enum.Material.Rock,
+				floor
+			)
+		end
+		-- pines on the slopes (the main hump's height there, a little sunk)
+		for _ = 1, random:NextInteger(E.IslandPines[1], E.IslandPines[2]) do
+			local a = random:NextNumber(0, math.pi * 2)
+			local d = radius * random:NextNumber(0.05, 0.55)
+			local y = height * (1 + math.cos(math.pi * d / radius)) / 2 - 2
+			local p = pine(
+				ctx.static,
+				Vector3.new(x + math.cos(a) * d, y, z + math.sin(a) * d),
+				between(random, E.PineHeight) * 0.7,
+				random
+			)
+			p.CanCollide = false
+			p.CanQuery = false
+		end
+	end
+	-- rock outcrops on the shore where the coast curves (past the beaches), half in the water
+	for k = 1, E.CoastRocks do
+		local side = if k % 2 == 0 then 1 else -1
+		local z = side
+			* random:NextNumber(LandCfg.CoastStraight + 100, LandCfg.CoastStraight + 1600)
+		local x = Land.coast(LandCfg, ctx.seaEdge, z) - random:NextNumber(-10, 40)
+		if Land.inset(LandCfg, x, z) > 200 then
+			for _ = 1, random:NextInteger(2, 4) do
+				local size = between(random, E.RockSize)
+				bell(
+					x + random:NextNumber(-20, 20),
+					z + random:NextNumber(-30, 30),
+					size,
+					size * random:NextNumber(0.5, 0.9),
+					Enum.Material.Rock,
+					-LandCfg.DeepDepth - 4
+				)
+			end
+		end
 	end
 end
 
@@ -453,6 +518,199 @@ local function barn(
 	return m
 end
 
+-- the farm's big barn facing `out`: red plank walls with white corner boards, a gambrel roof (steep lower
+-- slopes, a shallow top) with white trim along its edges, big X-braced doors, a hay loft door with a hoist beam,
+-- side windows and a weather vane. Returns the model and its frame.
+local function bigBarn(parent: Instance, at: Vector3, out: Vector3, wall: Color3): (Model, CFrame)
+	local B = Cfg.Farm.Barn
+	local w, d, h, roof = B.w, B.d, B.h, B.roof
+	local T = Cfg.Farm.BarnWall
+	local m = model(parent, "Barn")
+	local cf = CFrame.lookAt(at, at + out) -- -Z is the front
+	local trim = WHITE
+	local dark = Color3.fromRGB(122, 32, 30)
+	local roofColour = rgb(B.RoofColour)
+	local function box(
+		size: Vector3,
+		x: number,
+		y: number,
+		z: number,
+		colour: Color3,
+		mat: Enum.Material?
+	)
+		return part(m, size, cf * CFrame.new(x, y, z), colour, mat)
+	end
+	-- a thin part from p1 to p2 (x, y in the front view) at depth z, `thick` across, `deep` along z
+	local function strut(
+		x1: number,
+		y1: number,
+		x2: number,
+		y2: number,
+		z: number,
+		thick: number,
+		deep: number,
+		colour: Color3,
+		mat: Enum.Material?
+	)
+		local len = math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+		return part(
+			m,
+			Vector3.new(len, thick, deep),
+			cf
+				* CFrame.new((x1 + x2) / 2, (y1 + y2) / 2, z)
+				* CFrame.Angles(0, 0, math.atan2(y2 - y1, x2 - x1)),
+			colour,
+			mat
+		)
+	end
+	-- walls
+	for _, e in { -1, 1 } do
+		box(Vector3.new(w, h, T), 0, h / 2, e * (d / 2 - T / 2), wall, Enum.Material.WoodPlanks)
+		box(
+			Vector3.new(T, h, d - 2 * T),
+			e * (w / 2 - T / 2),
+			h / 2,
+			0,
+			wall,
+			Enum.Material.WoodPlanks
+		)
+	end
+	-- the gambrel's outline in the front view: eave (half, h) -> knee -> ridge (0, h + roof)
+	local half = w / 2
+	local kx = half * (1 - B.Knee[1])
+	local ky = h + roof * B.Knee[2]
+	local top = h + roof
+	for _, zf in { -1, 1 } do
+		local z = zf * (d / 2 - T / 2)
+		box(Vector3.new(kx * 2, ky - h, T), 0, (h + ky) / 2, z, wall, Enum.Material.WoodPlanks)
+		for _, e in { -1, 1 } do
+			for _, tri in { { half, h, kx, ky }, { kx, ky, 0, top } } do
+				local run, rise = tri[1] - tri[3], tri[4] - tri[2]
+				local wg = Instance.new("WedgePart")
+				wg.Anchored = true
+				wg.Size = Vector3.new(T, rise, run)
+				wg.CFrame = cf
+					* CFrame.new(e * (tri[1] + tri[3]) / 2, tri[2] + rise / 2, z)
+					* CFrame.Angles(0, -e * math.pi / 2, 0) -- the wedge's tall end (its +Z) toward the ridge
+				wg.Color = wall
+				wg.Material = Enum.Material.WoodPlanks
+				wg.TopSurface = Enum.SurfaceType.Smooth
+				wg.Parent = m
+			end
+			-- white trim up the gable's edge, just proud of the wall
+			strut(e * (half + 0.3), h, e * kx, ky, zf * (d / 2 + 0.2), 0.8, 0.5, trim)
+			strut(e * kx, ky, 0, top, zf * (d / 2 + 0.2), 0.8, 0.5, trim)
+		end
+	end
+	-- the roof: four panels lying just above the outline, overhanging the walls, and a ridge cap
+	for _, e in { -1, 1 } do
+		for _, seg in { { half + 1.5, h - 1, kx, ky }, { kx, ky, 0, top } } do
+			local x1, y1, x2, y2 = e * seg[1], seg[2], e * seg[3], seg[4]
+			local len = math.sqrt((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+			local nx, ny = -(y2 - y1) / len, (x2 - x1) / len
+			if ny < 0 then
+				nx, ny = -nx, -ny
+			end
+			part(
+				m,
+				Vector3.new(len + 0.6, 0.8, d + 3),
+				cf
+					* CFrame.new((x1 + x2) / 2 + nx * 0.5, (y1 + y2) / 2 + ny * 0.5, 0)
+					* CFrame.Angles(0, 0, math.atan2(y2 - y1, x2 - x1)),
+				roofColour,
+				Enum.Material.Metal
+			)
+		end
+		-- white corner boards
+		for _, zf in { -1, 1 } do
+			box(Vector3.new(1.2, h, 1.2), e * (half - 0.3), h / 2, zf * (d / 2 - 0.3), trim)
+		end
+		-- three windows down each side
+		for k = -1, 1 do
+			box(Vector3.new(0.4, 5, 5), e * (half + 0.1), h * 0.6, k * d * 0.28, trim)
+			box(
+				Vector3.new(0.5, 3.8, 3.8),
+				e * (half + 0.15),
+				h * 0.6,
+				k * d * 0.28,
+				Color3.fromRGB(40, 44, 52)
+			)
+		end
+	end
+	box(Vector3.new(1.6, 1.2, d + 3.4), 0, top + 0.7, 0, trim)
+	-- the big doors: two dark-red leaves in a white frame, each with a white X
+	local dw, dh = w * B.Door[1], h * B.Door[2]
+	local fz = -d / 2 - 0.35
+	for _, e in { -1, 1 } do
+		local cx = e * dw / 4
+		box(Vector3.new(dw / 2 - 0.2, dh, 0.4), cx, dh / 2, fz, dark, Enum.Material.WoodPlanks)
+		strut(cx - dw / 4 + 0.6, 0.6, cx + dw / 4 - 0.6, dh - 0.6, fz - 0.3, 0.7, 0.3, trim)
+		strut(cx - dw / 4 + 0.6, dh - 0.6, cx + dw / 4 - 0.6, 0.6, fz - 0.3, 0.7, 0.3, trim)
+		box(Vector3.new(1, dh + 1, 0.6), e * (dw / 2 + 0.5), (dh + 1) / 2, fz - 0.1, trim)
+	end
+	box(Vector3.new(dw + 2, 1, 0.6), 0, dh + 0.5, fz - 0.1, trim)
+	box(Vector3.new(0.5, dh, 0.6), 0, dh / 2, fz - 0.25, trim)
+	-- the hay loft door high in the front gable, and the hoist beam over it
+	local ly = (h + ky) / 2 + 1
+	box(Vector3.new(9, 8, 0.4), 0, ly, fz, trim)
+	box(Vector3.new(7.4, 6.4, 0.5), 0, ly, fz - 0.1, dark, Enum.Material.WoodPlanks)
+	strut(-3.4, ly - 2.9, 3.4, ly + 2.9, fz - 0.4, 0.5, 0.3, trim)
+	strut(-3.4, ly + 2.9, 3.4, ly - 2.9, fz - 0.4, 0.5, 0.3, trim)
+	box(Vector3.new(1, 1, 6), 0, top - 1.5, -d / 2 - 2.5, WOOD, Enum.Material.WoodPlanks)
+	-- a weather vane on the ridge
+	local vane = top + 1.3
+	box(Vector3.new(0.3, 5, 0.3), 0, vane + 2.5, 0, STEEL, Enum.Material.Metal)
+	box(Vector3.new(0.3, 0.3, 4), 0, vane + 4, 0, STEEL, Enum.Material.Metal)
+	box(Vector3.new(4, 0.3, 0.3), 0, vane + 3.4, 0, STEEL, Enum.Material.Metal)
+	return m, cf
+end
+
+-- a wooden corral of `w` x `d` round `centre` (frame `cf`), posts and two rails a side, a trough inside
+local function corral(parent: Instance, props: Instance, cf: CFrame)
+	local C = Cfg.Farm.Corral
+	local w, d = C.w, C.d
+	local rail = Color3.fromRGB(196, 164, 120)
+	for _, side in
+		{ { w, 0, -d / 2 }, { w, 0, d / 2 }, { d, math.pi / 2, -w / 2 }, { d, math.pi / 2, w / 2 } }
+	do
+		local len, turn, off = side[1], side[2], side[3]
+		local frame = cf * CFrame.Angles(0, turn, 0) * CFrame.new(0, 0, off)
+		for _, y in { 2.2, 4.4 } do
+			part(
+				parent,
+				Vector3.new(len, 0.6, 0.4),
+				frame * CFrame.new(0, y, 0),
+				rail,
+				Enum.Material.WoodPlanks
+			)
+		end
+		local posts = math.max(2, math.floor(len / C.PostGap) + 1)
+		for k = 0, posts - 1 do
+			part(
+				parent,
+				Vector3.new(0.8, 5.4, 0.8),
+				frame * CFrame.new(-len / 2 + k * len / (posts - 1), 2.7, 0),
+				WOOD,
+				Enum.Material.WoodPlanks
+			)
+		end
+	end
+	local trough = prop(props, "Trough")
+	part(
+		trough,
+		Vector3.new(10, 2.6, 3.4),
+		cf * CFrame.new(w * 0.2, 1.3, -d * 0.3),
+		STEEL,
+		Enum.Material.Metal
+	)
+	paint(
+		trough,
+		Vector3.new(9.2, 0.2, 2.6),
+		cf * CFrame.new(w * 0.2, 2.5, -d * 0.3),
+		Color3.fromRGB(60, 140, 200)
+	)
+end
+
 local function farm(ctx: Ctx)
 	local F = Cfg.Farm
 	local r = F.Rect
@@ -488,18 +746,23 @@ local function farm(ctx: Ctx)
 	end
 	-- the yard: barn and silo facing west toward the fields, hay bales round them
 	local yard = Vector3.new(r.x + r.w * 0.36, 0, r.z)
+	local _, barnCf =
+		bigBarn(ctx.buildings, yard + Vector3.new(0, 0, -40), Vector3.new(-1, 0, 0), rgb(F.BarnRed))
+	-- a dirt yard in front of the doors (terrain), and a corral beside it
 	local B = F.Barn
-	barn(
-		ctx.buildings,
-		yard + Vector3.new(0, 0, -40),
-		Vector3.new(-1, 0, 0),
-		B.d,
-		B.w,
-		B.h,
-		B.roof,
-		rgb(F.BarnRed),
-		"Barn"
+	local lo, hi = Vector3.one * math.huge, -Vector3.one * math.huge
+	for _, c in { { -1, 0 }, { 1, 0 }, { -1, 1 }, { 1, 1 } } do
+		local p = (barnCf * CFrame.new(c[1] * (B.w / 2 + 16), 0, -B.d / 2 - c[2] * F.Yard)).Position
+		lo, hi = lo:Min(p), hi:Max(p)
+	end
+	workspace.Terrain:ReplaceMaterial(
+		Region3.new(Vector3.new(lo.X, -10, lo.Z), Vector3.new(hi.X, 4, hi.Z)):ExpandToGrid(4),
+		4,
+		Enum.Material.Grass,
+		Enum.Material.Ground
 	)
+	local corralCf = barnCf * CFrame.new(B.w / 2 + F.Corral.w / 2 + 6, 0, -B.d / 2 + F.Corral.d / 2)
+	corral(ctx.static, ctx.props, corralCf)
 	local silo = model(ctx.buildings, "Silo")
 	local S = F.Silo
 	local at = yard + Vector3.new(10, 0, 30)
@@ -514,6 +777,13 @@ local function farm(ctx: Ctx)
 	for k = 1, F.Bales do
 		local a = k / F.Bales * math.pi * 2
 		local p = yard + Vector3.new(math.cos(a) * 75, 0, math.sin(a) * 90)
+		local inCorral = corralCf:PointToObjectSpace(p)
+		if
+			math.abs(inCorral.X) < F.Corral.w / 2 + 6
+			and math.abs(inCorral.Z) < F.Corral.d / 2 + 6
+		then
+			continue
+		end
 		local bale = prop(ctx.props, "Bale")
 		local b = part(
 			bale,
@@ -626,13 +896,7 @@ local function beaches(ctx: Ctx)
 		local from = ctx.port.z + side * (ctx.port.d / 2 + B.Gap)
 		local len = half - math.abs(from)
 		local zc = from + side * len / 2
-		part(
-			folder,
-			Vector3.new(B.Width, 1, len),
-			CFrame.new(x0 + B.Width / 2, -0.43, zc),
-			SAND,
-			Enum.Material.Sand
-		)
+		-- (the sand itself is terrain, laid with the ground: OutskirtsKit)
 		-- umbrellas with a towel under each
 		for _ = 1, B.Umbrellas do
 			local at = Vector3.new(
@@ -699,31 +963,143 @@ local function beaches(ctx: Ctx)
 			)
 		end
 	end
-	-- the lighthouse at the south end of the coast, red and white bands
+	-- the lighthouse at the south end of the coast: a rocky knoll, a plinth, red and white bands with a door and
+	-- little windows facing the land, a railed gallery, a glass lantern room with its lamp, a red cap; and the
+	-- keeper's cottage beside it
 	local L = B.Lighthouse
 	local lh = model(ctx.buildings, "Lighthouse")
 	local at = Vector3.new(x0 + 30, 0, half - 260)
+	local red = rgb(B.LighthouseRed)
+	for k = 0, 3 do
+		local a = k * math.pi / 2 + 0.4
+		bell(
+			at.X + math.cos(a) * L.dia * 0.9,
+			at.Z + math.sin(a) * L.dia * 0.9,
+			L.dia * 0.7,
+			5 + k % 2 * 3,
+			Enum.Material.Rock
+		)
+	end
+	post(lh, 3, L.dia + 8, at, Color3.fromRGB(200, 200, 196)).Material = Enum.Material.Concrete
+	local base = at + Vector3.new(0, 3, 0)
 	local band = L.h / 5
 	for k = 0, 4 do
 		post(
 			lh,
 			band,
 			L.dia * (1 - k * 0.06),
-			at + Vector3.new(0, k * band, 0),
-			if k % 2 == 0 then WHITE else rgb(B.LighthouseRed)
+			base + Vector3.new(0, k * band, 0),
+			if k % 2 == 0 then WHITE else red
 		)
 	end
-	disc(lh, 1, L.dia + 4, at + Vector3.new(0, L.h, 0), STEEL)
-	local lamp =
-		post(lh, 7, L.dia * 0.6, at + Vector3.new(0, L.h + 1, 0), Color3.fromRGB(255, 240, 180))
-	lamp.Material = Enum.Material.Neon
-	local cap = part(
+	local landward = Vector3.xAxis -- the land is east of the coast
+	local r0 = L.dia / 2
+	part(
 		lh,
-		Vector3.one * L.dia * 0.7,
-		CFrame.new(at + Vector3.new(0, L.h + 8, 0)),
-		rgb(B.LighthouseRed)
+		Vector3.new(0.6, 8, 5.6),
+		CFrame.new(base + landward * (r0 - 0.1) + Vector3.new(0, 4, 0)),
+		WHITE
 	)
+	part(
+		lh,
+		Vector3.new(0.6, 7, 4.2),
+		CFrame.new(base + landward * (r0 + 0.1) + Vector3.new(0, 3.5, 0)),
+		red
+	)
+	for k = 1, 3 do
+		local y = k * band + band / 2
+		local rk = r0 * (1 - k * 0.06)
+		part(
+			lh,
+			Vector3.new(0.6, 3, 2.2),
+			CFrame.new(base + landward * (rk - 0.1) + Vector3.new(0, y, 0)),
+			Color3.fromRGB(36, 44, 56)
+		)
+	end
+	-- the gallery: a platform, a ring of posts and a rail of short segments
+	local gy = base.Y + L.h
+	local gr = L.dia / 2 + 2
+	disc(lh, 1, gr * 2, Vector3.new(at.X, gy, at.Z), STEEL)
+	local n = L.RailPosts
+	for k = 0, n - 1 do
+		local a0, a1 = k / n * math.pi * 2, (k + 1) / n * math.pi * 2
+		local p0 =
+			Vector3.new(at.X + math.cos(a0) * (gr - 0.4), gy + 1, at.Z + math.sin(a0) * (gr - 0.4))
+		local p1 =
+			Vector3.new(at.X + math.cos(a1) * (gr - 0.4), gy + 1, at.Z + math.sin(a1) * (gr - 0.4))
+		post(lh, 3, 0.35, p0, WHITE)
+		local mid = (p0 + p1) / 2 + Vector3.new(0, 3, 0)
+		part(
+			lh,
+			Vector3.new(0.3, 0.3, (p1 - p0).Magnitude + 0.2),
+			CFrame.lookAt(mid, mid + (p1 - p0)),
+			WHITE
+		)
+	end
+	-- the lantern room: a glass drum round the lamp, a red cap and a finial
+	local glass =
+		post(lh, 8, L.dia * 0.62, Vector3.new(at.X, gy + 0.5, at.Z), Color3.fromRGB(180, 220, 240))
+	glass.Material = Enum.Material.Glass
+	glass.Transparency = 0.45
+	glass:SetAttribute("Glass", true)
+	local lamp =
+		post(lh, 4, L.dia * 0.3, Vector3.new(at.X, gy + 2.5, at.Z), Color3.fromRGB(255, 240, 180))
+	lamp.Material = Enum.Material.Neon
+	lamp.CastShadow = false
+	disc(lh, 1, L.dia * 0.72, Vector3.new(at.X, gy + 8.5, at.Z), red)
+	local cap =
+		part(lh, Vector3.one * L.dia * 0.6, CFrame.new(at + Vector3.new(0, gy - at.Y + 10, 0)), red)
 	cap.Shape = Enum.PartType.Ball
+	post(lh, 4, 0.4, Vector3.new(at.X, gy + 14, at.Z), STEEL)
+	-- the keeper's cottage, inland of the tower
+	local K = L.Cottage
+	local cottage = model(ctx.buildings, "Cottage")
+	local cc =
+		CFrame.lookAt(at + Vector3.new(K.Off, 0, 0), at + Vector3.new(K.Off, 0, 0) - landward) -- door faces the sea
+	local function box(
+		size: Vector3,
+		x: number,
+		y: number,
+		z: number,
+		colour: Color3,
+		mat: Enum.Material?
+	)
+		return part(cottage, size, cc * CFrame.new(x, y, z), colour, mat)
+	end
+	box(Vector3.new(K.w, K.h, K.d), 0, K.h / 2, 0, WHITE, Enum.Material.Plaster)
+	local slope = math.sqrt((K.d / 2) ^ 2 + K.roof ^ 2) + 1.2
+	local tilt = math.atan2(K.roof, K.d / 2)
+	for _, e in { -1, 1 } do
+		part(
+			cottage,
+			Vector3.new(K.w + 2, 0.8, slope),
+			cc * CFrame.new(0, K.h + K.roof / 2 + 0.3, e * K.d / 4) * CFrame.Angles(e * tilt, 0, 0),
+			red
+		)
+		for _, zf in { -1, 1 } do
+			local g = Instance.new("WedgePart")
+			g.Anchored = true
+			g.Size = Vector3.new(0.4, K.roof, K.d / 2)
+			g.CFrame = cc
+				* CFrame.new(e * (K.w / 2 - 0.2), K.h + K.roof / 2, zf * K.d / 4)
+				* CFrame.Angles(0, if zf > 0 then math.pi else 0, 0)
+			g.Color = WHITE
+			g.Material = Enum.Material.Plaster
+			g.Parent = cottage
+		end
+	end
+	box(Vector3.new(3.6, 6.4, 0.4), -K.w * 0.2, 3.2, -K.d / 2 - 0.2, Color3.fromRGB(60, 90, 140))
+	for _, x in { K.w * 0.15, K.w * 0.35 } do
+		box(Vector3.new(3, 3, 0.4), x, K.h * 0.55, -K.d / 2 - 0.2, Color3.fromRGB(36, 44, 56))
+	end
+	box(
+		Vector3.new(2.4, 5, 2.4),
+		K.w * 0.3,
+		K.h + K.roof * 0.6,
+		K.d * 0.15,
+		Color3.fromRGB(150, 80, 60),
+		Enum.Material.Brick
+	)
 end
 
 local function forest(ctx: Ctx)
@@ -773,69 +1149,273 @@ end
 
 -- a gas station facing `out` (toward the road), centred at `at`: forecourt, canopy on posts, two pumps, a
 -- shop with a glass front, a price sign. Canopy and shop smash; pumps get knocked over.
+-- a roadside gas station facing `out` (the road): a forecourt with a canopy (lit soffit, red fascia with a
+-- yellow stripe) over two pump islands, a little shop with a glass front and sign at the back, a price pylon by
+-- the road, and the clutter round it (air stand, ice chest, bins, oil stains, parking bays)
 function CountryKit.gasStation(ctx: Ctx, at: Vector3, out: Vector3)
 	local G = Cfg.Cells.Gas
 	local red = rgb(Cfg.Cells.GasRed)
-	local cf = CFrame.lookAt(at, at + out)
+	local yellow = rgb(G.Accent)
+	local cream = Color3.fromRGB(236, 232, 222)
+	local cf = CFrame.lookAt(at, at + out) -- -Z faces the road
+	local pd = G.pad
+	local function box(
+		m: Instance,
+		size: Vector3,
+		x: number,
+		y: number,
+		z: number,
+		colour: Color3,
+		mat: Enum.Material?
+	)
+		return part(m, size, cf * CFrame.new(x, y, z), colour, mat)
+	end
+	-- ground: asphalt pad, a concrete forecourt under the canopy, kerbs, bays and stains (all static)
 	part(
 		ctx.static,
-		Vector3.new(G.pad[1], 1, G.pad[2]),
+		Vector3.new(pd[1], 1, pd[2]),
 		cf + Vector3.new(0, -0.41, 0),
 		ROAD,
 		Enum.Material.Asphalt
 	)
-	local station = model(ctx.buildings, "GasStation")
 	local c = G.canopy
-	part(station, Vector3.new(c[1], 1.4, c[2]), cf * CFrame.new(0, c[3], -G.pad[2] * 0.12), WHITE)
-	part(
-		station,
-		Vector3.new(c[1] + 0.4, 1, c[2] + 0.4),
-		cf * CFrame.new(0, c[3] - 1, -G.pad[2] * 0.12),
-		red
+	local cz = -pd[2] / 2 + 6 + c[2] / 2
+	local apron = paint(
+		ctx.static,
+		Vector3.new(c[1] + 8, 0.2, c[2] + 8),
+		cf * CFrame.new(0, 0.1, cz),
+		Color3.fromRGB(176, 176, 172)
 	)
+	apron.Material = Enum.Material.Concrete
 	for _, e in { -1, 1 } do
-		part(
-			station,
-			Vector3.new(1.4, c[3] - 1.5, 1.4),
-			cf * CFrame.new(e * c[1] * 0.3, (c[3] - 1.5) / 2, -G.pad[2] * 0.12),
-			WHITE
-		)
-		local pump = prop(ctx.props, "Pump")
-		part(
-			pump,
-			Vector3.new(2.4, 5, 1.6),
-			cf * CFrame.new(e * c[1] * 0.3, 2.5, -G.pad[2] * 0.12 + 3),
-			red
+		box(
+			ctx.static,
+			Vector3.new(0.8, 0.5, pd[2]),
+			e * (pd[1] / 2 - 0.4),
+			0.25,
+			0,
+			WHITE,
+			Enum.Material.Concrete
 		)
 	end
-	local s = G.shop
-	local back = cf * CFrame.new(0, 0, G.pad[2] / 2 - s[2] / 2 - 1)
-	part(
-		station,
-		Vector3.new(s[1], s[3], s[2]),
-		back * CFrame.new(0, s[3] / 2, 0),
-		Color3.fromRGB(236, 232, 222),
-		Enum.Material.Plaster
+	box(
+		ctx.static,
+		Vector3.new(pd[1], 0.5, 0.8),
+		0,
+		0.25,
+		pd[2] / 2 - 0.4,
+		WHITE,
+		Enum.Material.Concrete
 	)
-	local glass = part(
-		station,
-		Vector3.new(s[1] - 6, s[3] * 0.55, 0.4),
-		back * CFrame.new(0, s[3] * 0.4, -s[2] / 2 - 0.2),
+	local s = G.shop
+	local sz = pd[2] / 2 - s[2] / 2 - 2
+	for k = 0, G.Bays do
+		paint(
+			ctx.static,
+			Vector3.new(0.4, 0.15, 12),
+			cf * CFrame.new(s[1] / 2 + 4 + k * 7, 0.1, sz),
+			WHITE
+		)
+	end
+	for k = 1, 3 do
+		local d = paint(
+			ctx.static,
+			Vector3.new(0.12, 3 + k, 3 + k),
+			cf
+				* CFrame.new((k - 2) * 9, 0.09, cz + (k % 2) * 5 - 2)
+				* CFrame.Angles(0, 0, math.pi / 2),
+			Color3.fromRGB(40, 40, 44)
+		)
+		d.Shape = Enum.PartType.Cylinder
+		d.Transparency = 0.45
+	end
+
+	local station = model(ctx.buildings, "GasStation")
+	-- the canopy: deck, lit soffit panels, a red fascia all round with a yellow stripe under it
+	box(station, Vector3.new(c[1], 1.2, c[2]), 0, c[3] + 0.6, cz, WHITE)
+	for _, e in { -1, 1 } do
+		box(station, Vector3.new(c[1] + 1, 2.6, 0.6), 0, c[3] + 1.3, cz + e * (c[2] / 2 + 0.3), red)
+		box(station, Vector3.new(0.6, 2.6, c[2] + 1.6), e * (c[1] / 2 + 0.3), c[3] + 1.3, cz, red)
+		box(
+			station,
+			Vector3.new(c[1] + 1.2, 0.5, 0.7),
+			0,
+			c[3] - 0.25,
+			cz + e * (c[2] / 2 + 0.35),
+			yellow
+		)
+		box(
+			station,
+			Vector3.new(0.7, 0.5, c[2] + 1.8),
+			e * (c[1] / 2 + 0.35),
+			c[3] - 0.25,
+			cz,
+			yellow
+		)
+	end
+	for _, ex in { -1, 1 } do
+		for _, ez in { -1, 1 } do
+			local panel = box(
+				station,
+				Vector3.new(c[1] * 0.38, 0.2, c[2] * 0.3),
+				ex * c[1] * 0.24,
+				c[3] - 0.05,
+				cz + ez * c[2] * 0.22,
+				Color3.fromRGB(255, 250, 230),
+				Enum.Material.Neon
+			)
+			panel.CastShadow = false
+		end
+	end
+	-- two pump islands, each a kerb with a post holding up the canopy, two pumps and yellow bollards at the ends
+	for _, ex in { -1, 1 } do
+		local x = ex * c[1] * 0.24
+		box(station, Vector3.new(4, 0.8, c[2] * 0.62), x, 0.4, cz, cream, Enum.Material.Concrete)
+		box(station, Vector3.new(1.2, c[3] - 0.8, 1.2), x, (c[3] - 0.8) / 2 + 0.8, cz, WHITE)
+		for _, ez in { -1, 1 } do
+			local pump = prop(ctx.props, "Pump")
+			local pz = cz + ez * c[2] * 0.17
+			part(pump, Vector3.new(2.6, 5.6, 1.8), cf * CFrame.new(x, 3.6, pz), WHITE)
+			part(pump, Vector3.new(2.8, 1.4, 2), cf * CFrame.new(x, 7.1, pz), red)
+			for _, side in { -1, 1 } do
+				paint(
+					pump,
+					Vector3.new(1.6, 1.1, 0.1),
+					cf * CFrame.new(x, 5.2, pz + side * 0.92),
+					Color3.fromRGB(28, 32, 40)
+				)
+				paint(
+					pump,
+					Vector3.new(0.3, 3.4, 0.3),
+					cf * CFrame.new(x + 1.45, 3.4, pz + side * 0.5),
+					Color3.fromRGB(30, 30, 32)
+				)
+			end
+			local b = post(
+				station,
+				3.2,
+				0.9,
+				(cf * CFrame.new(x, 0.8, cz + ez * (c[2] * 0.31 + 0.2))).Position,
+				yellow
+			)
+			b.Name = "Bollard"
+		end
+	end
+
+	-- the shop at the back: plaster box, a glass front with white mullions and a door, a red fascia with a
+	-- yellow stripe and the MART sign, a parapet and two roof units
+	local back = cf * CFrame.new(0, 0, sz)
+	local function shop(
+		size: Vector3,
+		x: number,
+		y: number,
+		z: number,
+		colour: Color3,
+		mat: Enum.Material?
+	)
+		return part(station, size, back * CFrame.new(x, y, z), colour, mat)
+	end
+	shop(Vector3.new(s[1], s[3], s[2]), 0, s[3] / 2, 0, cream, Enum.Material.Plaster)
+	local front = -s[2] / 2 - 0.2
+	local glass = shop(
+		Vector3.new(s[1] - 4, s[3] * 0.58, 0.4),
+		0,
+		s[3] * 0.36,
+		front,
 		Color3.fromRGB(96, 140, 170),
 		Enum.Material.Glass
 	)
 	glass.Transparency = 0.25
 	glass:SetAttribute("Glass", true)
-	part(station, Vector3.new(s[1] + 1, 1.6, s[2] + 1), back * CFrame.new(0, s[3] + 0.8, 0), red)
-	local signAt = (cf * CFrame.new(c[1] * 0.75, 0, -G.pad[2] / 2 + 3)).Position
-	post(station, 18, 1.2, signAt, STEEL)
+	for k = -2, 2 do
+		shop(Vector3.new(0.5, s[3] * 0.6, 0.6), k * (s[1] - 4) / 4, s[3] * 0.36, front - 0.1, WHITE)
+	end
+	shop(Vector3.new(s[1] - 3, 0.5, 0.7), 0, s[3] * 0.07 + 0.3, front - 0.1, WHITE)
+	local door = shop(
+		Vector3.new(4.6, 7.6, 0.5),
+		-s[1] * 0.18,
+		3.8,
+		front - 0.35,
+		Color3.fromRGB(60, 88, 110),
+		Enum.Material.Glass
+	)
+	door.Transparency = 0.15
+	shop(Vector3.new(s[1] + 1, 2.4, s[2] + 1), 0, s[3] - 0.6, 0, red)
+	shop(Vector3.new(s[1] + 1.2, 0.5, s[2] + 1.2), 0, s[3] - 2, 0, yellow)
+	for _, e in { -1, 1 } do
+		shop(Vector3.new(s[1], 1.2, 0.6), 0, s[3] + 1.2, e * (s[2] / 2 - 0.3), cream)
+		shop(Vector3.new(0.6, 1.2, s[2]), e * (s[1] / 2 - 0.3), s[3] + 1.2, 0, cream)
+		shop(
+			Vector3.new(4, 2.4, 3.2),
+			e * s[1] * 0.22,
+			s[3] + 1.2,
+			s[2] * 0.15,
+			Color3.fromRGB(176, 180, 186),
+			Enum.Material.Metal
+		)
+	end
 	Places.sign(
 		station,
-		Vector3.new(12, 7, 1),
-		CFrame.lookAt(signAt + Vector3.new(0, 20, 0), signAt + Vector3.new(0, 20, 0) + out),
-		"GAS",
+		Vector3.new(12, 2.2, 0.4),
+		back * CFrame.new(s[1] * 0.12, s[3] - 0.6, front - 0.6),
+		"MART",
 		red,
+		WHITE
+	)
+	-- by the shop: an ice chest, an air stand and two bins (knockable)
+	local ice = prop(ctx.props, "IceChest")
+	part(ice, Vector3.new(5, 3.6, 2.4), back * CFrame.new(s[1] * 0.36, 1.8, front - 1.6), WHITE)
+	paint(
+		ice,
+		Vector3.new(4, 1.4, 0.1),
+		back * CFrame.new(s[1] * 0.36, 2.2, front - 2.85),
+		Color3.fromRGB(60, 140, 220)
+	)
+	local air = prop(ctx.props, "AirStand")
+	part(
+		air,
+		Vector3.new(1.8, 4.6, 1.4),
+		cf * CFrame.new(-pd[1] / 2 + 5, 2.3, sz - s[2] / 2 - 4),
+		red
+	)
+	paint(
+		air,
+		Vector3.new(1.2, 0.8, 0.1),
+		cf * CFrame.new(-pd[1] / 2 + 5, 3.6, sz - s[2] / 2 - 4.75),
+		yellow
+	)
+	for _, e in { -1, 1 } do
+		local bin = prop(ctx.props, "Bin")
+		post(
+			bin,
+			3.4,
+			2.2,
+			(back * CFrame.new(e * (s[1] / 2 + 2.5), 0, front - 1)).Position,
+			Color3.fromRGB(56, 110, 70)
+		)
+	end
+
+	-- the price pylon by the road: a red column, a white GAS board and a dark price board, read from the road
+	local signAt = (cf * CFrame.new(pd[1] / 2 - 6, 0, -pd[2] / 2 + 3)).Position
+	local face = CFrame.lookAt(signAt, signAt + out:Cross(Vector3.yAxis))
+	part(station, Vector3.new(2.6, 20, 2.6), face * CFrame.new(0, 10, 0), red)
+	part(station, Vector3.new(11, 0.6, 3), face * CFrame.new(0, 26.6, 0), yellow)
+	Places.sign(
+		station,
+		Vector3.new(11, 6, 2.4),
+		face * CFrame.new(0, 23.3, 0),
+		"GAS",
 		WHITE,
+		red,
+		true
+	)
+	Places.sign(
+		station,
+		Vector3.new(9, 3.4, 2.2),
+		face * CFrame.new(0, 18.4, 0),
+		G.Price,
+		Color3.fromRGB(26, 26, 30),
+		yellow,
 		true
 	)
 end

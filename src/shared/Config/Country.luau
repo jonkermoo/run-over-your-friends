@@ -38,6 +38,11 @@ return table.freeze({
 		IslandJitter = 300, -- along the coast, from even spacing
 		BeachSpread = 1.15, -- each island's sand skirt, as a share of its radius...
 		BeachRise = 0.25, -- ...and of its height
+		Shoulders = table.freeze({ 1, 2 }), -- lower humps off each island's main hill
+		IslandRocks = table.freeze({ 3, 6 }), -- rocks at each island's waterline
+		IslandPines = table.freeze({ 4, 9 }),
+		RockSize = table.freeze({ 14, 30 }), -- radius of a terrain rock (it stands 0.5-0.9 of that)
+		CoastRocks = 12, -- outcrops on the shore where the coast curves
 	}),
 
 	-- the open grass inside the walls the zones leave empty (after the groves and ponds): low rolling hills to
@@ -85,7 +90,19 @@ return table.freeze({
 			{ 170, 190, 90 },
 		}) :: { RGB },
 		Soil = { 116, 86, 60 } :: RGB,
-		Barn = table.freeze({ w = 50, d = 70, h = 22, roof = 16 }),
+		-- the big barn: w across its front, d deep; a gambrel roof `roof` tall whose knee is Knee[1] of the half
+		-- width in from the eave and Knee[2] of the roof's height up; doors Door[1] of the width, Door[2] of the walls
+		Barn = table.freeze({
+			w = 70,
+			d = 50,
+			h = 22,
+			roof = 18,
+			Knee = { 0.32, 0.68 },
+			Door = { 0.36, 0.72 },
+			RoofColour = { 74, 72, 80 },
+		}),
+		Yard = 40, -- the dirt yard reaches this far out from the barn's doors
+		Corral = table.freeze({ w = 44, d = 36, PostGap = 8 }),
 		BarnWall = 1.5, -- wall thickness (the forest cabin too)
 		BarnRed = { 168, 44, 40 } :: RGB,
 		Silo = table.freeze({ dia = 18, h = 46 }),
@@ -120,7 +137,13 @@ return table.freeze({
 		}) :: { RGB },
 		PierLength = 160,
 		PierWidth = 16,
-		Lighthouse = table.freeze({ dia = 16, h = 70 }),
+		Lighthouse = table.freeze({
+			dia = 16,
+			h = 70,
+			RailPosts = 12, -- round the gallery
+			-- the keeper's cottage, `Off` inland of the tower: w along the coast, d across, walls h, roof rise
+			Cottage = table.freeze({ Off = 34, w = 22, d = 16, h = 10, roof = 6 }),
+		}),
 		LighthouseRed = { 200, 50, 46 } :: RGB,
 	}),
 
@@ -149,7 +172,14 @@ return table.freeze({
 		}), -- gas on odd cells (billboards take the even ones)
 		CornerTrees = 5, -- the four corner cells get a small grove
 		Turbine = table.freeze({ h = 90, blade = 34, dia = 4.5 }),
-		Gas = table.freeze({ pad = { 80, 46 }, canopy = { 44, 26, 15 }, shop = { 26, 16, 12 } }), -- w, d, h
+		Gas = table.freeze({
+			pad = { 96, 70 },
+			canopy = { 48, 24, 15 },
+			shop = { 32, 18, 12 }, -- w, d, h
+			Bays = 4, -- parking bays beside the shop
+			Accent = { 255, 208, 0 }, -- the canopy stripe, bollards and price digits (the UI's road yellow)
+			Price = "$2.49",
+		}),
 		GasRed = { 214, 58, 48 } :: RGB,
 	}),
 

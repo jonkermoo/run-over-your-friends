@@ -42,6 +42,7 @@ return table.freeze({
 			length = 40,
 			foot = -300,
 			containers = 3,
+			containerGap = 9, -- between the jump's containers
 			landingFoot = -80,
 		}),
 		-- dirt rollers (terrain) on the same lane, east of the containers
@@ -70,7 +71,41 @@ return table.freeze({
 		Cols = 4,
 		Cranes = 2,
 		Bollards = 10,
+		Fenders = 20, -- tyres on the quay's face
+		Dock = { 150, 150, 146 }, -- the yard's concrete (darker than the plazas, so it doesn't blow out in the sun)
+		LaneColour = { 240, 196, 40 },
 		SeaDepth = 12, -- water surface sits 1 stud under the quay
+		-- the cargo ship off the quay: hull width, length (bow tip to stern), the bow's taper, keel and deck heights
+		Ship = table.freeze({
+			Width = 40,
+			Length = 260,
+			Bow = 40,
+			Keel = -10,
+			Deck = 6,
+			Topsides = { 34, 52, 84 },
+		}),
+	}),
+
+	-- shipping containers (the port's stacks and the stunt park's jump): a 40-foot box in proportion, painted one
+	-- of these colours, with overlay images (0 = none) for the corrugated walls, the frame and the doors
+	Container = table.freeze({
+		Size = { 16, 17, 72 }, -- wide, tall, long
+		JumpSize = { 16, 16, 56 }, -- the stunt park's jump containers (shorter, to fit its lane)
+		Gap = 2, -- between the two containers side by side in a stack
+		RibStuds = 2.2, -- one rib of the corrugation
+		Ribs = 76189861431152,
+		Frame = 133617883462700,
+		Door = 89850448249829,
+		Colours = table.freeze({
+			{ 232, 112, 40 }, -- orange
+			{ 28, 128, 140 }, -- teal
+			{ 186, 50, 44 }, -- red
+			{ 36, 62, 112 }, -- navy
+			{ 226, 224, 216 }, -- white
+			{ 62, 122, 74 }, -- green
+			{ 240, 190, 30 }, -- yellow
+			{ 214, 78, 136 }, -- pink
+		}),
 	}),
 
 	Desert = table.freeze({
@@ -132,6 +167,6 @@ return table.freeze({
 		bowl = { 70, 150, 200 },
 		cactus = { 70, 130, 70 },
 		ship = { 160, 40, 36 },
-		water = { 40, 110, 140 },
+		water = { 20, 120, 150 }, -- deep teal
 	}) :: { [string]: RGB },
 })

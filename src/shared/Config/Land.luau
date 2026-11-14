@@ -31,6 +31,21 @@ return table.freeze({
 	-- sits a hair under y = 0, below the roads and sidewalks (measured in Studio)
 	GroundSink = 2.2,
 	WallSegments = 240,
-	Shore = 40, -- a sand strip along the coast past the beaches
+	Shore = 40, -- a sand strip along the whole coast (not the port's quay)
+	-- the sea bed: a sand shelf runs gently down from the shore to the port's depth (Outskirts Port.SeaDepth)
+	-- over `Shelf` studs, then down again to `DeepDepth` by `DeepFrom` off the coast, so the water is pale
+	-- turquoise in the shallows and darkens further out. The port's quay drops straight to the port's depth.
+	Shelf = 150,
+	ShelfTop = -0.6, -- the shelf's top at the water's edge (the water's surface is at -1)
+	DeepFrom = 480,
+	DeepDepth = 44,
+	-- the beaches' inland edge wanders (sand into grass, no straight seam): waves of `k` studs, `amp` studs
+	BeachWaves = table.freeze({
+		table.freeze({ k = 260, amp = 22, phase = 0.3 }),
+		table.freeze({ k = 95, amp = 9, phase = 2.2 }),
+	}) :: { Wave },
+	BeachTaper = 300, -- the beaches narrow to nothing over this far at their ends
+	WaterWave = 0.15,
+	WaterClear = 0.3, -- terrain water transparency
 	SuburbSeed = 20261111, -- the suburbs' own random stream (Config/Suburbs)
 })

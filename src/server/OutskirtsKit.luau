@@ -55,13 +55,6 @@ local COLORS = {
 	yellow = Color3.fromRGB(242, 206, 70),
 	metal = Color3.fromRGB(70, 74, 80),
 }
-local CONTAINERS = {
-	Color3.fromRGB(190, 60, 50),
-	Color3.fromRGB(40, 100, 170),
-	Color3.fromRGB(230, 160, 40),
-	Color3.fromRGB(60, 140, 90),
-	Color3.fromRGB(150, 150, 155),
-}
 local MAX_PART = 2048
 
 -- an anchored part; one longer than MAX_PART is laid as tiles (the first tile is returned)
@@ -147,6 +140,45 @@ local function ramp(
 end
 
 -- dark bands across a ramp's slope (paint: they never bump a wheel)
+-- a shipping container: one painted box (length along its frame's Z) dressed with overlays that let its colour
+-- show through (tools/port/container_textures.py): corrugated walls and roof, a frame with corner posts and
+-- castings on the long sides, and doors with lock bars on its back end
+local function container(parent: Instance, size: Vector3, cf: CFrame, colour: Color3): Part
+	local K = Cfg.Container
+	local box = Instance.new("Part")
+	box.Anchored = true
+	box.Size = size
+	box.CFrame = cf
+	box.Color = colour
+	box.Material = Enum.Material.SmoothPlastic
+	box.TopSurface = Enum.SurfaceType.Smooth
+	box.BottomSurface = Enum.SurfaceType.Smooth
+	local function overlay(face: Enum.NormalId, id: number, u: number, v: number)
+		if id == 0 then
+			return
+		end
+		local t = Instance.new("Texture")
+		t.Face = face
+		t.Texture = `rbxassetid://{id}`
+		t.StudsPerTileU = u
+		t.StudsPerTileV = v
+		t.Parent = box
+	end
+	for _, face in { Enum.NormalId.Left, Enum.NormalId.Right } do
+		overlay(face, K.Ribs, K.RibStuds * 2, size.Y)
+		overlay(face, K.Frame, size.Z, size.Y)
+	end
+	overlay(Enum.NormalId.Front, K.Ribs, K.RibStuds * 2, size.Y)
+	overlay(Enum.NormalId.Back, K.Door, size.X, size.Y)
+	overlay(Enum.NormalId.Top, K.Ribs, K.RibStuds * 2, size.Z)
+	box.Parent = parent
+	return box
+end
+
+local function containerColour(random: Random): Color3
+	return rgb(Cfg.Container.Colours[random:NextInteger(1, #Cfg.Container.Colours)])
+end
+
 local function stripes(w: WedgePart, n: number)
 	local s = w.Size
 	local tilt = -math.atan2(s.Y, s.Z)
@@ -230,8 +262,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
 	terrain.WaterColor = rgb(C.water)
-	terrain.WaterWaveSize = 0.08
-	terrain.WaterTransparency = 0.5
+	terrain.WaterWaveSize = LandCfg.WaterWave
+	terrain.WaterTransparency = LandCfg.WaterClear
 
 	local R = ctx.road
 	local half = ctx.half
@@ -267,13 +299,43 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		return edgeAt[math.floor(a / (math.pi * 2) * EDGE_STEPS + 0.5)] - math.sqrt(x * x + z * z)
 	end
 	local SAND, GRASS = Enum.Material.Sand, Enum.Material.Grass
+	-- the beaches north and south of the port (CountryKit puts the umbrellas, tower and pier on them): terrain
+	-- sand whose inland edge wanders and which narrows at its ends, so it melts into the grass
+	local BEACH = Country.Beach
+	local port = zones.port
+	local function beachWidth(zc: number): number
+		local off = math.abs(zc - port.z) - (port.d / 2 + BEACH.Gap)
+		local toEnd = half - math.abs(zc)
+		if off <= 0 or toEnd < 0 then
+			return 0
+		end
+		local w = BEACH.Width
+		for _, wave in L.BeachWaves do
+			w += wave.amp * math.sin(zc / wave.k * math.pi * 2 + wave.phase)
+		end
+		local t = math.clamp(math.min(off, toEnd) / L.BeachTaper, 0, 1)
+		return w * t * t * (3 - 2 * t)
+	end
+	-- the sea bed's top `d` studs off the coast: a gentle sand shelf, then a slope to the deep (Config/Land);
+	-- the port's quay drops straight to the port's depth
+	local function smooth(t: number): number
+		t = math.clamp(t, 0, 1)
+		return t * t * (3 - 2 * t)
+	end
+	local function bedAt(d: number, quay: boolean): number
+		local shelf = if quay then 0 else L.Shelf
+		if d < shelf then
+			return L.ShelfTop + (-P.SeaDepth - L.ShelfTop) * smooth(d / shelf)
+		end
+		return -P.SeaDepth + (P.SeaDepth - L.DeepDepth) * smooth((d - shelf) / (L.DeepFrom - shelf))
+	end
 	for z = -fill, fill - tile, tile do
 		local zc = z + tile / 2
 		if z % (tile * 32) == 0 then
 			task.wait() -- the fill is long: yield so the build doesn't time out
 		end
 		local coastX = Land.coast(L, seaEdge, zc)
-		local curved = math.abs(zc) > L.CoastStraight
+		local quay = math.abs(zc - port.z) < port.d / 2
 		local runFrom, runKind = 0, nil :: Enum.Material?
 		local function flush(xTo: number)
 			if not runKind then
@@ -292,7 +354,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			if x < fill then
 				local xc = x + tile / 2
 				if xc > coastX and insetAt(xc, zc) > -L.Overrun then
-					kind = if curved and xc - coastX < L.Shore then SAND else GRASS
+					kind = GRASS
 				elseif xc <= coastX and xc > coastX - seaFar then
 					seaFrom, seaTo = math.min(seaFrom, x), math.max(seaTo, x + tile)
 				end
@@ -303,17 +365,49 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			end
 		end
 		if seaTo > seaFrom then
+			-- the deep sea over the whole row, on a sand floor; then the shelf and slope near the coast, column
+			-- by column (terrain draws its surface about 2 studs above a filled block's top, as on land)
 			local len = seaTo - seaFrom
 			terrain:FillBlock(
-				CFrame.new(seaFrom + len / 2, -P.SeaDepth - 2, zc),
+				CFrame.new(seaFrom + len / 2, -L.DeepDepth / 2 - 0.5, zc),
+				Vector3.new(len, L.DeepDepth - 1, tile),
+				Enum.Material.Water
+			)
+			terrain:FillBlock(
+				CFrame.new(seaFrom + len / 2, -L.DeepDepth - 2, zc),
 				Vector3.new(len, 4, tile),
 				SAND
 			)
-			terrain:FillBlock(
-				CFrame.new(seaFrom + len / 2, -P.SeaDepth / 2 - 0.5, zc),
-				Vector3.new(len, P.SeaDepth - 1, tile),
-				Enum.Material.Water
-			)
+			local floor = -L.DeepDepth
+			local x = seaTo - tile
+			while x >= seaFrom and coastX - (x + tile / 2) < L.DeepFrom do
+				local top = bedAt(coastX - (x + tile / 2), quay) - 2
+				if top > floor then
+					terrain:FillBlock(
+						CFrame.new(x + tile / 2, (floor + top) / 2, zc),
+						Vector3.new(tile, top - floor, tile),
+						SAND
+					)
+				end
+				x -= tile
+			end
+		end
+	end
+	-- the sand along the coast (the beaches, and a strip everywhere else but the port), painted over the grass in
+	-- 4-stud rows, so its inland edge is smooth rather than stepped in whole cells
+	for z = -fill, fill - 4, 4 do
+		if z % 512 == 0 then
+			task.wait()
+		end
+		local zc = z + 2
+		local width = math.max(beachWidth(zc), L.Shore)
+		if math.abs(zc - port.z) > port.d / 2 + 10 then
+			local coastX = Land.coast(L, seaEdge, zc)
+			local region = Region3.new(
+				Vector3.new(coastX - 8, -L.GroundDepth - 8, z),
+				Vector3.new(coastX + width, 4, z + 4)
+			):ExpandToGrid(4)
+			terrain:ReplaceMaterial(region, 4, GRASS, SAND)
 		end
 	end
 	local outline = Land.outline(L, seaEdge, L.WallSegments)
@@ -617,13 +711,13 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		local stack = Instance.new("Model")
 		stack.Name = "Containers"
 		for k = 0, J.containers - 1 do
-			local cx = J.foot + J.length + 30 + k * 25
-			part(
+			local js = Cfg.Container.JumpSize
+			local cx = J.foot + J.length + 30 + k * (js[1] + J.containerGap)
+			container(
 				stack,
-				Vector3.new(16, 16, 56),
-				CFrame.new(at(cx, jz) + Vector3.new(0, 8, 0)),
-				CONTAINERS[k % #CONTAINERS + 1],
-				Enum.Material.CorrodedMetal
+				Vector3.new(js[1], js[2], js[3]),
+				CFrame.new(at(cx, jz) + Vector3.new(0, js[2] / 2, 0)),
+				rgb(Cfg.Container.Colours[k % #Cfg.Container.Colours + 1])
 			)
 		end
 		stack.Parent = buildings
@@ -741,9 +835,22 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			static,
 			Vector3.new(pt.w, 1, pt.d),
 			CFrame.new(pt.x, -0.42, pt.z),
-			COLORS.concrete,
+			rgb(P.Dock),
 			Enum.Material.Concrete
 		)
+		-- painted lanes between the stack rows: a yellow line down each side of every aisle
+		local lane = rgb(P.LaneColour)
+		for row = 0, P.Rows - 2 do
+			local z = pt.z - pt.d / 2 + 100 + (row + 0.5) * (pt.d - 200) / (P.Rows - 1)
+			for _, e in { -1, 1 } do
+				paint(
+					static,
+					Vector3.new(pt.w - 120, 0.1, 0.8),
+					CFrame.new(pt.x + 40, 0.1, z + e * 30),
+					lane
+				)
+			end
+		end
 		for row = 0, P.Rows - 1 do
 			for col = 0, P.Cols - 1 do
 				local stack = Instance.new("Model")
@@ -753,14 +860,24 @@ function OutskirtsKit.build(ctx: Ctx): Result
 					0,
 					pt.z - pt.d / 2 + 100 + row * (pt.d - 200) / (P.Rows - 1)
 				)
+				local K = Cfg.Container
+				local size = Vector3.new(K.Size[1], K.Size[2], K.Size[3])
 				for h = 0, random:NextInteger(1, 3) do
 					for k = 0, 1 do
-						part(
+						-- doors face either end, at random
+						local turn = if random:NextNumber() < 0.5 then 0 else math.pi
+						container(
 							stack,
-							Vector3.new(16, 16, 56),
-							CFrame.new(base + Vector3.new(k * 18, 8 + h * 16.2, 0)),
-							CONTAINERS[random:NextInteger(1, #CONTAINERS)],
-							Enum.Material.CorrodedMetal
+							size,
+							CFrame.new(
+								base
+									+ Vector3.new(
+										k * (size.X + K.Gap),
+										size.Y / 2 + h * (size.Y + 0.2),
+										0
+									)
+							) * CFrame.Angles(0, turn, 0),
+							containerColour(random)
 						)
 					end
 				end
@@ -795,60 +912,284 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				COLORS.stripe
 			)
 		end
+		-- black tyre fenders hung on the quay's face
+		for k = 0, P.Fenders - 1 do
+			local f = part(
+				static,
+				Vector3.new(2, 5, 5),
+				CFrame.new(qx - 0.6, -1.5, pt.z - pt.d / 2 + (k + 0.5) * pt.d / P.Fenders),
+				rgb(C.tyre)
+			)
+			f.Shape = Enum.PartType.Cylinder
+		end
 		local craneCol = rgb(C.crane)
+		local dark = Color3.fromRGB(34, 36, 40)
+		-- a beam between two points, `t` thick
+		local function beam(
+			parent: Instance,
+			p1: Vector3,
+			p2: Vector3,
+			t: number,
+			colour: Color3
+		): Part
+			return part(
+				parent,
+				Vector3.new(t, t, (p2 - p1).Magnitude),
+				CFrame.lookAt((p1 + p2) / 2, p2),
+				colour,
+				Enum.Material.Metal
+			)
+		end
+		local K = Cfg.Container
 		for k = 0, P.Cranes - 1 do
 			local cz = pt.z + (k - (P.Cranes - 1) / 2) * 320
 			local crane = Instance.new("Model")
 			crane.Name = "Crane"
-			for _, lx in { 12, 52 } do
-				for _, lz in { -14, 14 } do
+			local legX, legZ, topY = { 12, 52 }, { -14, 14 }, 56
+			local function at3(x: number, y: number, z: number): Vector3
+				return Vector3.new(qx + x, y, cz + z)
+			end
+			-- four legs on wheeled bogies, hazard bands at their feet
+			for _, lx in legX do
+				for _, lz in legZ do
 					part(
 						crane,
-						Vector3.new(3, 56, 3),
-						CFrame.new(qx + lx, 28, cz + lz),
+						Vector3.new(3, topY, 3),
+						CFrame.new(at3(lx, topY / 2, lz)),
 						craneCol,
 						Enum.Material.Metal
 					)
+					part(
+						crane,
+						Vector3.new(4.4, 2.4, 7),
+						CFrame.new(at3(lx, 1.2, lz)),
+						dark,
+						Enum.Material.Metal
+					)
+					part(crane, Vector3.new(3.2, 1.2, 3.2), CFrame.new(at3(lx, 4, lz)), dark)
 				end
+			end
+			-- cross-bracing: an X and a sill beam in each side frame, portal beams across the top
+			for _, lz in legZ do
+				beam(crane, at3(legX[1], 8, lz), at3(legX[2], topY - 4, lz), 1.4, craneCol)
+				beam(crane, at3(legX[1], topY - 4, lz), at3(legX[2], 8, lz), 1.4, craneCol)
+				beam(crane, at3(legX[1], 28, lz), at3(legX[2], 28, lz), 2, craneCol)
+			end
+			for _, lx in legX do
+				beam(
+					crane,
+					at3(lx, topY - 1, legZ[1] - 1.5),
+					at3(lx, topY - 1, legZ[2] + 1.5),
+					3,
+					craneCol
+				)
+				beam(crane, at3(lx, 30, legZ[1]), at3(lx, 30, legZ[2]), 2, craneCol)
+			end
+			-- the boom: two girders out over the water, a lattice between them, a machine house at the back
+			local boomFrom, boomTo, by = 70, -60, topY + 3
+			for _, gz in { -3.5, 3.5 } do
+				beam(crane, at3(boomFrom, by, gz), at3(boomTo, by, gz), 2.4, craneCol)
+				beam(crane, at3(boomFrom - 6, by + 8, gz), at3(10, by + 8, gz), 1.2, craneCol)
+			end
+			for kk = 0, 5 do
+				local x = boomFrom - 6 - kk * 11
+				beam(crane, at3(x, by, -3.5), at3(x - 6, by + 8, -3.5), 0.8, craneCol)
+				beam(crane, at3(x, by, 3.5), at3(x - 6, by + 8, 3.5), 0.8, craneCol)
 			end
 			part(
 				crane,
-				Vector3.new(130, 5, 5),
-				CFrame.new(qx + 10, 58, cz),
+				Vector3.new(16, 9, 12),
+				CFrame.new(at3(boomFrom - 6, by + 5.5, 0)),
+				COLORS.white
+			)
+			part(
+				crane,
+				Vector3.new(16.4, 1.2, 12.4),
+				CFrame.new(at3(boomFrom - 6, by + 10.4, 0)),
+				craneCol
+			)
+			-- the driver's cab under the boom, with a dark window band
+			part(crane, Vector3.new(8, 6, 8), CFrame.new(at3(-4, by - 5, 6)), COLORS.white)
+			part(
+				crane,
+				Vector3.new(8.2, 2.4, 8.2),
+				CFrame.new(at3(-4, by - 4.4, 6)),
+				dark,
+				Enum.Material.Glass
+			)
+			-- the trolley over the water, its cables and a spreader holding a container
+			local tx = -32 + k * 14
+			part(
+				crane,
+				Vector3.new(10, 3, 10),
+				CFrame.new(at3(tx, by - 2.6, 0)),
+				dark,
+				Enum.Material.Metal
+			)
+			local hang = 22 + k * 8
+			for _, cz2 in { -3, 3 } do
+				part(
+					crane,
+					Vector3.new(0.3, hang, 0.3),
+					CFrame.new(at3(tx, by - 4 - hang / 2, cz2)),
+					dark
+				)
+			end
+			local sy = by - 4 - hang
+			part(
+				crane,
+				Vector3.new(K.Size[1] + 1, 1.4, K.Size[3] * 0.9),
+				CFrame.new(at3(tx, sy, 0)) * CFrame.Angles(0, math.pi / 2, 0),
 				craneCol,
 				Enum.Material.Metal
 			)
-			part(crane, Vector3.new(8, 6, 10), CFrame.new(qx - 20, 53, cz), COLORS.white)
-			part(crane, Vector3.new(0.5, 30, 0.5), CFrame.new(qx - 20, 35, cz), COLORS.stripe)
+			container(
+				crane,
+				Vector3.new(K.Size[1], K.Size[2], K.Size[3]),
+				CFrame.new(at3(tx, sy - 0.7 - K.Size[2] / 2, 0)) * CFrame.Angles(0, math.pi / 2, 0),
+				containerColour(random)
+			)
 			crane.Parent = buildings
 		end
-		-- a cargo ship moored off the quay (you can jump onto its deck)
+		-- a cargo ship moored off the quay (you can jump onto its deck): a two-tone hull with a pointed bow, a
+		-- deck stacked with containers, a bridge tower with windows and wings at the stern, a funnel, rails and
+		-- lifeboats. The bow points along -z.
 		local ship = Instance.new("Model")
 		ship.Name = "Ship"
+		local SH = P.Ship
 		local sx = qx - 34
-		part(
-			ship,
-			Vector3.new(44, 16, 240),
-			CFrame.new(sx, -3, pt.z),
-			rgb(C.ship),
-			Enum.Material.Metal
-		)
-		part(
-			ship,
-			Vector3.new(44, 1, 240),
-			CFrame.new(sx, 5.5, pt.z),
-			Color3.fromRGB(90, 96, 100),
-			Enum.Material.Metal
-		)
-		part(ship, Vector3.new(36, 18, 26), CFrame.new(sx, 15, pt.z + 100), COLORS.white)
-		part(ship, Vector3.new(8, 12, 8), CFrame.new(sx, 30, pt.z + 104), COLORS.stripe)
-		for k = 0, 3 do
+		local hw, len, bowLen = SH.Width / 2, SH.Length, SH.Bow
+		local z0 = pt.z - len / 2 + bowLen -- where the bow starts to narrow
+		local z1 = pt.z + len / 2 -- the stern
+		local hullMid = (z0 + z1) / 2
+		local lowCol, topCol = rgb(C.ship), rgb(SH.Topsides)
+		local deckCol = Color3.fromRGB(96, 104, 100)
+		local function hull(y0: number, y1: number, colour: Color3)
 			part(
 				ship,
-				Vector3.new(16, 16, 56),
-				CFrame.new(sx + (k % 2 - 0.5) * 18, 14, pt.z - 90 + (k // 2) * 60),
-				CONTAINERS[k + 1],
-				Enum.Material.CorrodedMetal
+				Vector3.new(SH.Width, y1 - y0, z1 - z0),
+				CFrame.new(sx, (y0 + y1) / 2, hullMid),
+				colour,
+				Enum.Material.Metal
+			)
+			for _, e in { -1, 1 } do
+				local wg = Instance.new("WedgePart")
+				wg.Anchored = true
+				wg.Size = Vector3.new(y1 - y0, hw, bowLen)
+				-- the right angle sits at the bow's base on the centre line: local Y runs out to the side, local -Z
+				-- runs to the tip, local X is up
+				wg.CFrame = CFrame.fromMatrix(
+					Vector3.new(sx + e * hw / 2, (y0 + y1) / 2, z0 - bowLen / 2),
+					Vector3.new(0, -e, 0),
+					Vector3.new(e, 0, 0),
+					Vector3.new(0, 0, 1)
+				)
+				wg.Color = colour
+				wg.Material = Enum.Material.Metal
+				wg.Parent = ship
+			end
+		end
+		hull(SH.Keel, -1, lowCol)
+		hull(-1, SH.Deck, topCol)
+		hull(SH.Deck, SH.Deck + 0.4, deckCol)
+		-- a white band along the waterline
+		for _, e in { -1, 1 } do
+			part(
+				ship,
+				Vector3.new(0.3, 0.8, z1 - z0),
+				CFrame.new(sx + e * (hw + 0.1), -0.6, hullMid),
+				COLORS.white
+			)
+		end
+		-- rails along the deck edges
+		for _, e in { -1, 1 } do
+			for _, y in { 2, 3.6 } do
+				part(
+					ship,
+					Vector3.new(0.3, 0.3, z1 - z0 - 4),
+					CFrame.new(sx + e * (hw - 0.4), SH.Deck + y, hullMid),
+					COLORS.white
+				)
+			end
+		end
+		-- containers on deck, two abreast, two rows, stacked
+		local cs = Vector3.new(K.Size[1], K.Size[2], K.Size[3])
+		for row = 0, 1 do
+			for col = -1, 1, 2 do
+				local cz = z0 + 4 + cs.Z / 2 + row * (cs.Z + 4)
+				for h = 0, random:NextInteger(1, 2) do
+					container(
+						ship,
+						cs,
+						CFrame.new(
+							sx + col * (cs.X / 2 + 1),
+							SH.Deck + 0.4 + cs.Y / 2 + h * (cs.Y + 0.2),
+							cz
+						),
+						containerColour(random)
+					)
+				end
+			end
+		end
+		-- the bridge tower at the stern: two white tiers, a dark window band, wings, a mast
+		local bz = z1 - 18
+		local by0 = SH.Deck + 0.4
+		part(ship, Vector3.new(34, 16, 24), CFrame.new(sx, by0 + 8, bz), COLORS.white)
+		part(ship, Vector3.new(30, 9, 20), CFrame.new(sx, by0 + 20.5, bz - 1), COLORS.white)
+		part(
+			ship,
+			Vector3.new(30.4, 3, 20.4),
+			CFrame.new(sx, by0 + 21.5, bz - 1),
+			Color3.fromRGB(30, 46, 64),
+			Enum.Material.Glass
+		)
+		part(
+			ship,
+			Vector3.new(SH.Width + 4, 0.8, 6),
+			CFrame.new(sx, by0 + 25.4, bz - 8),
+			COLORS.white
+		)
+		part(
+			ship,
+			Vector3.new(30.6, 0.8, 20.6),
+			CFrame.new(sx, by0 + 25.4, bz - 1),
+			Color3.fromRGB(200, 60, 50)
+		)
+		for _, y in { 5, 10 } do
+			part(
+				ship,
+				Vector3.new(34.4, 1.6, 24.4),
+				CFrame.new(sx, by0 + y, bz),
+				Color3.fromRGB(30, 46, 64),
+				Enum.Material.Glass
+			)
+		end
+		part(ship, Vector3.new(0.8, 12, 0.8), CFrame.new(sx, by0 + 32, bz), COLORS.white)
+		part(ship, Vector3.new(8, 0.6, 0.6), CFrame.new(sx, by0 + 35, bz), COLORS.white)
+		-- the funnel behind it: red with a white band and a black top
+		local fz = z1 - 5
+		part(ship, Vector3.new(9, 14, 8), CFrame.new(sx, by0 + 22, fz), Color3.fromRGB(200, 60, 50))
+		part(ship, Vector3.new(9.2, 2.4, 8.2), CFrame.new(sx, by0 + 22, fz), COLORS.white)
+		part(ship, Vector3.new(9.2, 2, 8.2), CFrame.new(sx, by0 + 29.6, fz), COLORS.stripe)
+		-- orange lifeboats hung on the bridge's sides
+		for _, e in { -1, 1 } do
+			local boat = part(
+				ship,
+				Vector3.new(10, 3, 3),
+				CFrame.new(sx + e * 19, by0 + 13, bz) * CFrame.Angles(0, math.pi / 2, 0),
+				Color3.fromRGB(240, 120, 30)
+			)
+			boat.Shape = Enum.PartType.Cylinder
+		end
+		-- the anchor and its hawse pipe on each bow
+		for _, e in { -1, 1 } do
+			part(
+				ship,
+				Vector3.new(0.6, 6, 3),
+				CFrame.new(sx + e * (hw * 0.55), SH.Deck - 4, z0 - bowLen * 0.45)
+					* CFrame.Angles(0, -e * 0.62, 0),
+				COLORS.stripe,
+				Enum.Material.Metal
 			)
 		end
 		ship.Parent = buildings
