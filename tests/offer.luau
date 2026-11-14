@@ -32,7 +32,7 @@ return function(check: (string, boolean) -> ())
 	end
 	check(
 		"starter pack worth: cash + Muscle + Bulldozer",
-		Offer.worth(S, prices) == 25000 + 25000 + 100000
+		Offer.worth(S, prices) == 275000 + 25000 + 100000
 	)
 	check(
 		"worth ignores unknown vehicles",
@@ -41,10 +41,10 @@ return function(check: (string, boolean) -> ())
 			prices
 		) == 5
 	)
-	-- the best cash rate is the Money Truck's 400 $/R$: 150k for 49 R$ is 7.6x, for 99 R$ 3.8x
+	-- the best cash rate is the Money Truck's ~2,007 $/R$: 400k for 49 R$ is 4.1x, for 99 R$ 2.0x
 	local worth = Offer.worth(S, prices)
-	check("deal value times", Offer.valueTimes(worth, D.robux, Products.MoneyPacks) == 7)
-	check("full value times", Offer.valueTimes(worth, S.robux, Products.MoneyPacks) == 3)
+	check("deal value times", Offer.valueTimes(worth, D.robux, Products.MoneyPacks) == 4)
+	check("full value times", Offer.valueTimes(worth, S.robux, Products.MoneyPacks) == 2)
 	check("value times is at least 1", Offer.valueTimes(10, 99, Products.MoneyPacks) == 1)
 	check(
 		"value times with no packs",

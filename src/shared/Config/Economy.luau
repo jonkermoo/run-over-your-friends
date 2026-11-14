@@ -20,7 +20,7 @@ return table.freeze({
 	DoubleMoney = 2,
 	-- one-time cash for joining the game's Roblox group; 0 = no group yet (the row is hidden live, a test grant in Studio)
 	GroupId = 987419590,
-	GroupReward = 5000,
+	GroupReward = 25000,
 	RoadsterPassMoney = 50000, -- a head start, not enough to skip the garage
 	AutosaveSeconds = 60,
 	-- game pass ids; 0 until the passes exist on the Creator Hub. In Studio the shop toggles them for testing.
