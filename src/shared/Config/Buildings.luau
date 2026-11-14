@@ -114,6 +114,22 @@ return table.freeze({
 		AwningDepth = 4.5,
 		AwningWhite = { 250, 250, 245 } :: RGB,
 		Sign = { 7, 2.2 }, -- the hanging sign: reach from the wall, height
+		-- a big icon of what each shop sells on its roof (TownKit icon kinds), on a post this tall
+		IconLift = 3,
+		Icons = table.freeze({
+			["SOCK SHOP"] = "sock",
+			["BUN BAKERY"] = "donut",
+			["BIKE BITS"] = "wheel",
+			["BOOK NOOK"] = "book",
+			["TOY BOX"] = "gift",
+			["PHONE FIX"] = "phone",
+			["FRESH FRUIT"] = "apple",
+			["HAT HUT"] = "hat",
+			["PET PALS"] = "bone",
+			["SNACK SHACK"] = "lolly",
+			["LAMP LAND"] = "bulb",
+			["CHEESE PLEASE"] = "cheese",
+		}),
 		-- parody high street, one name per shop in turn
 		Names = table.freeze({
 			"SOCK SHOP",

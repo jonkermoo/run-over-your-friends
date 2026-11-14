@@ -309,6 +309,158 @@ function TownKit.office(
 	return model, door
 end
 
+-- a big 3D icon of what a shop sells, standing on its roof over the front parapet on a short post, facing the
+-- street (Config/Buildings Shops.Icons): a donut, a wheel, a book, a toy box, a phone, an apple, a top hat, a
+-- bone, an ice lolly, a light bulb, a cheese wedge or a sock. `frame` is at the icon's centre, -Z to the street.
+local function icon(model: Model, frame: CFrame, kind: string, accent: Color3)
+	local function p(
+		size: Vector3,
+		cf: CFrame,
+		colour: Color3,
+		material: Enum.Material?,
+		shape: Enum.PartType?
+	): Part
+		local q = Instance.new("Part")
+		q.Anchored = true
+		q.Size = size
+		q.CFrame = frame * cf
+		q.Color = colour
+		q.Material = material or Enum.Material.SmoothPlastic
+		q.TopSurface = Enum.SurfaceType.Smooth
+		q.BottomSurface = Enum.SurfaceType.Smooth
+		if shape then
+			q.Shape = shape
+		end
+		q.Parent = model
+		return q
+	end
+	local CYL, BALL = Enum.PartType.Cylinder, Enum.PartType.Ball
+	local facing = CFrame.Angles(0, math.pi / 2, 0) -- a cylinder's axis turned to face the street
+	local upright = CFrame.Angles(0, 0, math.pi / 2) -- a cylinder's axis turned upright
+	local white, dark = Color3.fromRGB(250, 248, 240), Color3.fromRGB(34, 34, 38)
+	if kind == "donut" then
+		p(
+			Vector3.new(1.4, 8.4, 8.4),
+			CFrame.new(0, 0, 0.4) * facing,
+			Color3.fromRGB(214, 160, 96),
+			nil,
+			CYL
+		)
+		p(
+			Vector3.new(1.4, 7.6, 7.6),
+			CFrame.new(0, 0, -0.2) * facing,
+			Color3.fromRGB(244, 126, 176),
+			nil,
+			CYL
+		)
+		p(
+			Vector3.new(1.8, 2.6, 2.6),
+			CFrame.new(0, 0, -0.3) * facing,
+			Color3.fromRGB(120, 80, 50),
+			nil,
+			CYL
+		)
+		for k = 0, 5 do
+			local a = k / 6 * math.pi * 2 + 0.3
+			p(
+				Vector3.new(1.2, 0.35, 0.3),
+				CFrame.new(math.cos(a) * 2.8, math.sin(a) * 2.8, -1) * CFrame.Angles(0, 0, a * 2),
+				if k % 2 == 0 then Color3.fromRGB(255, 208, 0) else Color3.fromRGB(90, 160, 240)
+			)
+		end
+	elseif kind == "wheel" then
+		p(Vector3.new(1.6, 8.4, 8.4), facing, dark, nil, CYL)
+		p(Vector3.new(1.8, 6, 6), facing, Color3.fromRGB(200, 204, 210), Enum.Material.Metal, CYL)
+		p(Vector3.new(2, 2, 2), facing, accent, nil, CYL)
+	elseif kind == "book" then
+		p(Vector3.new(6, 8, 1.4), CFrame.new(0, 0, 0), accent)
+		p(Vector3.new(5.4, 7.6, 1.2), CFrame.new(0.5, 0, 0.1), white)
+		p(Vector3.new(4.6, 1, 0.2), CFrame.new(0, 2, -0.75), Color3.fromRGB(255, 208, 0))
+	elseif kind == "gift" then
+		p(Vector3.new(6.4, 6.4, 6.4), CFrame.new(), accent)
+		p(Vector3.new(1.2, 6.6, 6.6), CFrame.new(), Color3.fromRGB(255, 208, 0))
+		p(Vector3.new(6.6, 1.2, 6.6), CFrame.new(), Color3.fromRGB(255, 208, 0))
+		for _, e in { -1, 1 } do
+			p(
+				Vector3.one * 2.2,
+				CFrame.new(e * 1.1, 3.8, 0),
+				Color3.fromRGB(255, 208, 0),
+				nil,
+				BALL
+			)
+		end
+	elseif kind == "phone" then
+		p(Vector3.new(4.6, 8.4, 0.8), CFrame.new(), dark)
+		p(
+			Vector3.new(3.8, 6.6, 0.2),
+			CFrame.new(0, 0.2, -0.45),
+			Color3.fromRGB(120, 200, 255),
+			Enum.Material.Neon
+		)
+	elseif kind == "apple" then
+		p(Vector3.one * 7, CFrame.new(), Color3.fromRGB(220, 50, 50), nil, BALL)
+		p(Vector3.new(0.6, 2, 0.6), CFrame.new(0, 4, 0), Color3.fromRGB(110, 70, 40))
+		p(
+			Vector3.new(2.4, 0.3, 1.2),
+			CFrame.new(1.2, 4.4, 0) * CFrame.Angles(0, 0, 0.5),
+			Color3.fromRGB(70, 160, 60)
+		)
+	elseif kind == "hat" then
+		p(Vector3.new(6, 5, 5), CFrame.new(0, 0.6, 0) * upright, dark, nil, CYL)
+		p(Vector3.new(0.5, 8.4, 8.4), CFrame.new(0, -2.4, 0) * upright, dark, nil, CYL)
+		p(Vector3.new(1.1, 5.1, 5.1), CFrame.new(0, -1.4, 0) * upright, accent, nil, CYL)
+	elseif kind == "bone" then
+		p(Vector3.new(6.4, 1.8, 1.8), CFrame.new(), white, nil, CYL)
+		for _, x in { -3.2, 3.2 } do
+			for _, y in { -0.9, 0.9 } do
+				p(Vector3.one * 2.6, CFrame.new(x, y, 0), white, nil, BALL)
+			end
+		end
+	elseif kind == "lolly" then
+		p(Vector3.new(4.4, 6, 1.4), CFrame.new(0, 1, 0), Color3.fromRGB(244, 126, 176))
+		p(Vector3.new(4.4, 1.2, 1.5), CFrame.new(0, 3.4, 0), Color3.fromRGB(120, 70, 50))
+		p(Vector3.new(0.8, 3, 0.4), CFrame.new(0, -3.4, 0), Color3.fromRGB(226, 196, 140))
+	elseif kind == "bulb" then
+		p(
+			Vector3.one * 6,
+			CFrame.new(0, 1, 0),
+			Color3.fromRGB(255, 226, 120),
+			Enum.Material.Neon,
+			BALL
+		)
+		p(
+			Vector3.new(2.4, 2.8, 2.8),
+			CFrame.new(0, -2.6, 0) * upright,
+			Color3.fromRGB(170, 174, 180),
+			Enum.Material.Metal,
+			CYL
+		)
+	elseif kind == "cheese" then
+		local w = Instance.new("WedgePart")
+		w.Anchored = true
+		w.Size = Vector3.new(2.4, 6, 8)
+		w.CFrame = frame * CFrame.Angles(0, math.pi / 2, 0)
+		w.Color = Color3.fromRGB(255, 204, 60)
+		w.Parent = model
+		for k = 1, 3 do
+			p(
+				Vector3.new(0.3, 1.2, 1.2),
+				CFrame.new(-1.8 + k * 1.2, -1.6 + (k % 2) * 1.2, -1.25) * facing,
+				Color3.fromRGB(226, 170, 30),
+				nil,
+				CYL
+			)
+		end
+	elseif kind == "sock" then
+		p(Vector3.new(3, 6, 1.4), CFrame.new(-1, 1, 0), accent)
+		p(Vector3.new(5, 2.6, 1.4), CFrame.new(0, -2.6, 0), accent)
+		p(Vector3.new(3.1, 1, 1.5), CFrame.new(-1, 3.4, 0), white)
+		p(Vector3.new(3.1, 0.7, 1.5), CFrame.new(-1, 1.6, 0), white)
+	else
+		p(Vector3.one * 6, CFrame.new(), accent, nil, BALL)
+	end
+end
+
 -- one shop in a row: `width` wide, Config depth, facing the street along `out`; walls in the district's
 -- colour and material, trim / accent / roof from a house palette. Returns its Place.
 function TownKit.shop(
@@ -382,6 +534,21 @@ function TownKit.shop(
 		material
 	)
 	put(ctx, Vector3.new(width + 0.8, 0.5, T + 0.8), 0, top + 2.25, zf - T / 2, ctx.trim)
+	-- what it sells, big on the roof over the parapet (Config/Buildings Shops.Icons)
+	local kind = S.Icons[label]
+	if kind then
+		local lift = S.IconLift
+		put(
+			ctx,
+			Vector3.new(0.8, lift, 0.8),
+			0,
+			top + 2.5 + lift / 2,
+			zf - 2.5,
+			Color3.fromRGB(58, 58, 62),
+			Enum.Material.Metal
+		)
+		icon(model, ctx.base * CFrame.new(0, top + 2.5 + lift + 4, -(zf - 2.5)), kind, ctx.accent)
+	end
 	-- striped awning over the window and the door, sloping down to the street
 	local a0, a1 = -half + 2, half - 3
 	local n = S.AwningStripes
