@@ -104,6 +104,22 @@ BUILD.B = function(ctx)
 	put(ctx, Vector3.new(w + 0.6, 0.5, H.Wall + 0.4), 0, Y0 + fh, zf - H.Wall / 2, ctx.trim)
 	trims(ctx, 0, w / 2, zf, zb, top, true)
 	gable(ctx, 0, w, zf, zb, top, 8, "side")
+	if ctx.variant and ctx.variant.porch then
+		-- a front porch: a deck, two posts and a little roof over the door
+		put(
+			ctx,
+			Vector3.new(11, 0.6, 5),
+			found.door,
+			Y0 + 0.3,
+			zf + 2.5,
+			STEP,
+			Enum.Material.WoodPlanks
+		)
+		for _, e in { -4.8, 4.8 } do
+			put(ctx, Vector3.new(0.7, 9.4, 0.7), found.door + e, Y0 + 4.7, zf + 4.4, ctx.trim)
+		end
+		put(ctx, Vector3.new(12.4, 0.5, 6), found.door, Y0 + 9.75, zf + 2.6, ctx.roof)
+	end
 	chimney(ctx, 13, -3, top + 2, 9)
 	interior(ctx, 0, w, zf, zb)
 	return { door = found.door, front = zf, back = zb, living = Vector3.new(-10, 0, zf - 5) }
@@ -242,12 +258,36 @@ function HouseKit.build(
 	local model = Instance.new("Model")
 	model.Name = name
 	model:SetAttribute("HouseType", kind)
+	-- each house's own touches come from its name (no random draws, so the town's layout doesn't shift):
+	-- a roof colour from the darker set, shutters, flower boxes, a door canopy, a porch (Config/Houses Variety)
+	local function hash(text: string): number
+		local h = 0
+		for k = 1, #text do
+			h = (h * 131 + string.byte(text, k)) % 16777213
+		end
+		return h
+	end
+	local V = H.Variety
+	-- each trait hashes the name with its own salt, so the traits vary independently
+	local function roll(salt: string): number
+		return (hash(name .. "#" .. salt) % 1000) / 1000
+	end
+	local roof = if roll("roof") < V.OwnRoof
+		then Kit.rgb(V.Roofs[hash(name .. "#colour") % #V.Roofs + 1])
+		else Kit.rgb(palette.roof)
 	local ctx = Kit.context(model, c, out, mirror, {
 		wall = Kit.rgb(palette.wall),
 		trim = Kit.rgb(palette.trim),
 		accent = Kit.rgb(palette.accent),
-		roof = Kit.rgb(palette.roof),
+		roof = roof,
 	}, (Enum.Material :: any)[palette.material] or Enum.Material.SmoothPlastic, H.Wall)
+	local porch = kind == "B" and roll("porch") < V.Porch
+	ctx.variant = {
+		sh = roll("shutters") < V.Shutters,
+		fl = roll("flowers") < V.Flowers,
+		can = not porch and roll("canopy") < V.Canopy, -- a porch has its own roof over the door
+		porch = porch,
+	}
 	local base = ctx.base
 	local info = BUILD[kind](ctx)
 	-- the client furnishes the house from its frame, type and mirror flag

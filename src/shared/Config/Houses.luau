@@ -15,6 +15,24 @@ return table.freeze({
 	Wall = 1,
 	Overhang = 1.5, -- roofs reach this far past the walls
 	Plinth = 1.5, -- the darker band along the bottom of every wall
+	-- each house's own touches (HouseKit, picked from its name): chances of a roof from the darker set below
+	-- instead of its palette's, shutters and flower boxes on its front windows, a canopy over its door, and a
+	-- porch (family houses)
+	Variety = table.freeze({
+		OwnRoof = 0.6,
+		Shutters = 0.45,
+		Flowers = 0.5,
+		Canopy = 0.35,
+		Porch = 0.4,
+		Roofs = table.freeze({
+			{ 58, 62, 70 }, -- charcoal
+			{ 150, 62, 48 }, -- brick red
+			{ 62, 84, 122 }, -- slate blue
+			{ 56, 96, 70 }, -- forest green
+			{ 104, 70, 54 }, -- chocolate
+			{ 44, 46, 52 }, -- near black
+		}),
+	}),
 
 	Types = table.freeze({
 		A = table.freeze({ width = 30, depth = 26, floors = 1, perLot = 1 }) :: HouseType,

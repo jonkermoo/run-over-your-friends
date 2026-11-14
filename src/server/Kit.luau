@@ -26,6 +26,9 @@ export type Ctx = {
 	accent: Color3,
 	roof: Color3,
 	material: Enum.Material,
+	-- a house's own extras on its front wall (HouseKit): shutters, flower boxes under the ground-floor windows,
+	-- a canopy over the door; nil for every other building
+	variant: { sh: boolean, fl: boolean, can: boolean, porch: boolean }?,
 }
 
 local Y0, GLASS, STEP = Kit.Y0, Kit.GLASS, Kit.STEP
@@ -147,7 +150,16 @@ function Kit.row(
 	local T = ctx.t
 	local zc = zFace - s * T / 2
 	local found: { [string]: number } = {}
-	for _, g in segs do
+	local v = if s == 1 then ctx.variant else nil
+	local ground = y0 < 1
+	for _, seg in segs do
+		local g = seg
+		if v then
+			g = table.clone(seg)
+			g.sh = seg.sh or v.sh
+			g.fl = seg.fl or (v.fl and ground)
+			g.can = seg.can or v.can
+		end
 		local mid, len = (g.a + g.b) / 2, g.b - g.a
 		if g.k == "s" then
 			wallPart(ctx, Vector3.new(len, h, T), mid, y0 + h / 2, zc)
@@ -278,6 +290,17 @@ function Kit.row(
 				Color3.fromRGB(233, 230, 223)
 			)
 			put(ctx, Vector3.new(len + 1, 0.6, T + 0.4), mid, y0 + 9.25, zFace + s * 0.2, ctx.trim)
+			-- the door's panel lines
+			for k = 1, 3 do
+				put(
+					ctx,
+					Vector3.new(len - 0.8, 0.25, 0.2),
+					mid,
+					y0 + k * 2.25,
+					zFace - s * 0.15,
+					Color3.fromRGB(196, 192, 184)
+				)
+			end
 			put(
 				ctx,
 				Vector3.new(len + 2, 0.3, 8),
