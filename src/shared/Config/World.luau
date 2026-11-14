@@ -104,6 +104,16 @@ return table.freeze({
 			{ 120, 210, 60 },
 		}), -- UI colours
 	}),
+	-- no decoration grass in the city grid (and CityMargin past its outer sidewalk) or under flat ground parts
+	-- elsewhere (MapBuilder): parts whose bottom is at most MaxBottom and top at most MaxTop, at least MinSize
+	-- across, get Asphalt terrain (grass-tinted, no blades) under them
+	GrassUnder = table.freeze({
+		MaxBottom = 0.2,
+		MaxTop = 1.5,
+		MinSize = 4,
+		Batch = 300,
+		CityMargin = 8,
+	}),
 	Map = table.freeze({
 		GroundSize = 6000,
 		BlockSize = 220, -- city block, kerb to kerb

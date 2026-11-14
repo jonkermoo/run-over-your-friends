@@ -1323,6 +1323,62 @@ function MapBuilder.build(): Result
 			end
 		end
 	end
+	-- terrain decoration grass grows up through parts and meshes lying on the ground, so: the whole city grid's
+	-- terrain (roads, sidewalks, slabs and lawn parts over it) turns to Asphalt, which is tinted grass colour and
+	-- grows no blades; outside it, so does the terrain under every flat ground-level part (pads, car parks,
+	-- plazas, the invisible parts the ring road is driven on). Lawns of grass parts and the open country keep
+	-- their blades. (Road meshes are left out of the second pass: each covers a 512-stud square of fields.)
+	local GU = World.GrassUnder
+	local terrain = workspace.Terrain
+	local edge = World.Map.SidewalkWidth + GU.CityMargin
+	terrain:ReplaceMaterial(
+		Region3.new(
+			Vector3.new(x0 - edge, -16, z0 - edge),
+			Vector3.new(x0 + spanX + edge, 4, z0 + spanZ + edge)
+		):ExpandToGrid(4),
+		4,
+		Enum.Material.Grass,
+		Enum.Material.Asphalt
+	)
+	local cleared = 0
+	for _, p in map:GetDescendants() do
+		if
+			not p:IsA("BasePart")
+			or p:IsA("MeshPart")
+			or (p.Transparency >= 1 and not p.CanCollide)
+			or p.Material == Enum.Material.Grass
+			or p.Material == Enum.Material.LeafyGrass
+		then
+			continue
+		end
+		local size, cf = p.Size, p.CFrame
+		local half = Vector3.new(
+			math.abs(cf.XVector.X) * size.X
+				+ math.abs(cf.YVector.X) * size.Y
+				+ math.abs(cf.ZVector.X) * size.Z,
+			math.abs(cf.XVector.Y) * size.X
+				+ math.abs(cf.YVector.Y) * size.Y
+				+ math.abs(cf.ZVector.Y) * size.Z,
+			math.abs(cf.XVector.Z) * size.X
+				+ math.abs(cf.YVector.Z) * size.Y
+				+ math.abs(cf.ZVector.Z) * size.Z
+		) / 2
+		local lo, hi = cf.Position - half, cf.Position + half
+		if lo.Y > GU.MaxBottom or hi.Y > GU.MaxTop or math.min(half.X, half.Z) * 2 < GU.MinSize then
+			continue
+		end
+		terrain:ReplaceMaterial(
+			Region3.new(Vector3.new(lo.X, -12, lo.Z), Vector3.new(hi.X, 4, hi.Z)):ExpandToGrid(4),
+			4,
+			Enum.Material.Grass,
+			Enum.Material.Asphalt
+		)
+		cleared += 1
+		if cleared % GU.Batch == 0 then
+			task.wait()
+		end
+	end
+
 	-- far stand-ins for the buildings (always loaded; the client hides each while its building is here)
 	SkylineKit.build(map, buildings)
 	map.Parent = workspace
