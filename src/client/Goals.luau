@@ -103,9 +103,15 @@ local function claiming(): boolean
 	return player:GetAttribute("Tutorial") == Onboarding.Steps.Goal
 end
 
+-- the screen's GUI height in layout pixels (the drawn scale undone)
+local function guiHeight(): number
+	local fit = gui:FindFirstChild("ScreenFit") :: UIScale?
+	return gui.AbsoluteSize.Y / (if fit then fit.Scale else Style.scale())
+end
+
 -- layout pixels the whole sheet may take on this screen
 local function maxHeight(): number
-	return math.floor(gui.AbsoluteSize.Y / Style.scale()) - TOP - BOTTOM_MARGIN
+	return math.floor(guiHeight()) - TOP - BOTTOM_MARGIN
 end
 
 local function shape(): string
@@ -162,9 +168,7 @@ end
 
 -- centre the sheet on the screen's GUI area (layout px, so the drawn scale is undone first)
 local function place()
-	local fit = gui:FindFirstChild("ScreenFit") :: UIScale?
-	local guiH = gui.AbsoluteSize.Y / (if fit then fit.Scale else Style.scale())
-	local y = LayoutRules.sheetCentre(guiH, panel.Size.Y.Offset, TOP, BOTTOM_MARGIN)
+	local y = LayoutRules.sheetCentre(guiHeight(), panel.Size.Y.Offset, TOP, BOTTOM_MARGIN)
 	panel.Position = UDim2.new(0.5, 0, 0, y)
 end
 
