@@ -259,6 +259,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	-- terrain detail, which spreads it past the road's edge, still reads as grass
 	terrain:SetMaterialColor(Enum.Material.Asphalt, rgb(Country.TerrainGrass))
 	terrain:SetMaterialColor(Enum.Material.LeafyGrass, rgb(Country.TerrainLeafy))
+	terrain:SetMaterialColor(Enum.Material.Rock, rgb(Country.TerrainRock))
 	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
 	terrain.WaterColor = rgb(C.water)

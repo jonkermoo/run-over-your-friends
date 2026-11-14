@@ -123,7 +123,7 @@ end
 
 -- terrain mounds (buried balls); `hills` keeps them so things can be stood on the slopes
 -- a ball's cap (cy, r) or, with `h`, a bell `h` tall reaching out to r
-type Ball = { x: number, z: number, cy: number, r: number, h: number? }
+type Ball = { x: number, z: number, cy: number, r: number, h: number?, peak: number? }
 
 -- a smooth hill written voxel by voxel: a bell (cosine) profile `height` tall that flattens into the ground at
 -- `radius`, so it has no rim or terraces; merged with what is already there (never digs). It is filled from
@@ -200,6 +200,35 @@ local function mound(
 	if mounds % 6 == 0 then
 		task.wait() -- terrain is slow to fill: yield so the map's build doesn't time out
 	end
+	local PK = Cfg.Edge.Peak
+	if height >= PK.From then
+		-- a mountain: concave slopes up to a point (each layer's radius shrinks as (1 - t)^Shape), grass on the
+		-- lower slopes, rock above, snow on the tallest peaks' tops; stacked in flat discs from the sea floor up
+		local y = -SEA_DEPTH
+		local terrain = workspace.Terrain
+		local layers = 0
+		while y < height do
+			layers += 1
+			if layers % 40 == 0 then
+				task.wait() -- a tall peak is many fills: yield so the build doesn't time out
+			end
+			local top = math.min(y + MOUND_STEP, height)
+			local t = math.max((y + top) / 2, 0) / height
+			local d = radius * (1 - t) ^ PK.Shape
+			if d > 1 then
+				local layer = if t < PK.GrassTo
+					then Enum.Material.Grass
+					elseif height >= PK.SnowMin and t >= PK.SnowFrom then Enum.Material.Snow
+					else Enum.Material.Rock
+				terrain:FillCylinder(CFrame.new(x, (y + top) / 2, z), top - y, d, layer)
+			end
+			y = top
+		end
+		if hills then
+			table.insert(hills, { x = x, z = z, cy = 0, r = radius, h = height, peak = PK.Shape })
+		end
+		return
+	end
 	local r = (radius * radius / height + height) / 2
 	local cy = height - r
 	if height <= Cfg.Edge.BellMax then
@@ -241,8 +270,9 @@ local function heightAt(hills: { Ball }, x: number, z: number): number
 			local h = b.h
 			y = math.max(
 				y,
-				if h
-					then h * (1 + math.cos(math.pi * math.sqrt(d2) / b.r)) / 2
+				if h and b.peak
+					then h * (1 - (math.sqrt(d2) / b.r) ^ (1 / b.peak))
+					elseif h then h * (1 + math.cos(math.pi * math.sqrt(d2) / b.r)) / 2
 					else b.cy + math.sqrt(b.r * b.r - d2)
 			)
 		end
@@ -295,11 +325,15 @@ local function edges(ctx: Ctx)
 			local t = theta + random:NextNumber(-0.3, 0.3) * E.Spacing / LandCfg.Radius
 			local at = ray(t, between(random, row.out))
 			if landAt(at.X, at.Z, 0) then
-				local height = between(random, row.height)
-				local material = if height >= E.RockFrom
-					then Enum.Material.Rock
-					else Enum.Material.Grass
-				mound(hills, at.X, at.Z, between(random, row.radius), height, material)
+				-- skewed toward the low end, so a few big peaks stand out of the range
+				local height = row.height[1]
+					+ (row.height[2] - row.height[1]) * random:NextNumber() ^ row.skew
+				local radius = between(random, row.radius)
+					* (
+						E.RadiusScale[1]
+						+ (E.RadiusScale[2] - E.RadiusScale[1]) * height / row.height[2]
+					)
+				mound(hills, at.X, at.Z, radius, height, Enum.Material.Grass)
 			end
 		end)
 	end

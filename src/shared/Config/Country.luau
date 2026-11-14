@@ -16,9 +16,29 @@ return table.freeze({
 		Spacing = 170, -- between hills along the edge
 		MoundStep = 4, -- tall hills are stacked terrain discs this thick...
 		BellMax = 45, -- ...lower ones are smooth bells written voxel by voxel (no terraces)
-		Near = table.freeze({ out = { 60, 220 }, radius = { 220, 340 }, height = { 35, 80 } }), -- out: past the edge
-		Far = table.freeze({ out = { 380, 650 }, radius = { 380, 560 }, height = { 140, 300 } }),
-		RockFrom = 270, -- far hills this tall are rock, not grass
+		-- out: past the edge; heights are skewed toward the low end by `skew` (1 = even)
+		Near = table.freeze({
+			out = { 60, 220 },
+			radius = { 220, 340 },
+			height = { 35, 90 },
+			skew = 1,
+		}),
+		Far = table.freeze({
+			out = { 380, 700 },
+			radius = { 360, 600 },
+			height = { 160, 620 },
+			skew = 1.6,
+		}),
+		RadiusScale = { 0.8, 1.2 }, -- a hill's radius grows with its height, by this much from lowest to tallest
+		-- hills this tall are mountains: pointed, grass up to GrassTo of their height, rock above, and a snow cap
+		-- from SnowFrom on the ones at least SnowMin tall (Shape > 1 makes the slopes concave)
+		Peak = table.freeze({
+			From = 120,
+			Shape = 1.3,
+			GrassTo = 0.4,
+			SnowFrom = 0.78,
+			SnowMin = 340,
+		}),
 		BeltOut = 25, -- the woods' centre line, past the edge
 		BeltSpacing = 190, -- between belt meshes along the edge (each is about 210 long)
 		BeltLook = 90, -- a belt sits at the lowest ground found this far either side of its middle
@@ -49,8 +69,8 @@ return table.freeze({
 	-- drive over (terrain) and strips of woods (one Belt mesh each, scaled down, turned a random way)
 	Meadow = table.freeze({
 		Hills = 50,
-		HillRadius = table.freeze({ 60, 120 }),
-		HillHeight = table.freeze({ 5, 14 }),
+		HillRadius = table.freeze({ 80, 160 }),
+		HillHeight = table.freeze({ 8, 24 }),
 		Woods = 30,
 		WoodScale = table.freeze({ 0.45, 0.75 }),
 	}),
@@ -71,7 +91,7 @@ return table.freeze({
 			scale = { 1, 1.8 },
 			bushes = 2,
 		}),
-		Hills = table.freeze({ n = 300, radius = { 50, 180 }, height = { 6, 30 } }),
+		Hills = table.freeze({ n = 300, radius = { 70, 200 }, height = { 8, 36 } }),
 		-- patches of a second, darker grass (terrain colour blends at the edges): wobbly blobs `size` across
 		Patches = table.freeze({ n = 420, radius = 90, size = { 30, 75 } }),
 	}),
@@ -195,6 +215,7 @@ return table.freeze({
 	-- terrain grass (hills, knolls) renders lighter than the ground part's Grass; this tint matches them (Studio)
 	TerrainGrass = { 70, 122, 52 } :: RGB,
 	TerrainLeafy = { 52, 96, 44 } :: RGB, -- the patches (Fill.Patches)
+	TerrainRock = { 128, 120, 112 } :: RGB, -- the mountains' warm grey rock
 
 	-- a sidewalk along the outside of the city's outer road
 	OuterSidewalk = true,
