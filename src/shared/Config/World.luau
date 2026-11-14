@@ -3,25 +3,41 @@
 
 return table.freeze({
 	-- the world's look, "golden afternoon": a lower, warm late-afternoon sun for long readable shadows, cool
-	-- blue shade so lit sides pop, a warm light haze, a punchier grade and a touch of sun rays. Colours are
-	-- { r, g, b }. (Was "soft clean": 2 pm neutral light, grey shade, grade +0.08; it read flat and washed out.)
+	-- blue shade so lit sides pop, a painted cartoon sky with real clouds, a light blue haze that keeps the
+	-- distance clear, a punchier grade and a touch of sun rays. Colours are { r, g, b }.
+	-- (Was: no sky, no clouds, shadows off and a milky haze (Haze 1), Exposure +0.15 blew white concrete out.)
 	Look = table.freeze({
 		ClockTime = 16.4,
 		Brightness = 3,
-		Exposure = 0.15,
+		Exposure = 0,
+		Shadows = true, -- Lighting.GlobalShadows; phones on low quality skip shadows themselves
 		Ambient = table.freeze({ 125, 125, 140 }), -- indoor / no-sky fill
 		OutdoorAmbient = table.freeze({ 120, 130, 160 }), -- shade colour outdoors: cool, so sunlit sides stand out
 		SunTint = table.freeze({ 255, 226, 190 }), -- the sun's colour on lit faces (Lighting.ColorShift_Top)
 		ShadowSoftness = 0.25,
 		DiffuseScale = 1, -- sky light on surfaces
 		SpecularScale = 1, -- sky reflections on smooth parts (glass, paint)
-		AirDensity = 0.24, -- a light haze gives the bigger map depth and softens where far ground stops loading
+		AirDensity = 0.18, -- a light haze gives the bigger map depth and softens where far ground stops loading
 		AirOffset = 0.1,
-		AirHaze = 1,
-		AirGlare = 0.5,
-		AirColor = table.freeze({ 235, 222, 205 }), -- warm near the sun
-		AirDecay = table.freeze({ 175, 195, 230 }), -- blue away from it
-		Saturation = 0.2,
+		AirHaze = 0.4,
+		AirGlare = 0.2,
+		AirColor = table.freeze({ 225, 232, 240 }), -- the horizon: close to the sky's pale band
+		AirDecay = table.freeze({ 110, 165, 225 }), -- blue distance away from the sun
+		-- the painted sky (tools/sky/make_sky.py): image ids per face, and a big cartoon sun
+		Sky = table.freeze({
+			Ft = 124408530416332,
+			Bk = 121619511943463,
+			Lf = 105868860160466,
+			Rt = 79382770347599,
+			Up = 137876384618520,
+			Dn = 84132017227560,
+		}),
+		SunSize = 16, -- Sky.SunAngularSize, degrees
+		-- volumetric clouds (workspace.Terrain.Clouds); off on low quality
+		CloudCover = 0.4,
+		CloudDensity = 0.45,
+		CloudColor = table.freeze({ 255, 255, 255 }),
+		Saturation = 0.25,
 		Contrast = 0.12,
 		GradeBrightness = 0.01,
 		Tint = table.freeze({ 255, 249, 240 }),
@@ -46,6 +62,23 @@ return table.freeze({
 		Roof = "Concrete", -- flat, wide, thin parts
 		RoofThickness = 1.6,
 		RoofWidth = 8,
+	}),
+	-- far stand-ins (SkylineKit): one box per building of these kinds, round its walls (parts at least MinPart
+	-- long), shrunk by Inset so it never shows through the real thing
+	Skyline = table.freeze({
+		Kinds = table.freeze({
+			"Home",
+			"SuburbHome",
+			"Shop",
+			"Office",
+			"Restaurant",
+			"Warehouse",
+			"Cabin",
+			"Barn",
+			"Silo",
+		}),
+		MinPart = 3,
+		Inset = 0.6,
 	}),
 	Map = table.freeze({
 		GroundSize = 6000,

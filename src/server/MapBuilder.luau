@@ -30,6 +30,7 @@ local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
 local RoadKit = require(script.Parent.RoadKit)
+local SkylineKit = require(script.Parent.SkylineKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
 
@@ -988,6 +989,7 @@ function MapBuilder.build(): Result
 	Lighting.ClockTime = look.ClockTime
 	Lighting.Brightness = look.Brightness
 	Lighting.ExposureCompensation = look.Exposure
+	Lighting.GlobalShadows = look.Shadows
 	Lighting.Ambient = rgb(look.Ambient)
 	Lighting.OutdoorAmbient = rgb(look.OutdoorAmbient)
 	Lighting.ColorShift_Top = rgb(look.SunTint)
@@ -1002,6 +1004,24 @@ function MapBuilder.build(): Result
 	air.Color = rgb(look.AirColor)
 	air.Decay = rgb(look.AirDecay)
 	air.Parent = Lighting
+	local sky = Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky")
+	local faces = look.Sky
+	if faces.Up ~= 0 then
+		sky.SkyboxFt = `rbxassetid://{faces.Ft}`
+		sky.SkyboxBk = `rbxassetid://{faces.Bk}`
+		sky.SkyboxLf = `rbxassetid://{faces.Lf}`
+		sky.SkyboxRt = `rbxassetid://{faces.Rt}`
+		sky.SkyboxUp = `rbxassetid://{faces.Up}`
+		sky.SkyboxDn = `rbxassetid://{faces.Dn}`
+	end
+	sky.SunAngularSize = look.SunSize
+	sky.StarCount = 0
+	sky.Parent = Lighting
+	local clouds = workspace.Terrain:FindFirstChildOfClass("Clouds") or Instance.new("Clouds")
+	clouds.Cover = look.CloudCover
+	clouds.Density = look.CloudDensity
+	clouds.Color = rgb(look.CloudColor)
+	clouds.Parent = workspace.Terrain
 	local grade = (Lighting:FindFirstChild("Grade") :: ColorCorrectionEffect?)
 		or Instance.new("ColorCorrectionEffect")
 	grade.Name = "Grade"
@@ -1031,6 +1051,8 @@ function MapBuilder.build(): Result
 			end
 		end
 	end
+	-- far stand-ins for the buildings (always loaded; the client hides each while its building is here)
+	SkylineKit.build(map, buildings)
 	map.Parent = workspace
 	return {
 		buildings = buildings,
