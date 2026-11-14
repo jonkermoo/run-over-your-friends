@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local Rules = require(ReplicatedStorage.Shared.Rules.Collapse)
+local Particles = require(ReplicatedStorage.Shared.Config.Particles)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Crumble = require(script.Parent.Crumble)
 local Drive = require(script.Parent.Drive)
@@ -75,6 +76,9 @@ local function makeDust(anchor: Attachment, size: Vector3, mine: boolean): { Par
 		a.Position = Vector3.new(math.cos(angle) * size.X * 0.5, 0, math.sin(angle) * size.Z * 0.5)
 		a.Parent = anchor
 		local p = Instance.new("ParticleEmitter")
+		if Particles.Puff ~= 0 then
+			p.Texture = `rbxassetid://{Particles.Puff}`
+		end
 		p.Color = ColorSequence.new(Color3.fromRGB(196, 186, 170))
 		p.Size = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 12),

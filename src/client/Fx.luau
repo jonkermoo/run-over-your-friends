@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
+local Particles = require(ReplicatedStorage.Shared.Config.Particles)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -162,14 +163,25 @@ end
 
 ---------------------------------------------------------------- particles
 
+local function sprite(id: number): string
+	return if id ~= 0
+		then `rbxassetid://{id}`
+		else "rbxasset://textures/particles/sparkles_main.dds"
+end
+
+-- a cartoon puff of smoke that pops out then fades, and broken chunks thrown out of it that fall
 local function burst(at: Vector3, color: Color3, count: number, speed: number, size: number)
 	local a = Instance.new("Attachment")
 	a.WorldPosition = at
 	a.Parent = workspace.Terrain
 	local p = Instance.new("ParticleEmitter")
+	p.Texture = sprite(Particles.Puff)
+	p.Rotation = NumberRange.new(0, 360)
+	p.RotSpeed = NumberRange.new(-60, 60)
 	p.Color = ColorSequence.new(color)
 	p.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, size),
+		NumberSequenceKeypoint.new(0, size * 0.5),
+		NumberSequenceKeypoint.new(0.15, size * 1.5),
 		NumberSequenceKeypoint.new(1, size * 2.2),
 	})
 	p.Transparency =
@@ -182,6 +194,28 @@ local function burst(at: Vector3, color: Color3, count: number, speed: number, s
 	p.Rate = 0
 	p.Parent = a
 	p:Emit(count)
+	local chunks = math.floor(count * Particles.ChunkShare)
+	if chunks > 0 then
+		local c = Instance.new("ParticleEmitter")
+		c.Texture = sprite(Particles.Chunk)
+		c.Color = ColorSequence.new(color)
+		c.Size = NumberSequence.new(size * 0.35)
+		c.Rotation = NumberRange.new(0, 360)
+		c.RotSpeed = NumberRange.new(-360, 360)
+		c.Speed = NumberRange.new(speed * 0.6, speed * 1.2)
+		c.SpreadAngle = Vector2.new(70, 70)
+		c.EmissionDirection = Enum.NormalId.Top
+		c.Acceleration = Vector3.new(0, -Particles.ChunkGravity, 0)
+		c.Lifetime = NumberRange.new(0.6, 1.1)
+		c.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.8, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		c.Rate = 0
+		c.Parent = a
+		c:Emit(chunks)
+	end
 	task.delay(1.5, function()
 		a:Destroy()
 	end)
@@ -192,10 +226,16 @@ local function stars(at: Vector3)
 	a.WorldPosition = at
 	a.Parent = workspace.Terrain
 	local p = Instance.new("ParticleEmitter")
+	p.Texture = sprite(Particles.Star)
+	p.Rotation = NumberRange.new(-20, 20)
+	p.RotSpeed = NumberRange.new(-120, 120)
 	p.Color = ColorSequence.new(C.gold, C.text)
 	p.LightEmission = 0.6
-	p.Size =
-		NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 0) })
+	p.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.4),
+		NumberSequenceKeypoint.new(0.2, 1.8),
+		NumberSequenceKeypoint.new(1, 0),
+	})
 	p.Speed = NumberRange.new(25, 45)
 	p.SpreadAngle = Vector2.new(180, 180)
 	p.Lifetime = NumberRange.new(0.3, 0.5)
