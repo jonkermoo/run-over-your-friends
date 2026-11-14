@@ -9,6 +9,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local PinnedGoals = require(script.Parent.PinnedGoals)
@@ -35,11 +37,12 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 Style.fit(gui)
 
-local TOP, BOTTOM_MARGIN = 68, 18
+local TOP, BOTTOM_MARGIN = LayoutConfig.SheetTop, LayoutConfig.SheetBottom
 
+-- the sheet sits in the middle of the screen, never over the menu strip (Rules/Layout.sheetCentre)
 local panel = Style.panel(gui)
 panel.Name = "GoalsSheet"
-panel.Position = UDim2.fromOffset(14, TOP)
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
 Style.setShadow(panel, C.blue)
@@ -268,6 +271,8 @@ local function rebuild()
 	body.CanvasSize = UDim2.fromOffset(0, y)
 	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 6)
 	panel.Size = UDim2.fromOffset(SHEET_W, sheetH)
+	local guiH = gui.AbsoluteSize.Y / Style.scale()
+	panel.Position = UDim2.new(0.5, 0, 0, LayoutRules.sheetCentre(guiH, sheetH, TOP, BOTTOM_MARGIN))
 end
 
 function Goals.toggle()
