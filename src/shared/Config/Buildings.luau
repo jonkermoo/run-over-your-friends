@@ -50,6 +50,17 @@ return table.freeze({
 		}),
 		DowntownReach = 1.5,
 		DowntownFloors = { 10, 13 },
+		-- the hero tower: the office nearest the spawn plaza stands this tall, faces the plaza, wears its own
+		-- glass and trim, a spire crown, and the game's name on its roof
+		Hero = table.freeze({
+			Floors = 22,
+			Glass = { 44, 96, 170 },
+			Accent = { 255, 208, 0 },
+			Trim = { 236, 236, 240 },
+			Crown = "spire",
+			Sign = "RUN OVER YOUR FRIENDS",
+			SignSize = { 64, 13 },
+		}),
 		RoofTrees = table.freeze({ trunk = { 5, 8 }, crown = { 7, 10 }, shade = 0.25 }), -- the roof garden's
 		CrownColours = table.freeze({
 			copper = { 92, 158, 132 },

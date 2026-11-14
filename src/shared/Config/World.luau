@@ -80,6 +80,30 @@ return table.freeze({
 		MinPart = 3,
 		Inset = 0.6,
 	}),
+	-- the spawn plaza's dressing (MapBuilder dressSpawnPlaza): paving bands, the trophy, planters, stalls, flags
+	SpawnPlaza = table.freeze({
+		SeedOffset = 77, -- its own random stream (trees), so the town's layout doesn't shift
+		Band = { 186, 92, 66 }, -- terracotta paving: the ring round the fountain and the border
+		Ring = 64, -- inside the spawn pads' inner corners (about 35 out)
+		Border = 6,
+		Gold = { 255, 196, 48 },
+		Stone = { 224, 214, 196 },
+		Planters = table.freeze({ { 82, 82 }, { 56, 88 }, { 88, 56 } }), -- x, z out from the middle, each corner
+		StallReach = 72, -- the food stalls stand on the diagonals this far out
+		Stalls = table.freeze({
+			table.freeze({ text = "HOT DOGS", colour = { 232, 60, 60 } }),
+			table.freeze({ text = "ICE CREAM", colour = { 236, 90, 160 } }),
+			table.freeze({ text = "TACOS", colour = { 255, 180, 0 } }),
+			table.freeze({ text = "DONUTS", colour = { 60, 140, 230 } }),
+		}),
+		PoleHeight = 26,
+		Banners = table.freeze({
+			{ 255, 208, 0 },
+			{ 236, 72, 150 },
+			{ 50, 130, 240 },
+			{ 120, 210, 60 },
+		}), -- UI colours
+	}),
 	Map = table.freeze({
 		GroundSize = 6000,
 		BlockSize = 220, -- city block, kerb to kerb

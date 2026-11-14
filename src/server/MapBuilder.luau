@@ -184,6 +184,202 @@ local function paintPlaza(parent: Instance, cx: number, cz: number, inner: numbe
 	end
 end
 
+-- the spawn plaza's dressing (World.SpawnPlaza), the first thing every player sees: coloured paving bands, a
+-- giant gold trophy on a plinth in the middle, trees in planters and food stalls on the diagonals (clear of
+-- the pads and the lanes out), and flag poles with banners in the UI's colours at the corners. Its own random
+-- stream, so the rest of the town keeps its layout.
+local function dressSpawnPlaza(
+	static: Instance,
+	props: Instance,
+	cx: number,
+	cz: number,
+	inner: number
+)
+	local SP = World.SpawnPlaza
+	local r = Random.new(M.Seed + SP.SeedOffset)
+	local centre = Vector3.new(cx, 0, cz)
+	local half = inner / 2
+	local band = rgb(SP.Band)
+	local yBand = 0.1 + World.Look.PaintLift / 2
+	-- a ring round the fountain and a border inside the plaza's edge
+	local ring = part(
+		static,
+		Vector3.new(0.1, SP.Ring, SP.Ring),
+		CFrame.new(cx, yBand, cz) * CFrame.Angles(0, 0, math.pi / 2),
+		band
+	)
+	ring.Shape = Enum.PartType.Cylinder
+	ring.CanCollide, ring.CanQuery, ring.CanTouch, ring.CastShadow = false, false, false, false
+	for _, e in { -1, 1 } do
+		paint(
+			static,
+			Vector2.new(inner, SP.Border),
+			CFrame.new(cx, yBand, cz + e * (half - SP.Border / 2)),
+			band
+		)
+		paint(
+			static,
+			Vector2.new(SP.Border, inner - SP.Border * 2),
+			CFrame.new(cx + e * (half - SP.Border / 2), yBand, cz),
+			band
+		)
+	end
+	-- the trophy: a two-step plinth, a dark pedestal, a gold cup with handles and a star on top
+	local trophy = Instance.new("Model")
+	trophy.Name = "Trophy"
+	trophy.Parent = static
+	local gold = rgb(SP.Gold)
+	local function cyl(h: number, dia: number, y: number, colour: Color3, mat: Enum.Material?): Part
+		local p = part(
+			trophy,
+			Vector3.new(h, dia, dia),
+			CFrame.new(cx, y + h / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
+			colour,
+			mat
+		)
+		p.Shape = Enum.PartType.Cylinder
+		return p
+	end
+	cyl(2.4, 18, 0, COLORS.concrete, Enum.Material.Concrete)
+	cyl(2, 13, 2.4, rgb(SP.Stone), Enum.Material.Limestone)
+	part(trophy, Vector3.new(7, 5, 7), CFrame.new(cx, 6.9, cz), PAINT_BLACK)
+	part(trophy, Vector3.new(7.4, 0.6, 7.4), CFrame.new(cx, 9.6, cz), gold, Enum.Material.Foil)
+	cyl(1.2, 5, 9.4, gold, Enum.Material.Foil)
+	cyl(4, 2, 10.6, gold, Enum.Material.Foil)
+	local bowl = part(trophy, Vector3.one * 9, CFrame.new(cx, 17.6, cz), gold, Enum.Material.Foil)
+	bowl.Shape = Enum.PartType.Ball
+	cyl(5, 9, 17.6, gold, Enum.Material.Foil)
+	cyl(0.8, 9.8, 22.4, gold, Enum.Material.Foil)
+	for _, e in { -1, 1 } do
+		part(
+			trophy,
+			Vector3.new(1, 6, 1),
+			CFrame.new(cx + e * 6.6, 19.4, cz),
+			gold,
+			Enum.Material.Foil
+		)
+		part(
+			trophy,
+			Vector3.new(2.6, 1, 1),
+			CFrame.new(cx + e * 5.4, 22, cz),
+			gold,
+			Enum.Material.Foil
+		)
+		part(
+			trophy,
+			Vector3.new(2.6, 1, 1),
+			CFrame.new(cx + e * 5.4, 16.8, cz),
+			gold,
+			Enum.Material.Foil
+		)
+	end
+	local star =
+		part(trophy, Vector3.one * 2.6, CFrame.new(cx, 24.4, cz), PAINT_YELLOW, Enum.Material.Neon)
+	star.Shape = Enum.PartType.Ball
+	-- trees in planters on the diagonals near the corners
+	for _, sx in { -1, 1 } do
+		for _, sz in { -1, 1 } do
+			for _, off in SP.Planters do
+				local at = centre + Vector3.new(sx * off[1], 0, sz * off[2])
+				part(
+					static,
+					Vector3.new(10, 2.4, 10),
+					CFrame.new(at + Vector3.new(0, 1.2, 0)),
+					rgb(SP.Stone),
+					Enum.Material.Limestone
+				)
+				paint(
+					static,
+					Vector2.new(8.4, 8.4),
+					CFrame.new(at + Vector3.new(0, 2.43, 0)),
+					Color3.fromRGB(92, 70, 52)
+				).Material =
+					Enum.Material.Ground
+				Greenery.tree(props, at + Vector3.new(0, 2.4, 0), r)
+			end
+		end
+	end
+	-- food stalls on the diagonals, facing the trophy: a counter, posts, a striped awning and a sign
+	for k, stall in SP.Stalls do
+		local a = math.rad(45 + (k - 1) * 90)
+		local at = centre + Vector3.new(math.cos(a), 0, math.sin(a)) * SP.StallReach
+		local cf = CFrame.lookAt(at, centre)
+		local m = Instance.new("Model")
+		m.Name = "Stall"
+		m:SetAttribute("Prop", "Stall")
+		m.Parent = props
+		local colour = rgb(stall.colour)
+		part(m, Vector3.new(10, 3.6, 3), cf * CFrame.new(0, 1.8, -1), Color3.fromRGB(245, 240, 228))
+		part(m, Vector3.new(10.4, 0.6, 3.4), cf * CFrame.new(0, 3.9, -1), colour)
+		for _, e in { -1, 1 } do
+			part(
+				m,
+				Vector3.new(0.5, 8, 0.5),
+				cf * CFrame.new(e * 4.8, 4, 1.5),
+				Color3.fromRGB(240, 240, 236)
+			)
+		end
+		for s = 0, 4 do
+			part(
+				m,
+				Vector3.new(2.2, 0.4, 7),
+				cf * CFrame.new(-4.4 + s * 2.2, 8.2, 0) * CFrame.Angles(0.2, 0, 0),
+				if s % 2 == 0 then colour else Color3.fromRGB(250, 250, 250)
+			)
+		end
+		Places.sign(
+			m,
+			Vector3.new(9, 2.2, 0.4),
+			cf * CFrame.new(0, 10, -3.2),
+			stall.text,
+			PAINT_BLACK,
+			colour
+		)
+	end
+	-- flag poles at the corners, two banners each in the UI's colours
+	for k, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		local at = centre + Vector3.new(c[1], 0, c[2]) * (half - SP.Border - 2)
+		local pole = part(
+			static,
+			Vector3.new(SP.PoleHeight, 1, 1),
+			CFrame.new(at + Vector3.new(0, SP.PoleHeight / 2, 0)) * CFrame.Angles(0, 0, math.pi / 2),
+			Color3.fromRGB(230, 230, 226),
+			Enum.Material.Metal
+		)
+		pole.Shape = Enum.PartType.Cylinder
+		local cap = part(
+			static,
+			Vector3.one * 1.8,
+			CFrame.new(at + Vector3.new(0, SP.PoleHeight + 0.6, 0)),
+			PAINT_YELLOW
+		)
+		cap.Shape = Enum.PartType.Ball
+		for side = 0, 1 do
+			local colour = rgb(SP.Banners[(k + side - 1) % #SP.Banners + 1])
+			local dir = if side == 0 then Vector3.new(c[1], 0, 0) else Vector3.new(0, 0, c[2])
+			local b = part(
+				static,
+				Vector3.new(0.3, 12, 4),
+				CFrame.lookAt(
+					at + dir * 2.6 + Vector3.new(0, SP.PoleHeight - 7, 0),
+					at + dir * 3.6 + Vector3.new(0, SP.PoleHeight - 7, 0)
+				),
+				colour,
+				Enum.Material.Fabric
+			)
+			b.CanCollide = false
+			part(
+				static,
+				Vector3.new(0.3, 2.4, 4),
+				b.CFrame * CFrame.new(0, -7.2, 0),
+				PAINT_BLACK,
+				Enum.Material.Fabric
+			).CanCollide =
+				false
+		end
+	end
+end
+
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
 local function ramp(
 	parent: Instance,
@@ -387,6 +583,22 @@ function MapBuilder.build(): Result
 	end
 	local SIDES =
 		{ Vector3.new(1, 0, 0), Vector3.new(-1, 0, 0), Vector3.new(0, 0, 1), Vector3.new(0, 0, -1) }
+	-- the hero tower (Config/Buildings Office.Hero) stands on the office block nearest the spawn plaza
+	local heroI, heroJ, heroD = -1, -1, math.huge
+	for i = 0, M.BlocksX - 1 do
+		for j = 0, M.BlocksZ - 1 do
+			if plan[i][j] == "spawn" then
+				for oi = 0, M.BlocksX - 1 do
+					for oj = 0, M.BlocksZ - 1 do
+						local dd = (oi - i) ^ 2 + (oj - j) ^ 2
+						if plan[oi][oj] == "office" and dd < heroD then
+							heroI, heroJ, heroD = oi, oj, dd
+						end
+					end
+				end
+			end
+		end
+	end
 	for i = 0, M.BlocksX - 1 do
 		for j = 0, M.BlocksZ - 1 do
 			local cx = x0 + R + i * pitch + B / 2
@@ -452,6 +664,7 @@ function MapBuilder.build(): Result
 				f.Color = COLORS.concrete
 				f.Parent = static
 				paintPlaza(static, cx, cz, inner)
+				dressSpawnPlaza(static, props, cx, cz, inner)
 				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
 				local boards = Instance.new("Model")
 				boards.Name = "Boards"
@@ -478,6 +691,38 @@ function MapBuilder.build(): Result
 						Color3.fromRGB(24, 24, 38)
 					)
 					face.Name = "Board_" .. board.key
+					-- a frame (yellow top and bottom, black sides) and two lamps leaning over the top
+					local frame =
+						CFrame.lookAt(Vector3.new(bx, 30, bz - 0.4), Vector3.new(bx, 30, bz + 10))
+					for _, e in { -1, 1 } do
+						part(
+							boards,
+							Vector3.new(55, 1.6, 1.6),
+							frame * CFrame.new(0, e * 23.8, 0),
+							PAINT_YELLOW
+						)
+						part(
+							boards,
+							Vector3.new(1.6, 46, 1.6),
+							frame * CFrame.new(e * 26.8, 0, 0),
+							PAINT_BLACK
+						)
+						local lamp = part(
+							boards,
+							Vector3.new(3, 1.4, 2.4),
+							frame
+								* CFrame.new(e * 14, 25.6, -2.6)
+								* CFrame.Angles(math.rad(-35), 0, 0),
+							PAINT_BLACK
+						)
+						local light = Instance.new("SpotLight")
+						light.Face = Enum.NormalId.Bottom
+						light.Angle = 70
+						light.Range = 40
+						light.Brightness = 2
+						light.Color = Color3.fromRGB(255, 244, 220)
+						light.Parent = lamp
+					end
 					for _, side in { -1, 1 } do
 						part(
 							boards,
@@ -511,6 +756,11 @@ function MapBuilder.build(): Result
 				count += 1
 				offices += 1
 				local out = SIDES[random:NextInteger(1, 4)]
+				local hero = i == heroI and j == heroJ
+				if hero then
+					floors = OF.Hero.Floors
+					out = towardSpawn(i, j)
+				end
 				-- the tower stands up to its front sidewalk, its car park behind it
 				local deep = math.abs(out:Dot(Vector3.new(w, 0, d)))
 				local tower = centre + out * (inner / 2 - BuildingConfig.Office.Setback - deep / 2)
@@ -545,12 +795,17 @@ function MapBuilder.build(): Result
 					stone = rgb(look.stone),
 					glass = rgb(OF.Tints[(offices * 5) % #OF.Tints + 1]),
 				}
+				if hero then
+					colours.glass = rgb(OF.Hero.Glass)
+					colours.accent = rgb(OF.Hero.Accent)
+					colours.trim = rgb(OF.Hero.Trim)
+				end
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
 				-- its own crown, taken in turn so neighbours differ (TowerKit)
 				TowerKit.crown(
 					model,
-					OF.Crowns[(offices - 1) % #OF.Crowns + 1],
+					if hero then OF.Hero.Crown else OF.Crowns[(offices - 1) % #OF.Crowns + 1],
 					tower,
 					w,
 					d,
@@ -566,15 +821,32 @@ function MapBuilder.build(): Result
 				addPlace(Places.office(model, door, out, width, top, name), i, j)
 				local boardAt = tower - out * 10 + Vector3.new(0, top + 14, 0)
 				local ad = Streets.Billboards[random:NextInteger(1, #Streets.Billboards)]
-				Places.sign(
-					model,
-					Vector3.new(34, 11, 1),
-					CFrame.lookAt(boardAt, boardAt + out),
-					ad,
-					Color3.fromRGB(250, 250, 245),
-					colours.accent:Lerp(Color3.new(0, 0, 0), 0.4),
-					true
-				)
+				if hero then
+					-- the hero tower carries the game's name in the UI's road yellow on black, seen from spawn
+					local size = OF.Hero.SignSize
+					Places.sign(
+						model,
+						Vector3.new(math.min(size[1], width - 4), size[2], 1.2),
+						CFrame.lookAt(
+							boardAt + Vector3.new(0, size[2] / 2 - 5, 0),
+							boardAt + Vector3.new(0, size[2] / 2 - 5, 0) + out
+						),
+						OF.Hero.Sign,
+						PAINT_BLACK,
+						PAINT_YELLOW,
+						true
+					)
+				else
+					Places.sign(
+						model,
+						Vector3.new(34, 11, 1),
+						CFrame.lookAt(boardAt, boardAt + out),
+						ad,
+						Color3.fromRGB(250, 250, 245),
+						colours.accent:Lerp(Color3.new(0, 0, 0), 0.4),
+						true
+					)
+				end
 				local along = Vector3.new(-out.Z, 0, out.X)
 				for _, e in { -12, 12 } do
 					part(
