@@ -1,6 +1,6 @@
 {
-  "robloxKeyEnv": "ROBLOX_API_KEY",
-  "universeId": null,
+  "robloxKeyEnv": "ROBLOX_GROUP_API_KEY",
+  "universeId": 10770965625,
   "testPlaceId": null,
-  "productionPlaceId": null
+  "productionPlaceId": 81704314202002
 }

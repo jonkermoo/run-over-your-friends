@@ -24,16 +24,23 @@ return table.freeze({
 	MoneyPacks = table.freeze({
 		p({
 			key = "Cash1",
-			id = 0,
+			id = 3731061335,
 			title = "Pocket Change",
 			money = 5000,
 			robux = 25,
 			once = false,
 		}),
-		p({ key = "Cash2", id = 0, title = "Fat Wallet", money = 25000, robux = 99, once = false }),
+		p({
+			key = "Cash2",
+			id = 3731061338,
+			title = "Fat Wallet",
+			money = 25000,
+			robux = 99,
+			once = false,
+		}),
 		p({
 			key = "Cash3",
-			id = 0,
+			id = 3731061340,
 			title = "Bank Job",
 			money = 120000,
 			robux = 399,
@@ -42,7 +49,7 @@ return table.freeze({
 		}),
 		p({
 			key = "Cash4",
-			id = 0,
+			id = 3731061343,
 			title = "Money Truck",
 			money = 600000,
 			robux = 1499,
@@ -58,7 +65,7 @@ return table.freeze({
 	StarterUntil = "Muscle",
 	Starter = p({
 		key = "Starter",
-		id = 0,
+		id = 3731061347,
 		title = "Starter Pack",
 		money = 25000,
 		vehicles = table.freeze({ "Muscle", "Bulldozer" }),
@@ -68,7 +75,7 @@ return table.freeze({
 	}),
 	StarterDeal = p({
 		key = "StarterDeal",
-		id = 0,
+		id = 3731061351,
 		title = "Starter Pack",
 		money = 25000,
 		vehicles = table.freeze({ "Muscle", "Bulldozer" }),
