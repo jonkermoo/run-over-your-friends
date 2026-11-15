@@ -28,8 +28,8 @@ return table.freeze({
 	AutosaveSeconds = 60,
 	-- game pass ids; 0 until the passes exist on the Creator Hub. In Studio the shop toggles them for testing.
 	Passes = table.freeze({
-		Roadster = 2088464699,
-		DoubleMoney = 2087894764,
+		Roadster = 2089071744,
+		DoubleMoney = 2089341746,
 		VIP = 2087931824, -- 99 R$: gold VIP tag (Config/Vip), VipMoney, the VIP Gold paint (Config/Paints)
 	}),
 })
