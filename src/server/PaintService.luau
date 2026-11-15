@@ -2,6 +2,7 @@
 -- Car paint: buy a colour once, then set it on any owned vehicle. The choice is saved per vehicle, and the
 -- server colours the vehicle's Paint part (at spawn, or at once if it's out), so every player sees it.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Paints)
@@ -15,6 +16,22 @@ local VehicleService = require(script.Parent.VehicleService)
 
 local PaintService = {}
 
+local function isVip(player: Player): boolean
+	return player:GetAttribute("PassVIP") == true
+end
+
+-- the car out now, in its saved colour (VIP colours only with the pass)
+local function repaint(player: Player)
+	local profile = Data.get(player)
+	local model = VehicleService.of(player)
+	local vehicleId = model and model:GetAttribute("VehicleId")
+	if not profile or not model or typeof(vehicleId) ~= "string" then
+		return
+	end
+	local paint = PaintRules.shown(profile.paint[vehicleId], isVip(player))
+	VehicleBuilder.paint(model, PaintRules.colour(vehicleId, paint), PaintRules.material(paint))
+end
+
 local function popup(player: Player, text: string)
 	Net.remote("Popup"):FireClient(player, text, "info")
 end
@@ -24,9 +41,14 @@ local function setPaint(player: Player, vehicleId: any, paintId: any)
 	if not profile or not RateLimit.allow(player, "paint", Config.SetEvery) then
 		return
 	end
-	local problem = PaintRules.setProblem(profile.owned, profile.paints, vehicleId, paintId)
+	local bought = PaintRules.withVip(profile.paints, isVip(player))
+	local problem = PaintRules.setProblem(profile.owned, bought, vehicleId, paintId)
 	if problem == "locked" then
-		popup(player, "Buy that colour first")
+		local p = Config.ById[paintId]
+		popup(
+			player,
+			if p and p.vip then "VIP only: get VIP in the store" else "Buy that colour first"
+		)
 	end
 	if problem then
 		return
@@ -35,7 +57,11 @@ local function setPaint(player: Player, vehicleId: any, paintId: any)
 	Data.changed(player)
 	local model = VehicleService.of(player)
 	if model and model:GetAttribute("VehicleId") == vehicleId then
-		VehicleBuilder.paint(model, PaintRules.colour(vehicleId, paintId))
+		VehicleBuilder.paint(
+			model,
+			PaintRules.colour(vehicleId, paintId),
+			PaintRules.material(paintId)
+		)
 	end
 end
 
@@ -47,6 +73,8 @@ local function buyPaint(player: Player, paintId: any)
 	local problem = PaintRules.buyProblem(profile.money, profile.paints, paintId)
 	if problem == "money" then
 		popup(player, "Not enough money yet")
+	elseif problem == "vip" then
+		popup(player, "VIP only: get VIP in the store")
 	end
 	if problem then
 		return
@@ -62,6 +90,16 @@ end
 function PaintService.start()
 	Net.remote("SetPaint").OnServerEvent:Connect(setPaint)
 	Net.remote("BuyPaint").OnServerEvent:Connect(buyPaint)
+	-- VIP bought (or found on join) with a VIP colour saved on the car that's out: show it now
+	local function watch(player: Player)
+		player:GetAttributeChangedSignal("PassVIP"):Connect(function()
+			repaint(player)
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, p in Players:GetPlayers() do
+		watch(p)
+	end
 end
 
 return PaintService

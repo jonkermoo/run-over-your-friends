@@ -484,6 +484,7 @@ end
 check("bigger packs give more money per Robux", ascending)
 check("starter ad waits at least a minute of play", Products.StarterOfferAfter >= 60)
 require("./offer")(check)
+require("./vip")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
 local function ph(t: number, offset: number?)

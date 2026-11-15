@@ -243,11 +243,25 @@ local function buildTracks(model: Model, chassis: BasePart)
 	shoe:Destroy()
 end
 
--- colour a vehicle's painted panels (0-255 sRGB); everyone sees it, as the server sets it
-function VehicleBuilder.paint(model: Model, rgb: { number }?)
+-- colour a vehicle's painted panels (0-255 sRGB) and finish (an Enum.Material name, nil = the model's own);
+-- everyone sees it, as the server sets it
+function VehicleBuilder.paint(model: Model, rgb: { number }?, material: string?)
 	local part = model:FindFirstChild("Paint")
-	if rgb and part and part:IsA("BasePart") then
+	if not (part and part:IsA("BasePart")) then
+		return
+	end
+	if rgb then
 		part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+	end
+	if part:GetAttribute("BaseMaterial") == nil then
+		part:SetAttribute("BaseMaterial", part.Material.Name)
+	end
+	local name = material or part:GetAttribute("BaseMaterial") :: string
+	local ok, m = pcall(function()
+		return (Enum.Material :: any)[name]
+	end)
+	if ok and m then
+		part.Material = m
 	end
 end
 

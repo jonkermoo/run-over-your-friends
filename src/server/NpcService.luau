@@ -239,9 +239,7 @@ function NpcService.knock(
 		if workspace:GetAttribute("Event") == "Stampede" then
 			pay *= EventConfig.StampedeMultiplier
 		end
-		if Passes.has(player, "DoubleMoney") then
-			pay *= Economy.DoubleMoney
-		end
+		pay *= Passes.moneyMultiplier(player)
 		pay *= SocialService.multiplier(player)
 		local profile = Data.get(player)
 		if
@@ -542,7 +540,7 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 		flingGiant(npc, root, dir, energy)
 		local pay = math.floor(
 			EventConfig.GiantHitPay
-				* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+				* Passes.moneyMultiplier(player)
 				* SocialService.multiplier(player)
 		)
 		Data.addMoney(player, pay)

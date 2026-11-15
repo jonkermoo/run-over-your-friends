@@ -1037,6 +1037,14 @@ local PASSES = {
 		accent = C.money,
 		text = "Double money from every hit.",
 	},
+	{
+		name = "VIP",
+		title = "VIP",
+		accent = C.gold,
+		text = `Gold VIP tag over your head and in chat, +{math.floor(
+			(Economy.VipMoney - 1) * 100 + 0.5
+		)}% cash ` .. "from hits and the VIP Gold car paint.",
+	},
 }
 -- the Starter Pack row: client/StarterCard keeps its text and price in step with the deal
 local starterHeader = header(1, "SPECIAL OFFER")

@@ -18,6 +18,9 @@ return table.freeze({
 	GaragePaySpeedShare = 0.5, -- the garage's "about $N a hit" is one hit at this share of the car's top speed
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
+	-- VIP pass: hit cash times this. The money passes multiply: 2x Money alone 2, VIP alone 1.25, both 2.5
+	-- (Rules/PassMoney). Covers what 2x Money covers: NPC, giant, traffic and building hits.
+	VipMoney = 1.25,
 	-- one-time cash for joining the game's Roblox group; 0 = no group yet (the row is hidden live, a test grant in Studio)
 	GroupId = 987419590,
 	GroupReward = 25000,
@@ -27,5 +30,6 @@ return table.freeze({
 	Passes = table.freeze({
 		Roadster = 2088464699,
 		DoubleMoney = 2087894764,
+		VIP = 2088303771, -- 99 R$: gold VIP tag (Config/Vip), VipMoney, the VIP Gold paint (Config/Paints)
 	}),
 })

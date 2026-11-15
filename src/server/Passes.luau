@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PassMoney = require(ReplicatedStorage.Shared.Rules.PassMoney)
 local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
 local RateLimit = require(script.Parent.RateLimit)
@@ -19,9 +20,23 @@ function Passes.has(player: Player, name: string): boolean
 	return player:GetAttribute("Pass" .. name) == true
 end
 
--- the Roadster pass gives the car and a one-time Economy.RoadsterPassMoney
-local function grant(player: Player, name: string)
+-- hit cash times this: 2x Money and VIP multiply (Config/Economy)
+function Passes.moneyMultiplier(player: Player): number
+	return PassMoney.multiplier(
+		Passes.has(player, "DoubleMoney"),
+		Passes.has(player, "VIP"),
+		Economy
+	)
+end
+
+-- the Roadster pass gives the car and a one-time Economy.RoadsterPassMoney; bought: just paid for (not a rejoin)
+local function grant(player: Player, name: string, bought: boolean?)
 	player:SetAttribute("Pass" .. name, true)
+	if bought and name == "VIP" then
+		local bonus = math.floor((Economy.VipMoney - 1) * 100 + 0.5)
+		Net.remote("Popup")
+			:FireClient(player, `You're VIP! Gold tag, +{bonus}% cash, VIP Gold paint`, "big")
+	end
 	if name == "Roadster" then
 		local profile = Data.get(player)
 		if profile then
@@ -74,7 +89,7 @@ function Passes.start()
 		end
 		for name, id in Economy.Passes do
 			if id == passId then
-				grant(player, name)
+				grant(player, name, true)
 			end
 		end
 	end)

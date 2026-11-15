@@ -13,7 +13,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CollapseRules = require(ReplicatedStorage.Shared.Rules.Collapse)
 local CrumbleRules = require(ReplicatedStorage.Shared.Rules.Crumble)
-local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -526,8 +525,7 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 			rem.CanQuery = false
 		end
 	end
-	local pay = CollapseRules.payout(count, COLLAPSE)
-		* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
+	local pay = CollapseRules.payout(count, COLLAPSE) * Passes.moneyMultiplier(player)
 	Net.remote("Collapse"):FireAllClients(model, pos, velocity, pay, player.UserId)
 	task.delay(COLLAPSE.PaySeconds, function()
 		if player.Parent then

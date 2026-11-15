@@ -1,7 +1,7 @@
 --!strict
 -- The garage card's paint picker: a PAINT button on owned cards flips the card's info to a row of colour swatches.
 -- Tapping one recolours the card's 3D preview; an open colour is saved for that vehicle (the server colours the
--- real one), a locked one turns the card's action button into BUY. Colours: Config/Paints.
+-- real one), a locked one turns the card's action button into BUY (GET VIP for the VIP colour). Colours: Config/Paints.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,17 +24,24 @@ export type Picker = {
 local SWATCH, GAP, PER_ROW = 22, 5, 8
 local SEND_AFTER = 0.5 -- seconds of no tapping before the chosen colour is sent
 
+local function isVip(): boolean
+	return player:GetAttribute("PassVIP") == true
+end
+
+-- paid colours, plus the VIP ones while this player has the VIP pass
 local function bought(): { [string]: boolean }
 	local out = {}
 	for id in string.gmatch((player:GetAttribute("Paints") or "") :: string, "[^,]+") do
 		out[id] = true
 	end
-	return out
+	return PaintRules.withVip(out, isVip())
 end
 
 local function saved(vehicleId: string): string
-	return PaintRules.decode((player:GetAttribute("Paint") or "") :: string)[vehicleId]
-		or Config.FactoryId
+	return PaintRules.shown(
+		PaintRules.decode((player:GetAttribute("Paint") or "") :: string)[vehicleId],
+		isVip()
+	) or Config.FactoryId
 end
 
 local function owns(vehicleId: string): boolean
@@ -85,6 +92,16 @@ function PaintPicker.attach(
 		local rgb = PaintRules.colour(vehicleId, paintId)
 		if part and part:IsA("BasePart") and rgb then
 			part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+			if part:GetAttribute("BaseMaterial") == nil then
+				part:SetAttribute("BaseMaterial", part.Material.Name)
+			end
+			local name = PaintRules.material(paintId) or part:GetAttribute("BaseMaterial") :: string
+			local ok, m = pcall(function()
+				return (Enum.Material :: any)[name]
+			end)
+			if ok and m then
+				part.Material = m
+			end
 		end
 	end
 
@@ -168,7 +185,11 @@ function PaintPicker.attach(
 		show(selected)
 		for id, s in swatches do
 			local open = PaintRules.isOpen(have, id)
-			s.button.Text = if id == Config.FactoryId then "F" elseif open then "" else "$"
+			s.button.Text = if id == Config.FactoryId
+				then "F"
+				elseif open then ""
+				elseif Config.ById[id].vip then "V"
+				else "$"
 			s.edge.Color = if id == selected then C.yellow else C.ink
 			s.edge.Thickness = if id == selected then 3 else 2
 		end
@@ -179,6 +200,11 @@ function PaintPicker.attach(
 		if PaintRules.isOpen(have, selected) then
 			caption.Text = string.upper(p.name) .. if selected == current then "  ON" else ""
 			caption.TextColor3 = C.text
+		elseif p.vip then
+			caption.Text = string.upper(p.name) .. "  VIP ONLY"
+			caption.TextColor3 = C.gold
+			action.Text = "GET VIP"
+			Style.setKind(action, "gold")
 		else
 			caption.Text = string.upper(p.name) .. "  " .. Style.money(p.price) .. "  ALL CARS"
 			caption.TextColor3 = C.money
@@ -188,18 +214,28 @@ function PaintPicker.attach(
 		end
 	end
 
-	-- a colour just bought: put it on this car
-	player:GetAttributeChangedSignal("Paints"):Connect(function()
+	-- a colour just bought (or VIP just got): put it on this car
+	local function justOpened()
 		if isOpen and selected ~= saved(vehicleId) and PaintRules.isOpen(bought(), selected) then
 			Net.waitFor("SetPaint"):FireServer(vehicleId, selected)
 		end
+	end
+	player:GetAttributeChangedSignal("Paints"):Connect(justOpened)
+	player:GetAttributeChangedSignal("PassVIP"):Connect(function()
+		justOpened()
+		changed()
 	end)
 
 	local function onAction(): boolean
 		if not isOpen or PaintRules.isOpen(bought(), selected) then
 			return false
 		end
-		Net.waitFor("BuyPaint"):FireServer(selected)
+		local p = Config.ById[selected]
+		if p and p.vip then
+			Net.waitFor("BuyPass"):FireServer("VIP")
+		else
+			Net.waitFor("BuyPaint"):FireServer(selected)
+		end
 		return true
 	end
 

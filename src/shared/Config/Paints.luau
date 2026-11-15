@@ -1,7 +1,8 @@
 --!strict
 -- Car paint: the colours a player can put on a vehicle's painted panels (its Paint part, split from the body in
 -- tools/blender/export_vehicles.py). Free colours are always open; the rest are bought once and then work on every
--- vehicle. "Factory" puts a vehicle back to its own colour. Colours are 0-255 sRGB.
+-- vehicle. "Factory" puts a vehicle back to its own colour. A vip colour is never sold: the VIP pass opens it
+-- (a saved VIP colour shows only while the player has the pass). Colours are 0-255 sRGB.
 
 export type Paint = {
 	id: string,
@@ -9,6 +10,8 @@ export type Paint = {
 	order: number,
 	price: number, -- in-game money, paid once; 0 = always open
 	rgb: { number }?, -- nil for Factory (each vehicle's own colour)
+	vip: boolean?, -- only with the VIP pass (price is 0)
+	material: string?, -- an Enum.Material name for the painted panels; nil = the model's own
 }
 
 local Paints = {}
@@ -34,6 +37,15 @@ local list: { Paint } = {
 	{ id = "Maroon", name = "Maroon", order = 15, price = 2500, rgb = { 118, 22, 42 } },
 	{ id = "Gold", name = "Gold", order = 16, price = 2500, rgb = { 212, 168, 58 } },
 	{ id = "Midnight", name = "Midnight", order = 17, price = 2500, rgb = { 26, 36, 84 } },
+	{
+		id = "VIP",
+		name = "VIP Gold",
+		order = 18,
+		price = 0,
+		vip = true,
+		rgb = { 255, 190, 30 },
+		material = "Foil",
+	},
 }
 for _, p in list do
 	table.freeze(p)

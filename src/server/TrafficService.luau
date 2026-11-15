@@ -11,7 +11,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Traffic)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
-local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Paints = require(ReplicatedStorage.Shared.Config.Paints)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
@@ -439,9 +438,7 @@ local function onHit(player: Player, id: unknown, velocity: unknown)
 		+ Vector3.new(0, Cfg.FlingUp + closing * Cfg.FlingUpPerMs, 0)
 	Net.remote("TrafficCrash"):FireAllClients(car.id, car.gen, push, player.UserId)
 	local pay = Cfg.Pay * math.clamp(closing / (Cfg.CrashSpeed * 2), 1, Cfg.PayMax)
-	if Passes.has(player, "DoubleMoney") then
-		pay *= Economy.DoubleMoney
-	end
+	pay *= Passes.moneyMultiplier(player)
 	Data.addMoney(player, pay)
 	Net.remote("Popup"):FireClient(player, `+${math.floor(pay + 0.5)}  WRECKED!`, "money")
 	Net.remote("Fx"):FireAllClients("Break", pos, 14, 9, player.UserId)
@@ -464,7 +461,7 @@ function TrafficService.setup(grid: Roads.Grid)
 	graph = Roads.graph(grid, lit)
 	edge = grid.road / 2
 	for n, p in Paints.List do
-		if p.rgb then
+		if p.rgb and not p.vip then -- the VIP colour stays the VIP pass's
 			table.insert(paintColours, n)
 		end
 	end

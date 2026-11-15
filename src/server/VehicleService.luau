@@ -168,7 +168,8 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	-- the driver's own car never streams out under them; everyone else gets it whole (like Atomic)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer
 	model:AddPersistentPlayer(player)
-	VehicleBuilder.paint(model, PaintRules.colour(id, profile.paint[id]))
+	local paint = PaintRules.shown(profile.paint[id], player:GetAttribute("PassVIP") == true)
+	VehicleBuilder.paint(model, PaintRules.colour(id, paint), PaintRules.material(paint))
 	local _, size = model:GetBoundingBox()
 	local ignore = { character, folder }
 	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)

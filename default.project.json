@@ -11,6 +11,9 @@
     "ReplicatedFirst": {
       "Loading": { "$path": "src/first/Loading.client.luau" }
     },
+    "TextChatService": {
+      "$properties": { "ChatVersion": "TextChatService" }
+    },
     "ServerScriptService": {
       "Server": { "$path": "src/server" }
     },
