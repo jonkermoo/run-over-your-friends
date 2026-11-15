@@ -206,6 +206,37 @@ function Crowd.bigSway(
 	return 1 / size, cfg.LiftPerSize * size
 end
 
+export type FlingConfig = {
+	Energy: number,
+	EnergyHigh: number,
+	MinSpeed: number,
+	MaxSpeed: number,
+	DownMin: number,
+	DownMax: number,
+}
+
+-- a car hit of `energy` joules on the giant: how fast it's thrown (studs/s; 0 means only shoved) and how many
+-- seconds it lies there before getting up
+function Crowd.giantFling(energy: number, cfg: FlingConfig): (number, number)
+	if energy < cfg.Energy then
+		return 0, 0
+	end
+	local s =
+		math.clamp(math.log10(energy / cfg.Energy) / math.log10(cfg.EnergyHigh / cfg.Energy), 0, 1)
+	return cfg.MinSpeed + (cfg.MaxSpeed - cfg.MinSpeed) * s,
+		cfg.DownMin + (cfg.DownMax - cfg.DownMin) * s
+end
+
+-- may the giant get up where it landed? Not when no ground was found under it (`groundY` nil), nor when that
+-- ground is far above where it was hit (`hitY`: a roof) or far below it (under the map)
+function Crowd.giantLandsHere(
+	hitY: number,
+	groundY: number?,
+	cfg: { MaxRise: number, MaxDrop: number }
+): boolean
+	return groundY ~= nil and groundY - hitY <= cfg.MaxRise and hitY - groundY <= cfg.MaxDrop
+end
+
 -- how close the camera must be for someone to animate: a giant is seen from much further away
 function Crowd.animRadius(size: number, cfg: { AnimRadius: number }): number
 	return cfg.AnimRadius * math.max(1, size)

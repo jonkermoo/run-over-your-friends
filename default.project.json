@@ -8,6 +8,9 @@
       "SceneryModels": { "$path": "assets/Scenery.rbxm" },
       "RoadModels": { "$path": "assets/Roads.rbxm" }
     },
+    "ReplicatedFirst": {
+      "Loading": { "$path": "src/first/Loading.client.luau" }
+    },
     "ServerScriptService": {
       "Server": { "$path": "src/server" }
     },
