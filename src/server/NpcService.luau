@@ -39,6 +39,10 @@ local random = Random.new()
 local friendsAdded: { [Player]: boolean } = {}
 local jingleToken: { [BasePart]: number } = {}
 local REACT = CrowdConfig.React
+local GIANT = CrowdConfig.GiantFling
+-- the giant while it's flung: which fling it gets up from (a newer hit replaces it) and where it was first hit
+local giantFlings: { [Model]: { token: number, hitAt: Vector3 } } = {}
+local flingCount = 0
 -- reactions: when each person last got a dodge roll against a vehicle, and until when they're too scared
 -- (running from a crash, jumping clear) for the ice-cream jingle to call them back
 local react = {
@@ -130,6 +134,44 @@ function NpcService.all(): { Model }
 	return out
 end
 
+-- the colliding ground under `from`, looking `down` studs (street, sidewalk, island terrain; never people or cars)
+local function groundUnder(from: Vector3, down: number): number?
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true
+	params.CollisionGroup = "Giant" -- what the giant stands on (street props are passed through)
+	params.FilterDescendantsInstances = {
+		CrowdService.folder,
+		workspace:FindFirstChild("Vehicles") or CrowdService.folder,
+	}
+	local hit = workspace:Raycast(from, Vector3.new(0, -down, 0), params)
+	return if hit then hit.Position.Y else nil
+end
+
+-- stand the giant upright with its feet on `feet` (a height) at `at`, facing `look` along the ground
+local function standGiant(npc: Model, at: Vector3, feet: number, look: Vector3)
+	local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
+	local hum = npc:FindFirstChildOfClass("Humanoid")
+	local up = if root and hum then hum.HipHeight + root.Size.Y / 2 else 4 * EventConfig.GiantScale
+	local pos = Vector3.new(at.X, feet + up + EventConfig.GiantSpawnLift, at.Z)
+	npc:PivotTo(CFrame.lookAt(pos, pos + look))
+	if root then
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end
+end
+
+-- which way along the ground a part faces, whatever way up it lies
+local function flatFacing(part: BasePart): Vector3
+	for _, v in { part.CFrame.LookVector, part.CFrame.UpVector } do
+		local f = v * Vector3.new(1, 0, 1)
+		if f.Magnitude > 0.2 then
+			return f.Unit
+		end
+	end
+	return Vector3.new(0, 0, -1)
+end
+
 -- a giant (Giant in Town): a normal pedestrian scaled up that takes several hits to topple
 function NpcService.spawnGiant(at: Vector3): Model?
 	local npc = CrowdService.spawnGiant(at)
@@ -138,26 +180,9 @@ function NpcService.spawnGiant(at: Vector3): Model?
 	end
 	-- CrowdService built it GiantScale times an ordinary person before it entered the world
 	-- stand it on whatever is really under the spot (street, sidewalk or island terrain), feet first
-	local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local hum = npc:FindFirstChildOfClass("Humanoid")
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.RespectCanCollide = true
-	params.FilterDescendantsInstances = {
-		CrowdService.folder,
-		workspace:FindFirstChild("Vehicles") or CrowdService.folder,
-	}
-	local hit = workspace:Raycast(
-		at + Vector3.new(0, EventConfig.GiantGroundProbe.Up, 0),
-		Vector3.new(0, -(EventConfig.GiantGroundProbe.Up + EventConfig.GiantGroundProbe.Down), 0),
-		params
-	)
-	local feet = if hit then hit.Position.Y else at.Y
-	local up = if root and hum then hum.HipHeight + root.Size.Y / 2 else 4 * EventConfig.GiantScale
-	npc:PivotTo(
-		CFrame.new(Vector3.new(at.X, feet + up + EventConfig.GiantSpawnLift, at.Z))
-			* npc:GetPivot().Rotation
-	)
+	local probe = EventConfig.GiantGroundProbe
+	local feet = groundUnder(at + Vector3.new(0, probe.Up, 0), probe.Up + probe.Down) or at.Y
+	standGiant(npc, at, feet, npc:GetPivot().LookVector * Vector3.new(1, 0, 1))
 	npc:SetAttribute("GiantHp", EventConfig.GiantHits)
 	local humanoid = npc:FindFirstChildOfClass("Humanoid")
 	if humanoid then
@@ -393,6 +418,71 @@ function NpcService.inRadius(pos: Vector3, radius: number): { Model }
 	return out
 end
 
+-- the giant goes limp (Shared/Ragdoll.limp) and every part of it flies off at `velocity`, tumbling over
+-- forwards along `along` (a limp body's parts move apart, so each is thrown, not just its root)
+local function throwLimp(npc: Model, velocity: Vector3, along: Vector3)
+	Ragdoll.limp(npc, true)
+	local spin = along:Cross(Vector3.yAxis) * -GIANT.Spin * random:NextNumber(0.5, 1)
+	for _, p in npc:GetChildren() do
+		if p:IsA("BasePart") then
+			p.AssemblyLinearVelocity = velocity
+			p.AssemblyAngularVelocity = spin
+		end
+	end
+end
+
+-- the giant back on its feet after a fling: where it landed, or back where it was hit when it came down on a
+-- roof, under the map or nowhere (Rules/Crowd.giantLandsHere); then it walks on
+local function giantGetUp(npc: Model, token: number)
+	local f = giantFlings[npc]
+	if not f or f.token ~= token then
+		return -- hit again since, or toppled
+	end
+	giantFlings[npc] = nil
+	local hitAt = f.hitAt
+	if not npc.Parent or npc:GetAttribute("Down") then
+		return
+	end
+	local root = npc:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	local look = flatFacing(root)
+	local ground =
+		groundUnder(root.Position + Vector3.new(0, GIANT.ProbeUp, 0), GIANT.ProbeUp + GIANT.Probe)
+	local hitGround =
+		groundUnder(hitAt + Vector3.new(0, GIANT.ProbeUp, 0), GIANT.ProbeUp + GIANT.Probe)
+	local hitY = hitGround or hitAt.Y
+	Ragdoll.limp(npc, false)
+	if CrowdRules.giantLandsHere(hitY, ground, GIANT) then
+		standGiant(npc, root.Position, ground :: number, look)
+	else
+		standGiant(npc, hitAt, hitY, look)
+	end
+	npc:SetAttribute("Flung", nil)
+	CrowdService.rise(npc)
+end
+
+-- a car hit the giant without toppling it: a soft hit shoves it along the ground; a hard one knocks it flat and
+-- throws it, harder the more energy (Rules/Crowd.giantFling), and it gets up a few seconds later
+local function flingGiant(npc: Model, root: BasePart, dir: Vector3, energy: number)
+	local along = dir * Vector3.new(1, 0, 1)
+	along = if along.Magnitude > 0.01 then along.Unit else flatFacing(root)
+	local speed, down = CrowdRules.giantFling(energy, GIANT)
+	if speed <= 0 then
+		root.AssemblyLinearVelocity += along * GIANT.ShoveSpeed
+		return
+	end
+	flingCount += 1
+	-- hit again while still flying: if it lands somewhere bad it gets up where it was first hit
+	local was = giantFlings[npc]
+	giantFlings[npc] = { token = flingCount, hitAt = if was then was.hitAt else root.Position }
+	npc:SetAttribute("Flung", true)
+	CrowdService.down(npc)
+	throwLimp(npc, (along + Vector3.new(0, GIANT.Lift, 0)).Unit * speed, along)
+	task.delay(down, giantGetUp, npc, flingCount)
+end
+
 local function onHit(player: Player, npc: unknown, velocity: unknown)
 	if
 		typeof(npc) ~= "Instance"
@@ -449,7 +539,7 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 			humanoid.DisplayName =
 				string.gsub(humanoid.DisplayName, "%(%d+ hits%)", `({giantHp - 1} hits)`)
 		end
-		root.AssemblyLinearVelocity += (dir * Vector3.new(1, 0, 1)) * 40
+		flingGiant(npc, root, dir, energy)
 		local pay = math.floor(
 			EventConfig.GiantHitPay
 				* (if Passes.has(player, "DoubleMoney") then Economy.DoubleMoney else 1)
@@ -468,14 +558,21 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 				:FireClient(everyone, "GIANT TOPPLED!", `{player.DisplayName} brought it down.`)
 		end
 	end
-	local launch = Impact.launchSpeed(energy)
-	NpcService.knock(
-		npc,
-		(dir * Vector3.new(1, 0, 1) + Vector3.new(0, 0.6, 0)).Unit * launch,
-		energy,
-		player,
-		1
-	)
+	-- the toppling hit throws the giant like any other fling, never softer than the softest
+	local launch = if typeof(giantHp) == "number"
+		then math.max(CrowdRules.giantFling(energy, GIANT), GIANT.MinSpeed)
+		else Impact.launchSpeed(energy)
+	local lift = if typeof(giantHp) == "number" then GIANT.Lift else 0.6
+	if typeof(giantHp) == "number" then
+		giantFlings[npc] = nil -- no getting up from this one
+		npc:SetAttribute("Flung", nil)
+	end
+	local throw = (dir * Vector3.new(1, 0, 1) + Vector3.new(0, lift, 0)).Unit * launch
+	NpcService.knock(npc, throw, energy, player, 1)
+	if typeof(giantHp) == "number" then
+		-- limp, so it lies on the street instead of sinking its legs into it
+		throwLimp(npc, throw, (throw * Vector3.new(1, 0, 1)).Unit)
+	end
 end
 
 local function bubble(part: BasePart, text: string)

@@ -1639,6 +1639,19 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	end
 	-- the last pass: knolls, pine stands, woods, hedgerows, wildflowers, more hills (Config/Country Fill)
 	WildsKit.fill(country, exclude)
+	-- the suburbs' lawns are all one grass: the darker patches (Wilds Fill.Patches) are taken back out of them,
+	-- so neighbouring plots match
+	for _, r in suburbs.rects do
+		workspace.Terrain:ReplaceMaterial(
+			Region3.new(
+				Vector3.new(r.x - r.w / 2, -16, r.z - r.d / 2),
+				Vector3.new(r.x + r.w / 2, 4, r.z + r.d / 2)
+			):ExpandToGrid(4),
+			4,
+			Enum.Material.LeafyGrass,
+			Enum.Material.Grass
+		)
+	end
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 
