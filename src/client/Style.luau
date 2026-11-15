@@ -143,6 +143,8 @@ Style.colors = table.freeze({
 	purple = Color3.fromRGB(150, 70, 255),
 	green = Color3.fromRGB(43, 220, 90),
 	grey = Color3.fromRGB(70, 70, 78),
+	billEdge = Color3.fromRGB(26, 160, 67), -- the store's drawn banknotes
+	billInk = Color3.fromRGB(11, 93, 34),
 })
 local C = Style.colors
 

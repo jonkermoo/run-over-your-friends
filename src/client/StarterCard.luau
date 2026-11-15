@@ -310,15 +310,19 @@ function StarterCard.show(closed: (() -> ())?)
 	card.Visible = true
 end
 
--- the store row: its description and button follow the deal (price, countdown) and it hides once bought
-local storeRow: { text: TextLabel, button: TextButton, row: GuiObject, header: GuiObject? }? = nil
-function StarterCard.bindStore(
+-- the store's banner: its line, the deal's % off, struck-through full price and countdown, and the price
+-- button follow the deal, and it hides once bought
+export type StoreParts = {
 	row: GuiObject,
 	text: TextLabel,
 	button: TextButton,
-	header: GuiObject?
-)
-	storeRow = { text = text, button = button, row = row, header = header }
+	off: TextLabel,
+	was: TextLabel,
+	timer: TextLabel,
+}
+local storeRow: StoreParts? = nil
+function StarterCard.bindStore(parts: StoreParts)
+	storeRow = parts
 end
 
 local function refreshStore()
@@ -326,25 +330,17 @@ local function refreshStore()
 	if not s then
 		return
 	end
-	local bought = StarterCard.bought()
-	s.row.Visible = not bought
-	if s.header then
-		s.header.Visible = not bought
-	end
+	s.row.Visible = not StarterCard.bought()
 	local product = StarterCard.current()
-	local cars = {}
-	for _, id in FULL.vehicles or {} do
-		table.insert(cars, Vehicles.ById[id].name)
-	end
-	local what =
-		`The {table.concat(cars, " + the ")} + {Style.money(FULL.money)}. Worth {Style.money(WORTH)}, once per account.`
-	if product == DEAL then
-		s.text.Text =
-			`{what} {Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}% off for {Offer.clock(
-				dealEnds() - now()
-			)} more.`
-	else
-		s.text.Text = what
+	local deal = product == DEAL
+	s.text.Text = `Worth {Style.money(WORTH)}. Once per account.`
+	s.off.Visible = deal
+	s.was.Visible = deal
+	s.timer.Visible = deal
+	if deal then
+		s.off.Text = `-{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}% TODAY`
+		s.was.Text = "R$ " .. robuxShown[FULL.key]
+		s.timer.Text = "ENDS " .. Offer.clock(dealEnds() - now())
 	end
 	s.button.Text = rs(product)
 end

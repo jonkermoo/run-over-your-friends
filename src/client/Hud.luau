@@ -4,6 +4,7 @@
 -- Every visual comes from Style.
 
 local GroupService = game:GetService("GroupService")
+local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,6 +33,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
 local PaintPicker = require(script.Parent.PaintPicker)
+local Pad = require(script.Parent.Pad)
 local Popups = require(script.Parent.Popups)
 local StarterCard = require(script.Parent.StarterCard)
 local Style = require(script.Parent.Style)
@@ -600,7 +602,8 @@ if screenFit then
 	screenFit:GetPropertyChangedSignal("Scale"):Connect(placeSheets)
 end
 
-local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
+-- an empty sheet in the middle of the screen with its accent shadow
+local function sheetFrame(accent: Color3): Frame
 	local p = Style.panel(gui)
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
 	p.Size = UDim2.new(1, -28, 1, -(TOP + BOTTOM))
@@ -612,25 +615,26 @@ local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	limit.Parent = p
 	table.insert(sheets, p)
 	placeSheets()
-	-- the title sits on the right, by the X: the job card can cover the sheet's top-left corner
-	local t = Style.label(p, title, 36, F.display, C.text)
-	t.AnchorPoint = Vector2.new(1, 0)
-	t.Position = UDim2.new(1, -72, 0, 12)
-	t.Size = UDim2.fromOffset(300, 40)
-	t.TextXAlignment = Enum.TextXAlignment.Right
-	local line = Style.dashes(p, C.yellow, false, 4)
-	line.Position = UDim2.fromOffset(0, 58)
+	return p
+end
+
+-- the yellow X in a sheet's top-right corner
+local function closeButton(p: Frame, y: number): TextButton
 	local close = Style.button(p, "X", "gold", 22)
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, 9)
+	close.Position = UDim2.new(1, -14, 0, y)
 	close.Size = UDim2.fromOffset(44, 44)
 	close.Activated:Connect(function()
 		p.Visible = false
 	end)
+	return close
+end
+
+local function scroller(p: Frame, x: number, y: number): ScrollingFrame
 	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.fromOffset(16, 72)
-	list.Size = UDim2.new(1, -32, 1, -84)
+	list.Position = UDim2.fromOffset(x, y)
+	list.Size = UDim2.new(1, -(x + 16), 1, -(y + 12))
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
@@ -643,7 +647,21 @@ local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	pad.PaddingLeft = UDim.new(0, 4)
 	pad.PaddingBottom = UDim.new(0, 12)
 	pad.Parent = list
-	return p, list
+	return list
+end
+
+local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
+	local p = sheetFrame(accent)
+	-- the title sits on the right, by the X: the job card can cover the sheet's top-left corner
+	local t = Style.label(p, title, 36, F.display, C.text)
+	t.AnchorPoint = Vector2.new(1, 0)
+	t.Position = UDim2.new(1, -72, 0, 12)
+	t.Size = UDim2.fromOffset(300, 40)
+	t.TextXAlignment = Enum.TextXAlignment.Right
+	local line = Style.dashes(p, C.yellow, false, 4)
+	line.Position = UDim2.fromOffset(0, 58)
+	closeButton(p, 9)
+	return p, scroller(p, 16, 72)
 end
 
 local garage, garageList = panel("GARAGE", C.pink)
@@ -728,18 +746,22 @@ local function posePreview(m: Model, stats: Vehicles.Vehicle)
 	end
 end
 
-local function preview(parent: Instance, stats: Vehicles.Vehicle): Model?
+-- a 3D picture of the vehicle: a garage card's top (122 px tall with a lane line under it), or with
+-- height given, a bare picture that fills the parent's width
+local function preview(parent: Instance, stats: Vehicles.Vehicle, height: number?): Model?
 	local vf = Instance.new("ViewportFrame")
-	vf.Position = UDim2.fromOffset(6, 6)
-	vf.Size = UDim2.new(1, -12, 0, 122)
+	vf.Position = if height then UDim2.new() else UDim2.fromOffset(6, 6)
+	vf.Size = if height then UDim2.new(1, 0, 0, height) else UDim2.new(1, -12, 0, 122)
 	vf.BackgroundColor3 = Color3.fromRGB(46, 46, 54) -- no UIGradient here: it would tint the 3D model
 	vf.Ambient = Color3.fromRGB(175, 175, 190)
 	vf.LightColor = Color3.new(1, 1, 1)
 	vf.LightDirection = Vector3.new(-1, -2, -1)
 	vf.Parent = parent
-	local line = Style.dashes(parent, C.yellow, false, 3)
-	line.Position = UDim2.fromOffset(6, 128)
-	line.Size = UDim2.new(1, -12, 0, 3)
+	if not height then
+		local line = Style.dashes(parent, C.yellow, false, 3)
+		line.Position = UDim2.fromOffset(6, 128)
+		line.Size = UDim2.new(1, -12, 0, 3)
+	end
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(stats.id) :: Model?
 	if not template then
@@ -953,18 +975,61 @@ function refreshCards()
 	end
 end
 
-local store, storeList = panel("STORE", C.blue)
+-- the store: a dark rail on the left lists its sections (DEALS, MONEY, PASSES, FREE: tap one to jump to it,
+-- LB/RB on a gamepad), and the right side is one scrolling page: the Starter Pack banner, the money packs,
+-- the game passes, the group reward and the credits. The section in view names the page and lights its tab.
+local RAIL = 200
+local store = sheetFrame(C.blue)
 store.Name = "Store"
+local rail = Instance.new("Frame")
+rail.Name = "Rail"
+rail.BackgroundColor3 = C.ink
+rail.BorderSizePixel = 0
+rail.Size = UDim2.new(0, RAIL, 1, 0)
+rail.Parent = store
+local storeTitle = Style.label(rail, "STORE", 40, F.display, C.text)
+storeTitle.Position = UDim2.fromOffset(20, 16)
+storeTitle.Size = UDim2.new(1, -28, 0, 44)
+storeTitle.TextXAlignment = Enum.TextXAlignment.Left
+local pageTitle = Style.label(store, "", 36, F.display, C.text)
+pageTitle.Name = "PageTitle"
+pageTitle.Position = UDim2.fromOffset(RAIL + 26, 16)
+pageTitle.Size = UDim2.new(1, -(RAIL + 26 + 190), 0, 44)
+pageTitle.TextXAlignment = Enum.TextXAlignment.Left
+pageTitle.TextTruncate = Enum.TextTruncate.AtEnd
+local storeLine = Style.dashes(store, C.yellow, false, 4)
+storeLine.Position = UDim2.fromOffset(0, 66)
+closeButton(store, 12)
+local closeHint = Pad.chip(store, { Enum.KeyCode.ButtonB }, "close")
+closeHint.AnchorPoint = Vector2.new(1, 0.5)
+closeHint.Position = UDim2.new(1, -72, 0, 34)
+local storeList = scroller(store, RAIL + 24, 82)
+storeList.Name = "Page"
 local storeLayout = Instance.new("UIListLayout")
-storeLayout.Padding = UDim.new(0, 12)
+storeLayout.Padding = UDim.new(0, 14)
 storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 storeLayout.Parent = storeList
 
-local function header(order: number, text: string)
-	local h = Style.label(storeList, text, 22, F.display, C.yellow)
-	h.Size = UDim2.new(1, -12, 0, 26)
-	h.TextXAlignment = Enum.TextXAlignment.Left
+-- a section heading: yellow words on a dashed lane line that runs to the right edge
+local function sectionHead(order: number, text: string): Frame
+	local h = Instance.new("Frame")
+	h.BackgroundTransparency = 1
+	h.Size = UDim2.new(1, -12, 0, 28)
 	h.LayoutOrder = order
+	h.Parent = storeList
+	local line = Style.dashes(h, C.yellow, false, 3)
+	line.AnchorPoint = Vector2.new(0, 0.5)
+	line.Position = UDim2.fromScale(0, 0.5)
+	local l = Style.label(h, text, 24, F.display, C.yellow)
+	l.BackgroundColor3 = C.panel
+	l.BackgroundTransparency = 0
+	l.AutomaticSize = Enum.AutomaticSize.X
+	l.Size = UDim2.fromScale(0, 1)
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	l.ZIndex = 2
+	local pad = Instance.new("UIPadding")
+	pad.PaddingRight = UDim.new(0, 12)
+	pad.Parent = l
 	return h
 end
 
@@ -985,48 +1050,233 @@ local function robuxText(product: Products.Product, label: TextButton)
 	end
 end
 
-local passButtons: { [string]: TextButton } = {}
-local function storeRow(
-	order: number,
-	title: string,
-	text: string,
-	buttonText: string,
-	accent: Color3,
-	kind: string,
-	onClick: () -> ()
-): (TextButton, TextLabel)
-	local row = Style.card(storeList)
-	row.Size = UDim2.new(1, -12, 0, 88)
-	row.LayoutOrder = order
-	local stripe = Instance.new("Frame")
-	stripe.BackgroundColor3 = accent
-	stripe.BorderSizePixel = 0
-	stripe.Position = UDim2.fromOffset(0, 0)
-	stripe.Size = UDim2.new(0, 8, 1, 0)
-	stripe.Parent = row
-	local t = Style.label(row, title, 24, F.display, C.text)
-	t.Position = UDim2.fromOffset(24, 10)
-	t.Size = UDim2.new(1, -220, 0, 30)
-	t.TextXAlignment = Enum.TextXAlignment.Left
-	local d = Style.label(row, text, 13, F.bold, C.dim)
-	d.Position = UDim2.fromOffset(24, 42)
-	d.Size = UDim2.new(1, -220, 0, 36)
-	d.TextWrapped = true
-	d.TextXAlignment = Enum.TextXAlignment.Left
-	d.TextYAlignment = Enum.TextYAlignment.Top
-	local b = Style.button(row, buttonText, kind, 18)
-	b.AnchorPoint = Vector2.new(1, 0.5)
-	b.Position = UDim2.new(1, -16, 0.5, 0)
-	b.Size = UDim2.fromOffset(170, 48)
-	b.Activated:Connect(onClick)
-	return b, d
+local function paint(parent: Instance, color: Color3, size: UDim2): Frame
+	local s = Instance.new("Frame")
+	s.BackgroundColor3 = color
+	s.BorderSizePixel = 0
+	s.Size = size
+	s.Parent = parent
+	return s
 end
+
+---------------- the Starter Pack banner: client/StarterCard keeps its text, prices and countdown in step
+
+local hero = Style.card(storeList)
+hero.Name = "StarterBanner"
+hero.Size = UDim2.new(1, -12, 0, 222)
+hero.LayoutOrder = 1
+hero.ClipsDescendants = true
+paint(hero, C.yellow, UDim2.new(0, 8, 1, 0))
+local heroHazard = paint(hero, C.yellow, UDim2.new(1, 0, 0, 12))
+heroHazard.ClipsDescendants = true
+for x = -20, 1000, 28 do
+	local s = paint(heroHazard, C.ink, UDim2.fromOffset(12, 40))
+	s.Position = UDim2.fromOffset(x, -14)
+	s.Rotation = 40
+end
+local heroTitle = Style.label(hero, string.upper(Products.Starter.title), 44, F.display, C.text)
+heroTitle.Position = UDim2.fromOffset(24, 26)
+heroTitle.Size = UDim2.new(1, -300, 0, 48)
+heroTitle.TextXAlignment = Enum.TextXAlignment.Left
+heroTitle.TextScaled = true
+local heroTitleSize = Instance.new("UITextSizeConstraint")
+heroTitleSize.MaxTextSize = 44
+heroTitleSize.Parent = heroTitle
+local heroText = Style.label(hero, "", 15, F.bold, C.dim)
+heroText.Position = UDim2.fromOffset(26, 76)
+heroText.Size = UDim2.new(1, -300, 0, 20)
+heroText.TextXAlignment = Enum.TextXAlignment.Left
+heroText.TextTruncate = Enum.TextTruncate.AtEnd
+-- what's inside: a picture of each car and the cash
+local gets = Instance.new("Frame")
+gets.BackgroundTransparency = 1
+gets.Position = UDim2.fromOffset(24, 106)
+gets.Size = UDim2.new(1, -300, 0, 96)
+gets.Parent = hero
+local getsList = Instance.new("UIListLayout")
+getsList.FillDirection = Enum.FillDirection.Horizontal
+getsList.Padding = UDim.new(0, 12)
+getsList.SortOrder = Enum.SortOrder.LayoutOrder
+getsList.Parent = gets
+for i, id in Products.Starter.vehicles or {} do
+	local stats = Vehicles.ById[id]
+	local tile = Instance.new("Frame")
+	tile.BackgroundColor3 = C.ink
+	tile.BorderSizePixel = 0
+	tile.Size = UDim2.fromOffset(150, 96)
+	tile.LayoutOrder = i
+	tile.Parent = gets
+	Style.stroke(tile, C.ink, 2, 0)
+	if stats then
+		preview(tile, stats, 96)
+		local n = Style.label(tile, string.upper(stats.name), 15, F.display, C.text)
+		n.AnchorPoint = Vector2.new(0, 1)
+		n.Position = UDim2.new(0, 8, 1, -4)
+		n.Size = UDim2.new(1, -16, 0, 18)
+		n.TextXAlignment = Enum.TextXAlignment.Left
+		n.ZIndex = 2
+		Style.outline(n, 2)
+	end
+end
+local cashTile = Instance.new("Frame")
+cashTile.BackgroundColor3 = C.ink
+cashTile.BorderSizePixel = 0
+cashTile.Size = UDim2.fromOffset(150, 96)
+cashTile.LayoutOrder = 10
+cashTile.Parent = gets
+local cashAmount = Style.label(cashTile, money(Products.Starter.money), 28, F.display, C.money)
+cashAmount.Position = UDim2.fromOffset(6, 24)
+cashAmount.Size = UDim2.new(1, -12, 0, 32)
+cashAmount.TextScaled = true
+local cashAmountSize = Instance.new("UITextSizeConstraint")
+cashAmountSize.MaxTextSize = 28
+cashAmountSize.Parent = cashAmount
+local cashIn = Style.label(cashTile, "IN GAME", 14, F.heavy, C.dim)
+cashIn.Position = UDim2.fromOffset(0, 58)
+cashIn.Size = UDim2.new(1, 0, 0, 18)
+-- the price side: the deal's % off, the struck-through full price and the countdown, then BUY
+local heroPrice = Instance.new("Frame")
+heroPrice.BackgroundTransparency = 1
+heroPrice.AnchorPoint = Vector2.new(1, 0)
+heroPrice.Position = UDim2.new(1, -22, 0, 26)
+heroPrice.Size = UDim2.fromOffset(240, 100)
+heroPrice.Parent = hero
+local heroOff = Style.pill(heroPrice, "", C.red)
+heroOff.TextColor3 = C.text
+heroOff.TextSize = 15
+heroOff.Size = UDim2.fromOffset(0, 22)
+heroOff.AnchorPoint = Vector2.new(1, 0)
+heroOff.Position = UDim2.fromScale(1, 0)
+local heroWas = Style.label(heroPrice, "", 24, F.display, C.dim)
+heroWas.AnchorPoint = Vector2.new(1, 0)
+heroWas.Position = UDim2.fromOffset(240, 30)
+heroWas.Size = UDim2.fromOffset(0, 26)
+heroWas.AutomaticSize = Enum.AutomaticSize.X
+local strike = paint(heroWas, C.red, UDim2.new(1, 4, 0, 4))
+strike.AnchorPoint = Vector2.new(0.5, 0.5)
+strike.Position = UDim2.fromScale(0.5, 0.42)
+local heroTimer = Style.label(heroPrice, "", 20, F.display, C.text)
+heroTimer.BackgroundColor3 = C.red
+heroTimer.BackgroundTransparency = 0
+heroTimer.AnchorPoint = Vector2.new(1, 0)
+heroTimer.Position = UDim2.fromOffset(240, 64)
+heroTimer.Size = UDim2.fromOffset(0, 30)
+heroTimer.AutomaticSize = Enum.AutomaticSize.X
+do
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.Parent = heroTimer
+end
+local heroBuy = Style.button(hero, "", "gold", 30)
+heroBuy.Name = "Buy"
+heroBuy.AnchorPoint = Vector2.new(1, 1)
+heroBuy.Position = UDim2.new(1, -22, 1, -22)
+heroBuy.Size = UDim2.fromOffset(240, 62)
+heroBuy.Activated:Connect(function()
+	Net.waitFor("BuyProduct"):FireServer(StarterCard.current().key)
+end)
+StarterCard.bindStore({
+	row = hero,
+	text = heroText,
+	button = heroBuy,
+	off = heroOff,
+	was = heroWas,
+	timer = heroTimer,
+})
+StarterCard.start(gui, preview)
+
+---------------- money packs: a stack of bills that grows with the pack
+
+-- where each bill of the drawing sits (px from the drawing's top-left), per pack in Products.MoneyPacks order
+local BILLS = {
+	{ { 17, 26 } },
+	{ { 6, 30 }, { 26, 18 } },
+	{ { 0, 34 }, { 30, 34 }, { 15, 14 } },
+	{ { -6, 40 }, { 20, 40 }, { 46, 40 }, { 7, 20 }, { 33, 20 }, { 20, 0 } },
+}
+local function bill(parent: Instance, x: number, y: number)
+	local b = paint(parent, C.green, UDim2.fromOffset(46, 22))
+	b.Position = UDim2.fromOffset(x, y)
+	Style.stroke(b, C.ink, 2, 0)
+	local inner = Instance.new("UIStroke")
+	inner.Color = C.billEdge
+	inner.Thickness = 3
+	inner.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	inner.LineJoinMode = Enum.LineJoinMode.Miter
+	local face = paint(b, C.green, UDim2.new(1, -6, 1, -6))
+	face.Position = UDim2.fromOffset(3, 3)
+	inner.Parent = face
+	local d = Style.label(b, "$", 16, F.display, C.billInk)
+	d.Size = UDim2.fromScale(1, 1)
+	d.ZIndex = 2
+end
+
+local moneyHead = sectionHead(2, "MONEY")
+local packs = Instance.new("Frame")
+packs.BackgroundTransparency = 1
+packs.Size = UDim2.new(1, -12, 0, 200)
+packs.LayoutOrder = 3
+packs.Parent = storeList
+local packGrid = Instance.new("UIGridLayout")
+packGrid.CellSize = UDim2.new(0.25, -11, 1, 0)
+packGrid.CellPadding = UDim2.fromOffset(14, 0)
+packGrid.SortOrder = Enum.SortOrder.LayoutOrder
+packGrid.Parent = packs
+local firstPackBuy: TextButton? = nil
+for i, pack in Products.MoneyPacks do
+	local card = Style.card(packs)
+	card.LayoutOrder = i
+	paint(card, C.money, UDim2.new(1, 0, 0, 6))
+	local drawing = Instance.new("Frame")
+	drawing.BackgroundTransparency = 1
+	drawing.AnchorPoint = Vector2.new(0.5, 0)
+	drawing.Position = UDim2.new(0.5, 0, 0, 14)
+	drawing.Size = UDim2.fromOffset(80, 62)
+	drawing.Parent = card
+	for _, at in BILLS[math.min(i, #BILLS)] do
+		bill(drawing, at[1], at[2])
+	end
+	if pack.tag then
+		local tag =
+			Style.pill(card, pack.tag, if i == #Products.MoneyPacks then C.gold else C.orange)
+		tag.TextSize = 14
+		tag.Size = UDim2.fromOffset(0, 20)
+		tag.AnchorPoint = Vector2.new(0.5, 0)
+		tag.Position = UDim2.fromScale(0.5, 0)
+		tag.ZIndex = 3
+	end
+	local amount = Style.label(card, money(pack.money), 34, F.display, C.money)
+	amount.Position = UDim2.fromOffset(6, 78)
+	amount.Size = UDim2.new(1, -12, 0, 36)
+	amount.TextScaled = true
+	local amountSize = Instance.new("UITextSizeConstraint")
+	amountSize.MaxTextSize = 34
+	amountSize.Parent = amount
+	local name = Style.label(card, string.upper(pack.title), 14, F.heavy, C.dim)
+	name.Position = UDim2.fromOffset(0, 114)
+	name.Size = UDim2.new(1, 0, 0, 18)
+	local buy = Style.button(card, "", "gold", 22)
+	buy.Name = "Buy"
+	buy.AnchorPoint = Vector2.new(0.5, 1)
+	buy.Position = UDim2.new(0.5, 0, 1, -14)
+	buy.Size = UDim2.new(1, -28, 0, 46)
+	robuxText(pack, buy)
+	buy.Activated:Connect(function()
+		Net.waitFor("BuyProduct"):FireServer(pack.key)
+	end)
+	firstPackBuy = firstPackBuy or buy
+end
+
+---------------- game passes: one poster card each, in its own colour
 
 local PASSES = {
 	{
 		name = "Roadster",
 		title = "ROADSTER",
 		accent = C.red,
+		ink = C.text,
 		text = `The dream car: rear jet, air control and a thruster. Plus {money(
 			Economy.RoadsterPassMoney
 		)} in game.`,
@@ -1035,96 +1285,98 @@ local PASSES = {
 		name = "DoubleMoney",
 		title = "2x MONEY",
 		accent = C.money,
+		ink = C.ink,
 		text = "Double money from every hit.",
 	},
 	{
 		name = "VIP",
 		title = "VIP",
 		accent = C.gold,
+		ink = C.ink,
 		text = `Gold VIP tag over your head and in chat, +{math.floor(
 			(Economy.VipMoney - 1) * 100 + 0.5
 		)}% cash ` .. "from hits and the VIP Gold car paint.",
 	},
 }
--- the Starter Pack row: client/StarterCard keeps its text and price in step with the deal
-local starterHeader = header(1, "SPECIAL OFFER")
-local starterButton, starterText = storeRow(
-	2,
-	string.upper(Products.Starter.title),
-	"",
-	"",
-	C.gold,
-	"gold",
-	function()
-		Net.waitFor("BuyProduct"):FireServer(StarterCard.current().key)
-	end
-)
-StarterCard.bindStore(starterButton.Parent :: GuiObject, starterText, starterButton, starterHeader)
-StarterCard.start(gui, preview)
-
-header(3, "MONEY")
-local packs = Instance.new("Frame")
-packs.BackgroundTransparency = 1
-packs.Size = UDim2.new(1, -12, 0, 176)
-packs.LayoutOrder = 4
-packs.Parent = storeList
-local packGrid = Instance.new("UIGridLayout")
-packGrid.CellSize = UDim2.new(0.25, -10, 1, 0)
-packGrid.CellPadding = UDim2.fromOffset(12, 0)
-packGrid.SortOrder = Enum.SortOrder.LayoutOrder
-packGrid.Parent = packs
-for i, pack in Products.MoneyPacks do
-	local card = Style.card(packs)
-	card.LayoutOrder = i
-	if pack.tag then
-		local tag =
-			Style.pill(card, pack.tag, if i == #Products.MoneyPacks then C.gold else C.orange)
-		tag.AnchorPoint = Vector2.new(0.5, 0)
-		tag.Position = UDim2.new(0.5, 0, 0, 10)
-	end
-	local amount = Style.label(card, money(pack.money), 30, F.display, C.money)
-	amount.Position = UDim2.fromOffset(0, 36)
-	amount.Size = UDim2.new(1, 0, 0, 40)
-	local name = Style.label(card, string.upper(pack.title), 13, F.heavy, C.dim)
-	name.Position = UDim2.fromOffset(0, 78)
-	name.Size = UDim2.new(1, 0, 0, 18)
-	local buy = Style.button(card, "", "gold", 18)
-	buy.AnchorPoint = Vector2.new(0.5, 1)
-	buy.Position = UDim2.new(0.5, 0, 1, -12)
-	buy.Size = UDim2.new(1, -24, 0, 46)
-	robuxText(pack, buy)
-	buy.Activated:Connect(function()
-		Net.waitFor("BuyProduct"):FireServer(pack.key)
-	end)
-end
-
-header(5, "GAME PASSES")
+local passButtons: { [string]: TextButton } = {}
+local passHead = sectionHead(4, "GAME PASSES")
+local passRow = Instance.new("Frame")
+passRow.BackgroundTransparency = 1
+passRow.Size = UDim2.new(1, -12, 0, 226)
+passRow.LayoutOrder = 5
+passRow.Parent = storeList
+local passGrid = Instance.new("UIGridLayout")
+passGrid.CellSize = UDim2.new(1 / #PASSES, -10, 1, 0)
+passGrid.CellPadding = UDim2.fromOffset(14, 0)
+passGrid.SortOrder = Enum.SortOrder.LayoutOrder
+passGrid.Parent = passRow
 for i, p in PASSES do
-	passButtons[p.name] = storeRow(5 + i, p.title, p.text, "GET", p.accent, "gold", function()
+	local card = Style.card(passRow)
+	card.LayoutOrder = i
+	local band = paint(card, p.accent, UDim2.new(1, 0, 0, 56))
+	local t = Style.label(band, p.title, 30, F.display, p.ink)
+	t.Position = UDim2.fromOffset(16, 6)
+	t.Size = UDim2.new(1, -32, 1, -6)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	local d = Style.label(card, p.text, 15, F.bold, C.text)
+	d.Position = UDim2.fromOffset(16, 68)
+	d.Size = UDim2.new(1, -32, 0, 86)
+	d.TextWrapped = true
+	d.TextXAlignment = Enum.TextXAlignment.Left
+	d.TextYAlignment = Enum.TextYAlignment.Top
+	local b = Style.button(card, "GET", "gold", 22)
+	b.Name = "Buy"
+	b.AnchorPoint = Vector2.new(0.5, 1)
+	b.Position = UDim2.new(0.5, 0, 1, -14)
+	b.Size = UDim2.new(1, -28, 0, 50)
+	b.Activated:Connect(function()
 		Net.waitFor("BuyPass"):FireServer(p.name)
 	end)
+	passButtons[p.name] = b
 end
-local freeHeader = header(9, "FREE")
-local groupButton = storeRow(
-	10,
-	"GROUP REWARD",
-	`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
-	"CLAIM",
-	C.gold,
-	"green",
-	function()
-		if player:GetAttribute("GroupClaimed") == true then
-			return
-		end
-		if Economy.GroupId ~= 0 then
-			-- Roblox's own join prompt; the server checks membership either way
-			pcall(function()
-				(GroupService :: any):PromptJoinAsync(Economy.GroupId)
-			end)
-		end
-		Net.waitFor("ClaimGroup"):FireServer()
+
+---------------- free: the group reward
+
+local freeHead = sectionHead(6, "FREE")
+local groupRow = Style.card(storeList)
+groupRow.Size = UDim2.new(1, -12, 0, 92)
+groupRow.LayoutOrder = 7
+paint(groupRow, C.blue, UDim2.new(0, 8, 1, 0))
+do
+	local t = Style.label(groupRow, "GROUP REWARD", 26, F.display, C.text)
+	t.Position = UDim2.fromOffset(24, 12)
+	t.Size = UDim2.new(1, -230, 0, 30)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	local d = Style.label(
+		groupRow,
+		`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
+		15,
+		F.bold,
+		C.dim
+	)
+	d.Position = UDim2.fromOffset(24, 46)
+	d.Size = UDim2.new(1, -230, 0, 36)
+	d.TextWrapped = true
+	d.TextXAlignment = Enum.TextXAlignment.Left
+	d.TextYAlignment = Enum.TextYAlignment.Top
+end
+local groupButton = Style.button(groupRow, "CLAIM", "green", 22)
+groupButton.Name = "Claim"
+groupButton.AnchorPoint = Vector2.new(1, 0.5)
+groupButton.Position = UDim2.new(1, -16, 0.5, 0)
+groupButton.Size = UDim2.fromOffset(170, 50)
+groupButton.Activated:Connect(function()
+	if player:GetAttribute("GroupClaimed") == true then
+		return
 	end
-)
+	if Economy.GroupId ~= 0 then
+		-- Roblox's own join prompt; the server checks membership either way
+		pcall(function()
+			(GroupService :: any):PromptJoinAsync(Economy.GroupId)
+		end)
+	end
+	Net.waitFor("ClaimGroup"):FireServer()
+end)
 local credits = Style.label(
 	storeList,
 	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0). "
@@ -1136,6 +1388,146 @@ local credits = Style.label(
 credits.TextWrapped = true
 credits.Size = UDim2.new(1, -12, 0, 44)
 credits.LayoutOrder = 20
+
+---------------- the rail: one tab per section; the section in view is lit and names the page
+
+type Section = {
+	key: string,
+	title: string,
+	accent: Color3,
+	anchor: GuiObject,
+	first: GuiObject?,
+	tab: TextButton?,
+}
+local SECTIONS: { Section } = {
+	{ key = "DEALS", title = "TODAY'S DEALS", accent = C.red, anchor = hero, first = heroBuy },
+	{ key = "MONEY", title = "MONEY", accent = C.money, anchor = moneyHead, first = firstPackBuy },
+	{
+		key = "PASSES",
+		title = "GAME PASSES",
+		accent = C.pink,
+		anchor = passHead,
+		first = passButtons[PASSES[1].name],
+	},
+	{ key = "FREE", title = "FREE STUFF", accent = C.blue, anchor = freeHead, first = groupButton },
+}
+local railTabs = Instance.new("Frame")
+railTabs.BackgroundTransparency = 1
+railTabs.Position = UDim2.fromOffset(0, 84)
+railTabs.Size = UDim2.new(1, 0, 1, -130)
+railTabs.Parent = rail
+local railList = Instance.new("UIListLayout")
+railList.Padding = UDim.new(0, 6)
+railList.SortOrder = Enum.SortOrder.LayoutOrder
+railList.Parent = railTabs
+local shownSection = 0
+
+local function visibleSections(): { Section }
+	local out = {}
+	for _, s in SECTIONS do
+		if s.anchor.Visible then
+			table.insert(out, s)
+		end
+	end
+	return out
+end
+
+local function markSection(s: Section)
+	pageTitle.Text = s.title
+	for _, other in SECTIONS do
+		local t = other.tab
+		if t then
+			t.BackgroundTransparency = if other == s then 0 else 1
+			t.TextColor3 = if other == s then C.ink else C.text
+		end
+	end
+end
+
+-- the section in view: the last one whose top is at or above the page's top (a little slack), or the last
+-- one once the page is scrolled to its end
+local function sectionInView()
+	local shown = visibleSections()
+	if #shown == 0 then
+		return
+	end
+	local tops = {}
+	for _, s in shown do
+		table.insert(tops, s.anchor.AbsolutePosition.Y - storeList.AbsolutePosition.Y)
+	end
+	local atEnd = storeList.CanvasPosition.Y
+		>= storeList.AbsoluteCanvasSize.Y - storeList.AbsoluteWindowSize.Y - 2
+	local i = LayoutRules.sectionAt(tops, LayoutConfig.SectionSlack * Style.scale(), atEnd)
+	shownSection = i
+	markSection(shown[i])
+end
+storeList:GetPropertyChangedSignal("CanvasPosition"):Connect(sectionInView)
+
+-- scroll so the section's top meets the page's top
+local function jumpTo(s: Section)
+	local delta = s.anchor.AbsolutePosition.Y - storeList.AbsolutePosition.Y
+	local maxY = math.max(0, storeList.AbsoluteCanvasSize.Y - storeList.AbsoluteWindowSize.Y)
+	local y = math.clamp(storeList.CanvasPosition.Y + delta, 0, maxY)
+	TweenService:Create(storeList, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+		CanvasPosition = Vector2.new(0, y),
+	}):Play()
+	markSection(s)
+end
+
+for i, s in SECTIONS do
+	local railTab = Instance.new("TextButton")
+	railTab.Name = s.key
+	railTab.AutoButtonColor = false
+	railTab.BackgroundColor3 = C.yellow
+	railTab.BackgroundTransparency = 1
+	railTab.BorderSizePixel = 0
+	railTab.Size = UDim2.new(1, 0, 0, 54)
+	railTab.Text = s.key
+	railTab.TextSize = 22
+	railTab.FontFace = F.display
+	railTab.TextColor3 = C.text
+	railTab.TextXAlignment = Enum.TextXAlignment.Left
+	railTab.LayoutOrder = i
+	railTab.Parent = railTabs
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 26)
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.Parent = railTab
+	local bar = paint(railTab, s.accent, UDim2.new(0, 8, 1, 0))
+	bar.Position = UDim2.fromOffset(-26, -4) -- undo the padding
+	bar.Size = UDim2.new(0, 8, 1, 4)
+	s.tab = railTab
+	railTab.Activated:Connect(function()
+		jumpTo(s)
+	end)
+	-- a section that isn't offered (the pack bought, no group) loses its tab
+	s.anchor:GetPropertyChangedSignal("Visible"):Connect(function()
+		railTab.Visible = s.anchor.Visible
+	end)
+	railTab.Visible = s.anchor.Visible
+end
+local switchHint = Pad.chip(rail, { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1 }, "switch")
+switchHint.AnchorPoint = Vector2.new(0, 1)
+switchHint.Position = UDim2.new(0, 20, 1, -16)
+
+Pad.menu(store, {
+	first = function()
+		return if hero.Visible then heroBuy else firstPackBuy
+	end,
+	close = function()
+		store.Visible = false
+	end,
+	shoulders = function(dir: number)
+		local shown = visibleSections()
+		local s = shown[math.clamp(shownSection + dir, 1, #shown)]
+		if s then
+			jumpTo(s)
+			-- the selection follows to the section's first button
+			if s.first and Pad.usingGamepad() then
+				GuiService.SelectedObject = s.first
+			end
+		end
+	end,
+})
 
 local function refreshStore()
 	for name, b in passButtons do
@@ -1153,9 +1545,16 @@ local function refreshStore()
 	Style.setKind(groupButton, if claimed then "dark" else "green")
 	-- no group yet: nothing to offer outside Studio
 	local groupLive = Economy.GroupId ~= 0 or RunService:IsStudio()
-	freeHeader.Visible = groupLive;
-	(groupButton.Parent :: GuiObject).Visible = groupLive
+	freeHead.Visible = groupLive
+	groupRow.Visible = groupLive
+	task.defer(sectionInView)
 end
+store:GetPropertyChangedSignal("Visible"):Connect(function()
+	if store.Visible then
+		storeList.CanvasPosition = Vector2.zero
+		task.defer(sectionInView)
+	end
+end)
 
 local function open(p: Frame)
 	placeSheets()

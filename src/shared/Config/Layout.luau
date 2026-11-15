@@ -56,5 +56,7 @@ return table.freeze({
 	-- but never below this, so their few words stay readable
 	BillboardMinScale = 0.8,
 
-	TapPad = 12, -- extra touch area around small buttons on touch screens
+	TapPad = 12,
+	-- a store section counts as in view once its top is within this many layout px of the page's top
+	SectionSlack = 40, -- extra touch area around small buttons on touch screens
 })

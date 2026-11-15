@@ -2805,6 +2805,18 @@ do
 	local phone = Layout.scale(848, 395, cfg)
 	check("layout: a phone is scaled by its height", math.abs(phone - 395 / 560) < 1e-6)
 	check("layout: a tiny screen stops at the minimum", Layout.scale(300, 200, cfg) == cfg.MinScale)
+	check(
+		"layout: the store opens on its first section",
+		Layout.sectionAt({ 0, 300, 600 }, cfg.SectionSlack, false) == 1
+	)
+	check(
+		"layout: a section counts once its top reaches the page top",
+		Layout.sectionAt({ -320, 20, 330 }, 40, false) == 2
+	)
+	check(
+		"layout: scrolled to the end shows the last section",
+		Layout.sectionAt({ -900, -500, 200 }, 40, true) == 3
+	)
 	check("layout: a narrow screen scales by width", Layout.scale(800, 900, cfg) == 0.8)
 	check("layout: garage row fits the phone canvas", 395 / phone - 86 - 84 >= 310)
 	local top, bottom = cfg.SheetTop, cfg.SheetBottom
