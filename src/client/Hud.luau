@@ -21,6 +21,7 @@ local DriveHudRules = require(ReplicatedStorage.Shared.Rules.DriveHud)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local GarageRules = require(ReplicatedStorage.Shared.Rules.Garage)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -181,12 +182,10 @@ local shownMoney = 0
 -- coins flying up out of the cash box on a big gain
 local function sparkle()
 	for i = 1, Callouts.CashSparks do
-		local coin = Instance.new("Frame")
-		coin.BorderSizePixel = 0
-		coin.BackgroundColor3 = if i % 2 == 0 then C.yellow else C.money
+		local coin = Style.image(moneyBox, if i % 2 == 0 then Icons.Coin else Icons.Bill)
 		coin.AnchorPoint = Vector2.new(0.5, 0.5)
-		coin.Rotation = 45
-		coin.Size = UDim2.fromOffset(9, 9)
+		coin.Rotation = math.random(-20, 20)
+		coin.Size = UDim2.fromOffset(Callouts.CashSparkSize, Callouts.CashSparkSize)
 		coin.Position = UDim2.fromScale(0.3 + math.random() * 0.6, 0.6)
 		coin.ZIndex = 5
 		coin.Parent = moneyBox
@@ -200,8 +199,8 @@ local function sparkle()
 					-0.6 - math.random() * 0.6,
 					0
 				),
-				Rotation = 45 + math.random(-180, 180),
-				BackgroundTransparency = 1,
+				Rotation = math.random(-180, 180),
+				ImageTransparency = 1,
 			}
 		)
 		fly:Play()

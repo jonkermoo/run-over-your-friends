@@ -263,7 +263,7 @@ local function rebuild()
 					pinButton.AnchorPoint = Vector2.new(1, 0.5)
 					pinButton.Position = UDim2.new(1, -8, 0.5, 0)
 					pinButton.Size = UDim2.fromOffset(26, 26)
-					PinnedGoals.pinIcon(pinButton, 16, if pinned then C.ink else C.dim)
+					PinnedGoals.pinIcon(pinButton, 24, if pinned then C.ink else C.dim)
 					local setName, index = name, i
 					Style.onTap(pinButton, function()
 						if PinnedGoals.toggle(setName, index) == "full" then

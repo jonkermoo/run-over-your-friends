@@ -19,6 +19,7 @@ local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local ServerGoals = require(ReplicatedStorage.Shared.Config.ServerGoals)
 local Pins = require(ReplicatedStorage.Shared.Rules.Pins)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -74,40 +75,19 @@ local function keysOf(list: { Pins.Pin }): string
 	return table.concat(keys, ",")
 end
 
--- a pushpin drawn from frames (emoji pins don't draw everywhere): a square head, a collar, a needle,
--- all tilted. Returns the holder; tint it with PinnedGoals.tintPin.
-function PinnedGoals.pinIcon(parent: Instance, size: number, color: Color3): Frame
-	local holder = Instance.new("Frame")
-	holder.Name = "PinIcon"
-	holder.BackgroundTransparency = 1
-	holder.AnchorPoint = Vector2.new(0.5, 0.5)
-	holder.Position = UDim2.fromScale(0.5, 0.5)
-	holder.Size = UDim2.fromOffset(size, size)
-	holder.Rotation = 35
-	holder.Parent = parent
-	local function piece(x: number, y: number, w: number, h: number)
-		local f = Instance.new("Frame")
-		f.BorderSizePixel = 0
-		f.BackgroundColor3 = color
-		f.AnchorPoint = Vector2.new(0.5, 0)
-		f.Position = UDim2.fromScale(x, y)
-		f.Size = UDim2.fromScale(w, h)
-		f.ZIndex = 4
-		f.Parent = holder
-	end
-	piece(0.5, 0.0, 0.62, 0.22) -- head
-	piece(0.5, 0.22, 0.34, 0.26) -- body
-	piece(0.5, 0.46, 0.78, 0.12) -- collar
-	piece(0.5, 0.58, 0.1, 0.42) -- needle
-	return holder
+-- a push-pin (Config/Icons.Pin, tilted, white so it takes the colour). Tint it with PinnedGoals.tintPin.
+function PinnedGoals.pinIcon(parent: Instance, size: number, color: Color3): ImageLabel
+	local icon = Style.image(parent, Icons.Pin, color)
+	icon.Name = "PinIcon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromOffset(size, size)
+	icon.ZIndex = 4
+	return icon
 end
 
-function PinnedGoals.tintPin(icon: Frame, color: Color3)
-	for _, f in icon:GetChildren() do
-		if f:IsA("Frame") then
-			f.BackgroundColor3 = color
-		end
-	end
+function PinnedGoals.tintPin(icon: ImageLabel, color: Color3)
+	icon.ImageColor3 = color
 end
 
 local function shortNumber(n: number): string

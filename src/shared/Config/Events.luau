@@ -99,7 +99,8 @@ return table.freeze({
 		AboveHead = 40, -- layout px: the on-screen marker sits this far above the giant's head
 		PlateWidth = 104, -- layout px
 		PlateHeight = 50,
-		Pointer = 22, -- layout px: the diamond that points the way
+		Pointer = 22, -- layout px: the room the pointer takes past the plate's edge
+		PointerImage = 36, -- layout px: the pointer image's box (the wedge fills about two thirds of it)
 		ClearGap = 10, -- layout px kept between the plate and the controls card or speedometer (Rules/Clear)
 		ScanSeconds = 0.5, -- how often to look for the giant in the crowd
 		Unit = "m", -- distance label: one stud is one of these

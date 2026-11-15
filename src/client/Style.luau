@@ -421,6 +421,17 @@ function Style.laneGaps(back: Frame, behind: Color3)
 	end
 end
 
+-- one of the HUD's shape images (Config/Icons), fitted into its box; color tints the white ones
+function Style.image(parent: Instance, id: number, color: Color3?): ImageLabel
+	local img = Instance.new("ImageLabel")
+	img.BackgroundTransparency = 1
+	img.Image = if id ~= 0 then `rbxassetid://{id}` else ""
+	img.ScaleType = Enum.ScaleType.Fit
+	img.ImageColor3 = color or C.text
+	img.Parent = parent
+	return img
+end
+
 -- a square paint tag ("TUTORIAL", "HOURLY")
 function Style.pill(parent: Instance, text: string, color: Color3): TextLabel
 	local p = Style.label(parent, text, 12, F.heavy, C.ink)
