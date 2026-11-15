@@ -30,6 +30,6 @@ return table.freeze({
 	Passes = table.freeze({
 		Roadster = 2088464699,
 		DoubleMoney = 2087894764,
-		VIP = 2088303771, -- 99 R$: gold VIP tag (Config/Vip), VipMoney, the VIP Gold paint (Config/Paints)
+		VIP = 2087931824, -- 99 R$: gold VIP tag (Config/Vip), VipMoney, the VIP Gold paint (Config/Paints)
 	}),
 })
