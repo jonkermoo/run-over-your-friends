@@ -80,16 +80,39 @@ return table.freeze({
 		MinPart = 3,
 		Inset = 0.6,
 	}),
-	-- the spawn plaza's dressing (MapBuilder dressSpawnPlaza): paving bands, the trophy, planters, stalls, flags
+	-- the spawn plaza (MapBuilder spawnPlaza, dressSpawnPlaza): a roundabout hub. A grass island in the middle
+	-- holds the Hall of Fame tower (an all-time board on all four sides, the gold trophy on its roof); the spawn
+	-- pads stand in a ring round it, each facing out onto a painted one-way ring road with four exits to the
+	-- streets; the crowd waits at the four corners by the food stalls. All distances in studs from the middle.
 	SpawnPlaza = table.freeze({
 		SeedOffset = 77, -- its own random stream (trees), so the town's layout doesn't shift
-		Band = { 186, 92, 66 }, -- terracotta paving: the ring round the fountain and the border
-		Ring = 64, -- inside the spawn pads' inner corners (about 35 out)
+		Band = { 186, 92, 66 }, -- terracotta paving: the island's kerb and the plaza's border
 		Border = 6,
 		Gold = { 255, 196, 48 },
 		Stone = { 224, 214, 196 },
-		Planters = table.freeze({ { 82, 82 }, { 56, 88 }, { 88, 56 } }), -- x, z out from the middle, each corner
-		StallReach = 72, -- the food stalls stand on the diagonals this far out
+		Island = 24, -- grass island radius
+		Kerb = 3, -- terracotta kerb round it
+		IslandTop = 0.3, -- near flush: a flat car collider stops dead on a 0.5 kerb
+		Pads = 12,
+		PadRadius = 44, -- pad centres, between the island and the ring road
+		PadSize = 10,
+		PadAngle = 15, -- degrees: the first pad's angle, so no pad sits on an exit's line
+		RingInner = 58, -- the ring road's asphalt
+		RingOuter = 78,
+		RingDashes = 24, -- yellow dashes along its middle
+		RingArrows = 8, -- white one-way arrows (anticlockwise seen from above)
+		ExitWidth = 28, -- asphalt from the ring out to each side street
+		Tower = table.freeze({
+			Width = 28, -- square footprint
+			Height = 42, -- top of the block; the trophy stands on it
+			FaceWidth = 26, -- a board face on each side
+			FaceHeight = 32,
+			FaceBottom = 7,
+			TrophyScale = 1.6, -- the gold trophy on its roof, against the old 16-stud plaza trophy
+		}),
+		Corner = table.freeze({ reach = 92, spread = 11, people = 6 }), -- the crowd at each corner
+		Planters = table.freeze({ { 56, 88 }, { 88, 56 } }), -- x, z out from the middle, each corner
+		StallReach = 106, -- the food stalls stand on the diagonals this far out
 		Stalls = table.freeze({
 			table.freeze({ text = "HOT DOGS", colour = { 232, 60, 60 } }),
 			table.freeze({ text = "ICE CREAM", colour = { 236, 90, 160 } }),

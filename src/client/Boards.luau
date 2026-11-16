@@ -1,7 +1,8 @@
 --!strict
--- Draws the weekly leaderboards on the board stands at the spawn plaza (parts named Board_<key>):
--- title, a reset countdown, and the top 10 with rank badges, avatar headshots, names and scores.
--- Your own row is outlined in gold.
+-- Draws the leaderboards at the spawn plaza (parts named Board_<key>): the weekly ones on the stands, the
+-- all-time one on each face of the Hall of Fame tower. Title, a tag (THIS WEEK and a reset countdown, or the
+-- all-time board's tag), and the top 10 with rank badges, avatar headshots, names and scores. Your own row is
+-- outlined in gold.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,10 +21,10 @@ local Boards = {}
 type Entry = { userId: number, name: string, value: number }
 type View = { gui: SurfaceGui, list: Frame, countdown: TextLabel, board: Config.Board }
 
-local PPS = 14 -- pixels per stud on the board face (52 x 46 studs → 728 x 644 px)
+local WIDTH_PX = 728 -- every face is laid out this wide (a 52-stud stand at 14 px per stud)
 local LIST_TOP, LIST_BOTTOM = 146, 16
 local MEDALS = { C.yellow, Color3.fromRGB(225, 230, 240), C.orange }
-local views: { [string]: View } = {}
+local views: { [string]: { View } } = {} -- one per face
 local headshots: { [number]: string } = {}
 local endsAt, clockOffset = 0, 0
 
@@ -66,7 +67,7 @@ local function build(part: BasePart, board: Config.Board): View
 	gui.Adornee = part
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = PPS
+	gui.PixelsPerStud = WIDTH_PX / part.Size.X
 	gui.LightInfluence = 0
 	gui.MaxDistance = 400
 	gui.ResetOnSpawn = false
@@ -106,7 +107,7 @@ local function build(part: BasePart, board: Config.Board): View
 	local title = Style.label(bg, board.title, 58, F.display, C.text)
 	title.Position = UDim2.fromOffset(0, 30)
 	title.Size = UDim2.new(1, 0, 0, 56)
-	local week = Style.pill(bg, "THIS WEEK", accent)
+	local week = Style.pill(bg, board.tag or "THIS WEEK", accent)
 	week.AnchorPoint = Vector2.new(0.5, 0)
 	week.Position = UDim2.new(0.5, 0, 0, 88)
 	week.TextSize = 18
@@ -133,7 +134,8 @@ local function fill(view: View, entries: { Entry })
 		return
 	end
 	local face = view.gui.Adornee :: BasePart
-	local rowH = math.floor((face.Size.Y * PPS - LIST_TOP - LIST_BOTTOM) / Config.Top)
+	local rowH =
+		math.floor((face.Size.Y * view.gui.PixelsPerStud - LIST_TOP - LIST_BOTTOM) / Config.Top)
 	for i, e in entries do
 		local row = Style.card(view.list)
 		row.Position = UDim2.fromOffset(0, (i - 1) * rowH)
@@ -184,11 +186,19 @@ local function attach()
 		return
 	end
 	for _, board in Config.Boards do
-		local part = stands:WaitForChild("Board_" .. board.key, 30) :: BasePart?
-		if part then
-			views[board.key] = build(part, board)
-			fill(views[board.key], latest[board.key] or {})
+		local name = "Board_" .. board.key
+		if not stands:WaitForChild(name, 30) then
+			continue
 		end
+		local list = {}
+		for _, part in stands:GetChildren() do
+			if part.Name == name and part:IsA("BasePart") then
+				local view = build(part, board)
+				fill(view, latest[board.key] or {})
+				table.insert(list, view)
+			end
+		end
+		views[board.key] = list
 	end
 end
 
@@ -200,8 +210,10 @@ function Boards.start()
 		endsAt = payload.endsAt or 0
 		clockOffset = (payload.now or os.time()) - os.time()
 		latest = payload.boards or {}
-		for key, view in views do
-			fill(view, latest[key] or {})
+		for key, list in views do
+			for _, view in list do
+				fill(view, latest[key] or {})
+			end
 		end
 	end)
 	task.spawn(attach)
@@ -212,8 +224,12 @@ function Boards.start()
 		end
 		last = os.clock()
 		local left = endsAt - (os.time() + clockOffset)
-		for _, view in views do
-			view.countdown.Text = if endsAt > 0 then "resets in " .. fmt(left) else ""
+		for _, list in views do
+			for _, view in list do
+				view.countdown.Text = if endsAt > 0 and not view.board.allTime
+					then "resets in " .. fmt(left)
+					else ""
+			end
 		end
 	end)
 end

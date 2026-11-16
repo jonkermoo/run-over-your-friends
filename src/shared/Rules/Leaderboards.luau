@@ -70,6 +70,8 @@ function Leaderboards.value(stats: Stats, key: string): number
 		return stats.launch
 	elseif key == "Combo" then
 		return stats.combo
+	elseif key == "HitsAll" then
+		return stats.allHits
 	end
 	return 0
 end

@@ -6,6 +6,9 @@
 return table.freeze({
 	BigCarPrice = 100000, -- cars at or over this shop price hit with the Big terms (Bulldozer and up)
 	SpawnShield = 3, -- seconds after a spawn when nobody can hit you
+	-- the whole spawn block (World.Map.BlockSize, kerb to kerb) is a safe zone: players on foot and their cars
+	-- there can't be hit; it reaches this many studs past the kerb into the roads round it
+	SafeZoneMargin = 0,
 	-- the same attacker hitting the same player again within RepeatWindow seconds of their last hit
 	-- does RepeatFactor as much each time, never under RepeatFloor (Big cars skip this)
 	RepeatWindow = 60,

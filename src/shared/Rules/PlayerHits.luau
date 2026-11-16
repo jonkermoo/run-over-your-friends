@@ -51,4 +51,17 @@ function PlayerHits.repeatScale(earlier: number, price: number, cfg: Config): nu
 	return math.max(cfg.RepeatFloor, cfg.RepeatFactor ^ earlier)
 end
 
+-- inside the spawn safe zone: a square `half` studs each way (flat) from `centre`; nobody there can be hit
+function PlayerHits.safe(pos: Vector3, centre: Vector3, half: number): boolean
+	return math.abs(pos.X - centre.X) <= half and math.abs(pos.Z - centre.Z) <= half
+end
+
+-- the same, reading the zone from workspace's attributes SafeZoneCentre and SafeZoneHalf (set by MapBuilder);
+-- false while they aren't set
+function PlayerHits.inSafeZone(pos: Vector3, centre: unknown, half: unknown): boolean
+	return typeof(centre) == "Vector3"
+		and typeof(half) == "number"
+		and PlayerHits.safe(pos, centre :: Vector3, half :: number)
+end
+
 return PlayerHits

@@ -14,6 +14,7 @@ local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Parks = require(ReplicatedStorage.Shared.Config.Parks)
 local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
+local HitConfig = require(ReplicatedStorage.Shared.Config.PlayerHits)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
@@ -115,56 +116,82 @@ local function paint(parent: Instance, size: Vector2, cf: CFrame, color: Color3)
 	return p
 end
 
--- the spawn plaza's road paint: dashed yellow lanes out from the fountain, numbered white parking bays
--- round the four spawn pads, and big white chevrons near each edge pointing out to the streets
+-- a flat disc of paint lying on the plaza, centred at `at` (no collisions, no raycasts)
+local function paintDisc(parent: Instance, dia: number, at: Vector3, color: Color3): Part
+	local p = paint(parent, Vector2.new(dia, dia), CFrame.new(at), color)
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(0.05, dia, dia)
+	p.CFrame = CFrame.new(at) * CFrame.Angles(0, 0, math.pi / 2)
+	return p
+end
+
+-- a white chevron of two bars on the ground, its point at `tip` facing along `dir` (flat)
+local function chevron(parent: Instance, tip: Vector3, dir: Vector3, bar: number, width: number)
+	local yaw = math.atan2(dir.X, dir.Z) + math.pi -- turned so the point faces `dir`
+	local reach = bar * 0.29
+	for _, side in { -1, 1 } do
+		local cf = CFrame.new(tip)
+			* CFrame.Angles(0, yaw, 0)
+			* CFrame.new(side * reach, 0, -reach)
+			* CFrame.Angles(0, side * math.rad(45), 0)
+		paint(parent, Vector2.new(width, bar), cf, PAINT_WHITE)
+	end
+end
+
+-- the spawn pads' spots (World.SpawnPlaza): a ring round the middle, each with the way out it faces
+local function padSpots(cx: number, cz: number): { { at: Vector3, out: Vector3 } }
+	local SP = World.SpawnPlaza
+	local spots = {}
+	for k = 0, SP.Pads - 1 do
+		local a = math.rad(SP.PadAngle) + k / SP.Pads * math.pi * 2
+		local out = Vector3.new(math.cos(a), 0, math.sin(a))
+		table.insert(spots, { at = Vector3.new(cx, 0, cz) + out * SP.PadRadius, out = out })
+	end
+	return spots
+end
+
+-- the spawn plaza's road paint (World.SpawnPlaza): the ring road's asphalt and four exits out to the streets,
+-- a dashed yellow line round its middle, white one-way arrows (anticlockwise seen from above), big white
+-- chevrons at each exit pointing out, and each spawn pad's number painted just outside it
 local function paintPlaza(parent: Instance, cx: number, cz: number, inner: number)
+	local SP = World.SpawnPlaza
 	local folder = Instance.new("Folder")
 	folder.Name = "Paint"
 	folder.Parent = parent
-	local y = 0.12 + World.Look.PaintLift
+	local y = 0.11 + World.Look.PaintLift -- three layers 0.02 apart: asphalt, paving back over it, markings
 	local half = inner / 2
+	local centre = Vector3.new(cx, y, cz)
+	local asphalt = Color3.fromRGB(64, 66, 74)
+	paintDisc(folder, SP.RingOuter * 2, centre, asphalt)
+	paintDisc(folder, SP.RingInner * 2, centre + Vector3.new(0, 0.02, 0), COLORS.plaza).Material =
+		Enum.Material.Pavement
+	local mark = centre + Vector3.new(0, 0.04, 0)
+	local mid = (SP.RingInner + SP.RingOuter) / 2
 	for _, dir in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
-		local along = if math.abs(dir.X) > 0 then Vector2.new(4, 0.8) else Vector2.new(0.8, 4)
-		for d = 24, half - 20, 7 do
-			paint(folder, along, CFrame.new(cx + dir.X * d, y, cz + dir.Z * d), PAINT_YELLOW)
-		end
-		-- a chevron of two bars pointing outwards
-		local tip = Vector3.new(cx, y, cz) + dir * (half - 12)
-		local yaw = math.atan2(dir.X, dir.Z) + math.pi -- turned so the point faces the street
-		for _, side in { -1, 1 } do
-			local cf = CFrame.new(tip)
-				* CFrame.Angles(0, yaw, 0)
-				* CFrame.new(side * 3.2, 0, -3.2)
-				* CFrame.Angles(0, side * math.rad(45), 0)
-			paint(folder, Vector2.new(2, 11), cf, PAINT_WHITE)
-		end
+		local from = SP.RingOuter - 6
+		local length = half - from
+		local size = if math.abs(dir.X) > 0
+			then Vector2.new(length, SP.ExitWidth)
+			else Vector2.new(SP.ExitWidth, length)
+		paint(folder, size, CFrame.new(centre + dir * (from + length / 2)), asphalt)
+		chevron(folder, mark + dir * (half - 12), dir, 11, 2)
 	end
-	for s = 0, 3 do
-		local px = cx + (s % 2 - 0.5) * 60
-		local pz = cz + (math.floor(s / 2) - 0.5) * 60
-		for _, edge in
-			{
-				{ 0, -7.5, 15.6, 0.7 },
-				{ 0, 7.5, 15.6, 0.7 },
-				{ -7.5, 0, 0.7, 15.6 },
-				{ 7.5, 0, 0.7, 15.6 },
-			}
-		do
-			paint(
-				folder,
-				Vector2.new(edge[3], edge[4]),
-				CFrame.new(px + edge[1], y, pz + edge[2]),
-				PAINT_WHITE
-			)
-		end
-		-- the bay number painted just outside the pad, on the side away from the fountain
-		local out = Vector3.new(px - cx, 0, pz - cz).Unit
-		local tag = paint(
-			folder,
-			Vector2.new(9, 6),
-			CFrame.new(px + out.X * 13, y, pz + out.Z * 13),
-			PAINT_WHITE
-		)
+	for k = 0, SP.RingDashes - 1 do
+		local a = (k + 0.5) / SP.RingDashes * math.pi * 2
+		local at = mark + Vector3.new(math.cos(a), 0, math.sin(a)) * mid
+		local along = Vector3.new(math.sin(a), 0, -math.cos(a))
+		paint(folder, Vector2.new(0.8, 5), CFrame.lookAt(at, at + along), PAINT_YELLOW)
+	end
+	-- anticlockwise from above: from +X (east) round to -Z (north)
+	local lane = (mid + SP.RingOuter) / 2
+	for k = 0, SP.RingArrows - 1 do
+		local a = (k + 0.25) / SP.RingArrows * math.pi * 2
+		local at = mark + Vector3.new(math.cos(a), 0, math.sin(a)) * lane
+		chevron(folder, at, Vector3.new(math.sin(a), 0, -math.cos(a)), 6, 1.2)
+	end
+	for n, spot in padSpots(cx, cz) do
+		local at = spot.at + spot.out * (SP.PadSize / 2 + 3.5)
+		local tag = paint(folder, Vector2.new(7, 5), CFrame.new(at.X, mark.Y, at.Z), PAINT_WHITE)
 		tag.Transparency = 1
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = Enum.NormalId.Top
@@ -175,11 +202,11 @@ local function paintPlaza(parent: Instance, cx: number, cz: number, inner: numbe
 		local label = Instance.new("TextLabel")
 		label.BackgroundTransparency = 1
 		label.Size = UDim2.fromScale(1, 1)
-		label.Text = string.format("%02d", s + 1)
+		label.Text = string.format("%02d", n)
 		label.TextScaled = true
 		label.TextColor3 = PAINT_WHITE
 		label.FontFace = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
-		label.Rotation = math.deg(math.atan2(out.X, out.Z)) + 180 -- reads from the pad
+		label.Rotation = math.deg(math.atan2(spot.out.X, spot.out.Z)) + 180 -- reads from the pad
 		label.Parent = gui
 	end
 end
@@ -201,15 +228,20 @@ local function dressSpawnPlaza(
 	local half = inner / 2
 	local band = rgb(SP.Band)
 	local yBand = 0.1 + World.Look.PaintLift / 2
-	-- a ring round the fountain and a border inside the plaza's edge
-	local ring = part(
-		static,
-		Vector3.new(0.1, SP.Ring, SP.Ring),
-		CFrame.new(cx, yBand, cz) * CFrame.Angles(0, 0, math.pi / 2),
-		band
-	)
-	ring.Shape = Enum.PartType.Cylinder
-	ring.CanCollide, ring.CanQuery, ring.CanTouch, ring.CastShadow = false, false, false, false
+	-- the grass island in the middle with a terracotta kerb (the Hall of Fame tower stands on it), and a
+	-- border inside the plaza's edge
+	local function slab(radius: number, top: number, colour: Color3, material: Enum.Material)
+		local p = part(
+			static,
+			Vector3.new(top + 0.4, radius * 2, radius * 2),
+			CFrame.new(cx, (top - 0.4) / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
+			colour,
+			material
+		)
+		p.Shape = Enum.PartType.Cylinder
+	end
+	slab(SP.Island + SP.Kerb, SP.IslandTop - 0.05, band, Enum.Material.Pavement)
+	slab(SP.Island, SP.IslandTop, COLORS.grass, Enum.Material.Grass)
 	for _, e in { -1, 1 } do
 		paint(
 			static,
@@ -224,58 +256,6 @@ local function dressSpawnPlaza(
 			band
 		)
 	end
-	-- the trophy: a two-step plinth, a dark pedestal, a gold cup with handles and a star on top
-	local trophy = Instance.new("Model")
-	trophy.Name = "Trophy"
-	trophy.Parent = static
-	local gold = rgb(SP.Gold)
-	local function cyl(h: number, dia: number, y: number, colour: Color3, mat: Enum.Material?): Part
-		local p = part(
-			trophy,
-			Vector3.new(h, dia, dia),
-			CFrame.new(cx, y + h / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
-			colour,
-			mat
-		)
-		p.Shape = Enum.PartType.Cylinder
-		return p
-	end
-	cyl(2.4, 18, 0, COLORS.concrete, Enum.Material.Concrete)
-	cyl(2, 13, 2.4, rgb(SP.Stone), Enum.Material.Limestone)
-	part(trophy, Vector3.new(7, 5, 7), CFrame.new(cx, 6.9, cz), PAINT_BLACK)
-	part(trophy, Vector3.new(7.4, 0.6, 7.4), CFrame.new(cx, 9.6, cz), gold, Enum.Material.Foil)
-	cyl(1.2, 5, 9.4, gold, Enum.Material.Foil)
-	cyl(4, 2, 10.6, gold, Enum.Material.Foil)
-	local bowl = part(trophy, Vector3.one * 9, CFrame.new(cx, 17.6, cz), gold, Enum.Material.Foil)
-	bowl.Shape = Enum.PartType.Ball
-	cyl(5, 9, 17.6, gold, Enum.Material.Foil)
-	cyl(0.8, 9.8, 22.4, gold, Enum.Material.Foil)
-	for _, e in { -1, 1 } do
-		part(
-			trophy,
-			Vector3.new(1, 6, 1),
-			CFrame.new(cx + e * 6.6, 19.4, cz),
-			gold,
-			Enum.Material.Foil
-		)
-		part(
-			trophy,
-			Vector3.new(2.6, 1, 1),
-			CFrame.new(cx + e * 5.4, 22, cz),
-			gold,
-			Enum.Material.Foil
-		)
-		part(
-			trophy,
-			Vector3.new(2.6, 1, 1),
-			CFrame.new(cx + e * 5.4, 16.8, cz),
-			gold,
-			Enum.Material.Foil
-		)
-	end
-	local star =
-		part(trophy, Vector3.one * 2.6, CFrame.new(cx, 24.4, cz), PAINT_YELLOW, Enum.Material.Neon)
-	star.Shape = Enum.PartType.Ball
 	-- trees in planters on the diagonals near the corners
 	for _, sx in { -1, 1 } do
 		for _, sz in { -1, 1 } do
@@ -378,6 +358,88 @@ local function dressSpawnPlaza(
 				false
 		end
 	end
+end
+
+-- the Hall of Fame tower on the spawn plaza's island (World.SpawnPlaza.Tower): a black block on a concrete
+-- step with an all-time board face on each side (parts named Board_<key>; the client draws them), yellow
+-- bands, and the gold trophy (cup, handles, star) standing on its roof
+local function hallOfFame(boards: Instance, static: Instance, cx: number, cz: number, key: string)
+	local SP = World.SpawnPlaza
+	local T = SP.Tower
+	local w, h, base = T.Width, T.Height, SP.IslandTop
+	part(
+		boards,
+		Vector3.new(w + 4, 1, w + 4),
+		CFrame.new(cx, base + 0.5, cz),
+		COLORS.concrete,
+		Enum.Material.Concrete
+	)
+	part(
+		boards,
+		Vector3.new(w, h - base - 1, w),
+		CFrame.new(cx, (h + base + 1) / 2, cz),
+		PAINT_BLACK
+	)
+	part(boards, Vector3.new(w + 1.6, 1.6, w + 1.6), CFrame.new(cx, h + 0.8, cz), PAINT_YELLOW)
+	local faceY = T.FaceBottom + T.FaceHeight / 2
+	for _, out in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
+		local at = Vector3.new(cx, faceY, cz) + out * (w / 2 + 0.3)
+		local frame = CFrame.lookAt(at, at + out)
+		local face = part(
+			boards,
+			Vector3.new(T.FaceWidth, T.FaceHeight, 0.6),
+			frame,
+			Color3.fromRGB(24, 24, 38)
+		)
+		face.Name = "Board_" .. key
+		for _, e in { -1, 1 } do
+			part(
+				boards,
+				Vector3.new(T.FaceWidth + 1, 1.2, 1),
+				frame * CFrame.new(0, e * (T.FaceHeight / 2 + 0.6), 0),
+				PAINT_YELLOW
+			)
+		end
+	end
+	-- the trophy, built from its foot at `top` and scaled by TrophyScale
+	local trophy = Instance.new("Model")
+	trophy.Name = "Trophy"
+	trophy.Parent = static
+	local gold = rgb(SP.Gold)
+	local s, top = T.TrophyScale, h + 1.6
+	local function piece(size: Vector3, x: number, y: number, shape: Enum.PartType?): Part
+		local p = part(
+			trophy,
+			size * s,
+			CFrame.new(cx + x * s, top + y * s, cz),
+			gold,
+			Enum.Material.Foil
+		)
+		p.CanCollide = false
+		if shape then
+			p.Shape = shape
+		end
+		return p
+	end
+	local function cyl(height: number, dia: number, y: number): Part
+		local p = piece(Vector3.new(height, dia, dia), 0, y + height / 2, Enum.PartType.Cylinder)
+		p.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
+		return p
+	end
+	piece(Vector3.new(7.4, 0.6, 7.4), 0, 0.3)
+	cyl(1.2, 5, 0.6)
+	cyl(4, 2, 1.8)
+	piece(Vector3.one * 9, 0, 8.8, Enum.PartType.Ball)
+	cyl(5, 9, 8.8)
+	cyl(0.8, 9.8, 13.6)
+	for _, e in { -1, 1 } do
+		piece(Vector3.new(1, 6, 1), e * 6.6, 10.6)
+		piece(Vector3.new(2.6, 1, 1), e * 5.4, 13.2)
+		piece(Vector3.new(2.6, 1, 1), e * 5.4, 8)
+	end
+	local star = piece(Vector3.one * 2.6, 0, 15.6, Enum.PartType.Ball)
+	star.Color = PAINT_YELLOW
+	star.Material = Enum.Material.Neon
 end
 
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
@@ -632,7 +694,7 @@ function MapBuilder.build(): Result
 				math.max(math.abs(i - centreI + 0.5), math.abs(j - centreJ + 0.5))
 			local kind = plan[i][j]
 			if kind == "spawn" then
-				-- spawn plaza
+				-- spawn plaza: a roundabout hub (World.SpawnPlaza)
 				part(
 					static,
 					Vector3.new(inner, 1, inner),
@@ -640,32 +702,26 @@ function MapBuilder.build(): Result
 					COLORS.plaza,
 					Enum.Material.Pavement
 				)
-				for s = 0, 3 do
+				-- the pads in a ring round the island, each facing out onto the ring road; just above the
+				-- road paint so they show
+				for _, spot in padSpots(cx, cz) do
 					local sp = Instance.new("SpawnLocation")
 					sp.Anchored = true
-					sp.Size = Vector3.new(10, 1, 10)
-					-- each pad faces out to the side street nearest it (west pads west, east pads east), so
-					-- a first drive heads straight for the road, not into the leaderboard stands on the north side
-					sp.CFrame = CFrame.new(
-						cx + (s % 2 - 0.5) * 60,
-						-0.36,
-						cz + (math.floor(s / 2) - 0.5) * 60
-					) * CFrame.Angles(0, if s % 2 == 0 then math.pi / 2 else -math.pi / 2, 0)
+					sp.Size = Vector3.new(World.SpawnPlaza.PadSize, 1, World.SpawnPlaza.PadSize)
+					local at = spot.at + Vector3.new(0, -0.29, 0)
+					sp.CFrame = CFrame.lookAt(at, at + spot.out)
 					sp.Color = COLORS.ramp
 					sp.Material = Enum.Material.SmoothPlastic
 					sp.Duration = 0
 					sp.Parent = static
 				end
-				local f = Instance.new("Part")
-				f.Shape = Enum.PartType.Cylinder
-				f.Anchored = true
-				f.Size = Vector3.new(0.6, 40, 40) -- flat, so new drivers don't beach on it
-				f.CFrame = CFrame.new(cx, 0.05, cz) * CFrame.Angles(0, 0, math.pi / 2)
-				f.Color = COLORS.concrete
-				f.Parent = static
+				-- the whole block is a safe zone: nobody in it can be hit by a player (PlayerHitService, Drive)
+				workspace:SetAttribute("SafeZoneCentre", Vector3.new(cx, 0, cz))
+				workspace:SetAttribute("SafeZoneHalf", B / 2 + HitConfig.SafeZoneMargin)
 				paintPlaza(static, cx, cz, inner)
 				dressSpawnPlaza(static, props, cx, cz, inner)
-				-- leaderboard stands on the north sidewalk, facing the plaza (the client draws the boards)
+				-- leaderboard stands on the north sidewalk, facing the plaza, and the Hall of Fame tower on the
+				-- island (the client draws the boards)
 				local boards = Instance.new("Model")
 				boards.Name = "Boards"
 				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
@@ -681,7 +737,13 @@ function MapBuilder.build(): Result
 						PAINT_BLACK
 					)
 				end
-				for k, board in Leaderboards.Boards do
+				local k = 0
+				for _, board in Leaderboards.Boards do
+					if board.allTime then
+						hallOfFame(boards, static, cx, cz, board.key)
+						continue
+					end
+					k += 1
 					local bx = cx + (k - 2) * 62
 					local bz = cz - B / 2 + 6
 					local face = part(
@@ -732,13 +794,17 @@ function MapBuilder.build(): Result
 						)
 					end
 				end
-				-- the first crowd: right in front of where new players appear
-				for k = 1, 24 do
-					local a = k / 24 * math.pi * 2
-					local r = if k % 2 == 0 then 50 else 80
-					local p = centre + Vector3.new(math.cos(a) * r, 0.5, math.sin(a) * r)
-					table.insert(walkPoints, p)
-					table.insert(crowdPoints, p)
+				-- the first crowd: at the four corners, a short drive out from the pads
+				local corner = World.SpawnPlaza.Corner
+				for _, c in { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } } do
+					local at = centre + Vector3.new(c[1], 0, c[2]) * (corner.reach / math.sqrt(2))
+					for n = 1, corner.people do
+						local a = n / corner.people * math.pi * 2
+						local r = if n % 2 == 0 then corner.spread else corner.spread * 0.45
+						local p = at + Vector3.new(math.cos(a) * r, 0.5, math.sin(a) * r)
+						table.insert(walkPoints, p)
+						table.insert(crowdPoints, p)
+					end
 				end
 				addPlace(Places.open("spawn", centre, crowdPoints), i, j)
 			elseif kind == "office" then

@@ -20,6 +20,7 @@ local FlightRules = require(ReplicatedStorage.Shared.Rules.Flight)
 local Ground = require(ReplicatedStorage.Shared.Ground)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Net = require(ReplicatedStorage.Shared.Net)
+local PlayerHits = require(ReplicatedStorage.Shared.Rules.PlayerHits)
 local Smash = require(ReplicatedStorage.Shared.Config.Smash)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local Unstuck = require(ReplicatedStorage.Shared.Config.Unstuck)
@@ -841,6 +842,17 @@ local function detectHits(s: CarState, velocity: Vector3)
 				if m and Players:GetPlayerFromCharacter(m) then
 					target = m
 				end
+			end
+			-- nobody in the spawn safe zone can be hit (the server checks it too)
+			if
+				target
+				and PlayerHits.inSafeZone(
+					target:GetPivot().Position,
+					workspace:GetAttribute("SafeZoneCentre"),
+					workspace:GetAttribute("SafeZoneHalf")
+				)
+			then
+				target = nil
 			end
 			if target and (wreckAt[target] or 0) + 1 < now then
 				wreckAt[target] = now

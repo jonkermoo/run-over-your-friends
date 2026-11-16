@@ -454,6 +454,52 @@ check(
 	"new week resets weekly only",
 	Lb.roll(st, 6) and st.hits == 0 and st.launch == 0 and st.allHits == 3 and st.allLaunch == 120
 )
+check("all-time board keeps counting", Lb.value(st, "HitsAll") == 3 and Lb.value(st, "Hits") == 0)
+do
+	local weeklyBoards, allTimeBoards = 0, 0
+	for _, board in LbConfig.Boards do
+		if board.allTime then
+			allTimeBoards += 1
+		else
+			weeklyBoards += 1
+		end
+	end
+	check(
+		"3 weekly boards on the stand, 1 all-time tower",
+		weeklyBoards == 3 and allTimeBoards == 1
+	)
+end
+
+-- spawn plaza (roundabout hub) fits together
+do
+	local SP = World.SpawnPlaza
+	local T = SP.Tower
+	local inner = World.Map.BlockSize - World.Map.SidewalkWidth * 2
+	local padIn, padOut = SP.PadRadius - SP.PadSize * 0.71, SP.PadRadius + SP.PadSize * 0.71
+	check("tower stands on the island", T.Width * 0.71 + 2 < SP.Island)
+	check(
+		"pads sit between the island kerb and the ring road",
+		padIn > SP.Island + SP.Kerb and padOut < SP.RingInner
+	)
+	check("pads don't touch", 2 * math.pi * SP.PadRadius / SP.Pads > SP.PadSize * 1.5)
+	check("ring road inside the plaza", SP.RingOuter < inner / 2 - SP.Border)
+	check("corner crowd is past the ring road", SP.Corner.reach - SP.Corner.spread > SP.RingOuter)
+	check(
+		"board faces fit the tower",
+		T.FaceWidth < T.Width and T.FaceBottom + T.FaceHeight < T.Height
+	)
+end
+
+-- the spawn safe zone
+do
+	local V3 = require("@lune/roblox").Vector3
+	local PlayerHitRules = require("../src/shared/Rules/PlayerHits")
+	local c = V3.new(100, 0, -50)
+	check("safe inside the block", PlayerHitRules.safe(V3.new(200, 30, 50), c, 110))
+	check("not safe past the kerb", not PlayerHitRules.safe(V3.new(211, 0, -50), c, 110))
+	check("no zone set, not safe", not PlayerHitRules.inSafeZone(c, nil, nil))
+	check("zone from attributes", PlayerHitRules.inSafeZone(c, c, 110))
+end
 local ranked = Lb.rank({
 	{ userId = 3, name = "c", value = 5 },
 	{ userId = 1, name = "a", value = 9 },
