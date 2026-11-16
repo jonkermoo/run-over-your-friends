@@ -60,14 +60,15 @@ function Offer.dealState(ends: number, now: number): string
 	return if now < ends then "open" else "over"
 end
 
--- seconds left as "29:59" (or "1:02:03" past an hour), rounded up so 0:00 only shows at the end
+-- seconds left as "29:59" under an hour, else hours and minutes ("47h 59m", no ticking seconds), rounded up so
+-- 0:00 only shows at the end
 function Offer.clock(seconds: number): string
 	local s = math.max(0, math.ceil(seconds))
-	local h, m = s // 3600, (s // 60) % 60
-	if h > 0 then
-		return string.format("%d:%02d:%02d", h, m, s % 60)
+	if s >= 3600 then
+		local minutes = math.ceil(s / 60)
+		return string.format("%dh %02dm", minutes // 60, minutes % 60)
 	end
-	return string.format("%d:%02d", m, s % 60)
+	return string.format("%d:%02d", s // 60, s % 60)
 end
 
 -- still near the start: owns no vehicle priced at or above untilPrice

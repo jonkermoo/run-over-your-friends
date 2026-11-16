@@ -59,8 +59,9 @@ return table.freeze({
 	}),
 	StarterOfferAfter = 300, -- seconds of play (tutorial done) before the Starter Pack ad pops up, once a session
 	-- the pop-up's discount: a window of this many seconds starts the first time the card shows (saved per
-	-- player, never restarted); while it runs the pack sells as StarterDeal, after it only at the full price
-	StarterDealSeconds = 1800,
+	-- player, never restarted); while it runs the pack sells as StarterDeal, after it only at the full price.
+	-- 48 hours: Roblox's monetization guidelines call a discount offered only for a very short time unfair
+	StarterDealSeconds = 172800,
 	-- the pack is offered (pop-up and garage) only while the player owns no vehicle at least this dear
 	StarterUntil = "Muscle",
 	Starter = p({

@@ -291,7 +291,7 @@ local function build(gui: ScreenGui, preview: Preview)
 		Net.waitFor("BuyProduct"):FireServer(product.key)
 	end)
 	no.Activated:Connect(StarterCard.hide)
-	-- gamepad: it starts on GET IT, and B is NO THANKS
+	-- gamepad: it starts on VIEW OFFER, and B is NO THANKS
 	Pad.menu(card, {
 		first = function()
 			return buy
@@ -316,7 +316,7 @@ local function refresh()
 		Loc.set(timer, "EventEnds", { time = Offer.clock(dealEnds() - now()) })
 	end
 	buy.AutoLocalize = false
-	buy.Text = Loc.source("GET IT") .. "  ·  " .. rs(product)
+	buy.Text = Loc.source("VIEW OFFER") .. "  ·  " .. rs(product)
 end
 
 function StarterCard.isOpen(): boolean
