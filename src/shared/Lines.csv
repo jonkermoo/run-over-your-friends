@@ -96,6 +96,7 @@ ClaimReward,CLAIM ${n},,,COBRAR ${n},RESGATAR ${n}
 MaxPinned,MAX {n} PINNED,,,MÁX. {n} FIJADAS,MÁX. {n} FIXADAS
 CollectReward,COLLECT {money},,,COBRAR {money},PEGAR {money}
 StreakDay,DAY {n},,,DÍA {n},DIA {n}
+StreakSub,Day {n} in a row! Come back tomorrow for {money},,,¡{n} días seguidos! Vuelve mañana por {money},{n} dias seguidos! Volte amanhã para ganhar {money}
 StarterWorth,WORTH {money}  ·  {times}x VALUE,,,VALE {money}  ·  {times}x MÁS,VALE {money}  ·  {times}x MAIS
 StarterWorthLine,Worth {money}. Once per account.,,,Vale {money}. Una vez por cuenta.,Vale {money}. Uma vez por conta.
 OffToday,-{pct}% TODAY,,,-{pct}% HOY,-{pct}% HOJE

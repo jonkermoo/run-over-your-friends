@@ -137,9 +137,10 @@ end
 local function draw()
 	local today = math.max(state.streak, 1)
 	local reward = Daily.reward(today, Config.StreakRewards)
-	sub.Text = `Day {today} in a row! Come back tomorrow for {money(
-		Daily.reward(today + 1, Config.StreakRewards)
-	)}`
+	Loc.set(sub, "StreakSub", {
+		n = today,
+		money = money(Daily.reward(today + 1, Config.StreakRewards)),
+	})
 	Loc.set(collect, "CollectReward", { money = money(reward) })
 	-- the row shows the week this day falls in; past the 7th it slides so today stays at the end
 	local first = if today <= TILES then 1 else today - TILES + 1
