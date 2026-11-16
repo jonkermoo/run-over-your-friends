@@ -3409,6 +3409,44 @@ local function checkHideUi()
 end
 checkHideUi()
 
+-- every lettered board in the map has its drawn artwork (Config/Signs), so a new name never falls back to text
+local function checkSigns()
+	local Signs = require("../src/shared/Config/Signs")
+	local Suburbs = require("../src/shared/Config/Suburbs")
+	local function has(key: string): boolean
+		local id = Signs.Images[key]
+		return id ~= nil and id > 0
+	end
+	local all = true
+	for _, s in World.SpawnPlaza.Stalls do
+		all = all and has("Stall_" .. s.text)
+	end
+	for _, n in CrowdConfig.OfficeNames do
+		all = all and has("Office_" .. n)
+	end
+	for _, n in BuildingConfig.Shops.Names do
+		all = all and has("Shop_" .. n)
+	end
+	for _, n in Streets.Billboards do
+		all = all and has("Ad_" .. n)
+	end
+	for _, h in Suburbs.Hoods do
+		all = all and has("Suburb_" .. h.name)
+	end
+	check("signs: every stall, office, shop, ad and suburb has artwork", all)
+	local fixed = true
+	for key in Signs.Images do
+		fixed = fixed and has(key)
+	end
+	check("signs: every sign key has an image id", fixed)
+	local tiled = true
+	for key, ratio in Signs.Tiled do
+		tiled = tiled and Signs.Images[key] ~= nil and ratio > 0
+	end
+	check("signs: tiled signs are signs", tiled)
+end
+checkSigns()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

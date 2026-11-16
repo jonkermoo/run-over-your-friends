@@ -207,6 +207,9 @@ local function sign(parent: Instance, at: Vector3, face: Vector3, text: string)
 		rgb(Cfg.SignColour),
 		Enum.Material.Wood
 	)
+	if Places.art(board, "Suburb_" .. text) then
+		return
+	end
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
