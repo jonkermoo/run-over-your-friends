@@ -13,6 +13,10 @@ return table.freeze({
 	SheetBottom = 18,
 	SheetMaxWidth = 1100, -- the garage and store sheet never grows past this on big screens
 	SheetMaxHeight = 760,
+	-- the garage: the vehicle list's width, and the chosen vehicle's block under its picture (blurb, stats,
+	-- paint or price, the button); the picture takes the rest of the sheet's height
+	GarageListWidth = 330,
+	GarageDetailBottom = 196,
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,

@@ -789,18 +789,30 @@ local function update()
 		end
 		for _, c in garage:GetDescendants() do
 			if c:IsA("TextButton") and c.Name == "Action" then
-				local cardFrame = c.Parent
-				local mine = garageOpen
-					and glowCard ~= nil
-					and cardFrame ~= nil
-					and cardFrame.Name == glowCard
-				glow(c, mine)
+				-- the vehicle's detail panel (client/Hud: a frame under Details named by its id)
+				local id = c:GetAttribute("VehicleId")
+				local detailList = garage:FindFirstChild("Details")
+				local cardFrame = if typeof(id) == "string" and detailList
+					then detailList:FindFirstChild(id) :: GuiObject?
+					else nil
+				local mine = garageOpen and glowCard ~= nil and cardFrame ~= nil and id == glowCard
+				-- the garage shows one vehicle at a time: while another is shown, point at this one's row
+				local shown = cardFrame ~= nil and cardFrame.Visible
+				local rowList = garage:FindFirstChild("Rows", true)
+				local row = if mine
+						and not shown
+						and rowList
+					then rowList:FindFirstChild(id :: string) :: GuiObject?
+					else nil
+				glow(c, mine and shown)
 				if mine and (stepValue == Steps.Buy or stepValue == Steps.Spawn) then
+					local at = row or c
 					if not scrolled then
 						scrolled = true
-						bringIntoView(c)
+						bringIntoView(at)
 					end
-					pressTarget = c
+					pressTarget = at
+					pressFromSide = row ~= nil -- from the right: from above it would cover the row over it
 				end
 			end
 		end
