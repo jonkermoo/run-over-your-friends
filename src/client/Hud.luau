@@ -1,6 +1,6 @@
 --!strict
 -- Screen UI: money and pop-ups, the speedometer with jet and thruster meters, the garage (3D previews,
--- stats, buy and spawn), the store (passes, like reward, credits) and the phone driving buttons.
+-- stats, buy and spawn), the store (passes, group reward) and the phone driving buttons.
 -- Every visual comes from Style.
 
 local GroupService = game:GetService("GroupService")
@@ -1188,7 +1188,7 @@ Pad.menu(garage, {
 
 -- the store: a dark rail on the left lists its sections (DEALS, MONEY, PASSES, FREE: tap one to jump to it,
 -- LB/RB on a gamepad), and the right side is one scrolling page: the Starter Pack banner, the money packs,
--- the game passes, the group reward and the credits. The section in view names the page and lights its tab.
+-- the game passes, and the group reward. The section in view names the page and lights its tab.
 local RAIL = 200
 local store = sheetFrame(C.blue)
 store.Name = "Store"
@@ -1586,18 +1586,6 @@ groupButton.Activated:Connect(function()
 	end
 	Net.waitFor("ClaimGroup"):FireServer()
 end)
-local credits = Style.label(
-	storeList,
-	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0). "
-		.. "Roadster: simplified from a model by metarex.4d on Sketchfab (CC BY 4.0).",
-	12,
-	F.medium,
-	C.dim
-)
-credits.TextWrapped = true
-credits.Size = UDim2.new(1, -12, 0, 44)
-credits.LayoutOrder = 20
-
 ---------------- the rail: one tab per section; the section in view is lit and names the page
 
 type Section = {
