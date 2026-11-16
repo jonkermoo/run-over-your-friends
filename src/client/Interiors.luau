@@ -6,7 +6,6 @@
 -- in a vehicle, not anyone else); nothing is hit-tested, and a building being smashed loses its furniture
 -- until it's rebuilt. Inside a town building the shade indoors eases warmer and brighter.
 
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -1421,12 +1420,17 @@ local function holds(model: Model, eye: Vector3): boolean
 		and p.Y < (if typeof(h) == "number" then h else 16)
 end
 
--- indoors the shade warms and lifts (the sky can't reach in), eased so walking through a door is smooth
+-- indoors the shade warms and lifts (the sky can't reach in), eased so walking through a door is smooth.
+-- `indoors` is how far in the camera is (0..1); DayNight folds it into the outdoor light it sets each frame.
+local IN_AMBIENT =
+	Color3.fromRGB(TOWN.IndoorAmbient[1], TOWN.IndoorAmbient[2], TOWN.IndoorAmbient[3])
+local indoors = 0
+
+function Interiors.blend(outAmbient: Color3, outExposure: number): (Color3, number)
+	return outAmbient:Lerp(IN_AMBIENT, indoors), outExposure + TOWN.IndoorExposure * indoors
+end
+
 local function easeIndoors(built: { [Model]: Furnished })
-	local outAmbient, outExposure = Lighting.Ambient, Lighting.ExposureCompensation
-	local c = TOWN.IndoorAmbient
-	local inAmbient = Color3.fromRGB(c[1], c[2], c[3])
-	local inExposure = outExposure + TOWN.IndoorExposure
 	local t = 0
 	RunService.RenderStepped:Connect(function(dt)
 		local camera = workspace.CurrentCamera
@@ -1446,8 +1450,7 @@ local function easeIndoors(built: { [Model]: Furnished })
 		end
 		local step = dt / TOWN.EaseTime
 		t = if goal > t then math.min(goal, t + step) else math.max(goal, t - step)
-		Lighting.Ambient = outAmbient:Lerp(inAmbient, t)
-		Lighting.ExposureCompensation = outExposure + (inExposure - outExposure) * t
+		indoors = t
 	end)
 end
 

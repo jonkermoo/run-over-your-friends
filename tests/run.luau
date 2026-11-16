@@ -3505,6 +3505,110 @@ local function checkSigns()
 end
 checkSigns()
 
+-- day/night
+local function checkDayNight()
+	local C = require("../src/shared/Config/DayNight")
+	local DNR = require("../src/shared/Rules/DayNight")
+	local okStops, lastAt, lastClock = true, -1, -math.huge
+	for _, s in C.Stops do
+		okStops = okStops
+			and s.at > lastAt
+			and s.at < C.Cycle
+			and s.clock >= lastClock
+			and C.Looks[s.look] ~= nil
+		lastAt, lastClock = s.at, s.clock
+	end
+	check("day/night: stops rise, inside the cycle, name a look", okStops)
+	check("day/night: first stop at 0", C.Stops[1].at == 0)
+	check(
+		"day/night: the clock runs on less than a day",
+		C.Stops[#C.Stops].clock - C.Stops[1].clock < 24
+	)
+	local lookKeys, okLooks = {}, true
+	for k in C.Looks.Day do
+		lookKeys[k] = true
+	end
+	for _, look in C.Looks do
+		for k in lookKeys do
+			okLooks = okLooks and look[k] ~= nil
+		end
+		for k, v in look do
+			okLooks = okLooks and lookKeys[k] == true
+			if type(v) == "table" then
+				okLooks = okLooks and #v == 3
+				for _, n in v do
+					okLooks = okLooks and n >= 0 and n <= 255
+				end
+			end
+		end
+		okLooks = okLooks and look.Glow >= 0 and look.Glow <= 1 and look.Stars >= 0
+	end
+	check("day/night: every look has the same fields, colours in range", okLooks)
+	-- night must never be darker than the day's shade (the user's rule): outdoor shade and exposure stay up
+	local function lum(c: { number }): number
+		return (c[1] + c[2] + c[3]) / 3
+	end
+	local day = C.Looks.Day
+	local bright = true
+	for _, look in C.Looks do
+		bright = bright
+			and lum(look.OutdoorAmbient) >= lum(day.OutdoorAmbient)
+			and look.Exposure >= day.Exposure
+	end
+	check("day/night: no look lowers the outdoor shade or exposure", bright)
+	check("day/night: StartAt inside the cycle", C.StartAt >= 0 and C.StartAt < C.Cycle)
+	check("day/night: phase wraps", near(DNR.phase(1300, 0, 1, 1200), 100, 1e-9))
+	check("day/night: phase runs at speed", near(DNR.phase(10, 0, 20, 1200), 200, 1e-9))
+	local e2 = DNR.rebase(500, 0, 1, 20)
+	check(
+		"day/night: rebase keeps the time",
+		near(DNR.phase(500, e2, 20, 1200), DNR.phase(500, 0, 1, 1200), 1e-6)
+	)
+	local s0 = DNR.sample(C.Stops, C.Looks, 0, C.Cycle)
+	check("day/night: at 0 the first stop's clock", near(s0.clock, C.Stops[1].clock % 24, 1e-9))
+	local mid = DNR.sample(C.Stops, C.Looks, 400, C.Cycle)
+	check("day/night: midday is the day look", near(mid.look.Glow, 0, 1e-9) and mid.look.Stars == 0)
+	local night = DNR.sample(C.Stops, C.Looks, 1000, C.Cycle)
+	check("day/night: night has full glow", near(night.look.Glow, 1, 1e-9))
+	check("day/night: night clock past midnight wraps", night.clock >= 0 and night.clock < 24)
+	-- the clock moves smoothly all the way round, including over the wrap
+	local smooth, prevClock = true, s0.clock
+	for t = 1, C.Cycle do
+		local c = DNR.sample(C.Stops, C.Looks, t % C.Cycle, C.Cycle).clock
+		smooth = smooth and (c - prevClock) % 24 < 0.2
+		prevClock = c
+	end
+	check("day/night: the clock never jumps", smooth)
+	local glowSmooth, g0 = true, s0.look.Glow
+	for t = 1, C.Cycle do
+		local g = DNR.sample(C.Stops, C.Looks, t % C.Cycle, C.Cycle).look.Glow
+		glowSmooth = glowSmooth and math.abs(g - g0) < 0.05
+		g0 = g
+	end
+	check("day/night: glow eases, no jumps", glowSmooth)
+	local hashOk, lit, n = true, 0, 2000
+	for i = 1, n do
+		local h = DNR.hash(i * 4.1 - 3000, (i % 37) * 2.3, -i * 1.7)
+		hashOk = hashOk and h >= 0 and h < 1
+		if DNR.paneOn(h, C.Windows.Share, C.Windows.FirstAt, C.Windows.LastAt) then
+			lit += 1
+		end
+	end
+	check("day/night: hash in 0..1", hashOk)
+	check("day/night: about Share of panes light", math.abs(lit / n - C.Windows.Share) < 0.08)
+	local last = DNR.paneOn(0.3999, 0.4, 0.15, 0.85)
+	check(
+		"day/night: panes come on between FirstAt and LastAt",
+		DNR.paneOn(0, 0.4, 0.15, 0.85) == 0.15
+			and last ~= nil
+			and last <= 0.85
+			and DNR.paneOn(0.5, 0.4, 0.15, 0.85) == nil
+	)
+	check("day/night: night lights every lit pane", C.Looks.Night.Glow >= C.Windows.LastAt)
+	check("day/night: headlights on by night", C.Looks.Night.Glow >= C.Headlights.From)
+end
+checkDayNight()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end
