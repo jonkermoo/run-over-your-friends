@@ -4,6 +4,7 @@
 -- Every visual comes from Style.
 
 local GroupService = game:GetService("GroupService")
+local GuiService = game:GetService("GuiService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,6 +21,7 @@ local DriveHudRules = require(ReplicatedStorage.Shared.Rules.DriveHud)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local GarageRules = require(ReplicatedStorage.Shared.Rules.Garage)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -33,6 +35,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Cockpit = require(script.Parent.Cockpit)
 local Drive = require(script.Parent.Drive)
 local PaintPicker = require(script.Parent.PaintPicker)
+local Pad = require(script.Parent.Pad)
 local Popups = require(script.Parent.Popups)
 local StarterCard = require(script.Parent.StarterCard)
 local Style = require(script.Parent.Style)
@@ -141,15 +144,41 @@ local function pushFeed(item: GuiObject, hold: number, height: number)
 	end)
 end
 
--- one feed plate: paint colour, text colour, size
-local function plate(text: string, fill: Color3, ink: Color3, size: number, font: Font): TextLabel
+-- one feed plate: paint colour, text colour, size, and a picture at its front (Config/Icons), tinted when given
+local function plate(
+	text: string,
+	fill: Color3,
+	ink: Color3,
+	size: number,
+	font: Font,
+	icon: number?,
+	tint: Color3?
+): TextLabel
 	local l = Style.label(feed, text, size, font, ink)
 	l.AutoLocalize = false -- already in the player's language (popup)
 	l.BackgroundColor3 = fill
 	l.BackgroundTransparency = 0
 	l.AnchorPoint = Vector2.new(1, 0)
 	l.Position = UDim2.fromScale(1, 0)
-	Style.fitText(l, 12, 4)
+	local iconW = if icon then size + 10 else 0
+	if icon then
+		-- the padding keeps the words clear of the picture, which sits in the padded strip
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, iconW)
+		pad.Parent = l
+		local img = Style.image(l, icon, tint)
+		img.AnchorPoint = Vector2.new(0, 0.5)
+		img.Position = UDim2.new(0, -iconW + 4, 0.5, 0)
+		img.Size = UDim2.fromOffset(size + 6, size + 6)
+	end
+	-- TextBounds are real pixels: undo the screen's scale and the pop-in's (pushFeed grows the plate in)
+	local function fit()
+		local pop = l:FindFirstChildOfClass("UIScale")
+		local s = Style.scale() * (if pop then pop.Scale else 1)
+		l.Size = UDim2.fromOffset(l.TextBounds.X / s + 24 + iconW, l.TextBounds.Y / s + 8)
+	end
+	l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
+	fit()
 	Style.shadow(l, C.ink, 4)
 	return l
 end
@@ -165,7 +194,9 @@ local function popup(line: string | Loc.Msg, kind: string)
 			C.panel,
 			C.text,
 			15,
-			F.heavy
+			F.heavy,
+			Icons.Pin,
+			C.yellow
 		)
 		item.RichText = true
 		hold = 3
@@ -173,13 +204,13 @@ local function popup(line: string | Loc.Msg, kind: string)
 		item = plate(text, C.yellow, C.ink, 26, F.display)
 		hold = 2.4
 	elseif kind == "social" then
-		item = plate(text, C.pink, C.text, 18, F.display)
+		item = plate(text, C.pink, C.text, 18, F.display, Icons.Sign)
 		hold = 2.6
 	elseif kind == "info" then
-		item = plate(text, C.panel, C.text, 15, F.heavy)
+		item = plate(text, C.panel, C.text, 15, F.heavy, Icons.Sign, C.yellow)
 		hold = 2.4
 	else
-		item = plate(text, C.money, C.ink, 24, F.display)
+		item = plate(text, C.money, C.ink, 24, F.display, Icons.Coin)
 	end
 	pushFeed(item, hold, item.TextSize + 8)
 end
@@ -188,12 +219,10 @@ local shownMoney = 0
 -- coins flying up out of the cash box on a big gain
 local function sparkle()
 	for i = 1, Callouts.CashSparks do
-		local coin = Instance.new("Frame")
-		coin.BorderSizePixel = 0
-		coin.BackgroundColor3 = if i % 2 == 0 then C.yellow else C.money
+		local coin = Style.image(moneyBox, if i % 2 == 0 then Icons.Coin else Icons.Bill)
 		coin.AnchorPoint = Vector2.new(0.5, 0.5)
-		coin.Rotation = 45
-		coin.Size = UDim2.fromOffset(9, 9)
+		coin.Rotation = math.random(-20, 20)
+		coin.Size = UDim2.fromOffset(Callouts.CashSparkSize, Callouts.CashSparkSize)
 		coin.Position = UDim2.fromScale(0.3 + math.random() * 0.6, 0.6)
 		coin.ZIndex = 5
 		coin.Parent = moneyBox
@@ -207,8 +236,8 @@ local function sparkle()
 					-0.6 - math.random() * 0.6,
 					0
 				),
-				Rotation = 45 + math.random(-180, 180),
-				BackgroundTransparency = 1,
+				Rotation = math.random(-180, 180),
+				ImageTransparency = 1,
 			}
 		)
 		fly:Play()
@@ -611,7 +640,8 @@ if screenFit then
 	screenFit:GetPropertyChangedSignal("Scale"):Connect(placeSheets)
 end
 
-local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
+-- an empty sheet in the middle of the screen with its accent shadow
+local function sheetFrame(accent: Color3): Frame
 	local p = Style.panel(gui)
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
 	p.Size = UDim2.new(1, -28, 1, -(TOP + BOTTOM))
@@ -623,25 +653,26 @@ local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	limit.Parent = p
 	table.insert(sheets, p)
 	placeSheets()
-	-- the title sits on the right, by the X: the job card can cover the sheet's top-left corner
-	local t = Style.label(p, title, 36, F.display, C.text)
-	t.AnchorPoint = Vector2.new(1, 0)
-	t.Position = UDim2.new(1, -72, 0, 12)
-	t.Size = UDim2.fromOffset(300, 40)
-	t.TextXAlignment = Enum.TextXAlignment.Right
-	local line = Style.dashes(p, C.yellow, false, 4)
-	line.Position = UDim2.fromOffset(0, 58)
+	return p
+end
+
+-- the yellow X in a sheet's top-right corner
+local function closeButton(p: Frame, y: number): TextButton
 	local close = Style.button(p, "X", "gold", 22)
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, 9)
+	close.Position = UDim2.new(1, -14, 0, y)
 	close.Size = UDim2.fromOffset(44, 44)
 	close.Activated:Connect(function()
 		p.Visible = false
 	end)
+	return close
+end
+
+local function scroller(p: Frame, x: number, y: number): ScrollingFrame
 	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.fromOffset(16, 72)
-	list.Size = UDim2.new(1, -32, 1, -84)
+	list.Position = UDim2.fromOffset(x, y)
+	list.Size = UDim2.new(1, -(x + 16), 1, -(y + 12))
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
@@ -654,27 +685,73 @@ local function panel(title: string, accent: Color3): (Frame, ScrollingFrame)
 	pad.PaddingLeft = UDim.new(0, 4)
 	pad.PaddingBottom = UDim.new(0, 12)
 	pad.Parent = list
-	return p, list
+	return list
 end
 
-local garage, garageList = panel("GARAGE", C.pink)
+-- the garage, a showroom: every vehicle in a list on the left (bay number, name, and its price or that you
+-- own it) and the chosen one big on the right: its 3D picture, blurb, stats, what a hit pays, the paint
+-- swatches (owned) or the price, and one SPAWN / BUY button. Each vehicle has its own detail panel, named
+-- by its id with its button named Action (client/Guide points at them); only the chosen one shows.
+local LIST_W = LayoutConfig.GarageListWidth
+local DETAIL_BOTTOM = LayoutConfig.GarageDetailBottom
+local garage = sheetFrame(C.pink)
 garage.Name = "Garage"
-local grid = Instance.new("UIGridLayout")
-grid.CellSize = UDim2.fromOffset(244, 316)
-grid.CellPadding = UDim2.fromOffset(14, 14)
-grid.SortOrder = Enum.SortOrder.LayoutOrder
-grid.Parent = garageList
+local carList = Instance.new("Frame")
+carList.Name = "CarList"
+carList.BackgroundColor3 = C.ink
+carList.BorderSizePixel = 0
+carList.Size = UDim2.new(0, LIST_W, 1, 0)
+carList.Parent = garage
+local garageTitle = Style.label(carList, "GARAGE", 40, F.display, C.text)
+garageTitle.Position = UDim2.fromOffset(20, 16)
+garageTitle.Size = UDim2.new(1, -28, 0, 44)
+garageTitle.TextXAlignment = Enum.TextXAlignment.Left
+local rows = Instance.new("ScrollingFrame")
+rows.Name = "Rows"
+rows.Position = UDim2.fromOffset(0, 80)
+rows.Size = UDim2.new(1, -4, 1, -88)
+rows.BackgroundTransparency = 1
+rows.BorderSizePixel = 0
+rows.ScrollBarThickness = 6
+rows.ScrollBarImageColor3 = C.yellow
+rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
+rows.CanvasSize = UDim2.new()
+rows.Parent = carList
+local rowsLayout = Instance.new("UIListLayout")
+rowsLayout.Padding = UDim.new(0, 4)
+rowsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+rowsLayout.Parent = rows
+local details = Instance.new("Frame")
+details.Name = "Details"
+details.BackgroundTransparency = 1
+details.Position = UDim2.fromOffset(LIST_W, 0)
+details.Size = UDim2.new(1, -LIST_W, 1, 0)
+details.Parent = garage
+local garageLine = Style.dashes(garage, C.yellow, false, 4)
+garageLine.Position = UDim2.fromOffset(0, 66)
+local garageClose = closeButton(garage, 12)
+garageClose.ZIndex = 3
+local garageHint = Pad.chip(garage, { Enum.KeyCode.ButtonB }, "close")
+garageHint.AnchorPoint = Vector2.new(1, 0.5)
+garageHint.Position = UDim2.new(1, -72, 0, 34)
 
 type Card = {
 	stats: Vehicles.Vehicle,
 	action: TextButton,
 	price: TextLabel,
+	priceBox: Frame,
 	frame: Frame,
 	picker: PaintPicker.Picker,
 	sale: TextLabel,
 	was: TextLabel,
 	strike: Frame,
 	nextUp: TextLabel,
+	row: TextButton,
+	rowBay: TextLabel,
+	rowName: TextLabel,
+	rowPrice: TextLabel,
+	rowTag: TextLabel,
+	rowNext: Frame,
 }
 
 -- your car of the day (Config/Daily) is cheaper: the server picks it from the cars you don't own and
@@ -699,18 +776,19 @@ local FIRST_STEP_UP = (Vehicles.ById[Economy.RookieUntil] or { price = 0 }).pric
 local cards: { Card } = {}
 local refreshCards: () -> ()
 
+-- a stat: its name and a dashed paint bar
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
-	local l = Style.label(parent, name, 10, F.heavy, C.dim)
-	l.Position = UDim2.fromOffset(14, y)
-	l.Size = UDim2.fromOffset(72, 12)
+	local l = Style.label(parent, name, 14, F.heavy, C.dim)
+	l.Position = UDim2.fromOffset(0, y)
+	l.Size = UDim2.fromOffset(96, 18)
 	l.TextXAlignment = Enum.TextXAlignment.Left
 	local back, fill = Style.bar(parent, color)
-	back.BackgroundColor3 = C.panel
+	back.BackgroundColor3 = C.card
 	back.BackgroundTransparency = 0
-	back.Position = UDim2.fromOffset(88, y + 3)
-	back.Size = UDim2.new(1, -102, 0, 7)
+	back.Position = UDim2.fromOffset(100, y + 3)
+	back.Size = UDim2.new(1, -100, 0, 12)
 	fill.Size = UDim2.fromScale(math.clamp(value, 0.05, 1), 1)
-	Style.laneGaps(back, C.card)
+	Style.laneGaps(back, C.panel)
 end
 
 -- the template holds its moving parts as modelled: the steering wheel or handlebars stand upright and the marker
@@ -739,18 +817,22 @@ local function posePreview(m: Model, stats: Vehicles.Vehicle)
 	end
 end
 
-local function preview(parent: Instance, stats: Vehicles.Vehicle): Model?
+-- a 3D picture of the vehicle: a card's top (122 px tall with a lane line under it, the Starter Pack card),
+-- or bare, a picture that fills its parent
+local function preview(parent: Instance, stats: Vehicles.Vehicle, bare: boolean?): Model?
 	local vf = Instance.new("ViewportFrame")
-	vf.Position = UDim2.fromOffset(6, 6)
-	vf.Size = UDim2.new(1, -12, 0, 122)
+	vf.Position = if bare then UDim2.new() else UDim2.fromOffset(6, 6)
+	vf.Size = if bare then UDim2.fromScale(1, 1) else UDim2.new(1, -12, 0, 122)
 	vf.BackgroundColor3 = Color3.fromRGB(46, 46, 54) -- no UIGradient here: it would tint the 3D model
 	vf.Ambient = Color3.fromRGB(175, 175, 190)
 	vf.LightColor = Color3.new(1, 1, 1)
 	vf.LightDirection = Vector3.new(-1, -2, -1)
 	vf.Parent = parent
-	local line = Style.dashes(parent, C.yellow, false, 3)
-	line.Position = UDim2.fromOffset(6, 128)
-	line.Size = UDim2.new(1, -12, 0, 3)
+	if not bare then
+		local line = Style.dashes(parent, C.yellow, false, 3)
+		line.Position = UDim2.fromOffset(6, 128)
+		line.Size = UDim2.new(1, -12, 0, 3)
+	end
 	local models = ReplicatedStorage:WaitForChild("VehicleModels")
 	local template = models:FindFirstChild(stats.id) :: Model?
 	if not template then
@@ -762,7 +844,7 @@ local function preview(parent: Instance, stats: Vehicles.Vehicle): Model?
 	local cf, size = m:GetBoundingBox()
 	local cam = Instance.new("Camera")
 	cam.FieldOfView = 30
-	local dist = size.Magnitude * 1.85
+	local dist = size.Magnitude * (if bare then 1.5 else 1.85) -- a bare picture frames it closer
 	cam.CFrame =
 		CFrame.lookAt(cf.Position + Vector3.new(-0.75, 0.45, -0.75).Unit * dist, cf.Position)
 	cam.Parent = vf
@@ -770,110 +852,188 @@ local function preview(parent: Instance, stats: Vehicles.Vehicle): Model?
 	return m
 end
 
+local chosenId = Vehicles.Starter -- the vehicle shown big
+
+local function choose(id: string)
+	if id ~= chosenId then
+		chosenId = id
+		refreshCards()
+	end
+end
+
 for _, stats in Vehicles.List do
-	local card = Style.card(garageList, 16)
-	card.LayoutOrder = stats.order
+	-- its row in the list
+	local row = Instance.new("TextButton")
+	row.Name = stats.id
+	row.AutoButtonColor = false
+	row.BackgroundColor3 = C.yellow
+	row.BackgroundTransparency = 1
+	row.BorderSizePixel = 0
+	row.Text = ""
+	row.Size = UDim2.new(1, 0, 0, 50)
+	row.LayoutOrder = stats.order
+	row.Parent = rows
+	local rowNext = Instance.new("Frame") -- the car to save for: a yellow edge
+	rowNext.BackgroundColor3 = C.yellow
+	rowNext.BorderSizePixel = 0
+	rowNext.Size = UDim2.new(0, 6, 1, 0)
+	rowNext.Visible = false
+	rowNext.Parent = row
+	local rowBay = Style.label(row, string.format("%02d", stats.order), 22, F.display, C.yellow)
+	rowBay.Position = UDim2.fromOffset(6, 2)
+	rowBay.Size = UDim2.new(0, 46, 1, 0)
+	local rowName = Style.label(row, string.upper(stats.name), 20, F.display, C.text)
+	rowName.Position = UDim2.fromOffset(56, 2)
+	rowName.Size = UDim2.new(1, -56 - 112, 1, 0)
+	rowName.TextXAlignment = Enum.TextXAlignment.Left
+	rowName.TextTruncate = Enum.TextTruncate.AtEnd
+	local rowPrice = Style.label(row, "", 17, F.display, C.money)
+	rowPrice.AnchorPoint = Vector2.new(1, 0.5)
+	rowPrice.Position = UDim2.new(1, -14, 0.5, 2)
+	rowPrice.Size = UDim2.fromOffset(108, 24)
+	rowPrice.TextXAlignment = Enum.TextXAlignment.Right
+	local rowTag = Style.pill(row, "", C.money)
+	rowTag.TextSize = 15
+	rowTag.Size = UDim2.fromOffset(0, 22)
+	rowTag.AnchorPoint = Vector2.new(1, 0.5)
+	rowTag.Position = UDim2.new(1, -14, 0.5, 0)
+	rowTag.Visible = false
+
+	-- its detail panel
+	local card = Instance.new("Frame")
 	card.Name = stats.id
-	local shown = preview(card, stats)
-	-- painted bay number in the corner of the preview
-	local bay = Style.label(card, string.format("%02d", stats.order), 30, F.display, C.yellow)
-	bay.Position = UDim2.fromOffset(14, 10)
-	bay.Size = UDim2.fromOffset(60, 32)
-	bay.TextXAlignment = Enum.TextXAlignment.Left
-	bay.TextTransparency = 0.15
-	bay.ZIndex = 2
-	Style.outline(bay, 2)
-	local name = Style.label(card, stats.name, 22, F.display, C.text)
-	name.Position = UDim2.fromOffset(14, 132)
-	name.Size = UDim2.new(1, -28, 0, 26)
+	card.BackgroundTransparency = 1
+	card.Size = UDim2.fromScale(1, 1)
+	card.Visible = false
+	card.Parent = details
+	local name = Style.label(card, stats.name, 40, F.display, C.text)
+	name.Position = UDim2.fromOffset(24, 16)
+	name.Size = UDim2.new(1, -230, 0, 44)
 	name.TextXAlignment = Enum.TextXAlignment.Left
-	-- the blurb and stat bars, covered by the paint swatches while the PAINT side is open
-	local info = Instance.new("Frame")
-	info.Name = "Info"
-	info.BackgroundTransparency = 1
-	info.Size = UDim2.fromScale(1, 1)
-	info.Parent = card
-	local blurb = Style.label(info, stats.blurb, 12, F.bold, C.dim)
-	blurb.Position = UDim2.fromOffset(14, 158)
-	blurb.Size = UDim2.new(1, -28, 0, 30)
-	blurb.TextWrapped = true
-	blurb.TextXAlignment = Enum.TextXAlignment.Left
-	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(info, 190, "SPEED", stats.topSpeed / 250, C.orange)
-	statBar(info, 203, "ACCEL", stats.launch / 15, C.blue)
-	statBar(info, 216, "HANDLING", stats.grip / 22, C.green)
-	statBar(info, 229, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
-	-- what it earns and what it can smash: the reasons to buy the next car
-	local pay =
-		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
-	local payText = Style.label(info, `ABOUT {money(pay)} A HIT`, 12, F.heavy, C.money)
-	payText.Position = UDim2.fromOffset(14, 242)
-	payText.Size = UDim2.fromOffset(110, 14)
-	payText.TextXAlignment = Enum.TextXAlignment.Left
-	local topples = GarageRules.topples(stats.weight, stats.topSpeed, SmashConfig, stats.maxBreak)
-	local smashText = Style.label(
-		info,
-		if topples then "TOPPLES BUILDINGS" else "SMASHES HOLES",
-		12,
-		F.heavy,
-		if topples then C.orange else C.dim
-	)
-	smashText.AnchorPoint = Vector2.new(1, 0)
-	smashText.Position = UDim2.new(1, -14, 0, 242)
-	smashText.Size = UDim2.fromOffset(120, 14)
-	smashText.TextXAlignment = Enum.TextXAlignment.Right
-	local price = Style.label(
-		card,
-		if stats.price == 0 then "FREE" else money(stats.price),
-		20,
-		F.display,
-		C.money
-	)
-	price.Position = UDim2.fromOffset(14, 272)
-	price.Size = UDim2.fromOffset(110, 32)
-	price.TextXAlignment = Enum.TextXAlignment.Left
-	-- car of the day: a paint tag on the preview and the old price struck through above the new one
+	name.TextScaled = true
+	local nameSize = Instance.new("UITextSizeConstraint")
+	nameSize.MaxTextSize = 40
+	nameSize.Parent = name
+	-- the picture fills what the bottom block leaves
+	local stage = Instance.new("Frame")
+	stage.Name = "Stage"
+	stage.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+	stage.BorderSizePixel = 0
+	stage.ClipsDescendants = true
+	stage.Position = UDim2.fromOffset(24, 84)
+	stage.Size = UDim2.new(1, -48, 1, -(84 + DETAIL_BOTTOM + 30))
+	stage.Parent = card
+	local shown = preview(stage, stats, true)
+	local bay = Style.label(stage, string.format("%02d", stats.order), 56, F.display, C.yellow)
+	bay.Position = UDim2.fromOffset(14, 8)
+	bay.Size = UDim2.fromOffset(100, 58)
+	bay.TextXAlignment = Enum.TextXAlignment.Left
+	bay.ZIndex = 2
+	Style.outline(bay, 3)
+	-- car of the day and NEXT UP tags in the picture's top-right corner
 	local sale = Style.pill(
-		card,
+		stage,
 		`CAR OF THE DAY  -{math.floor(DailyConfig.DiscountShare * 100 + 0.5)}%`,
 		C.pink
 	)
 	sale.Name = "Sale"
 	sale.TextColor3 = C.text
+	sale.TextSize = 15
+	sale.Size = UDim2.fromOffset(0, 22)
 	sale.AnchorPoint = Vector2.new(1, 0)
-	sale.Position = UDim2.new(1, -12, 0, 14)
+	sale.Position = UDim2.new(1, -12, 0, 12)
 	sale.ZIndex = 2
 	sale.Visible = false
-	-- the car to save for (Rules/Garage.nextUp); under the sale tag when both show
-	local nextUp = Style.pill(card, "NEXT UP", C.yellow)
+	local nextUp = Style.pill(stage, "NEXT UP", C.yellow)
 	nextUp.Name = "NextUp"
 	nextUp.TextColor3 = C.ink
+	nextUp.TextSize = 15
+	nextUp.Size = UDim2.fromOffset(0, 22)
 	nextUp.AnchorPoint = Vector2.new(1, 0)
-	nextUp.Position = UDim2.new(1, -12, 0, 14)
+	nextUp.Position = UDim2.new(1, -12, 0, 12)
 	nextUp.ZIndex = 2
 	nextUp.Visible = false
-	local was = Style.label(card, "", 13, F.heavy, C.dim)
+
+	local bottom = Instance.new("Frame")
+	bottom.Name = "Bottom"
+	bottom.BackgroundTransparency = 1
+	bottom.AnchorPoint = Vector2.new(0, 1)
+	bottom.Position = UDim2.new(0, 24, 1, -18)
+	bottom.Size = UDim2.new(1, -48, 0, DETAIL_BOTTOM)
+	bottom.Parent = card
+	-- left: the blurb, stat bars, what a hit pays and what it can smash (the reasons to buy the next car)
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.new(0.5, -12, 1, 0)
+	info.Parent = bottom
+	local blurb = Style.label(info, stats.blurb, 16, F.bold, C.text)
+	blurb.Size = UDim2.new(1, 0, 0, 40)
+	blurb.TextWrapped = true
+	blurb.TextXAlignment = Enum.TextXAlignment.Left
+	blurb.TextYAlignment = Enum.TextYAlignment.Top
+	statBar(info, 46, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(info, 68, "ACCEL", stats.launch / 15, C.blue)
+	statBar(info, 90, "HANDLING", stats.grip / 22, C.green)
+	statBar(info, 112, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	local pay =
+		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
+	local payText = Style.label(info, `ABOUT {money(pay)} A HIT`, 16, F.heavy, C.money)
+	payText.Position = UDim2.fromOffset(0, 142)
+	payText.Size = UDim2.new(1, 0, 0, 20)
+	payText.TextXAlignment = Enum.TextXAlignment.Left
+	local topples = GarageRules.topples(stats.weight, stats.topSpeed, SmashConfig, stats.maxBreak)
+	local smashText = Style.label(
+		info,
+		if topples then "TOPPLES BUILDINGS" else "SMASHES HOLES",
+		14,
+		F.heavy,
+		if topples then C.orange else C.dim
+	)
+	smashText.Position = UDim2.fromOffset(0, 166)
+	smashText.Size = UDim2.new(1, 0, 0, 18)
+	smashText.TextXAlignment = Enum.TextXAlignment.Left
+	-- right: the paint swatches when you own it, else the price (and the old one struck through on sale)
+	local paintSpot = Instance.new("Frame")
+	paintSpot.Name = "PaintSpot"
+	paintSpot.BackgroundTransparency = 1
+	paintSpot.Position = UDim2.new(0.5, 12, 0, 0)
+	paintSpot.Size = UDim2.new(0.5, -12, 0, 124)
+	paintSpot.Parent = bottom
+	local priceBox = Instance.new("Frame")
+	priceBox.Name = "PriceBox"
+	priceBox.BackgroundTransparency = 1
+	priceBox.Position = UDim2.new(0.5, 12, 0, 0)
+	priceBox.Size = UDim2.new(0.5, -12, 0, 124)
+	priceBox.Parent = bottom
+	local price = Style.label(priceBox, "", 34, F.display, C.money)
+	price.AnchorPoint = Vector2.new(1, 0)
+	price.Position = UDim2.new(1, 0, 0, 30)
+	price.Size = UDim2.new(1, 0, 0, 40)
+	price.TextXAlignment = Enum.TextXAlignment.Right
+	local was = Style.label(priceBox, "", 18, F.heavy, C.dim)
 	was.Name = "Was"
 	was.AutomaticSize = Enum.AutomaticSize.X
-	was.Position = UDim2.fromOffset(14, 260)
-	was.Size = UDim2.fromOffset(0, 14)
-	was.TextXAlignment = Enum.TextXAlignment.Left
+	was.AnchorPoint = Vector2.new(1, 0)
+	was.Position = UDim2.new(1, 0, 0, 4)
+	was.Size = UDim2.fromOffset(0, 22)
 	was.Visible = false
 	local strike = Instance.new("Frame")
 	strike.BackgroundColor3 = C.pink
 	strike.BorderSizePixel = 0
 	strike.AnchorPoint = Vector2.new(0, 0.5)
 	strike.Position = UDim2.fromScale(0, 0.5)
-	strike.Size = UDim2.new(1, 0, 0, 2)
+	strike.Size = UDim2.new(1, 0, 0, 3)
 	strike.Parent = was
-	local action = Style.button(card, "SPAWN", "green", 18)
+	local action = Style.button(bottom, "SPAWN", "green", 28)
 	action.Name = "Action"
-	action.AnchorPoint = Vector2.new(1, 0)
-	action.Position = UDim2.new(1, -12, 0, 268)
-	action.Size = UDim2.fromOffset(112, 38)
+	action:SetAttribute("VehicleId", stats.id) -- client/Guide finds the button by it
+	action.AnchorPoint = Vector2.new(1, 1)
+	action.Position = UDim2.fromScale(1, 1)
+	action.Size = UDim2.new(0.5, -12, 0, 60)
 	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
 		refreshCards()
-	end)
+	end, paintSpot)
 	action.Activated:Connect(function()
 		if picker.action() then
 			return -- buying the paint colour shown
@@ -898,17 +1058,44 @@ for _, stats in Vehicles.List do
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
+	-- a tap shows it; on a gamepad, moving onto a row shows it and A goes to its button
+	row.Activated:Connect(function()
+		choose(stats.id)
+		if Pad.usingGamepad() then
+			GuiService.SelectedObject = action
+		end
+	end)
+	row.SelectionGained:Connect(function()
+		choose(stats.id)
+	end)
 	table.insert(cards, {
 		stats = stats,
 		action = action,
 		price = price,
+		priceBox = priceBox,
 		frame = card,
 		picker = picker,
 		sale = sale,
 		was = was,
 		strike = strike,
 		nextUp = nextUp,
+		row = row,
+		rowBay = rowBay,
+		rowName = rowName,
+		rowPrice = rowPrice,
+		rowTag = rowTag,
+		rowNext = rowNext,
 	})
+end
+
+local function setTag(c: Card, text: string?, color: Color3?, ink: Color3?)
+	c.rowTag.Visible = text ~= nil
+	c.rowPrice.Visible = text == nil
+	if text and color then
+		c.rowTag.Text = text
+		c.rowTag.BackgroundColor3 = color
+		c.rowTag.TextColor3 = ink or C.ink
+	end
 end
 
 function refreshCards()
@@ -924,27 +1111,45 @@ function refreshCards()
 	end, NOT_FOR_CASH, FIRST_STEP_UP)
 	for _, c in cards do
 		local price = priceOf(c.stats)
+		local chosen = c.stats.id == chosenId
+		local mine = string.find(owned, "," .. c.stats.id .. ",", 1, true) ~= nil
+		local onSale = not mine and price < c.stats.price
+		c.frame.Visible = chosen
 		c.strike.Visible = true
 		c.was.TextColor3 = C.dim
 		c.nextUp.Visible = c.stats.id == save
-		if string.find(owned, "," .. c.stats.id .. ",", 1, true) then
+		c.rowNext.Visible = c.stats.id == save
+		c.priceBox.Visible = not mine
+		c.rowName.TextColor3 = C.text
+		c.rowPrice.TextColor3 = C.money
+		if mine then
 			local inIt = driving == c.stats.id
 			c.action.Text = if inIt then "DRIVING" else "SPAWN"
 			Style.setKind(c.action, if inIt then "dark" else "green")
-			c.price.Text = "OWNED"
-			c.price.TextColor3 = C.dim
 			c.sale.Visible = false
 			c.was.Visible = false
+			if inIt then
+				setTag(c, "IN USE", C.money)
+			else
+				setTag(c, "OWNED", C.grey, C.text)
+			end
 		else
 			c.price.Text = if price == 0 then "FREE" else money(price)
 			c.price.TextColor3 = C.money
-			c.sale.Visible = price < c.stats.price
-			c.was.Visible = price < c.stats.price
+			c.sale.Visible = onSale
+			c.was.Visible = onSale
 			c.was.Text = money(c.stats.price)
 			-- under the sale tag when both show
-			c.nextUp.Position = UDim2.new(1, -12, 0, if c.sale.Visible then 40 else 14)
+			c.nextUp.Position = UDim2.new(1, -12, 0, if c.sale.Visible then 40 else 12)
+			c.rowPrice.Text = c.price.Text
+			setTag(
+				c,
+				if onSale then `-{math.floor(DailyConfig.DiscountShare * 100 + 0.5)}%` else nil,
+				C.pink,
+				C.text
+			)
 			if cash >= price then
-				c.action.Text = "BUY"
+				c.action.Text = "BUY " .. money(price)
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
 				-- a pass car: the pass is the way in; the cash price stays as a small "or"
@@ -955,40 +1160,103 @@ function refreshCards()
 				c.was.Text = `or {money(price)}`
 				c.was.Visible = true
 				c.strike.Visible = false
+				setTag(c, "PASS", C.blue, C.text)
 			else
-				c.action.Text = "BUY"
+				c.action.Text = "BUY " .. money(price)
 				Style.setKind(c.action, "dark")
+				c.rowName.TextColor3 = C.dim -- out of reach for now
+				c.rowPrice.TextColor3 = C.dim
 			end
+		end
+		-- the chosen row is painted yellow, its words in ink
+		c.row.BackgroundTransparency = if chosen then 0 else 1
+		c.rowBay.TextColor3 = if chosen then C.ink else C.yellow
+		if chosen then
+			c.rowName.TextColor3 = C.ink
+			c.rowPrice.TextColor3 = C.ink
 		end
 		c.picker.refresh()
 	end
 end
 
-local store, storeList = panel("STORE", C.blue)
+Pad.menu(garage, {
+	first = function()
+		return rows:FindFirstChild(chosenId) :: GuiObject?
+	end,
+	close = function()
+		garage.Visible = false
+	end,
+})
+
+-- the store: a dark rail on the left lists its sections (DEALS, MONEY, PASSES, FREE: tap one to jump to it,
+-- LB/RB on a gamepad), and the right side is one scrolling page: the Starter Pack banner, the money packs,
+-- the game passes, the group reward and the credits. The section in view names the page and lights its tab.
+local RAIL = 200
+local store = sheetFrame(C.blue)
 store.Name = "Store"
+local rail = Instance.new("Frame")
+rail.Name = "Rail"
+rail.BackgroundColor3 = C.ink
+rail.BorderSizePixel = 0
+rail.Size = UDim2.new(0, RAIL, 1, 0)
+rail.Parent = store
+local storeTitle = Style.label(rail, "STORE", 40, F.display, C.text)
+storeTitle.Position = UDim2.fromOffset(20, 16)
+storeTitle.Size = UDim2.new(1, -28, 0, 44)
+storeTitle.TextXAlignment = Enum.TextXAlignment.Left
+local pageTitle = Style.label(store, "", 36, F.display, C.text)
+pageTitle.Name = "PageTitle"
+pageTitle.Position = UDim2.fromOffset(RAIL + 26, 16)
+pageTitle.Size = UDim2.new(1, -(RAIL + 26 + 190), 0, 44)
+pageTitle.TextXAlignment = Enum.TextXAlignment.Left
+pageTitle.TextTruncate = Enum.TextTruncate.AtEnd
+local storeLine = Style.dashes(store, C.yellow, false, 4)
+storeLine.Position = UDim2.fromOffset(0, 66)
+closeButton(store, 12)
+local closeHint = Pad.chip(store, { Enum.KeyCode.ButtonB }, "close")
+closeHint.AnchorPoint = Vector2.new(1, 0.5)
+closeHint.Position = UDim2.new(1, -72, 0, 34)
+local storeList = scroller(store, RAIL + 24, 82)
+storeList.Name = "Page"
 local storeLayout = Instance.new("UIListLayout")
-storeLayout.Padding = UDim.new(0, 12)
+storeLayout.Padding = UDim.new(0, 14)
 storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
 storeLayout.Parent = storeList
 
-local function header(order: number, text: string)
-	local h = Style.label(storeList, text, 22, F.display, C.yellow)
-	h.Size = UDim2.new(1, -12, 0, 26)
-	h.TextXAlignment = Enum.TextXAlignment.Left
+-- a section heading: yellow words on a dashed lane line that runs to the right edge
+local function sectionHead(order: number, text: string): Frame
+	local h = Instance.new("Frame")
+	h.BackgroundTransparency = 1
+	h.Size = UDim2.new(1, -12, 0, 28)
 	h.LayoutOrder = order
+	h.Parent = storeList
+	local line = Style.dashes(h, C.yellow, false, 3)
+	line.AnchorPoint = Vector2.new(0, 0.5)
+	line.Position = UDim2.fromScale(0, 0.5)
+	local l = Style.label(h, text, 24, F.display, C.yellow)
+	l.BackgroundColor3 = C.panel
+	l.BackgroundTransparency = 0
+	l.AutomaticSize = Enum.AutomaticSize.X
+	l.Size = UDim2.fromScale(0, 1)
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	l.ZIndex = 2
+	local pad = Instance.new("UIPadding")
+	pad.PaddingRight = UDim.new(0, 12)
+	pad.Parent = l
 	return h
 end
 
--- "R$ 99": the configured label until the product exists, then Roblox's real price
-local function robuxText(product: Products.Product, label: TextButton)
-	label.Text = "R$ " .. product.robux
+-- "R$ 99" (after prefix, if given): the configured price until the product exists, then Roblox's real one
+local function robuxText(product: Products.Product, label: TextButton, prefix: string?)
+	local before = prefix or ""
+	label.Text = before .. "R$ " .. product.robux
 	if product.id ~= 0 then
 		task.spawn(function()
 			local ok, info = pcall(function()
 				return MarketplaceService:GetProductInfo(product.id, Enum.InfoType.Product)
 			end)
 			if ok and info and info.PriceInRobux then
-				label.Text = "R$ " .. info.PriceInRobux
+				label.Text = before .. "R$ " .. info.PriceInRobux
 			end
 		end)
 	elseif RunService:IsStudio() then
@@ -996,48 +1264,233 @@ local function robuxText(product: Products.Product, label: TextButton)
 	end
 end
 
-local passButtons: { [string]: TextButton } = {}
-local function storeRow(
-	order: number,
-	title: string,
-	text: string,
-	buttonText: string,
-	accent: Color3,
-	kind: string,
-	onClick: () -> ()
-): (TextButton, TextLabel)
-	local row = Style.card(storeList)
-	row.Size = UDim2.new(1, -12, 0, 88)
-	row.LayoutOrder = order
-	local stripe = Instance.new("Frame")
-	stripe.BackgroundColor3 = accent
-	stripe.BorderSizePixel = 0
-	stripe.Position = UDim2.fromOffset(0, 0)
-	stripe.Size = UDim2.new(0, 8, 1, 0)
-	stripe.Parent = row
-	local t = Style.label(row, title, 24, F.display, C.text)
-	t.Position = UDim2.fromOffset(24, 10)
-	t.Size = UDim2.new(1, -220, 0, 30)
-	t.TextXAlignment = Enum.TextXAlignment.Left
-	local d = Style.label(row, text, 13, F.bold, C.dim)
-	d.Position = UDim2.fromOffset(24, 42)
-	d.Size = UDim2.new(1, -220, 0, 36)
-	d.TextWrapped = true
-	d.TextXAlignment = Enum.TextXAlignment.Left
-	d.TextYAlignment = Enum.TextYAlignment.Top
-	local b = Style.button(row, buttonText, kind, 18)
-	b.AnchorPoint = Vector2.new(1, 0.5)
-	b.Position = UDim2.new(1, -16, 0.5, 0)
-	b.Size = UDim2.fromOffset(170, 48)
-	b.Activated:Connect(onClick)
-	return b, d
+local function paint(parent: Instance, color: Color3, size: UDim2): Frame
+	local s = Instance.new("Frame")
+	s.BackgroundColor3 = color
+	s.BorderSizePixel = 0
+	s.Size = size
+	s.Parent = parent
+	return s
 end
+
+---------------- the Starter Pack banner: client/StarterCard keeps its text, prices and countdown in step
+
+local hero = Style.card(storeList)
+hero.Name = "StarterBanner"
+hero.Size = UDim2.new(1, -12, 0, 222)
+hero.LayoutOrder = 1
+hero.ClipsDescendants = true
+paint(hero, C.yellow, UDim2.new(0, 8, 1, 0))
+local heroHazard = paint(hero, C.yellow, UDim2.new(1, 0, 0, 12))
+heroHazard.ClipsDescendants = true
+for x = -20, 1000, 28 do
+	local s = paint(heroHazard, C.ink, UDim2.fromOffset(12, 40))
+	s.Position = UDim2.fromOffset(x, -14)
+	s.Rotation = 40
+end
+local heroTitle = Style.label(hero, string.upper(Products.Starter.title), 44, F.display, C.text)
+heroTitle.Position = UDim2.fromOffset(24, 26)
+heroTitle.Size = UDim2.new(1, -300, 0, 48)
+heroTitle.TextXAlignment = Enum.TextXAlignment.Left
+heroTitle.TextScaled = true
+local heroTitleSize = Instance.new("UITextSizeConstraint")
+heroTitleSize.MaxTextSize = 44
+heroTitleSize.Parent = heroTitle
+local heroText = Style.label(hero, "", 15, F.bold, C.dim)
+heroText.Position = UDim2.fromOffset(26, 76)
+heroText.Size = UDim2.new(1, -300, 0, 20)
+heroText.TextXAlignment = Enum.TextXAlignment.Left
+heroText.TextTruncate = Enum.TextTruncate.AtEnd
+-- what's inside: a picture of each car and the cash
+local gets = Instance.new("Frame")
+gets.BackgroundTransparency = 1
+gets.Position = UDim2.fromOffset(24, 106)
+gets.Size = UDim2.new(1, -300, 0, 96)
+gets.Parent = hero
+local getsList = Instance.new("UIListLayout")
+getsList.FillDirection = Enum.FillDirection.Horizontal
+getsList.Padding = UDim.new(0, 12)
+getsList.SortOrder = Enum.SortOrder.LayoutOrder
+getsList.Parent = gets
+for i, id in Products.Starter.vehicles or {} do
+	local stats = Vehicles.ById[id]
+	local tile = Instance.new("Frame")
+	tile.BackgroundColor3 = C.ink
+	tile.BorderSizePixel = 0
+	tile.Size = UDim2.fromOffset(150, 96)
+	tile.LayoutOrder = i
+	tile.Parent = gets
+	Style.stroke(tile, C.ink, 2, 0)
+	if stats then
+		preview(tile, stats, true)
+		local n = Style.label(tile, string.upper(stats.name), 15, F.display, C.text)
+		n.AnchorPoint = Vector2.new(0, 1)
+		n.Position = UDim2.new(0, 8, 1, -4)
+		n.Size = UDim2.new(1, -16, 0, 18)
+		n.TextXAlignment = Enum.TextXAlignment.Left
+		n.ZIndex = 2
+		Style.outline(n, 2)
+	end
+end
+local cashTile = Instance.new("Frame")
+cashTile.BackgroundColor3 = C.ink
+cashTile.BorderSizePixel = 0
+cashTile.Size = UDim2.fromOffset(150, 96)
+cashTile.LayoutOrder = 10
+cashTile.Parent = gets
+local cashAmount = Style.label(cashTile, money(Products.Starter.money), 28, F.display, C.money)
+cashAmount.Position = UDim2.fromOffset(6, 24)
+cashAmount.Size = UDim2.new(1, -12, 0, 32)
+cashAmount.TextScaled = true
+local cashAmountSize = Instance.new("UITextSizeConstraint")
+cashAmountSize.MaxTextSize = 28
+cashAmountSize.Parent = cashAmount
+local cashIn = Style.label(cashTile, "IN GAME", 14, F.heavy, C.dim)
+cashIn.Position = UDim2.fromOffset(0, 58)
+cashIn.Size = UDim2.new(1, 0, 0, 18)
+-- the price side: the deal's % off, the struck-through full price and the countdown, then BUY
+local heroPrice = Instance.new("Frame")
+heroPrice.BackgroundTransparency = 1
+heroPrice.AnchorPoint = Vector2.new(1, 0)
+heroPrice.Position = UDim2.new(1, -22, 0, 26)
+heroPrice.Size = UDim2.fromOffset(240, 100)
+heroPrice.Parent = hero
+local heroOff = Style.pill(heroPrice, "", C.red)
+heroOff.TextColor3 = C.text
+heroOff.TextSize = 15
+heroOff.Size = UDim2.fromOffset(0, 22)
+heroOff.AnchorPoint = Vector2.new(1, 0)
+heroOff.Position = UDim2.fromScale(1, 0)
+local heroWas = Style.label(heroPrice, "", 24, F.display, C.dim)
+heroWas.AnchorPoint = Vector2.new(1, 0)
+heroWas.Position = UDim2.fromOffset(240, 30)
+heroWas.Size = UDim2.fromOffset(0, 26)
+heroWas.AutomaticSize = Enum.AutomaticSize.X
+local strike = paint(heroWas, C.red, UDim2.new(1, 4, 0, 4))
+strike.AnchorPoint = Vector2.new(0.5, 0.5)
+strike.Position = UDim2.fromScale(0.5, 0.42)
+local heroTimer = Style.label(heroPrice, "", 20, F.display, C.text)
+heroTimer.BackgroundColor3 = C.red
+heroTimer.BackgroundTransparency = 0
+heroTimer.AnchorPoint = Vector2.new(1, 0)
+heroTimer.Position = UDim2.fromOffset(240, 64)
+heroTimer.Size = UDim2.fromOffset(0, 30)
+heroTimer.AutomaticSize = Enum.AutomaticSize.X
+do
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 10)
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.Parent = heroTimer
+end
+local heroBuy = Style.button(hero, "", "gold", 30)
+heroBuy.Name = "Buy"
+heroBuy.AnchorPoint = Vector2.new(1, 1)
+heroBuy.Position = UDim2.new(1, -22, 1, -22)
+heroBuy.Size = UDim2.fromOffset(240, 62)
+heroBuy.Activated:Connect(function()
+	Net.waitFor("BuyProduct"):FireServer(StarterCard.current().key)
+end)
+StarterCard.bindStore({
+	row = hero,
+	text = heroText,
+	button = heroBuy,
+	off = heroOff,
+	was = heroWas,
+	timer = heroTimer,
+})
+StarterCard.start(gui, preview)
+
+---------------- money packs: a stack of bills that grows with the pack
+
+-- where each bill of the drawing sits (px from the drawing's top-left), per pack in Products.MoneyPacks order
+local BILLS = {
+	{ { 17, 26 } },
+	{ { 6, 30 }, { 26, 18 } },
+	{ { 0, 34 }, { 30, 34 }, { 15, 14 } },
+	{ { -6, 40 }, { 20, 40 }, { 46, 40 }, { 7, 20 }, { 33, 20 }, { 20, 0 } },
+}
+local function bill(parent: Instance, x: number, y: number)
+	local b = paint(parent, C.green, UDim2.fromOffset(46, 22))
+	b.Position = UDim2.fromOffset(x, y)
+	Style.stroke(b, C.ink, 2, 0)
+	local inner = Instance.new("UIStroke")
+	inner.Color = C.billEdge
+	inner.Thickness = 3
+	inner.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	inner.LineJoinMode = Enum.LineJoinMode.Miter
+	local face = paint(b, C.green, UDim2.new(1, -6, 1, -6))
+	face.Position = UDim2.fromOffset(3, 3)
+	inner.Parent = face
+	local d = Style.label(b, "$", 16, F.display, C.billInk)
+	d.Size = UDim2.fromScale(1, 1)
+	d.ZIndex = 2
+end
+
+local moneyHead = sectionHead(2, "MONEY")
+local packs = Instance.new("Frame")
+packs.BackgroundTransparency = 1
+packs.Size = UDim2.new(1, -12, 0, 200)
+packs.LayoutOrder = 3
+packs.Parent = storeList
+local packGrid = Instance.new("UIGridLayout")
+packGrid.CellSize = UDim2.new(0.25, -11, 1, 0)
+packGrid.CellPadding = UDim2.fromOffset(14, 0)
+packGrid.SortOrder = Enum.SortOrder.LayoutOrder
+packGrid.Parent = packs
+local firstPackBuy: TextButton? = nil
+for i, pack in Products.MoneyPacks do
+	local card = Style.card(packs)
+	card.LayoutOrder = i
+	paint(card, C.money, UDim2.new(1, 0, 0, 6))
+	local drawing = Instance.new("Frame")
+	drawing.BackgroundTransparency = 1
+	drawing.AnchorPoint = Vector2.new(0.5, 0)
+	drawing.Position = UDim2.new(0.5, 0, 0, 14)
+	drawing.Size = UDim2.fromOffset(80, 62)
+	drawing.Parent = card
+	for _, at in BILLS[math.min(i, #BILLS)] do
+		bill(drawing, at[1], at[2])
+	end
+	if pack.tag then
+		local tag =
+			Style.pill(card, pack.tag, if i == #Products.MoneyPacks then C.gold else C.orange)
+		tag.TextSize = 14
+		tag.Size = UDim2.fromOffset(0, 20)
+		tag.AnchorPoint = Vector2.new(0.5, 0)
+		tag.Position = UDim2.fromScale(0.5, 0)
+		tag.ZIndex = 3
+	end
+	local amount = Style.label(card, money(pack.money), 34, F.display, C.money)
+	amount.Position = UDim2.fromOffset(6, 78)
+	amount.Size = UDim2.new(1, -12, 0, 36)
+	amount.TextScaled = true
+	local amountSize = Instance.new("UITextSizeConstraint")
+	amountSize.MaxTextSize = 34
+	amountSize.Parent = amount
+	local name = Style.label(card, string.upper(pack.title), 14, F.heavy, C.dim)
+	name.Position = UDim2.fromOffset(0, 114)
+	name.Size = UDim2.new(1, 0, 0, 18)
+	local buy = Style.button(card, "", "gold", 22)
+	buy.Name = "Buy"
+	buy.AnchorPoint = Vector2.new(0.5, 1)
+	buy.Position = UDim2.new(0.5, 0, 1, -14)
+	buy.Size = UDim2.new(1, -28, 0, 46)
+	robuxText(pack, buy)
+	buy.Activated:Connect(function()
+		Net.waitFor("BuyProduct"):FireServer(pack.key)
+	end)
+	firstPackBuy = firstPackBuy or buy
+end
+
+---------------- game passes: one poster card each, in its own colour
 
 local PASSES = {
 	{
 		name = "Roadster",
 		title = "ROADSTER",
 		accent = C.red,
+		ink = C.text,
 		text = `The dream car: rear jet, air control and a thruster. Plus {money(
 			Economy.RoadsterPassMoney
 		)} in game.`,
@@ -1046,96 +1499,98 @@ local PASSES = {
 		name = "DoubleMoney",
 		title = "2x MONEY",
 		accent = C.money,
+		ink = C.ink,
 		text = "Double money from every hit.",
 	},
 	{
 		name = "VIP",
 		title = "VIP",
 		accent = C.gold,
+		ink = C.ink,
 		text = `Gold VIP tag over your head and in chat, +{math.floor(
 			(Economy.VipMoney - 1) * 100 + 0.5
 		)}% cash ` .. "from hits and the VIP Gold car paint.",
 	},
 }
--- the Starter Pack row: client/StarterCard keeps its text and price in step with the deal
-local starterHeader = header(1, "SPECIAL OFFER")
-local starterButton, starterText = storeRow(
-	2,
-	string.upper(Products.Starter.title),
-	"",
-	"",
-	C.gold,
-	"gold",
-	function()
-		Net.waitFor("BuyProduct"):FireServer(StarterCard.current().key)
-	end
-)
-StarterCard.bindStore(starterButton.Parent :: GuiObject, starterText, starterButton, starterHeader)
-StarterCard.start(gui, preview)
-
-header(3, "MONEY")
-local packs = Instance.new("Frame")
-packs.BackgroundTransparency = 1
-packs.Size = UDim2.new(1, -12, 0, 176)
-packs.LayoutOrder = 4
-packs.Parent = storeList
-local packGrid = Instance.new("UIGridLayout")
-packGrid.CellSize = UDim2.new(0.25, -10, 1, 0)
-packGrid.CellPadding = UDim2.fromOffset(12, 0)
-packGrid.SortOrder = Enum.SortOrder.LayoutOrder
-packGrid.Parent = packs
-for i, pack in Products.MoneyPacks do
-	local card = Style.card(packs)
-	card.LayoutOrder = i
-	if pack.tag then
-		local tag =
-			Style.pill(card, pack.tag, if i == #Products.MoneyPacks then C.gold else C.orange)
-		tag.AnchorPoint = Vector2.new(0.5, 0)
-		tag.Position = UDim2.new(0.5, 0, 0, 10)
-	end
-	local amount = Style.label(card, money(pack.money), 30, F.display, C.money)
-	amount.Position = UDim2.fromOffset(0, 36)
-	amount.Size = UDim2.new(1, 0, 0, 40)
-	local name = Style.label(card, string.upper(pack.title), 13, F.heavy, C.dim)
-	name.Position = UDim2.fromOffset(0, 78)
-	name.Size = UDim2.new(1, 0, 0, 18)
-	local buy = Style.button(card, "", "gold", 18)
-	buy.AnchorPoint = Vector2.new(0.5, 1)
-	buy.Position = UDim2.new(0.5, 0, 1, -12)
-	buy.Size = UDim2.new(1, -24, 0, 46)
-	robuxText(pack, buy)
-	buy.Activated:Connect(function()
-		Net.waitFor("BuyProduct"):FireServer(pack.key)
-	end)
-end
-
-header(5, "GAME PASSES")
+local passButtons: { [string]: TextButton } = {}
+local passHead = sectionHead(4, "GAME PASSES")
+local passRow = Instance.new("Frame")
+passRow.BackgroundTransparency = 1
+passRow.Size = UDim2.new(1, -12, 0, 226)
+passRow.LayoutOrder = 5
+passRow.Parent = storeList
+local passGrid = Instance.new("UIGridLayout")
+passGrid.CellSize = UDim2.new(1 / #PASSES, -10, 1, 0)
+passGrid.CellPadding = UDim2.fromOffset(14, 0)
+passGrid.SortOrder = Enum.SortOrder.LayoutOrder
+passGrid.Parent = passRow
 for i, p in PASSES do
-	passButtons[p.name] = storeRow(5 + i, p.title, p.text, "GET", p.accent, "gold", function()
+	local card = Style.card(passRow)
+	card.LayoutOrder = i
+	local band = paint(card, p.accent, UDim2.new(1, 0, 0, 56))
+	local t = Style.label(band, p.title, 30, F.display, p.ink)
+	t.Position = UDim2.fromOffset(16, 6)
+	t.Size = UDim2.new(1, -32, 1, -6)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	local d = Style.label(card, p.text, 15, F.bold, C.text)
+	d.Position = UDim2.fromOffset(16, 68)
+	d.Size = UDim2.new(1, -32, 0, 86)
+	d.TextWrapped = true
+	d.TextXAlignment = Enum.TextXAlignment.Left
+	d.TextYAlignment = Enum.TextYAlignment.Top
+	local b = Style.button(card, "GET", "gold", 22)
+	b.Name = "Buy"
+	b.AnchorPoint = Vector2.new(0.5, 1)
+	b.Position = UDim2.new(0.5, 0, 1, -14)
+	b.Size = UDim2.new(1, -28, 0, 50)
+	b.Activated:Connect(function()
 		Net.waitFor("BuyPass"):FireServer(p.name)
 	end)
+	passButtons[p.name] = b
 end
-local freeHeader = header(9, "FREE")
-local groupButton = storeRow(
-	10,
-	"GROUP REWARD",
-	`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
-	"CLAIM",
-	C.gold,
-	"green",
-	function()
-		if player:GetAttribute("GroupClaimed") == true then
-			return
-		end
-		if Economy.GroupId ~= 0 then
-			-- Roblox's own join prompt; the server checks membership either way
-			pcall(function()
-				(GroupService :: any):PromptJoinAsync(Economy.GroupId)
-			end)
-		end
-		Net.waitFor("ClaimGroup"):FireServer()
+
+---------------- free: the group reward
+
+local freeHead = sectionHead(6, "FREE")
+local groupRow = Style.card(storeList)
+groupRow.Size = UDim2.new(1, -12, 0, 92)
+groupRow.LayoutOrder = 7
+paint(groupRow, C.blue, UDim2.new(0, 8, 1, 0))
+do
+	local t = Style.label(groupRow, "GROUP REWARD", 26, F.display, C.text)
+	t.Position = UDim2.fromOffset(24, 12)
+	t.Size = UDim2.new(1, -230, 0, 30)
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	local d = Style.label(
+		groupRow,
+		`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
+		15,
+		F.bold,
+		C.dim
+	)
+	d.Position = UDim2.fromOffset(24, 46)
+	d.Size = UDim2.new(1, -230, 0, 36)
+	d.TextWrapped = true
+	d.TextXAlignment = Enum.TextXAlignment.Left
+	d.TextYAlignment = Enum.TextYAlignment.Top
+end
+local groupButton = Style.button(groupRow, "CLAIM", "green", 22)
+groupButton.Name = "Claim"
+groupButton.AnchorPoint = Vector2.new(1, 0.5)
+groupButton.Position = UDim2.new(1, -16, 0.5, 0)
+groupButton.Size = UDim2.fromOffset(170, 50)
+groupButton.Activated:Connect(function()
+	if player:GetAttribute("GroupClaimed") == true then
+		return
 	end
-)
+	if Economy.GroupId ~= 0 then
+		-- Roblox's own join prompt; the server checks membership either way
+		pcall(function()
+			(GroupService :: any):PromptJoinAsync(Economy.GroupId)
+		end)
+	end
+	Net.waitFor("ClaimGroup"):FireServer()
+end)
 local credits = Style.label(
 	storeList,
 	"Vehicle models: Pavel 3D, Low Poly City Vehicles Pack (CC BY 4.0). "
@@ -1147,6 +1602,146 @@ local credits = Style.label(
 credits.TextWrapped = true
 credits.Size = UDim2.new(1, -12, 0, 44)
 credits.LayoutOrder = 20
+
+---------------- the rail: one tab per section; the section in view is lit and names the page
+
+type Section = {
+	key: string,
+	title: string,
+	accent: Color3,
+	anchor: GuiObject,
+	first: GuiObject?,
+	tab: TextButton?,
+}
+local SECTIONS: { Section } = {
+	{ key = "DEALS", title = "TODAY'S DEALS", accent = C.red, anchor = hero, first = heroBuy },
+	{ key = "MONEY", title = "MONEY", accent = C.money, anchor = moneyHead, first = firstPackBuy },
+	{
+		key = "PASSES",
+		title = "GAME PASSES",
+		accent = C.pink,
+		anchor = passHead,
+		first = passButtons[PASSES[1].name],
+	},
+	{ key = "FREE", title = "FREE STUFF", accent = C.blue, anchor = freeHead, first = groupButton },
+}
+local railTabs = Instance.new("Frame")
+railTabs.BackgroundTransparency = 1
+railTabs.Position = UDim2.fromOffset(0, 84)
+railTabs.Size = UDim2.new(1, 0, 1, -130)
+railTabs.Parent = rail
+local railList = Instance.new("UIListLayout")
+railList.Padding = UDim.new(0, 6)
+railList.SortOrder = Enum.SortOrder.LayoutOrder
+railList.Parent = railTabs
+local shownSection = 0
+
+local function visibleSections(): { Section }
+	local out = {}
+	for _, s in SECTIONS do
+		if s.anchor.Visible then
+			table.insert(out, s)
+		end
+	end
+	return out
+end
+
+local function markSection(s: Section)
+	pageTitle.Text = s.title
+	for _, other in SECTIONS do
+		local t = other.tab
+		if t then
+			t.BackgroundTransparency = if other == s then 0 else 1
+			t.TextColor3 = if other == s then C.ink else C.text
+		end
+	end
+end
+
+-- the section in view: the last one whose top is at or above the page's top (a little slack), or the last
+-- one once the page is scrolled to its end
+local function sectionInView()
+	local shown = visibleSections()
+	if #shown == 0 then
+		return
+	end
+	local tops = {}
+	for _, s in shown do
+		table.insert(tops, s.anchor.AbsolutePosition.Y - storeList.AbsolutePosition.Y)
+	end
+	local atEnd = storeList.CanvasPosition.Y
+		>= storeList.AbsoluteCanvasSize.Y - storeList.AbsoluteWindowSize.Y - 2
+	local i = LayoutRules.sectionAt(tops, LayoutConfig.SectionSlack * Style.scale(), atEnd)
+	shownSection = i
+	markSection(shown[i])
+end
+storeList:GetPropertyChangedSignal("CanvasPosition"):Connect(sectionInView)
+
+-- scroll so the section's top meets the page's top
+local function jumpTo(s: Section)
+	local delta = s.anchor.AbsolutePosition.Y - storeList.AbsolutePosition.Y
+	local maxY = math.max(0, storeList.AbsoluteCanvasSize.Y - storeList.AbsoluteWindowSize.Y)
+	local y = math.clamp(storeList.CanvasPosition.Y + delta, 0, maxY)
+	TweenService:Create(storeList, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
+		CanvasPosition = Vector2.new(0, y),
+	}):Play()
+	markSection(s)
+end
+
+for i, s in SECTIONS do
+	local railTab = Instance.new("TextButton")
+	railTab.Name = s.key
+	railTab.AutoButtonColor = false
+	railTab.BackgroundColor3 = C.yellow
+	railTab.BackgroundTransparency = 1
+	railTab.BorderSizePixel = 0
+	railTab.Size = UDim2.new(1, 0, 0, 54)
+	railTab.Text = s.key
+	railTab.TextSize = 22
+	railTab.FontFace = F.display
+	railTab.TextColor3 = C.text
+	railTab.TextXAlignment = Enum.TextXAlignment.Left
+	railTab.LayoutOrder = i
+	railTab.Parent = railTabs
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 26)
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.Parent = railTab
+	local bar = paint(railTab, s.accent, UDim2.new(0, 8, 1, 0))
+	bar.Position = UDim2.fromOffset(-26, -4) -- undo the padding
+	bar.Size = UDim2.new(0, 8, 1, 4)
+	s.tab = railTab
+	railTab.Activated:Connect(function()
+		jumpTo(s)
+	end)
+	-- a section that isn't offered (the pack bought, no group) loses its tab
+	s.anchor:GetPropertyChangedSignal("Visible"):Connect(function()
+		railTab.Visible = s.anchor.Visible
+	end)
+	railTab.Visible = s.anchor.Visible
+end
+local switchHint = Pad.chip(rail, { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1 }, "switch")
+switchHint.AnchorPoint = Vector2.new(0, 1)
+switchHint.Position = UDim2.new(0, 20, 1, -16)
+
+Pad.menu(store, {
+	first = function()
+		return if hero.Visible then heroBuy else firstPackBuy
+	end,
+	close = function()
+		store.Visible = false
+	end,
+	shoulders = function(dir: number)
+		local shown = visibleSections()
+		local s = shown[math.clamp(shownSection + dir, 1, #shown)]
+		if s then
+			jumpTo(s)
+			-- the selection follows to the section's first button
+			if s.first and Pad.usingGamepad() then
+				GuiService.SelectedObject = s.first
+			end
+		end
+	end,
+})
 
 local function refreshStore()
 	for name, b in passButtons do
@@ -1164,9 +1759,16 @@ local function refreshStore()
 	Style.setKind(groupButton, if claimed then "dark" else "green")
 	-- no group yet: nothing to offer outside Studio
 	local groupLive = Economy.GroupId ~= 0 or RunService:IsStudio()
-	freeHeader.Visible = groupLive;
-	(groupButton.Parent :: GuiObject).Visible = groupLive
+	freeHead.Visible = groupLive
+	groupRow.Visible = groupLive
+	task.defer(sectionInView)
 end
+store:GetPropertyChangedSignal("Visible"):Connect(function()
+	if store.Visible then
+		storeList.CanvasPosition = Vector2.zero
+		task.defer(sectionInView)
+	end
+end)
 
 local function open(p: Frame)
 	placeSheets()
@@ -1179,50 +1781,84 @@ end
 
 ---------------------------------------------------------------- offers
 
+-- the "can't afford it" card, a poster like the Starter Pack's: how far you are from the car (its picture and a
+-- bar), the smallest cash pack that covers the gap, GET IT and KEEP DRIVING
+local OFFER_W, OFFER_H = 500, 410
 local offer = Style.panel(gui)
+offer.Name = "Upsell"
 offer.AnchorPoint = Vector2.new(0.5, 0.5)
 offer.Position = UDim2.fromScale(0.5, 0.5)
-offer.Size = UDim2.fromOffset(440, 270)
+offer.Size = UDim2.fromOffset(OFFER_W, OFFER_H)
 offer.ZIndex = 10
 offer.Visible = false
 Style.stroke(offer, C.yellow, 4, 0)
 Style.setShadow(offer, C.pink)
-local hazard = Instance.new("Frame")
-hazard.BackgroundColor3 = C.yellow
-hazard.BorderSizePixel = 0
-hazard.Size = UDim2.new(1, 0, 0, 14)
-hazard.ClipsDescendants = true
-hazard.ZIndex = 11
-hazard.Parent = offer
-for x = -20, 460, 28 do
-	local stripe = Instance.new("Frame")
-	stripe.BackgroundColor3 = C.ink
-	stripe.BorderSizePixel = 0
-	stripe.Position = UDim2.fromOffset(x, -10)
-	stripe.Size = UDim2.fromOffset(12, 40)
-	stripe.Rotation = 40
-	stripe.ZIndex = 11
-	stripe.Parent = hazard
+Style.hazard(offer, OFFER_W, 14)
+local offerTitle = Style.label(offer, "", 40, F.display, C.yellow)
+offerTitle.Position = UDim2.fromOffset(0, 26)
+offerTitle.Size = UDim2.new(1, 0, 0, 44)
+Style.outline(offerTitle, 2)
+-- the car you're saving for, and how far along you are
+local offerPic = Instance.new("Frame")
+offerPic.Name = "Picture"
+offerPic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+offerPic.BorderSizePixel = 0
+offerPic.ClipsDescendants = true
+offerPic.Position = UDim2.fromOffset(24, 84)
+offerPic.Size = UDim2.fromOffset(120, 70)
+offerPic.Parent = offer
+local offerCar = Style.label(offer, "", 20, F.display, C.text)
+offerCar.Position = UDim2.fromOffset(158, 84)
+offerCar.Size = UDim2.new(1, -182, 0, 24)
+offerCar.TextXAlignment = Enum.TextXAlignment.Left
+local offerBack, offerFill = Style.bar(offer, C.money)
+offerBack.BackgroundTransparency = 0
+offerBack.Position = UDim2.fromOffset(158, 112)
+offerBack.Size = UDim2.new(1, -182, 0, 16)
+Style.laneGaps(offerBack, C.ink)
+local offerAmount = Style.label(offer, "", 14, F.bold, C.dim)
+offerAmount.Position = UDim2.fromOffset(158, 132)
+offerAmount.Size = UDim2.new(1, -182, 0, 18)
+offerAmount.TextXAlignment = Enum.TextXAlignment.Left
+-- the pack that covers it
+local offerPack = Style.card(offer)
+offerPack.Position = UDim2.fromOffset(24, 172)
+offerPack.Size = UDim2.new(1, -48, 0, 76)
+do
+	local edge = Instance.new("Frame")
+	edge.BackgroundColor3 = C.money
+	edge.BorderSizePixel = 0
+	edge.Size = UDim2.new(0, 8, 1, 0)
+	edge.Parent = offerPack
+	local packBill = Style.image(offerPack, Icons.Bill)
+	packBill.AnchorPoint = Vector2.new(0, 0.5)
+	packBill.Position = UDim2.new(0, 20, 0.5, 0)
+	packBill.Size = UDim2.fromOffset(58, 58)
 end
-local offerTitle = Style.label(offer, "", 32, F.display, C.yellow)
-offerTitle.Position = UDim2.fromOffset(0, 28)
-offerTitle.Size = UDim2.new(1, 0, 0, 38)
-offerTitle.ZIndex = 11
-local offerText = Style.label(offer, "", 15, F.bold, C.text)
-offerText.Position = UDim2.fromOffset(28, 72)
-offerText.Size = UDim2.new(1, -56, 0, 64)
-offerText.TextWrapped = true
-offerText.ZIndex = 11
-local offerBuy = Style.button(offer, "", "gold", 22)
-offerBuy.AnchorPoint = Vector2.new(0.5, 0)
-offerBuy.Position = UDim2.new(0.5, 0, 0, 146)
-offerBuy.Size = UDim2.fromOffset(300, 54)
-offerBuy.ZIndex = 11
+local offerPackName = Style.label(offerPack, "", 24, F.display, C.money)
+offerPackName.Position = UDim2.fromOffset(90, 10)
+offerPackName.Size = UDim2.new(1, -102, 0, 30)
+offerPackName.TextXAlignment = Enum.TextXAlignment.Left
+offerPackName.TextScaled = true
+do
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 24
+	fit.Parent = offerPackName
+end
+local offerText = Style.label(offerPack, "", 14, F.bold, C.dim)
+offerText.Position = UDim2.fromOffset(90, 42)
+offerText.Size = UDim2.new(1, -102, 0, 20)
+offerText.TextXAlignment = Enum.TextXAlignment.Left
+local offerBuy = Style.button(offer, "", "gold", 26)
+offerBuy.Name = "UpsellBuy"
+offerBuy.AnchorPoint = Vector2.new(0.5, 1)
+offerBuy.Position = UDim2.new(0.5, 0, 1, -62)
+offerBuy.Size = UDim2.fromOffset(320, 58)
 local offerNo = Style.button(offer, "KEEP DRIVING", "dark", 16)
-offerNo.AnchorPoint = Vector2.new(0.5, 0)
-offerNo.Position = UDim2.new(0.5, 0, 0, 214)
-offerNo.Size = UDim2.fromOffset(200, 40)
-offerNo.ZIndex = 11
+offerNo.Name = "UpsellNo"
+offerNo.AnchorPoint = Vector2.new(0.5, 1)
+offerNo.Position = UDim2.new(0.5, 0, 1, -14)
+offerNo.Size = UDim2.fromOffset(200, 38)
 local offerKey = ""
 local offerIsUpsell = false -- the "can't afford it" card, which a successful buy closes
 offerBuy.Activated:Connect(function()
@@ -1232,26 +1868,15 @@ end)
 offerNo.Activated:Connect(function()
 	offer.Visible = false
 end)
-
-local function showOffer(
-	title: string,
-	text: string,
-	product: Products.Product,
-	buyLabel: string,
-	noLabel: string
-)
-	offerTitle.Text = title
-	offerText.Text = text
-	offerKey = product.key
-	robuxText(product, offerBuy)
-	offerBuy.Text = buyLabel .. "  ·  " .. offerBuy.Text
-	offerNo.Text = noLabel
-	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
-	scale.Parent = offer
-	scale.Scale = 0.8
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	offer.Visible = true
-end
+-- gamepad: it starts on GET IT, and B is KEEP DRIVING
+Pad.menu(offer, {
+	first = function()
+		return offerBuy
+	end,
+	close = function()
+		offer.Visible = false
+	end,
+})
 
 -- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
 offerFor = function(stats: Vehicles.Vehicle)
@@ -1262,7 +1887,8 @@ offerFor = function(stats: Vehicles.Vehicle)
 		return
 	end
 	local cash = (player:GetAttribute("Money") or 0) :: number
-	local gap = priceOf(stats) - cash
+	local price = priceOf(stats)
+	local gap = price - cash
 	local pick = Products.MoneyPacks[#Products.MoneyPacks]
 	for _, pack in Products.MoneyPacks do
 		if pack.money >= gap then
@@ -1271,13 +1897,21 @@ offerFor = function(stats: Vehicles.Vehicle)
 		end
 	end
 	offerIsUpsell = true
-	showOffer(
-		`NEED {money(gap)} MORE`,
-		`Keep running people over to earn it, or grab {pick.title} ({money(pick.money)}) for the {stats.name} right now.`,
-		pick,
-		"GET " .. money(pick.money),
-		"KEEP DRIVING"
-	)
+	offerTitle.Text = `NEED {money(gap)} MORE`
+	offerCar.Text = string.upper(stats.name)
+	offerFill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
+	offerAmount.Text = `{money(cash)} / {money(price)}`
+	offerPic:ClearAllChildren()
+	preview(offerPic, stats, true)
+	offerPackName.Text = `{string.upper(pick.title)}  ·  {money(pick.money)}`
+	offerText.Text = "covers it now, or keep running people over"
+	offerKey = pick.key
+	robuxText(pick, offerBuy, "GET IT  ·  ")
+	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = offer
+	scale.Scale = 0.8
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	offer.Visible = true
 end
 
 -- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds

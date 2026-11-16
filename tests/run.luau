@@ -2806,6 +2806,18 @@ do
 	local phone = Layout.scale(848, 395, cfg)
 	check("layout: a phone is scaled by its height", math.abs(phone - 395 / 560) < 1e-6)
 	check("layout: a tiny screen stops at the minimum", Layout.scale(300, 200, cfg) == cfg.MinScale)
+	check(
+		"layout: the store opens on its first section",
+		Layout.sectionAt({ 0, 300, 600 }, cfg.SectionSlack, false) == 1
+	)
+	check(
+		"layout: a section counts once its top reaches the page top",
+		Layout.sectionAt({ -320, 20, 330 }, 40, false) == 2
+	)
+	check(
+		"layout: scrolled to the end shows the last section",
+		Layout.sectionAt({ -900, -500, 200 }, 40, true) == 3
+	)
 	check("layout: a narrow screen scales by width", Layout.scale(800, 900, cfg) == 0.8)
 	check("layout: garage row fits the phone canvas", 395 / phone - 86 - 84 >= 310)
 	local top, bottom = cfg.SheetTop, cfg.SheetBottom
@@ -3409,6 +3421,44 @@ local function checkHideUi()
 	check("hide ui: closed while hidden stays closed", not H.restore(d))
 end
 checkHideUi()
+
+-- every lettered board in the map has its drawn artwork (Config/Signs), so a new name never falls back to text
+local function checkSigns()
+	local Signs = require("../src/shared/Config/Signs")
+	local Suburbs = require("../src/shared/Config/Suburbs")
+	local function has(key: string): boolean
+		local id = Signs.Images[key]
+		return id ~= nil and id > 0
+	end
+	local all = true
+	for _, s in World.SpawnPlaza.Stalls do
+		all = all and has("Stall_" .. s.text)
+	end
+	for _, n in CrowdConfig.OfficeNames do
+		all = all and has("Office_" .. n)
+	end
+	for _, n in BuildingConfig.Shops.Names do
+		all = all and has("Shop_" .. n)
+	end
+	for _, n in Streets.Billboards do
+		all = all and has("Ad_" .. n)
+	end
+	for _, h in Suburbs.Hoods do
+		all = all and has("Suburb_" .. h.name)
+	end
+	check("signs: every stall, office, shop, ad and suburb has artwork", all)
+	local fixed = true
+	for key in Signs.Images do
+		fixed = fixed and has(key)
+	end
+	check("signs: every sign key has an image id", fixed)
+	local tiled = true
+	for key, ratio in Signs.Tiled do
+		tiled = tiled and Signs.Images[key] ~= nil and ratio > 0
+	end
+	check("signs: tiled signs are signs", tiled)
+end
+checkSigns()
 
 if failures > 0 then
 	error(`{failures} test(s) failed`)

@@ -71,4 +71,19 @@ function Layout.inThumbZone(
 	return x < width * cfg.ThumbZoneWidth and y >= height * cfg.ThumbZoneTop
 end
 
+-- which section of a scrolling page is in view: the last whose top (px from the page's top, in page order)
+-- is at or above `slack` px down, or the last one once the page is scrolled to its end
+function Layout.sectionAt(tops: { number }, slack: number, atEnd: boolean): number
+	if atEnd then
+		return #tops
+	end
+	local at = 1
+	for i, top in tops do
+		if top <= slack then
+			at = i
+		end
+	end
+	return at
+end
+
 return Layout

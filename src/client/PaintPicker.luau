@@ -22,6 +22,7 @@ export type Picker = {
 }
 
 local SWATCH, GAP, PER_ROW = 22, 5, 8
+local INLINE_SWATCH = 30 -- the showroom's bigger swatches
 local SEND_AFTER = 0.5 -- seconds of no tapping before the chosen colour is sent
 
 local function isVip(): boolean
@@ -54,16 +55,20 @@ local function owns(vehicleId: string): boolean
 end
 
 -- card: the garage card; model: its preview's vehicle copy; info: what the swatches cover while open;
--- changed: refreshes the card (the garage's refresh, which calls this picker's refresh last)
+-- changed: refreshes the card (the garage's refresh, which calls this picker's refresh last). With inline
+-- (a frame to fill), the swatches always show there while the vehicle is owned, with no PAINT button; they're
+-- built the first time the card shows.
 function PaintPicker.attach(
 	card: Frame,
 	vehicleId: string,
 	model: Model?,
 	info: GuiObject,
 	action: TextButton,
-	changed: () -> ()
+	changed: () -> (),
+	inline: Frame?
 ): Picker
 	local isOpen = false
+	local swatch = if inline then INLINE_SWATCH else SWATCH
 	local selected = saved(vehicleId)
 	local sendToken = 0
 
@@ -78,13 +83,13 @@ function PaintPicker.attach(
 	local sheet = Instance.new("Frame")
 	sheet.Name = "Paints"
 	sheet.BackgroundTransparency = 1
-	sheet.Position = UDim2.fromOffset(14, 160)
-	sheet.Size = UDim2.new(1, -28, 0, 104)
+	sheet.Position = if inline then UDim2.new() else UDim2.fromOffset(14, 160)
+	sheet.Size = if inline then UDim2.fromScale(1, 1) else UDim2.new(1, -28, 0, 104)
 	sheet.Visible = false
-	sheet.Parent = card
-	local caption = Style.label(sheet, "", 13, F.heavy, C.text)
-	caption.Position = UDim2.fromOffset(0, 3 * (SWATCH + GAP) + 2)
-	caption.Size = UDim2.new(1, 0, 0, 16)
+	sheet.Parent = inline or card
+	local caption = Style.label(sheet, "", if inline then 15 else 13, F.heavy, C.text)
+	caption.Position = UDim2.fromOffset(0, 3 * (swatch + GAP) + 2)
+	caption.Size = UDim2.new(1, 0, 0, if inline then 20 else 16)
 	caption.TextXAlignment = Enum.TextXAlignment.Left
 
 	local function show(paintId: string)
@@ -122,12 +127,12 @@ function PaintPicker.attach(
 			local rgb = PaintRules.colour(vehicleId, p.id) or { 128, 128, 128 }
 			b.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
 			b.Position = UDim2.fromOffset(
-				((i - 1) % PER_ROW) * (SWATCH + GAP),
-				(i - 1) // PER_ROW * (SWATCH + GAP)
+				((i - 1) % PER_ROW) * (swatch + GAP),
+				(i - 1) // PER_ROW * (swatch + GAP)
 			)
-			b.Size = UDim2.fromOffset(SWATCH, SWATCH)
+			b.Size = UDim2.fromOffset(swatch, swatch)
 			b.FontFace = F.display
-			b.TextSize = 13
+			b.TextSize = if inline then 17 else 13
 			b.TextColor3 = C.text
 			b.Text = ""
 			b.Parent = sheet
@@ -170,7 +175,19 @@ function PaintPicker.attach(
 
 	local function refresh()
 		local mine = owns(vehicleId)
-		toggle.Visible = mine
+		if inline then
+			toggle.Visible = false
+			if mine and card.Visible then
+				buildSwatches()
+			end
+			if mine and not isOpen then
+				selected = saved(vehicleId)
+			end
+			isOpen = mine
+			sheet.Visible = mine
+		else
+			toggle.Visible = mine
+		end
 		if isOpen and not mine then
 			isOpen = false
 			sheet.Visible = false

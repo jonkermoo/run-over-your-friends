@@ -588,7 +588,8 @@ function TownKit.shop(
 		label,
 		ctx.accent,
 		Color3.new(1, 1, 1),
-		true
+		true,
+		"Shop_" .. label
 	)
 	-- each client furnishes the shop floor from these (Rules/Interiors); the shopkeeper and shoppers use them
 	model.WorldPivot = ctx.base

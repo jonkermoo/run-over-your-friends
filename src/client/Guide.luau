@@ -18,6 +18,7 @@ local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Rules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
@@ -95,38 +96,15 @@ hintText.Visible = false
 
 local Z_ARROW = 30 -- arrows sit above the sheets they point into
 
--- a chevron pointing down, from two bars (font glyphs like ▼ don't draw); returns its bars to paint
-local function chevron(
-	parent: Instance,
-	y: UDim,
-	reach: number,
-	length: number,
-	thick: number,
-	z: number
-): { Frame }
-	local bars = {}
-	for _, side in { -1, 1 } do
-		local bar = Instance.new("Frame")
-		bar.AnchorPoint = Vector2.new(0.5, 0.5)
-		bar.Position = UDim2.new(UDim.new(0.5, side * reach), y)
-		bar.Size = UDim2.fromOffset(length, thick)
-		bar.Rotation = side * -45
-		bar.BorderSizePixel = 0
-		bar.ZIndex = z
-		bar.Parent = parent
-		local edge = Instance.new("UIStroke")
-		edge.Color = INK
-		edge.Thickness = 3
-		edge.Parent = bar
-		table.insert(bars, bar)
-	end
-	return bars
-end
-
-local function paint(bars: { Frame }, color: Color3)
-	for _, bar in bars do
-		bar.BackgroundColor3 = color
-	end
+-- the block arrow pointing down (Config/Icons.Arrow, white so it takes the target's colour), centred on
+-- `centre` in a square box `size` px wide; it turns about its middle
+local function blockArrow(parent: Instance, centre: UDim2, size: number, z: number): ImageLabel
+	local img = Style.image(parent, Icons.Arrow)
+	img.AnchorPoint = Vector2.new(0.5, 0.5)
+	img.Position = centre
+	img.Size = UDim2.fromOffset(size, size)
+	img.ZIndex = z
+	return img
 end
 
 -- moved to the target every frame: the marker hangs from it
@@ -172,10 +150,8 @@ arrowHolder.Position = UDim2.fromScale(0.5, 1)
 arrowHolder.Parent = arrow
 local arrowScale = Instance.new("UIScale")
 arrowScale.Parent = arrowHolder
-local arrowBars = chevron(arrowHolder, UDim.new(0, 92), 25, 78, 24, 1)
-for _, bar in chevron(arrowHolder, UDim.new(0, 146), 25, 78, 24, 1) do
-	table.insert(arrowBars, bar)
-end
+-- its tip at the holder's bottom, under the words
+local arrowImage = blockArrow(arrowHolder, UDim2.new(0.5, 0, 1, -64), 150, 1)
 local arrowText = label(arrowHolder, "", 38, BOLD, WHITE)
 arrowText.Size = UDim2.new(1, 0, 0, 46)
 Style.outline(arrowText, 3)
@@ -196,7 +172,7 @@ edgeTurn.Position = UDim2.fromScale(0.5, 0.5)
 edgeTurn.Size = UDim2.fromScale(1, 1)
 edgeTurn.ZIndex = Z_ARROW
 edgeTurn.Parent = edge
-local edgeBars = chevron(edgeTurn, UDim.new(0.5, 10), 28, 88, 26, Z_ARROW)
+local edgeImage = blockArrow(edgeTurn, UDim2.new(0.5, 0, 0.5, 16), 116, Z_ARROW)
 local edgeScale = Instance.new("UIScale")
 edgeScale.Scale = Callouts.EdgeScale
 edgeScale.Parent = edgeTurn
@@ -216,7 +192,7 @@ press.Size = UDim2.fromOffset(90, 80)
 press.Visible = false
 press.ZIndex = Z_ARROW
 press.Parent = gui
-paint(chevron(press, UDim.new(0.5, 0), 17, 56, 18, Z_ARROW), GOLD)
+blockArrow(press, UDim2.fromScale(0.5, 0.5), 78, Z_ARROW).ImageColor3 = GOLD
 
 ---------------------------------------------------------------- tips and celebrations
 
@@ -484,7 +460,7 @@ local function showTarget(target: Target?, root: BasePart?)
 	anchor.Position = target.at
 	anchor.Parent = workspace
 	arrow.Enabled = true
-	paint(arrowBars, target.color)
+	arrowImage.ImageColor3 = target.color
 	arrowText.Text = target.text
 	arrowHolder.Position = UDim2.new(0.5, 0, 1, (-14 + math.sin(t * 6) * 14) * Callouts.ArrowScale)
 	arrowScale.Scale = Callouts.ArrowScale
@@ -520,7 +496,7 @@ local function showTarget(target: Target?, root: BasePart?)
 		local away = math.rad(e.angle + 90)
 		local gap = Callouts.EdgeTextGap
 		edgeText.Position = UDim2.new(0.5, -math.cos(away) * gap, 0.5, -math.sin(away) * gap)
-		paint(edgeBars, target.color)
+		edgeImage.ImageColor3 = target.color
 		local metres = (target.at - root.Position).Magnitude / Vehicles.StudsPerMetre
 		say(
 			edgeText,
@@ -844,21 +820,40 @@ local function update()
 		end
 		for _, c in garage:GetDescendants() do
 			if c:IsA("TextButton") and c.Name == "Action" then
-				local cardFrame = c.Parent
-				local mine = garageOpen
-					and glowCard ~= nil
-					and cardFrame ~= nil
-					and cardFrame.Name == glowCard
-				glow(c, mine)
+				-- the vehicle's detail panel (client/Hud: a frame under Details named by its id)
+				local id = c:GetAttribute("VehicleId")
+				local detailList = garage:FindFirstChild("Details")
+				local cardFrame = if typeof(id) == "string" and detailList
+					then detailList:FindFirstChild(id) :: GuiObject?
+					else nil
+				local mine = garageOpen and glowCard ~= nil and cardFrame ~= nil and id == glowCard
+				-- the garage shows one vehicle at a time: while another is shown, point at this one's row
+				local shown = cardFrame ~= nil and cardFrame.Visible
+				local rowList = garage:FindFirstChild("Rows", true)
+				local row = if mine
+						and not shown
+						and rowList
+					then rowList:FindFirstChild(id :: string) :: GuiObject?
+					else nil
+				glow(c, mine and shown)
 				if mine and (stepValue == Steps.Buy or stepValue == Steps.Spawn) then
+					local at = row or c
 					if not scrolled then
 						scrolled = true
-						bringIntoView(c)
+						bringIntoView(at)
 					end
-					pressTarget = c
+					pressTarget = at
+					pressFromSide = row ~= nil -- from the right: from above it would cover the row over it
 				end
 			end
 		end
+	end
+	-- a card over the screen (the Starter Pack, the "need more money" card) has the player's attention: no
+	-- arrow on top of it
+	local upsell = hud and hud:FindFirstChild("Upsell") :: GuiObject?
+	local starter = hud and hud:FindFirstChild("StarterCard") :: GuiObject?
+	if (upsell and upsell.Visible) or (starter and starter.Visible) then
+		pressTarget = nil
 	end
 	showTarget(target, root)
 	showPress(pressTarget, pressFromSide)

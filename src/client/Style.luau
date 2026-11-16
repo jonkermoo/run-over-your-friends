@@ -143,6 +143,9 @@ Style.colors = table.freeze({
 	purple = Color3.fromRGB(150, 70, 255),
 	green = Color3.fromRGB(43, 220, 90),
 	grey = Color3.fromRGB(70, 70, 78),
+	billEdge = Color3.fromRGB(26, 160, 67), -- the store's drawn banknotes
+	billInk = Color3.fromRGB(11, 93, 34),
+	prize = Color3.fromRGB(58, 42, 85), -- the daily streak's week prize tile
 })
 local C = Style.colors
 
@@ -417,6 +420,38 @@ function Style.laneGaps(back: Frame, behind: Color3)
 		gap.ZIndex = 2
 		gap.Parent = back
 	end
+end
+
+-- a yellow-and-ink hazard band across the top of a card; the stripes are drawn `width` layout px across
+function Style.hazard(parent: Instance, width: number, height: number): Frame
+	local band = Instance.new("Frame")
+	band.Name = "Hazard"
+	band.BackgroundColor3 = C.yellow
+	band.BorderSizePixel = 0
+	band.Size = UDim2.new(1, 0, 0, height)
+	band.ClipsDescendants = true
+	band.Parent = parent
+	for x = -20, width + 20, 28 do
+		local stripe = Instance.new("Frame")
+		stripe.BackgroundColor3 = C.ink
+		stripe.BorderSizePixel = 0
+		stripe.Position = UDim2.fromOffset(x, -10)
+		stripe.Size = UDim2.fromOffset(12, height + 26)
+		stripe.Rotation = 40
+		stripe.Parent = band
+	end
+	return band
+end
+
+-- one of the HUD's shape images (Config/Icons), fitted into its box; color tints the white ones
+function Style.image(parent: Instance, id: number, color: Color3?): ImageLabel
+	local img = Instance.new("ImageLabel")
+	img.BackgroundTransparency = 1
+	img.Image = if id ~= 0 then `rbxassetid://{id}` else ""
+	img.ScaleType = Enum.ScaleType.Fit
+	img.ImageColor3 = color or C.text
+	img.Parent = parent
+	return img
 end
 
 -- a square paint tag ("TUTORIAL", "HOURLY")

@@ -14,6 +14,7 @@ local Config = require(ReplicatedStorage.Shared.Config.Events)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
 local Joints = require(ReplicatedStorage.Shared.Joints)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Style = require(script.Parent.Style)
 
 local GiantFinder = {}
@@ -30,16 +31,11 @@ gui.IgnoreGuiInset = true -- camera points and this screen share one origin
 gui.Enabled = false
 Style.fit(gui)
 
--- the diamond that points the way, tucked behind the plate's edge
-local pointer = Instance.new("Frame")
+-- the wedge that points the way (Config/Icons.Pointer), tucked behind the plate's edge and turned to the giant
+local pointer = Style.image(gui, Icons.Pointer, RED)
 pointer.Name = "Pointer"
 pointer.AnchorPoint = Vector2.new(0.5, 0.5)
-pointer.Size = UDim2.fromOffset(G.Pointer, G.Pointer)
-pointer.Rotation = 45
-pointer.BackgroundColor3 = RED
-pointer.BorderSizePixel = 0
-pointer.Parent = gui
-Style.stroke(pointer, C.ink, 3)
+pointer.Size = UDim2.fromOffset(G.PointerImage, G.PointerImage)
 
 local plate = Style.panel(gui)
 plate.Name = "Plate"
@@ -217,6 +213,7 @@ local function update()
 	local ty = if math.abs(dir.Y) > 1e-3 then hh / math.abs(dir.Y) else math.huge
 	local tip = pos + dir * (math.min(tx, ty) + G.Pointer * 0.3)
 	pointer.Position = UDim2.fromOffset(tip.X, tip.Y)
+	pointer.Rotation = math.deg(math.atan2(dir.Y, dir.X))
 end
 
 function GiantFinder.start()

@@ -15,6 +15,7 @@ local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Popups = require(script.Parent.Popups)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -106,20 +107,12 @@ chip.AnchorPoint = Vector2.new(0.5, 0)
 chip.Position = UDim2.new(0.5, 0, 0, Card.Gap)
 chip.Size = UDim2.fromOffset(112, Card.Height)
 chip.Visible = false
--- the chip's icon: a diamond road sign in the event's colour with a "!" on it
-local chipDot = Instance.new("Frame")
-chipDot.BorderSizePixel = 0
+-- the chip's icon: a diamond warning sign in the event's colour with a "!" on it (Config/Icons.Sign)
+local chipDot = Style.image(chip, Icons.Sign)
 chipDot.AnchorPoint = Vector2.new(0.5, 0.5)
 chipDot.Position = UDim2.new(0, 22, 0.5, 0)
-chipDot.Size = UDim2.fromOffset(18, 18)
-chipDot.Rotation = 45
+chipDot.Size = UDim2.fromOffset(30, 30)
 chipDot.ZIndex = 2
-chipDot.Parent = chip
-local chipMark = Style.label(chip, "!", 18, F.display, C.ink)
-chipMark.AnchorPoint = Vector2.new(0.5, 0.5)
-chipMark.Position = UDim2.new(0, 22, 0.5, 1)
-chipMark.Size = UDim2.fromOffset(18, 22)
-chipMark.ZIndex = 3
 local chipTimer = Style.label(chip, "", 18, F.display, C.yellow)
 chipTimer.Position = UDim2.fromOffset(40, 3)
 chipTimer.Size = UDim2.new(1, -46, 1, 0)
@@ -295,8 +288,7 @@ local function update()
 	end
 	lastPhase, lastKey = phase, key
 	if shrunk then
-		chipDot.BackgroundColor3 = if phase == "quiet" then C.grey else color
-		chipMark.TextColor3 = inkOn(chipDot.BackgroundColor3)
+		chipDot.ImageColor3 = if phase == "quiet" then C.grey else color
 		chipTimer.Text = fmt(if phase == "quiet" then left + Config.WarnSeconds else left)
 		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
 		Style.setShadow(chip, if blink then C.text else C.ink)
