@@ -11,6 +11,7 @@ local Buildings = require(ReplicatedStorage.Shared.Config.Buildings)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
+local Signs = require(ReplicatedStorage.Shared.Config.Signs)
 local CrowdRules = require(ReplicatedStorage.Shared.Rules.Crowd)
 local InteriorConfig = require(ReplicatedStorage.Shared.Config.Interiors)
 local Layouts = require(ReplicatedStorage.Shared.Rules.Interiors)
@@ -55,7 +56,32 @@ local function part(
 	return p
 end
 
--- a board with big text on its front (and back) face
+-- the drawn artwork for sign `key` (Config/Signs) on the board's front (and back) face: false when the key has
+-- no image, so the caller letters it instead
+function Places.art(board: BasePart, key: string?, bothSides: boolean?): boolean
+	local id = if key then Signs.Images[key] else nil
+	if not id or id == 0 then
+		return false
+	end
+	local tile = Signs.Tiled[key :: string]
+	for _, face in
+		if bothSides then { Enum.NormalId.Front, Enum.NormalId.Back } else { Enum.NormalId.Front }
+	do
+		local image: Decal = if tile then Instance.new("Texture") else Instance.new("Decal")
+		if tile then
+			local texture = image :: Texture
+			texture.StudsPerTileV = board.Size.Y
+			texture.StudsPerTileU = board.Size.Y * tile
+		end
+		image.Name = "SignArt"
+		image.Texture = "rbxassetid://" .. id
+		image.Face = face
+		image.Parent = board
+	end
+	return true
+end
+
+-- a board with big text on its front (and back) face, or the sign's drawn artwork when `key` has one
 function Places.sign(
 	parent: Instance,
 	size: Vector3,
@@ -63,9 +89,13 @@ function Places.sign(
 	text: string,
 	back: Color3,
 	front: Color3,
-	bothSides: boolean?
+	bothSides: boolean?,
+	key: string?
 ): Part
 	local board = part(parent, size, cf, back)
+	if Places.art(board, key, bothSides) then
+		return board
+	end
 	for _, face in
 		if bothSides then { Enum.NormalId.Front, Enum.NormalId.Back } else { Enum.NormalId.Front }
 	do
@@ -198,7 +228,9 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 		CFrame.lookAt(loft, loft + out),
 		string.upper(Crowd.RestaurantName),
 		yellow,
-		red
+		red,
+		nil,
+		"BarnLoft"
 	)
 	-- porch over the door: a roof on two posts
 	put(ctx, Vector3.new(13, 0.5, 6.5), 0, Y0 + 10.4, zf + 3.1, ctx.roof)
@@ -238,7 +270,8 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 		"DRIVE-THRU",
 		yellow,
 		red,
-		true
+		true,
+		"BarnDrive"
 	)
 	-- a giant burger on the ridge, at the street end
 	local burger = base + out * (zf - 8) + Vector3.new(0, top + R.PeakRise + 1, 0)
@@ -303,7 +336,9 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 		CFrame.lookAt(menuAt, menuAt + out),
 		"BURGERS  FRIES  SHAKES",
 		Color3.fromRGB(30, 30, 34),
-		yellow
+		yellow,
+		nil,
+		"BarnMenu"
 	)
 	for _, a in R.Tables do
 		local at = base + out * (D * R.TableZ) + along * (a * W)
@@ -333,7 +368,8 @@ function Places.restaurant(parent: Instance, c: Vector3, out: Vector3): Place
 		string.upper(Crowd.RestaurantName),
 		yellow,
 		red,
-		true
+		true,
+		"BarnPole"
 	)
 	model.Parent = parent
 
@@ -492,7 +528,9 @@ function Places.warehouse(parent: Instance, c: Vector3, out: Vector3): Place
 		CFrame.lookAt(signAt, signAt + out),
 		string.upper(Crowd.WarehouseName),
 		trim,
-		Color3.new(1, 1, 1)
+		Color3.new(1, 1, 1),
+		nil,
+		"ParcelPlanet"
 	)
 	local boxAt = signAt - along * 43
 	part(
@@ -656,12 +694,17 @@ function Places.office(
 	local signAt = front - out * 2 + Vector3.new(0, top + 5, 0)
 	Places.sign(
 		model,
-		Vector3.new(math.min(width * 0.8, 60), 8, 1),
+		Vector3.new(
+			math.min(width * 0.8, 60),
+			math.min(8, math.min(width * 0.8, 60) / Signs.OfficeAspect),
+			1
+		),
 		CFrame.lookAt(signAt, signAt + out),
 		name,
 		Color3.fromRGB(24, 28, 40),
 		Color3.new(1, 1, 1),
-		true
+		true,
+		"Office_" .. name
 	)
 	local i = inside(model)
 	return {

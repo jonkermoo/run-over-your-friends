@@ -219,7 +219,8 @@ local function billboard(parent: Instance, at: Vector3, out: Vector3, text: stri
 		text,
 		Color3.fromRGB(250, 250, 245),
 		accent,
-		true
+		true,
+		"Ad_" .. text
 	)
 end
 
@@ -623,7 +624,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			"STUNT PARK",
 			Color3.fromRGB(250, 250, 245),
 			rgb(C.deckRed),
-			true
+			true,
+			"StuntPark"
 		)
 		local lineX = gx + 30
 		paint(
@@ -1328,7 +1330,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				CFrame.lookAt(signAt, signAt + Vector3.new(0, 0, 1)),
 				if side < 0 then "MEGACORP TOWER" else "COMING SOON",
 				hoard,
-				COLORS.white
+				COLORS.white,
+				nil,
+				if side < 0 then "Hoard_MEGACORP TOWER" else "Hoard_COMING SOON"
 			)
 		end
 		local taken: { { number } } = {} -- x, z, radius of what stands on the site
