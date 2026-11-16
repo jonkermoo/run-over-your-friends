@@ -13,8 +13,10 @@ local TweenService = game:GetService("TweenService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local Offer = require(ReplicatedStorage.Shared.Rules.Offer)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Pad = require(script.Parent.Pad)
 local Style = require(script.Parent.Style)
 
 local StarterCard = {}
@@ -100,26 +102,53 @@ local valueText: TextLabel
 local buy: TextButton
 local onClose: (() -> ())? = nil
 
-local CARD_W, CARD_H = 520, 476
-local TILE_W, TILE_H, TILE_GAP = 150, 176, 12
+local CARD_W, CARD_H = 580, 560
+local TILE_W, TILE_H, PLUS_W = 156, 160, 36
+local PIC_H = 104 -- the picture at the top of each tile
 
-local function tile(parent: Instance, x: number): Frame
+type Preview = (Instance, Vehicles.Vehicle, boolean?) -> Model?
+
+-- one of the things inside: a picture on top, a yellow lane edge, its name and what it's worth
+local function tile(
+	parent: Instance,
+	order: number,
+	name: string,
+	value: string,
+	nameColor: Color3
+): Frame
 	local t = Style.card(parent)
-	t.Position = UDim2.fromOffset(x, 0)
 	t.Size = UDim2.fromOffset(TILE_W, TILE_H)
+	t.LayoutOrder = order
+	local pic = Instance.new("Frame")
+	pic.Name = "Picture"
+	pic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+	pic.BorderSizePixel = 0
+	pic.ClipsDescendants = true
+	pic.Size = UDim2.new(1, 0, 0, PIC_H)
+	pic.Parent = t
+	local edge = Instance.new("Frame")
+	edge.BackgroundColor3 = C.yellow
+	edge.BorderSizePixel = 0
+	edge.Position = UDim2.fromOffset(0, PIC_H)
+	edge.Size = UDim2.new(1, 0, 0, 3)
+	edge.Parent = t
+	local n = Style.label(t, name, 17, F.display, nameColor)
+	n.Position = UDim2.fromOffset(6, PIC_H + 10)
+	n.Size = UDim2.new(1, -12, 0, 20)
+	local v = Style.label(t, value, 14, F.heavy, if nameColor == C.money then C.dim else C.money)
+	v.Position = UDim2.fromOffset(6, PIC_H + 32)
+	v.Size = UDim2.new(1, -12, 0, 18)
 	return t
 end
 
-local function tileText(t: Frame, name: string, value: string)
-	local n = Style.label(t, name, 15, F.heavy, C.text)
-	n.Position = UDim2.fromOffset(6, 134)
-	n.Size = UDim2.new(1, -12, 0, 18)
-	local v = Style.label(t, value, 14, F.heavy, C.money)
-	v.Position = UDim2.fromOffset(6, 153)
-	v.Size = UDim2.new(1, -12, 0, 16)
+local function plus(parent: Instance, order: number)
+	local p = Style.label(parent, "+", 34, F.display, C.yellow)
+	p.Size = UDim2.fromOffset(PLUS_W, TILE_H)
+	p.LayoutOrder = order
+	Style.outline(p, 2)
 end
 
-local function build(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Model?)
+local function build(gui: ScreenGui, preview: Preview)
 	card = Style.panel(gui)
 	card.Name = "StarterCard"
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -129,130 +158,131 @@ local function build(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Mo
 	card.Visible = false
 	Style.stroke(card, C.yellow, 4, 0)
 	Style.setShadow(card, C.pink)
+	Style.hazard(card, CARD_W, 14)
 
-	local hazard = Instance.new("Frame")
-	hazard.BackgroundColor3 = C.yellow
-	hazard.BorderSizePixel = 0
-	hazard.Size = UDim2.new(1, 0, 0, 14)
-	hazard.ClipsDescendants = true
-	hazard.Parent = card
-	for x = -20, CARD_W + 20, 28 do
-		local stripe = Instance.new("Frame")
-		stripe.BackgroundColor3 = C.ink
-		stripe.BorderSizePixel = 0
-		stripe.Position = UDim2.fromOffset(x, -10)
-		stripe.Size = UDim2.fromOffset(12, 40)
-		stripe.Rotation = 40
-		stripe.Parent = hazard
-	end
-
-	local title = Style.label(card, "STARTER PACK", 36, F.display, C.yellow)
-	title.Position = UDim2.fromOffset(0, 24)
-	title.Size = UDim2.new(1, 0, 0, 40)
-	Style.outline(title, 2)
-	local once = Style.pill(card, "ONE TIME ONLY · ONCE PER ACCOUNT", C.pink)
+	local title = Style.label(card, "STARTER PACK", 52, F.display, C.yellow)
+	title.Position = UDim2.fromOffset(0, 28)
+	title.Size = UDim2.new(1, -70, 0, 54) -- a little left of centre: the deal sticker takes the corner
+	title.Rotation = -3
+	Style.outline(title, 3)
+	-- the deal's sticker, slapped on the top-right corner while it runs
+	offPill = Style.label(card, "", 24, F.display, C.text)
+	offPill.Name = "DealSticker"
+	offPill.BackgroundColor3 = C.red
+	offPill.BackgroundTransparency = 0
+	offPill.AnchorPoint = Vector2.new(1, 0)
+	offPill.Position = UDim2.new(1, -8, 0, 22)
+	offPill.Size = UDim2.fromOffset(100, 40)
+	offPill.Rotation = 10
+	offPill.ZIndex = 3
+	Style.stroke(offPill, C.ink, 3, 0)
+	Style.shadow(offPill, C.ink, 4)
+	local once = Style.pill(card, "ONE TIME ONLY  ·  ONCE PER ACCOUNT", C.pink)
+	once.TextColor3 = C.text
+	once.TextSize = 15
+	once.Size = UDim2.fromOffset(0, 24)
 	once.AnchorPoint = Vector2.new(0.5, 0)
-	once.Position = UDim2.new(0.5, 0, 0, 66)
+	once.Position = UDim2.new(0.5, 0, 0, 92)
 
-	-- what's inside: a picture of each car, then the cash
+	-- what's inside: a picture of each car, then the cash, with a + between them
 	local row = Instance.new("Frame")
 	row.Name = "Contents"
 	row.BackgroundTransparency = 1
-	local count = #(FULL.vehicles or {}) + 1
-	local rowW = count * TILE_W + (count - 1) * TILE_GAP
-	row.Position = UDim2.fromOffset((CARD_W - rowW) // 2, 96)
-	row.Size = UDim2.fromOffset(rowW, TILE_H)
+	row.Position = UDim2.fromOffset(0, 130)
+	row.Size = UDim2.new(1, 0, 0, TILE_H)
 	row.Parent = card
-	local x = 0
+	local list = Instance.new("UIListLayout")
+	list.FillDirection = Enum.FillDirection.Horizontal
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Parent = row
+	local order = 0
 	for _, id in FULL.vehicles or {} do
 		local stats = Vehicles.ById[id]
 		if stats then
-			local t = tile(row, x)
-			preview(t, stats)
-			tileText(t, string.upper(stats.name), Style.money(stats.price))
-			x += TILE_W + TILE_GAP
+			order += 1
+			local t = tile(row, order, string.upper(stats.name), Style.money(stats.price), C.text)
+			preview(t:FindFirstChild("Picture") :: Frame, stats, true)
+			order += 1
+			plus(row, order)
 		end
 	end
-	local cash = tile(row, x)
-	local bills = Instance.new("Frame")
-	bills.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
-	bills.BorderSizePixel = 0
-	bills.Position = UDim2.fromOffset(6, 6)
-	bills.Size = UDim2.new(1, -12, 0, 122)
-	bills.Parent = cash
-	local big = Style.label(bills, Style.money(FULL.money), 30, F.display, C.money)
-	big.Size = UDim2.fromScale(1, 1)
-	Style.outline(big, 2)
-	local line = Style.dashes(cash, C.yellow, false, 3)
-	line.Position = UDim2.fromOffset(6, 128)
-	line.Size = UDim2.new(1, -12, 0, 3)
-	tileText(cash, "CASH", "spend it on anything")
+	local cash = tile(row, order + 1, Style.money(FULL.money), "CASH", C.money)
+	local pic = cash:FindFirstChild("Picture") :: Frame
+	local bill = Style.image(pic, Icons.Bill)
+	bill.AnchorPoint = Vector2.new(0.5, 0.5)
+	bill.Position = UDim2.fromScale(0.4, 0.45)
+	bill.Size = UDim2.fromOffset(70, 70)
+	local coin = Style.image(pic, Icons.Coin)
+	coin.AnchorPoint = Vector2.new(0.5, 0.5)
+	coin.Position = UDim2.fromScale(0.66, 0.6)
+	coin.Size = UDim2.fromOffset(46, 46)
 
-	-- the value line: honest numbers from Rules/Offer
+	-- the value bar: honest numbers from Rules/Offer
 	local value = Instance.new("Frame")
 	value.BackgroundColor3 = C.money
 	value.BorderSizePixel = 0
-	value.Position = UDim2.fromOffset(23, 284)
-	value.Size = UDim2.new(1, -46, 0, 34)
+	value.Position = UDim2.fromOffset(24, 304)
+	value.Size = UDim2.new(1, -48, 0, 40)
 	value.Parent = card
-	valueText = Style.label(value, "", 22, F.display, C.ink)
+	valueText = Style.label(value, "", 24, F.display, C.ink)
 	valueText.Size = UDim2.fromScale(1, 1)
 
-	-- the price: the full one struck through and the deal while it runs, with its countdown
+	-- the price: the full one struck through and the deal while it runs, and its countdown on the right
 	local priceRow = Instance.new("Frame")
 	priceRow.BackgroundTransparency = 1
-	priceRow.Position = UDim2.fromOffset(23, 326)
-	priceRow.Size = UDim2.new(1, -46, 0, 40)
+	priceRow.Position = UDim2.fromOffset(24, 354)
+	priceRow.Size = UDim2.new(1, -48, 0, 46)
 	priceRow.Parent = card
-	-- the struck price, the price and the % off sit in a row that sizes itself (TextBounds are screen pixels)
 	local left = Instance.new("Frame")
 	left.BackgroundTransparency = 1
-	left.Size = UDim2.fromScale(0.62, 1)
+	left.Size = UDim2.fromScale(0.6, 1)
 	left.Parent = priceRow
-	local list = Instance.new("UIListLayout")
-	list.FillDirection = Enum.FillDirection.Horizontal
-	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Padding = UDim.new(0, 10)
-	list.Parent = left
-	priceWas = Style.label(left, "", 22, F.display, C.dim)
+	local priceList = Instance.new("UIListLayout")
+	priceList.FillDirection = Enum.FillDirection.Horizontal
+	priceList.VerticalAlignment = Enum.VerticalAlignment.Center
+	priceList.SortOrder = Enum.SortOrder.LayoutOrder
+	priceList.Padding = UDim.new(0, 12)
+	priceList.Parent = left
+	priceWas = Style.label(left, "", 24, F.display, C.dim)
 	priceWas.AutomaticSize = Enum.AutomaticSize.X
-	priceWas.Size = UDim2.fromOffset(0, 40)
+	priceWas.Size = UDim2.fromOffset(0, 46)
 	priceWas.LayoutOrder = 1
 	strike = Instance.new("Frame")
 	strike.BackgroundColor3 = C.red
 	strike.BorderSizePixel = 0
 	strike.AnchorPoint = Vector2.new(0.5, 0.5)
-	strike.Position = UDim2.fromScale(0.5, 0.5)
-	strike.Size = UDim2.new(1, 0, 0, 3)
-	strike.Rotation = -8
+	strike.Position = UDim2.fromScale(0.5, 0.45)
+	strike.Size = UDim2.new(1, 4, 0, 4)
 	strike.Parent = priceWas
-	priceNow = Style.label(left, "", 30, F.display, C.yellow)
+	priceNow = Style.label(left, "", 36, F.display, C.yellow)
 	priceNow.AutomaticSize = Enum.AutomaticSize.X
-	priceNow.Size = UDim2.fromOffset(0, 40)
+	priceNow.Size = UDim2.fromOffset(0, 46)
 	priceNow.LayoutOrder = 2
 	Style.outline(priceNow, 2)
-	offPill = Style.pill(left, "", C.red)
-	offPill.TextColor3 = C.text
-	offPill.TextSize = 16
-	offPill.Size = UDim2.fromOffset(0, 24)
-	offPill.LayoutOrder = 3
-	timer = Style.label(priceRow, "", 16, F.heavy, C.text)
-	timer.AnchorPoint = Vector2.new(1, 0)
-	timer.Position = UDim2.fromScale(1, 0)
-	timer.Size = UDim2.fromOffset(170, 40)
-	timer.TextXAlignment = Enum.TextXAlignment.Right
+	timer = Style.label(priceRow, "", 19, F.display, C.text)
+	timer.BackgroundColor3 = C.red
+	timer.BackgroundTransparency = 0
+	timer.AnchorPoint = Vector2.new(1, 0.5)
+	timer.Position = UDim2.fromScale(1, 0.5)
+	timer.AutomaticSize = Enum.AutomaticSize.X
+	timer.Size = UDim2.fromOffset(0, 32)
+	local timerPad = Instance.new("UIPadding")
+	timerPad.PaddingLeft = UDim.new(0, 10)
+	timerPad.PaddingRight = UDim.new(0, 10)
+	timerPad.PaddingTop = UDim.new(0, 4)
+	timerPad.Parent = timer
 
-	buy = Style.button(card, "", "gold", 24)
+	buy = Style.button(card, "", "gold", 30)
 	buy.Name = "StarterBuy"
-	buy.AnchorPoint = Vector2.new(0.5, 0)
-	buy.Position = UDim2.new(0.5, 0, 0, 374)
-	buy.Size = UDim2.fromOffset(320, 54)
-	local no = Style.button(card, "NO THANKS", "dark", 15)
+	buy.AnchorPoint = Vector2.new(0.5, 1)
+	buy.Position = UDim2.new(0.5, 0, 1, -58)
+	buy.Size = UDim2.fromOffset(340, 62)
+	local no = Style.button(card, "NO THANKS", "dark", 16)
 	no.Name = "StarterNo"
-	no.AnchorPoint = Vector2.new(0.5, 0)
-	no.Position = UDim2.new(0.5, 0, 0, 434)
-	no.Size = UDim2.fromOffset(180, 32)
+	no.AnchorPoint = Vector2.new(0.5, 1)
+	no.Position = UDim2.new(0.5, 0, 1, -14)
+	no.Size = UDim2.fromOffset(180, 36)
 
 	buy.Activated:Connect(function()
 		local product = StarterCard.current()
@@ -260,6 +290,13 @@ local function build(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Mo
 		Net.waitFor("BuyProduct"):FireServer(product.key)
 	end)
 	no.Activated:Connect(StarterCard.hide)
+	-- gamepad: it starts on GET IT, and B is NO THANKS
+	Pad.menu(card, {
+		first = function()
+			return buy
+		end,
+		close = StarterCard.hide,
+	})
 end
 
 -- lay the price row out for what's on sale now
@@ -274,8 +311,8 @@ local function refresh()
 	timer.Visible = deal
 	if deal then
 		priceWas.Text = "R$ " .. robuxShown[FULL.key]
-		offPill.Text = `{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}% OFF`
-		timer.Text = "DEAL ENDS IN " .. Offer.clock(dealEnds() - now())
+		offPill.Text = `-{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}%`
+		timer.Text = "ENDS " .. Offer.clock(dealEnds() - now())
 	end
 	buy.Text = "GET IT  ·  " .. rs(product)
 end
@@ -345,7 +382,7 @@ local function refreshStore()
 	s.button.Text = rs(product)
 end
 
-function StarterCard.start(gui: ScreenGui, preview: (Instance, Vehicles.Vehicle) -> Model?)
+function StarterCard.start(gui: ScreenGui, preview: Preview)
 	build(gui, preview)
 	for _, name in { "Bought", "StarterDealEnds", "Owned" } do
 		player:GetAttributeChangedSignal(name):Connect(function()
