@@ -85,7 +85,8 @@ local function buyPaint(player: Player, paintId: any)
 	profile.paints[paint.id] = true
 	Data.changed(player)
 	Analytics.spent(player, paint.price, "Paint" .. paint.id)
-	Net.remote("Popup"):FireClient(player, Loc.msg("PaintUnlocked", { paint = paint.name }), "big")
+	Net.remote("Popup")
+		:FireClient(player, Loc.msg("PaintUnlocked", { paint = Loc.src(paint.name) }), "big")
 end
 
 function PaintService.start()

@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Paints)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
 local Style = require(script.Parent.Style)
@@ -215,18 +216,25 @@ function PaintPicker.attach(
 			return
 		end
 		if PaintRules.isOpen(have, selected) then
-			caption.Text = string.upper(p.name) .. if selected == current then "  ON" else ""
+			caption.AutoLocalize = false
+			caption.Text = if selected == current
+				then Loc.text("PaintOn", { paint = Loc.upper(Loc.source(p.name)) })
+				else Loc.upper(Loc.source(p.name))
 			caption.TextColor3 = C.text
 		elseif p.vip then
-			caption.Text = string.upper(p.name) .. "  VIP ONLY"
+			Loc.set(caption, "PaintVip", { paint = Loc.upper(Loc.source(p.name)) })
 			caption.TextColor3 = C.gold
 			action.Text = "GET VIP"
 			Style.setKind(action, "gold")
 		else
-			caption.Text = string.upper(p.name) .. "  " .. Style.money(p.price) .. "  ALL CARS"
+			Loc.set(
+				caption,
+				"PaintBuy",
+				{ paint = Loc.upper(Loc.source(p.name)), price = Style.money(p.price) }
+			)
 			caption.TextColor3 = C.money
 			local cash = (player:GetAttribute("Money") or 0) :: number
-			action.Text = "BUY " .. Style.money(p.price)
+			Loc.set(action, "BuyPrice", { price = Style.money(p.price) })
 			Style.setKind(action, if cash >= p.price then "orange" else "dark")
 		end
 	end

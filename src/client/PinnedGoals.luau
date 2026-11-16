@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -151,8 +152,9 @@ local function fillCard(card: Card, g: GoalView)
 	card.fill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
 	card.fill.BackgroundColor3 = if g.done then C.green else color
 	card.amount.Text = `{shortNumber(g.progress)}/{shortNumber(g.target)}`
+	card.reward.AutoLocalize = false
 	card.reward.Text = if g.done
-		then `DONE +${shortNumber(g.reward)}`
+		then Loc.text("PinnedDone", { n = shortNumber(g.reward) })
 		else "$" .. shortNumber(g.reward)
 	card.reward.BackgroundColor3 = if g.done then C.green else C.gold
 	card.text.TextColor3 = if g.done or g == WAITING then C.dim else C.text
@@ -161,7 +163,11 @@ local function fillCard(card: Card, g: GoalView)
 	local s = sets[card.pin.set]
 	if card.pin.set == "Server" and s then
 		local left = fmt(s.endsAt - (os.time() + clockOffset))
-		card.tag.Text = if g.done or g == WAITING then `SERVER  NEXT {left}` else `SERVER  {left}`
+		Loc.set(
+			card.tag,
+			if g.done or g == WAITING then "PinnedServerNext" else "PinnedServer",
+			{ time = left }
+		)
 		card.amount.Text = if g == WAITING then "" else card.amount.Text
 	end
 end
@@ -194,7 +200,8 @@ local function build(width: number)
 		local reward = Style.pill(frame, "", C.gold)
 		reward.AnchorPoint = Vector2.new(1, 0)
 		reward.Position = UDim2.new(1, -40, 0, 7)
-		local text = Style.label(frame, g.text, 15, F.heavy, C.text)
+		local text = Style.label(frame, Loc.goal(g, p.set == "Server"), 15, F.heavy, C.text)
+		text.AutoLocalize = false
 		text.Position = UDim2.fromOffset(16, 28)
 		text.Size = UDim2.new(1, -30, 0, 16)
 		text.TextXAlignment = Enum.TextXAlignment.Left

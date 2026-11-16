@@ -931,11 +931,8 @@ for _, stats in Vehicles.List do
 	bay.ZIndex = 2
 	Style.outline(bay, 3)
 	-- car of the day and NEXT UP tags in the picture's top-right corner
-	local sale = Style.pill(
-		stage,
-		`CAR OF THE DAY  -{math.floor(DailyConfig.DiscountShare * 100 + 0.5)}%`,
-		C.pink
-	)
+	local sale = Style.pill(stage, "", C.pink)
+	Loc.set(sale, "CarOfDay", { pct = math.floor(DailyConfig.DiscountShare * 100 + 0.5) })
 	sale.Name = "Sale"
 	sale.TextColor3 = C.text
 	sale.TextSize = 15
@@ -978,7 +975,8 @@ for _, stats in Vehicles.List do
 	statBar(info, 112, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
 	local pay =
 		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
-	local payText = Style.label(info, `ABOUT {money(pay)} A HIT`, 16, F.heavy, C.money)
+	local payText = Style.label(info, "", 16, F.heavy, C.money)
+	Loc.set(payText, "AboutPerHit", { money = money(pay) })
 	payText.Position = UDim2.fromOffset(0, 142)
 	payText.Size = UDim2.new(1, 0, 0, 20)
 	payText.TextXAlignment = Enum.TextXAlignment.Left
@@ -1149,7 +1147,7 @@ function refreshCards()
 				C.text
 			)
 			if cash >= price then
-				c.action.Text = "BUY " .. money(price)
+				Loc.set(c.action, "BuyPrice", { price = money(price) })
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
 				-- a pass car: the pass is the way in; the cash price stays as a small "or"
@@ -1157,12 +1155,12 @@ function refreshCards()
 				Style.setKind(c.action, "blue")
 				c.price.Text = "GAME PASS"
 				c.price.TextColor3 = C.blue
-				c.was.Text = `or {money(price)}`
+				Loc.set(c.was, "OrPrice", { price = money(price) })
 				c.was.Visible = true
 				c.strike.Visible = false
 				setTag(c, "PASS", C.blue, C.text)
 			else
-				c.action.Text = "BUY " .. money(price)
+				Loc.set(c.action, "BuyPrice", { price = money(price) })
 				Style.setKind(c.action, "dark")
 				c.rowName.TextColor3 = C.dim -- out of reach for now
 				c.rowPrice.TextColor3 = C.dim
@@ -1249,6 +1247,7 @@ end
 -- "R$ 99" (after prefix, if given): the configured price until the product exists, then Roblox's real one
 local function robuxText(product: Products.Product, label: TextButton, prefix: string?)
 	local before = prefix or ""
+	label.AutoLocalize = false -- a price, its prefix already translated
 	label.Text = before .. "R$ " .. product.robux
 	if product.id ~= 0 then
 		task.spawn(function()
@@ -1491,9 +1490,7 @@ local PASSES = {
 		title = "ROADSTER",
 		accent = C.red,
 		ink = C.text,
-		text = `The dream car: rear jet, air control and a thruster. Plus {money(
-			Economy.RoadsterPassMoney
-		)} in game.`,
+		text = Loc.text("PassRoadsterText", { money = money(Economy.RoadsterPassMoney) }),
 	},
 	{
 		name = "DoubleMoney",
@@ -1507,9 +1504,7 @@ local PASSES = {
 		title = "VIP",
 		accent = C.gold,
 		ink = C.ink,
-		text = `Gold VIP tag over your head and in chat, +{math.floor(
-			(Economy.VipMoney - 1) * 100 + 0.5
-		)}% cash ` .. "from hits and the VIP Gold car paint.",
+		text = Loc.text("PassVipText", { pct = math.floor((Economy.VipMoney - 1) * 100 + 0.5) }),
 	},
 }
 local passButtons: { [string]: TextButton } = {}
@@ -1563,7 +1558,7 @@ do
 	t.TextXAlignment = Enum.TextXAlignment.Left
 	local d = Style.label(
 		groupRow,
-		`Join our Roblox group for {money(Economy.GroupReward)}, once.`,
+		Loc.text("GroupRewardText", { money = money(Economy.GroupReward) }),
 		15,
 		F.bold,
 		C.dim
@@ -1897,16 +1892,20 @@ offerFor = function(stats: Vehicles.Vehicle)
 		end
 	end
 	offerIsUpsell = true
-	offerTitle.Text = `NEED {money(gap)} MORE`
+	Loc.set(offerTitle, "NeedMore", { money = money(gap) })
 	offerCar.Text = string.upper(stats.name)
 	offerFill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
 	offerAmount.Text = `{money(cash)} / {money(price)}`
 	offerPic:ClearAllChildren()
 	preview(offerPic, stats, true)
-	offerPackName.Text = `{string.upper(pick.title)}  ·  {money(pick.money)}`
+	Loc.set(
+		offerPackName,
+		"PackLine",
+		{ pack = Loc.src(string.upper(pick.title)), money = money(pick.money) }
+	)
 	offerText.Text = "covers it now, or keep running people over"
 	offerKey = pick.key
-	robuxText(pick, offerBuy, "GET IT  ·  ")
+	robuxText(pick, offerBuy, Loc.source("GET IT") .. "  ·  ")
 	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
 	scale.Parent = offer
 	scale.Scale = 0.8

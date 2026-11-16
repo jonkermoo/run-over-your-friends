@@ -198,6 +198,45 @@ function resolve(value: any): string
 end
 Loc.resolve = resolve
 
+-- string.upper for translated text: also the accented letters (é, ñ, ã, ç...), which string.upper leaves alone
+local UPPER = {
+	["á"] = "Á",
+	["à"] = "À",
+	["â"] = "Â",
+	["ã"] = "Ã",
+	["é"] = "É",
+	["ê"] = "Ê",
+	["í"] = "Í",
+	["ó"] = "Ó",
+	["ô"] = "Ô",
+	["õ"] = "Õ",
+	["ú"] = "Ú",
+	["ü"] = "Ü",
+	["ñ"] = "Ñ",
+	["ç"] = "Ç",
+}
+function Loc.upper(text: string): string
+	local out = string.upper(text)
+	for lower, upper in UPPER do
+		out = string.gsub(out, lower, upper)
+	end
+	return out
+end
+
+-- a goal's line (Config/Quests, Config/ServerGoals) in the player's language: its kind's line (Quest_<kind>,
+-- ServerGoal_<kind>) with the target, else its English text
+function Loc.goal(g: { kind: string?, target: number?, text: string? }, server: boolean?): string
+	local e = load()
+	if e and typeof(g.kind) == "string" and typeof(g.target) == "number" then
+		local key = (if server then "ServerGoal_" else "Quest_") .. g.kind
+		local out = e.byKey(key, { n = tostring(g.target) })
+		if out then
+			return out
+		end
+	end
+	return Loc.source(g.text or "")
+end
+
 -- set a label to a translated line and keep Roblox's own matching off it (the text is already translated, and
 -- lines with numbers would otherwise be captured once per number)
 function Loc.set(label: TextLabel | TextButton, key: string, args: Args?)

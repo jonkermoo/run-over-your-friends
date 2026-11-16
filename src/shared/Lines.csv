@@ -79,3 +79,29 @@ Quest_Jumps,Land {n} jumps,,,Aterriza {n} saltos,Acerte {n} saltos
 ServerGoal_Breaks,Smash {n} building pieces together,,,Rompan {n} pedazos de edificios entre todos,Quebrem {n} pedaços de prédios juntos
 ServerGoal_Hits,Run over {n} people together,,,Atropellen a {n} personas entre todos,Atropelem {n} pessoas juntos
 ServerGoal_Jumps,Land {n} stunt jumps together,,,Aterricen {n} saltos acrobáticos entre todos,Acertem {n} saltos de manobra juntos
+CarOfDay,CAR OF THE DAY  -{pct}%,,,AUTO DEL DÍA  -{pct}%,CARRO DO DIA  -{pct}%
+AboutPerHit,ABOUT {money} A HIT,,,UNOS {money} POR GOLPE,CERCA DE {money} POR BATIDA
+BuyPrice,BUY {price},,,COMPRAR {price},COMPRAR {price}
+OrPrice,or {price},,,o {price},ou {price}
+PassRoadsterText,"The dream car: rear jet, air control and a thruster. Plus {money} in game.",,,"El auto soñado: jet trasero, control en el aire y un impulsor. Además, {money} en el juego.","O carro dos sonhos: jato traseiro, controle no ar e um propulsor. E mais {money} no jogo."
+PassVipText,"Gold VIP tag over your head and in chat, +{pct}% cash from hits and the VIP Gold car paint.",,,"Etiqueta VIP dorada sobre tu cabeza y en el chat, +{pct}% de dinero por golpe y la pintura VIP Gold.","Etiqueta VIP dourada na sua cabeça e no chat, +{pct}% de grana por batida e a pintura VIP Gold."
+GroupRewardText,"Join our Roblox group for {money}, once.",,,"Únete a nuestro grupo de Roblox y gana {money}, una vez.","Entre no nosso grupo do Roblox e ganhe {money}, uma vez."
+NeedMore,NEED {money} MORE,,,TE FALTAN {money},FALTAM {money}
+PackLine,{pack}  ·  {money},,,{pack}  ·  {money},{pack}  ·  {money}
+GoalsDone,{done} / {total} DONE,,,{done} / {total} HECHAS,{done} / {total} FEITAS
+GoalsNewIn,new in {time},,,nuevas en {time},novas em {time}
+GoalsNextIn,next in {time},,,la próxima en {time},a próxima em {time}
+GoalsEndsIn,ends in {time},,,termina en {time},acaba em {time}
+ClaimReward,CLAIM ${n},,,COBRAR ${n},RESGATAR ${n}
+MaxPinned,MAX {n} PINNED,,,MÁX. {n} FIJADAS,MÁX. {n} FIXADAS
+CollectReward,COLLECT {money},,,COBRAR {money},PEGAR {money}
+StreakDay,DAY {n},,,DÍA {n},DIA {n}
+StarterWorth,WORTH {money}  ·  {times}x VALUE,,,VALE {money}  ·  {times}x MÁS,VALE {money}  ·  {times}x MAIS
+StarterWorthLine,Worth {money}. Once per account.,,,Vale {money}. Una vez por cuenta.,Vale {money}. Uma vez por conta.
+OffToday,-{pct}% TODAY,,,-{pct}% HOY,-{pct}% HOJE
+PinnedDone,DONE +${n},,,HECHA +${n},FEITA +${n}
+PinnedServerNext,SERVER  NEXT {time},,,SERVIDOR  PRÓXIMA {time},SERVIDOR  PRÓXIMA {time}
+PinnedServer,SERVER  {time},,,SERVIDOR  {time},SERVIDOR  {time}
+PaintOn,{paint}  ON,,,{paint}  PUESTA,{paint}  EM USO
+PaintVip,{paint}  VIP ONLY,,,{paint}  SOLO VIP,{paint}  SÓ VIP
+PaintBuy,{paint}  {price}  ALL CARS,,,{paint}  {price}  TODOS LOS AUTOS,{paint}  {price}  TODOS OS CARROS

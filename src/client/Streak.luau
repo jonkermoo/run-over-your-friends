@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config.Daily)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Daily = require(ReplicatedStorage.Shared.Rules.Daily)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Pad = require(script.Parent.Pad)
@@ -139,14 +140,15 @@ local function draw()
 	sub.Text = `Day {today} in a row! Come back tomorrow for {money(
 		Daily.reward(today + 1, Config.StreakRewards)
 	)}`
-	collect.Text = "COLLECT " .. money(reward)
+	Loc.set(collect, "CollectReward", { money = money(reward) })
 	-- the row shows the week this day falls in; past the 7th it slides so today stays at the end
 	local first = if today <= TILES then 1 else today - TILES + 1
 	for i, t in tiles do
 		local d = first + i - 1
 		local pay = Daily.reward(d, Config.StreakRewards)
 		local got, now = d < today, d == today
-		t.day.Text = if now then "TODAY" else "DAY " .. d
+		t.day.AutoLocalize = false
+		t.day.Text = if now then Loc.source("TODAY") else Loc.text("StreakDay", { n = d })
 		t.pay.Text = short(pay)
 		t.pay.TextSize = if now then 22 else 17
 		-- small pay is a coin, bigger is a banknote

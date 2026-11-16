@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -140,10 +141,14 @@ local function tickCountdowns()
 		local set = state[name]
 		if set then
 			local left = fmt(set.endsAt - t)
-			cd.Text = if name ~= "Server"
-				then "new in " .. left
-				elseif not set.goals[1] or set.goals[1].done then "next in " .. left
-				else "ends in " .. left
+			Loc.set(
+				cd,
+				if name ~= "Server"
+					then "GoalsNewIn"
+					elseif not set.goals[1] or set.goals[1].done then "GoalsNextIn"
+					else "GoalsEndsIn",
+				{ time = left }
+			)
 		end
 	end
 end
@@ -241,8 +246,13 @@ local function rebuild()
 		text.Position = UDim2.fromOffset(14, 0)
 		text.Size = UDim2.new(1, -170, 1, 0)
 		text.TextWrapped = true
-		local claim =
-			Style.button(row, `CLAIM ${Onboarding.Rewards[Onboarding.Steps.Goal]}`, "green", 18)
+		local claim = Style.button(
+			row,
+			Loc.text("ClaimReward", { n = Onboarding.Rewards[Onboarding.Steps.Goal] }),
+			"green",
+			18
+		)
+		claim.AutoLocalize = false
 		claim.Name = "TutorialClaim"
 		claim.AnchorPoint = Vector2.new(1, 0.5)
 		claim.Position = UDim2.new(1, -12, 0.5, 0)
@@ -311,7 +321,8 @@ local function rebuild()
 				local kicker = label(row, "SERVER GOAL  ·  EVERYONE HERE", 14, F.heavy, color)
 				kicker.Position = UDim2.fromOffset(20, 8)
 				kicker.Size = UDim2.new(1, -150, 0, 18)
-				local text = label(row, string.upper(g.text), 22, F.display, C.text)
+				local text = label(row, Loc.upper(Loc.goal(g, true)), 22, F.display, C.text)
+				text.AutoLocalize = false
 				text.Position = UDim2.fromOffset(20, 28)
 				text.Size = UDim2.new(1, -32 - inset, 0, 26)
 				text.TextScaled = true -- long shared goals shrink to fit beside the pin
@@ -338,7 +349,8 @@ local function rebuild()
 				y += HERO_H
 			else
 				row.Size = UDim2.new(1, -24, 0, ROW_H - 8)
-				local text = label(row, g.text, 16, F.heavy, if g.done then C.dim else C.text)
+				local text = label(row, Loc.goal(g), 16, F.heavy, if g.done then C.dim else C.text)
+				text.AutoLocalize = false
 				text.Position = UDim2.fromOffset(12, 8)
 				text.Size = UDim2.new(1, -100 - inset, 0, 20)
 				text.TextTruncate = Enum.TextTruncate.AtEnd
@@ -358,7 +370,7 @@ local function rebuild()
 		end
 		y += 2
 	end
-	countPill.Text = `{done} / {total} DONE`
+	Loc.set(countPill, "GoalsDone", { done = done, total = total })
 	tickCountdowns()
 	local sheetH = math.min(height(), maxHeight())
 	body.CanvasSize = UDim2.fromOffset(0, y)
@@ -469,7 +481,7 @@ function Goals.start()
 		end
 		tickCountdowns()
 		if now < fullUntil then
-			countPill.Text = `MAX {QuestConfig.Pins.Max} PINNED`
+			Loc.set(countPill, "MaxPinned", { n = QuestConfig.Pins.Max })
 			countPill.BackgroundColor3 = C.red
 		elseif countPill.BackgroundColor3 == C.red then
 			countPill.BackgroundColor3 = C.gold

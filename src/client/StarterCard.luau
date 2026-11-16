@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Offer = require(ReplicatedStorage.Shared.Rules.Offer)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
@@ -304,7 +305,7 @@ local function refresh()
 	local product = StarterCard.current()
 	local deal = product == DEAL
 	local times = Offer.valueTimes(WORTH, robuxShown[product.key], Products.MoneyPacks)
-	valueText.Text = `WORTH {Style.money(WORTH)}  ·  {times}x VALUE`
+	Loc.set(valueText, "StarterWorth", { money = Style.money(WORTH), times = times })
 	priceNow.Text = "R$ " .. robuxShown[product.key]
 	priceWas.Visible = deal
 	offPill.Visible = deal
@@ -312,9 +313,10 @@ local function refresh()
 	if deal then
 		priceWas.Text = "R$ " .. robuxShown[FULL.key]
 		offPill.Text = `-{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}%`
-		timer.Text = "ENDS " .. Offer.clock(dealEnds() - now())
+		Loc.set(timer, "EventEnds", { time = Offer.clock(dealEnds() - now()) })
 	end
-	buy.Text = "GET IT  ·  " .. rs(product)
+	buy.AutoLocalize = false
+	buy.Text = Loc.source("GET IT") .. "  ·  " .. rs(product)
 end
 
 function StarterCard.isOpen(): boolean
@@ -370,14 +372,18 @@ local function refreshStore()
 	s.row.Visible = not StarterCard.bought()
 	local product = StarterCard.current()
 	local deal = product == DEAL
-	s.text.Text = `Worth {Style.money(WORTH)}. Once per account.`
+	Loc.set(s.text, "StarterWorthLine", { money = Style.money(WORTH) })
 	s.off.Visible = deal
 	s.was.Visible = deal
 	s.timer.Visible = deal
 	if deal then
-		s.off.Text = `-{Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key])}% TODAY`
+		Loc.set(
+			s.off,
+			"OffToday",
+			{ pct = Offer.percentOff(robuxShown[FULL.key], robuxShown[DEAL.key]) }
+		)
 		s.was.Text = "R$ " .. robuxShown[FULL.key]
-		s.timer.Text = "ENDS " .. Offer.clock(dealEnds() - now())
+		Loc.set(s.timer, "EventEnds", { time = Offer.clock(dealEnds() - now()) })
 	end
 	s.button.Text = rs(product)
 end

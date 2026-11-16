@@ -9,6 +9,8 @@ local DriveHud = require("../src/shared/Rules/DriveHud")
 local EventConfig = require("../src/shared/Config/Events")
 local LoadingConfig = require("../src/shared/Config/Loading")
 local Onboarding = require("../src/shared/Config/Onboarding")
+local PaintConfig = require("../src/shared/Config/Paints")
+local Products = require("../src/shared/Config/Products")
 local QuestConfig = require("../src/shared/Config/Quests")
 local ServerGoals = require("../src/shared/Config/ServerGoals")
 
@@ -184,15 +186,28 @@ return function(check: (string, boolean) -> ())
 			table.insert(plain, row.label)
 		end
 	end
+	-- goal lines: Loc.goal reads Quest_<kind> / ServerGoal_<kind>, which must be the template's English
+	local goalsOk = true
 	for _, set in QuestConfig :: any do
 		if typeof(set) == "table" and set.Templates then
 			for _, q in set.Templates do
-				table.insert(plain, q.text)
+				goalsOk = goalsOk and keys["Quest_" .. q.kind] == q.text
 			end
 		end
 	end
 	for _, k in ServerGoals.Kinds do
-		table.insert(plain, k.text)
+		goalsOk = goalsOk and keys["ServerGoal_" .. k.kind] == k.text
+	end
+	check("translations: every goal kind has its line", goalsOk)
+	for _, paint in PaintConfig.List do
+		table.insert(plain, paint.name)
+	end
+	for _, pack in Products.MoneyPacks do
+		table.insert(plain, string.upper(pack.title))
+		table.insert(plain, string.upper(pack.title) .. "!")
+		if pack.tag then
+			table.insert(plain, pack.tag)
+		end
 	end
 	local plainMissing = 0
 	for _, s in plain do
@@ -214,6 +229,7 @@ return function(check: (string, boolean) -> ())
 	check("loc: ordinal keys", keys[Loc.ordinal(1).k :: string] == "{n}ST")
 	check("loc: 12th", Loc.ordinal(12).k == "OrdTH" and Loc.ordinal(22).k == "OrdND")
 	check("loc: one piece", Loc.amount(1, "pieces").k == "Amount_piece")
+	check("loc: upper with accents", Loc.upper("Verde-limão día") == "VERDE-LIMÃO DÍA")
 	check("loc: plain strings pass through", Loc.resolve("+$50") == "+$50")
 	check(
 		"loc: a source msg without the engine",
