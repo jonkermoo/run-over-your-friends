@@ -71,6 +71,7 @@ local PaintService = require(script.PaintService)
 local RateLimit = require(script.RateLimit)
 local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
+local DayNightService = require(script.DayNightService)
 
 -- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
 local Players = game:GetService("Players")
@@ -119,6 +120,7 @@ EventService.start()
 PaintService.start()
 ServerGoalService.start()
 StuntService.start()
+DayNightService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)

@@ -1325,7 +1325,8 @@ function MapBuilder.build(): Result
 		end
 	end
 
-	-- lighting and look
+	-- lighting and look: the start-up values (also what Edit mode shows). In play each client's DayNight
+	-- drives the clock, light, haze, grade and bloom through the day/night cycle (Config/DayNight).
 	local Lighting = game:GetService("Lighting")
 	local look = World.Look
 	Lighting.ClockTime = look.ClockTime
