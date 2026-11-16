@@ -3628,6 +3628,16 @@ local function checkBakedTerrain()
 	)
 	check("terrain: holds voxels", #(terrain :: any).SmoothGrid > 1000000)
 	check("terrain: nothing else inside it", #terrain:GetChildren() == 0)
+	local TerrainSource = require("../tools/lune/terrain_source")
+	local baked = terrain:GetAttribute("BakedSource")
+	local now = TerrainSource.hash()
+	if baked ~= now then
+		print(
+			"   the map code changed since the terrain bake: bake it again (see MapBuilder.bake), or every server "
+				.. "draws the terrain at start"
+		)
+	end
+	check("terrain: baked from the map code as it is now", baked == now)
 	check(
 		"map build: yields at least every half second",
 		World.Build.YieldEvery > 0 and World.Build.YieldEvery <= 0.5
