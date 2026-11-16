@@ -13,6 +13,11 @@ return table.freeze({
 	SheetBottom = 18,
 	SheetMaxWidth = 1100, -- the garage and store sheet never grows past this on big screens
 	SheetMaxHeight = 760,
+	-- the garage: the vehicle list's width, and the chosen vehicle's block under its picture (blurb, stats,
+	-- paint or price, the button); the picture takes the rest of the sheet's height
+	GarageListWidth = 330,
+	GarageDetailBottom = 196,
+	GoalsWidth = 420, -- the goals sheet, which hangs from the top left
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,
@@ -56,5 +61,7 @@ return table.freeze({
 	-- but never below this, so their few words stay readable
 	BillboardMinScale = 0.8,
 
-	TapPad = 12, -- extra touch area around small buttons on touch screens
+	TapPad = 12,
+	-- a store section counts as in view once its top is within this many layout px of the page's top
+	SectionSlack = 40, -- extra touch area around small buttons on touch screens
 })

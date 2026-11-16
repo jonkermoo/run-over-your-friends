@@ -313,7 +313,9 @@ local function dressSpawnPlaza(
 			cf * CFrame.new(0, 10, -3.2),
 			stall.text,
 			PAINT_BLACK,
-			colour
+			colour,
+			nil,
+			"Stall_" .. stall.text
 		)
 	end
 	-- flag poles at the corners, two banners each in the UI's colours
@@ -900,7 +902,8 @@ function MapBuilder.build(): Result
 						OF.Hero.Sign,
 						PAINT_BLACK,
 						PAINT_YELLOW,
-						true
+						true,
+						"Hero"
 					)
 				else
 					Places.sign(
@@ -910,7 +913,8 @@ function MapBuilder.build(): Result
 						ad,
 						Color3.fromRGB(250, 250, 245),
 						colours.accent:Lerp(Color3.new(0, 0, 0), 0.4),
-						true
+						true,
+						"Ad_" .. ad
 					)
 				end
 				local along = Vector3.new(-out.Z, 0, out.X)

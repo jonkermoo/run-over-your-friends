@@ -1,18 +1,20 @@
 --!strict
--- The goals sheet: the shared SERVER goal, then HOURLY and DAILY sets with reset countdowns, progress and rewards. It drops down
--- under the menu strip (top left) from the GOALS tab and closes from its header or the tab. Not
+-- The goals sheet: the shared SERVER goal on its own card, then HOURLY and DAILY sets with reset countdowns, progress
+-- and rewards. It hangs from the top left under the menu strip, opens from the GOALS tab and closes from its X, the
+-- tab or B on a gamepad. Not
 -- available until the tutorial's goal step, which puts a first goal to claim on top. Each unfinished goal,
 -- the server goal included, has a pin button that puts it on screen (PinnedGoals, up to three).
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Net = require(ReplicatedStorage.Shared.Net)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
-local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
+local Pad = require(script.Parent.Pad)
 local PinnedGoals = require(script.Parent.PinnedGoals)
 local Style = require(script.Parent.Style)
 
@@ -27,9 +29,13 @@ type SetView = { goals: { GoalView }, endsAt: number }
 
 local ORDER = { "Server", "Hourly", "Daily" }
 local COLORS = { Server = C.yellow, Hourly = C.blue, Daily = C.pink }
-local SHEET_W = 330
-local ROW_H, HEAD_H, SECTION_H = 52, 46, 30
-local CLAIM_H = 66
+local SHEET_W = LayoutConfig.GoalsWidth
+local HEAD_H = 66 -- the title row and its lane line
+local HERO_H = 112 -- the server goal's card (and the gap under it)
+local SECTION_H = 42 -- an HOURLY / DAILY heading
+local ROW_H = 76 -- a goal row (and the gap under it)
+local CLAIM_H = 78 -- the tutorial's first goal
+local PIN = 36 -- the pin button
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Goals"
@@ -39,42 +45,43 @@ Style.fit(gui)
 
 local TOP, BOTTOM_MARGIN = LayoutConfig.SheetTop, LayoutConfig.SheetBottom
 
--- the sheet sits in the middle of the screen, never over the menu strip (Rules/Layout.sheetCentre)
+-- the sheet hangs from the top left, under the menu strip and its GOALS tab
 local panel = Style.panel(gui)
 panel.Name = "GoalsSheet"
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.fromOffset(14, TOP)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
 Style.setShadow(panel, C.blue)
-local headLine = Style.dashes(panel, C.yellow)
-headLine.Position = UDim2.fromOffset(0, HEAD_H - 3)
+local headLine = Style.dashes(panel, C.yellow, false, 4)
+headLine.Position = UDim2.fromOffset(0, HEAD_H - 6)
 
-local header = Instance.new("TextButton")
-header.BackgroundTransparency = 1
-header.Text = ""
-header.Size = UDim2.new(1, 0, 0, HEAD_H)
-header.Parent = panel
-local title = Style.label(header, "GOALS", 24, F.display, C.text)
-title.Position = UDim2.fromOffset(16, 0)
-title.Size = UDim2.new(1, -110, 1, 0)
+local title = Style.label(panel, "GOALS", 32, F.display, C.text)
+title.Position = UDim2.fromOffset(16, 12)
+title.Size = UDim2.fromOffset(110, 38)
 title.TextXAlignment = Enum.TextXAlignment.Left
-Style.outline(title, 1.5)
-local countPill = Style.pill(header, "0 / 0", C.gold)
-countPill.AnchorPoint = Vector2.new(1, 0.5)
-countPill.Position = UDim2.new(1, -44, 0.5, 0)
-local chevron = Style.label(header, "X", 22, F.display, C.text)
-chevron.AnchorPoint = Vector2.new(1, 0.5)
-chevron.Position = UDim2.new(1, -12, 0.5, 0)
-chevron.Size = UDim2.fromOffset(24, 24)
+local countPill = Style.pill(panel, "0 / 0 DONE", C.gold)
+countPill.TextSize = 15
+countPill.Size = UDim2.fromOffset(0, 24)
+countPill.AnchorPoint = Vector2.new(0, 0.5)
+countPill.Position = UDim2.fromOffset(122, 31)
+local close = Style.button(panel, "X", "gold", 22)
+close.Name = "Close"
+close.AnchorPoint = Vector2.new(1, 0)
+close.Position = UDim2.new(1, -10, 0, 8)
+close.Size = UDim2.fromOffset(44, 44)
+local closeHint = Pad.chip(panel, { Enum.KeyCode.ButtonB }, "close")
+closeHint.AnchorPoint = Vector2.new(1, 0.5)
+closeHint.Position = UDim2.new(1, -66, 0, 31)
 
 -- the rows scroll when the sheet is taller than the screen has room for (phones)
 local body = Instance.new("ScrollingFrame")
+body.Name = "Body"
 body.BackgroundTransparency = 1
 body.BorderSizePixel = 0
-body.Position = UDim2.fromOffset(0, HEAD_H)
+body.Position = UDim2.fromOffset(0, HEAD_H + 6)
 body.Size = UDim2.fromScale(1, 0)
 body.CanvasSize = UDim2.new()
-body.ScrollBarThickness = 4
+body.ScrollBarThickness = 5
 body.ScrollBarImageColor3 = C.yellow
 body.ScrollingDirection = Enum.ScrollingDirection.Y
 body.Parent = panel
@@ -151,7 +158,7 @@ local function shortNumber(n: number): string
 end
 
 local function height(): number
-	local h = HEAD_H
+	local h = HEAD_H + 6
 	if open then
 		if claiming() then
 			h += CLAIM_H
@@ -159,42 +166,87 @@ local function height(): number
 		for _, name in ORDER do
 			local set = state[name]
 			if set then
-				h += SECTION_H + #set.goals * ROW_H + 6
+				h += if name == "Server"
+					then #set.goals * HERO_H
+					else SECTION_H + #set.goals * ROW_H
 			end
 		end
 	end
-	return h + 6
+	return h + 4
 end
 
--- centre the sheet on the screen's GUI area (layout px, so the drawn scale is undone first)
-local function place()
-	local y = LayoutRules.sheetCentre(guiHeight(), panel.Size.Y.Offset, TOP, BOTTOM_MARGIN)
-	panel.Position = UDim2.new(0.5, 0, 0, y)
+local function label(
+	parent: Instance,
+	text: string,
+	size: number,
+	font: Font,
+	color: Color3
+): TextLabel
+	local l = Style.label(parent, text, size, font, color)
+	l.TextXAlignment = Enum.TextXAlignment.Left
+	return l
+end
+
+-- a goal's progress bar: a dark track with the set's paint in lane-line dashes
+local function goalBar(
+	parent: Instance,
+	g: GoalView,
+	color: Color3,
+	x: number,
+	y: number,
+	h: number,
+	inset: number
+): Frame
+	local back, fill = Style.bar(parent, if g.done then C.green else color)
+	back.BackgroundColor3 = C.ink
+	back.BackgroundTransparency = 0
+	back.Position = UDim2.fromOffset(x, y)
+	back.Size = UDim2.new(1, -(x + 12 + inset), 0, h)
+	Style.laneGaps(back, C.ink)
+	fill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
+	return fill
+end
+
+-- the pin button that puts an unfinished goal on screen (PinnedGoals, up to three)
+local function pinButton(parent: Instance, name: string, i: number): TextButton
+	local pinned = PinnedGoals.isPinned(name, i)
+	local b = Style.button(parent, "", if pinned then "gold" else "dark", 14)
+	b.Name = `Pin{name}{i}`
+	b.Size = UDim2.fromOffset(PIN, PIN)
+	PinnedGoals.pinIcon(b, PIN - 4, if pinned then C.ink else C.dim)
+	Style.onTap(b, function()
+		if PinnedGoals.toggle(name, i) == "full" then
+			fullUntil = os.clock() + 2
+		end
+	end)
+	return b
 end
 
 local function rebuild()
 	builtShape = shape()
+	-- a rebuild replaces every button: a gamepad selection moves to the new one with the same name
+	local selected = GuiService.SelectedObject
+	local keep = if selected and selected:IsDescendantOf(body) then selected.Name else nil
 	body:ClearAllChildren()
 	table.clear(countdowns)
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
 	if claiming() then
-		local row = Style.card(body, 12)
+		local row = Style.card(body)
 		row.Name = "TutorialGoal"
-		row.Position = UDim2.fromOffset(10, 8)
-		row.Size = UDim2.new(1, -20, 0, CLAIM_H - 12)
-		Style.stroke(row, C.gold, 2, 0)
-		local text = Style.label(row, "Your first goal: open GOALS!", 15, F.heavy, C.text)
-		text.Position = UDim2.fromOffset(12, 0)
-		text.Size = UDim2.new(1, -130, 1, 0)
+		row.Position = UDim2.fromOffset(12, y)
+		row.Size = UDim2.new(1, -24, 0, CLAIM_H - 10)
+		Style.stroke(row, C.gold, 3, 0)
+		local text = label(row, "Your first goal: open GOALS!", 16, F.heavy, C.text)
+		text.Position = UDim2.fromOffset(14, 0)
+		text.Size = UDim2.new(1, -170, 1, 0)
 		text.TextWrapped = true
-		text.TextXAlignment = Enum.TextXAlignment.Left
 		local claim =
-			Style.button(row, `CLAIM ${Onboarding.Rewards[Onboarding.Steps.Goal]}`, "green", 15)
+			Style.button(row, `CLAIM ${Onboarding.Rewards[Onboarding.Steps.Goal]}`, "green", 18)
 		claim.Name = "TutorialClaim"
 		claim.AnchorPoint = Vector2.new(1, 0.5)
-		claim.Position = UDim2.new(1, -8, 0.5, 0)
-		claim.Size = UDim2.fromOffset(112, 38)
+		claim.Position = UDim2.new(1, -12, 0.5, 0)
+		claim.Size = UDim2.fromOffset(140, 46)
 		claim.Activated:Connect(function()
 			Net.waitFor("TutorialClaim"):FireServer()
 			Goals.close()
@@ -203,87 +255,121 @@ local function rebuild()
 	end
 	for _, name in ORDER do
 		local set = state[name]
-		if set then
-			local pill = Style.pill(body, string.upper(name), COLORS[name])
-			pill.Position = UDim2.fromOffset(14, y + 6)
-			local cd = Style.label(body, "", 13, F.bold, C.dim)
+		if not set then
+			continue
+		end
+		local color = COLORS[name]
+		if name ~= "Server" then
+			-- the set's heading: its name painted in its colour, and when it renews
+			local head = Style.label(body, string.upper(name), 22, F.display, C.text)
+			head.BackgroundColor3 = color
+			head.BackgroundTransparency = 0
+			head.AutomaticSize = Enum.AutomaticSize.X
+			head.Position = UDim2.fromOffset(12, y + 4)
+			head.Size = UDim2.fromOffset(0, 30)
+			local pad = Instance.new("UIPadding")
+			pad.PaddingLeft = UDim.new(0, 10)
+			pad.PaddingRight = UDim.new(0, 10)
+			pad.PaddingTop = UDim.new(0, 4)
+			pad.Parent = head
+			local cd = Style.label(body, "", 14, F.bold, C.dim)
 			cd.AnchorPoint = Vector2.new(1, 0)
-			cd.Position = UDim2.new(1, -16, 0, y + 6)
-			cd.Size = UDim2.fromOffset(140, 18)
+			cd.Position = UDim2.new(1, -14, 0, y + 10)
+			cd.Size = UDim2.fromOffset(160, 18)
 			cd.TextXAlignment = Enum.TextXAlignment.Right
 			countdowns[name] = cd
 			y += SECTION_H
-			for i, g in set.goals do
-				total += 1
-				if g.done then
-					done += 1
-				end
-				-- unfinished goals get a pin button at the right; the rest of the row
-				-- moves over for it
-				local pinnable = not g.done and PinnedGoals.colors[name] ~= nil
-				local inset = if pinnable then 32 else 0
-				local row = Style.card(body, 12)
-				row.Position = UDim2.fromOffset(10, y)
-				row.Size = UDim2.new(1, -20, 0, ROW_H - 6)
-				row.BackgroundTransparency = if g.done then 0.5 else 0
-				local text = Style.label(row, g.text, 15, F.heavy, if g.done then C.dim else C.text)
-				text.Position = UDim2.fromOffset(12, 5)
-				text.Size = UDim2.new(1, -90 - inset, 0, 18)
-				text.TextXAlignment = Enum.TextXAlignment.Left
-				text.TextTruncate = Enum.TextTruncate.AtEnd
-				local reward = Style.pill(
-					row,
-					if g.done then "DONE" else "$" .. shortNumber(g.reward),
-					if g.done then C.green else C.gold
-				)
-				reward.AnchorPoint = Vector2.new(1, 0)
-				reward.Position = UDim2.new(1, -10 - inset, 0, 6)
-				local back, fill = Style.bar(row, if g.done then C.green else COLORS[name])
-				back.BackgroundColor3 = C.panel
-				back.BackgroundTransparency = 0
-				back.Position = UDim2.fromOffset(12, 29)
-				back.Size = UDim2.new(1, -86 - inset, 0, 6)
-				Style.laneGaps(back, C.card)
-				fill.Size = UDim2.fromScale(math.clamp(g.progress / math.max(g.target, 1), 0, 1), 1)
-				local amount = Style.label(
-					row,
-					`{shortNumber(g.progress)}/{shortNumber(g.target)}`,
-					12,
-					F.bold,
-					C.dim
-				)
-				amount.AnchorPoint = Vector2.new(1, 0)
-				amount.Position = UDim2.new(1, -10 - inset, 0, 24)
-				amount.Size = UDim2.fromOffset(66, 14)
-				amount.TextXAlignment = Enum.TextXAlignment.Right
+		end
+		for i, g in set.goals do
+			total += 1
+			if g.done then
+				done += 1
+			end
+			local pinnable = not g.done and PinnedGoals.colors[name] ~= nil
+			local inset = if pinnable then PIN + 14 else 0
+			local amountText = `{shortNumber(g.progress)} / {shortNumber(g.target)}`
+			local row = Style.card(body)
+			row.Position = UDim2.fromOffset(12, y)
+			row.BackgroundTransparency = if g.done then 0.5 else 0
+			local reward = Style.pill(
+				row,
+				if g.done then "DONE" else "$" .. shortNumber(g.reward),
+				if g.done then C.green else C.gold
+			)
+			reward.TextSize = 15
+			reward.Size = UDim2.fromOffset(0, 22)
+			reward.AnchorPoint = Vector2.new(1, 0)
+			local fill: Frame, amount: TextLabel
+			if name == "Server" then
+				-- the shared goal: a card of its own with a yellow edge and a thick bar
+				row.Size = UDim2.new(1, -24, 0, HERO_H - 12)
+				local edge = Instance.new("Frame")
+				edge.BackgroundColor3 = color
+				edge.BorderSizePixel = 0
+				edge.Size = UDim2.new(0, 8, 1, 0)
+				edge.Parent = row
+				local kicker = label(row, "SERVER GOAL  ·  EVERYONE HERE", 14, F.heavy, color)
+				kicker.Position = UDim2.fromOffset(20, 8)
+				kicker.Size = UDim2.new(1, -150, 0, 18)
+				local text = label(row, string.upper(g.text), 22, F.display, C.text)
+				text.Position = UDim2.fromOffset(20, 28)
+				text.Size = UDim2.new(1, -32 - inset, 0, 26)
+				text.TextScaled = true -- long shared goals shrink to fit beside the pin
+				local fit = Instance.new("UITextSizeConstraint")
+				fit.MaxTextSize = 22
+				fit.MinTextSize = 15
+				fit.Parent = text
+				reward.Position = UDim2.new(1, -12 - inset, 0, 8)
+				fill = goalBar(row, g, color, 20, 58, 14, 0)
+				amount = label(row, amountText, 14, F.bold, C.dim)
+				amount.Position = UDim2.fromOffset(20, 76)
+				amount.Size = UDim2.fromOffset(160, 18)
+				local cd = Style.label(row, "", 14, F.bold, C.dim)
+				cd.AnchorPoint = Vector2.new(1, 0)
+				cd.Position = UDim2.new(1, -12, 0, 76)
+				cd.Size = UDim2.fromOffset(160, 18)
+				cd.TextXAlignment = Enum.TextXAlignment.Right
+				countdowns[name] = cd
 				if pinnable then
-					local pinned = PinnedGoals.isPinned(name, i)
-					local pinButton = Style.button(row, "", if pinned then "gold" else "dark", 14)
-					pinButton.Name = `Pin{name}{i}`
-					pinButton.AnchorPoint = Vector2.new(1, 0.5)
-					pinButton.Position = UDim2.new(1, -8, 0.5, 0)
-					pinButton.Size = UDim2.fromOffset(26, 26)
-					PinnedGoals.pinIcon(pinButton, 16, if pinned then C.ink else C.dim)
-					local setName, index = name, i
-					Style.onTap(pinButton, function()
-						if PinnedGoals.toggle(setName, index) == "full" then
-							fullUntil = os.clock() + 2
-						end
-					end)
+					local b = pinButton(row, name, i)
+					b.AnchorPoint = Vector2.new(1, 0)
+					b.Position = UDim2.new(1, -12, 0, 8)
 				end
-				table.insert(rowViews, { fill = fill, amount = amount })
+				y += HERO_H
+			else
+				row.Size = UDim2.new(1, -24, 0, ROW_H - 8)
+				local text = label(row, g.text, 16, F.heavy, if g.done then C.dim else C.text)
+				text.Position = UDim2.fromOffset(12, 8)
+				text.Size = UDim2.new(1, -100 - inset, 0, 20)
+				text.TextTruncate = Enum.TextTruncate.AtEnd
+				reward.Position = UDim2.new(1, -12 - inset, 0, 8)
+				fill = goalBar(row, g, color, 12, 34, 10, inset)
+				amount = label(row, amountText, 14, F.bold, C.dim)
+				amount.Position = UDim2.fromOffset(12, 48)
+				amount.Size = UDim2.fromOffset(160, 16)
+				if pinnable then
+					local b = pinButton(row, name, i)
+					b.AnchorPoint = Vector2.new(1, 0.5)
+					b.Position = UDim2.new(1, -12, 0.5, 0)
+				end
 				y += ROW_H
 			end
-			y += 6
+			table.insert(rowViews, { fill = fill, amount = amount })
 		end
+		y += 2
 	end
-	countPill.Text = `{done} / {total}`
+	countPill.Text = `{done} / {total} DONE`
 	tickCountdowns()
 	local sheetH = math.min(height(), maxHeight())
 	body.CanvasSize = UDim2.fromOffset(0, y)
-	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 6)
+	body.Size = UDim2.new(1, 0, 0, sheetH - HEAD_H - 10)
 	panel.Size = UDim2.fromOffset(SHEET_W, sheetH)
-	place()
+	if keep then
+		local again = body:FindFirstChild(keep, true)
+		if again and again:IsA("GuiObject") then
+			GuiService.SelectedObject = again
+		end
+	end
 end
 
 function Goals.toggle()
@@ -298,7 +384,24 @@ function Goals.close()
 	end
 end
 
-header.Activated:Connect(Goals.toggle)
+close.Activated:Connect(Goals.close)
+
+-- gamepad: B closes; a gamepad player starts on the tutorial's CLAIM, else the first pin, else the X
+Pad.menu(panel, {
+	first = function()
+		local claim = body:FindFirstChild("TutorialClaim", true)
+		if claim and claim:IsA("GuiObject") then
+			return claim
+		end
+		for _, d in body:GetDescendants() do
+			if d:IsA("TextButton") and string.sub(d.Name, 1, 3) == "Pin" then
+				return d
+			end
+		end
+		return close
+	end,
+	close = Goals.close,
+})
 
 -- new state from the server: rebuild when the list changed, else just move the bars and numbers
 local function apply()
@@ -362,7 +465,7 @@ function Goals.start()
 		end
 		last = now
 		if open and shape() ~= builtShape then
-			rebuild() -- the screen changed size: refit and re-centre the sheet
+			rebuild() -- the screen changed size: refit the sheet
 		end
 		tickCountdowns()
 		if now < fullUntil then

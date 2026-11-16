@@ -1,16 +1,19 @@
 --!strict
 -- The daily streak card: once a UTC day, after the tutorial and once the player has stopped (src/client/Popups),
--- a road-sign card in the middle shows the streak as a row of day tiles (collected, today, still to come) and a
--- COLLECT button. The server pays.
+-- a road-sign card in the middle shows the streak as a row of day tiles (collected ones stamped GOT, today's
+-- standing taller in yellow, the week's prize at the end) and a COLLECT button. The server pays. On a gamepad it
+-- starts on COLLECT and B puts it away for later.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Daily)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Daily = require(ReplicatedStorage.Shared.Rules.Daily)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Pad = require(script.Parent.Pad)
 local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 
@@ -21,8 +24,10 @@ local money = Style.money
 
 local Streak = {}
 
-local W, H = 440, 268
-local TILE_W, TILE_H, TILE_GAP = 52, 70, 6
+local W, H = 620, 360
+local TILE_W, TILE_H, TILE_GAP = 72, 104, 8
+local TODAY_H = 124 -- today's tile stands taller
+local PRIZE_W = 88 -- the last tile, the week's big prize, is wider
 local TILES = 7
 
 local gui = Instance.new("ScreenGui")
@@ -42,47 +47,80 @@ Style.stroke(card, C.yellow, 4, 0)
 Style.setShadow(card, C.blue)
 local scale = Instance.new("UIScale")
 scale.Parent = card
+Style.hazard(card, W, 14)
 
-local title = Style.label(card, "DAILY STREAK", 32, F.display, C.yellow)
-title.Position = UDim2.fromOffset(0, 14)
-title.Size = UDim2.new(1, 0, 0, 38)
-Style.outline(title, 1.5)
-local sub = Style.label(card, "", 14, F.bold, C.text)
-sub.Position = UDim2.fromOffset(20, 54)
-sub.Size = UDim2.new(1, -40, 0, 20)
-local line = Style.dashes(card, C.yellow)
-line.Position = UDim2.fromOffset(0, 82)
+local title = Style.label(card, "DAILY STREAK", 44, F.display, C.yellow)
+title.Position = UDim2.fromOffset(0, 26)
+title.Size = UDim2.new(1, 0, 0, 46)
+Style.outline(title, 2)
+local sub = Style.label(card, "", 16, F.bold, C.text)
+sub.Position = UDim2.fromOffset(20, 76)
+sub.Size = UDim2.new(1, -40, 0, 22)
 
+-- the week: tiles stand on one line, today's taller
 local row = Instance.new("Frame")
 row.BackgroundTransparency = 1
 row.AnchorPoint = Vector2.new(0.5, 0)
-row.Position = UDim2.new(0.5, 0, 0, 96)
-row.Size = UDim2.fromOffset(TILES * TILE_W + (TILES - 1) * TILE_GAP, TILE_H)
+row.Position = UDim2.new(0.5, 0, 0, 110)
+row.Size = UDim2.fromOffset((TILES - 1) * (TILE_W + TILE_GAP) + PRIZE_W, TODAY_H)
 row.Parent = card
 
-type Tile = { frame: Frame, day: TextLabel, pay: TextLabel, tick: TextLabel }
+type Tile = {
+	frame: Frame,
+	day: TextLabel,
+	icon: ImageLabel,
+	pay: TextLabel,
+	stamp: TextLabel,
+	prize: boolean,
+	edge: UIStroke,
+}
 local tiles: { Tile } = {}
 for i = 1, TILES do
+	local prize = i == TILES
 	local f = Style.card(row)
-	f.Position = UDim2.fromOffset((i - 1) * (TILE_W + TILE_GAP), 0)
-	f.Size = UDim2.fromOffset(TILE_W, TILE_H)
-	local day = Style.label(f, "", 11, F.heavy, C.dim)
+	f.AnchorPoint = Vector2.new(0, 1)
+	f.Position = UDim2.new(0, (i - 1) * (TILE_W + TILE_GAP), 1, 0)
+	f.Size = UDim2.fromOffset(if prize then PRIZE_W else TILE_W, TILE_H)
+	local edge = Style.stroke(f, C.yellow, 3, 0)
+	edge.Enabled = prize
+	local day = Style.label(f, "", 14, F.heavy, C.dim)
 	day.Position = UDim2.fromOffset(0, 6)
-	day.Size = UDim2.new(1, 0, 0, 14)
-	local pay = Style.label(f, "", 14, F.display, C.money)
-	pay.Position = UDim2.fromOffset(0, 26)
-	pay.Size = UDim2.new(1, 0, 0, 18)
-	local tick = Style.label(f, "", 18, F.display, C.money)
-	tick.Position = UDim2.fromOffset(0, 46)
-	tick.Size = UDim2.new(1, 0, 0, 20)
-	table.insert(tiles, { frame = f, day = day, pay = pay, tick = tick })
+	day.Size = UDim2.new(1, 0, 0, 18)
+	local icon = Style.image(f, Icons.Bill)
+	icon.AnchorPoint = Vector2.new(0.5, 0)
+	icon.Position = UDim2.new(0.5, 0, 0, 26)
+	icon.Size = UDim2.fromOffset(42, 42)
+	local pay = Style.label(f, "", 17, F.display, C.text)
+	pay.AnchorPoint = Vector2.new(0, 1)
+	pay.Position = UDim2.new(0, 0, 1, -8)
+	pay.Size = UDim2.new(1, 0, 0, 22)
+	-- collected days get a rubber stamp over the picture
+	local stamp = Style.label(f, "GOT", 16, F.display, C.money)
+	stamp.AnchorPoint = Vector2.new(0.5, 0.5)
+	stamp.Position = UDim2.new(0.5, 0, 0, 48)
+	stamp.Size = UDim2.fromOffset(50, 26)
+	stamp.Rotation = -12
+	stamp.ZIndex = 2
+	Style.stroke(stamp, C.money, 3, 0)
+	table.insert(tiles, {
+		frame = f,
+		day = day,
+		icon = icon,
+		pay = pay,
+		stamp = stamp,
+		prize = prize,
+		edge = edge,
+	})
 end
 
-local collect = Style.button(card, "COLLECT", "gold", 22)
+local collect = Style.button(card, "COLLECT", "gold", 30)
 collect.Name = "Collect"
-collect.AnchorPoint = Vector2.new(0.5, 0)
-collect.Position = UDim2.new(0.5, 0, 0, 190)
-collect.Size = UDim2.fromOffset(260, 54)
+collect.AnchorPoint = Vector2.new(0.5, 1)
+collect.Position = UDim2.new(0.5, 0, 1, -22)
+collect.Size = UDim2.fromOffset(300, 60)
+local collectHint = Pad.chip(card, { Enum.KeyCode.ButtonA }, "collect")
+collectHint.AnchorPoint = Vector2.new(1, 0.5)
+collectHint.Position = UDim2.new(1, -18, 1, -52)
 
 local state = { streak = 0, ready = false }
 
@@ -98,37 +136,37 @@ end
 local function draw()
 	local today = math.max(state.streak, 1)
 	local reward = Daily.reward(today, Config.StreakRewards)
-	sub.Text = `Day {today} in a row: {money(reward)}. Come back tomorrow for {money(
+	sub.Text = `Day {today} in a row! Come back tomorrow for {money(
 		Daily.reward(today + 1, Config.StreakRewards)
-	)}!`
+	)}`
+	collect.Text = "COLLECT " .. money(reward)
 	-- the row shows the week this day falls in; past the 7th it slides so today stays at the end
 	local first = if today <= TILES then 1 else today - TILES + 1
 	for i, t in tiles do
 		local d = first + i - 1
-		t.day.Text = "DAY " .. d
-		t.pay.Text = short(Daily.reward(d, Config.StreakRewards))
-		if d < today then
-			t.frame.BackgroundColor3 = C.card
-			t.tick.Text = "✓"
-			t.tick.TextColor3 = C.money
-			t.day.TextColor3 = C.dim
-			t.pay.TextColor3 = C.dim
-		elseif d == today then
-			t.frame.BackgroundColor3 = C.yellow
-			t.tick.Text = "TODAY"
-			t.tick.TextSize = 12
-			t.tick.TextColor3 = C.ink
-			t.day.TextColor3 = C.ink
-			t.pay.TextColor3 = C.ink
-		else
-			t.frame.BackgroundColor3 = C.grey
-			t.tick.Text = ""
-			t.day.TextColor3 = C.dim
-			t.pay.TextColor3 = C.text
-		end
-		if d ~= today then
-			t.tick.TextSize = 18
-		end
+		local pay = Daily.reward(d, Config.StreakRewards)
+		local got, now = d < today, d == today
+		t.day.Text = if now then "TODAY" else "DAY " .. d
+		t.pay.Text = short(pay)
+		t.pay.TextSize = if now then 22 else 17
+		-- small pay is a coin, bigger is a banknote
+		t.icon.Image = `rbxassetid://{if pay < Config.CoinBelow then Icons.Coin else Icons.Bill}`
+		local big = now or t.prize
+		local iconSize = if big then 54 else 42
+		t.icon.Size = UDim2.fromOffset(iconSize, iconSize)
+		t.icon.ImageTransparency = if got then 0.6 else 0
+		t.stamp.Visible = got
+		t.frame.Size =
+			UDim2.fromOffset(if t.prize then PRIZE_W else TILE_W, if big then TODAY_H else TILE_H)
+		t.edge.Enabled = t.prize and not now
+		local ink = if now then C.ink elseif got then C.dim elseif t.prize then C.yellow else C.text
+		t.frame.BackgroundColor3 = if now
+			then C.yellow
+			elseif got then C.card
+			elseif t.prize then C.prize
+			else C.grey
+		t.day.TextColor3 = if now or t.prize then ink else C.dim
+		t.pay.TextColor3 = ink
 	end
 end
 
@@ -164,6 +202,15 @@ local function update()
 		Popups.drop("Streak")
 	end
 end
+
+Pad.menu(card, {
+	first = function()
+		return collect
+	end,
+	close = function()
+		hideCard()
+	end,
+})
 
 collect.Activated:Connect(function()
 	card.Visible = false

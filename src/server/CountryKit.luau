@@ -909,7 +909,8 @@ local function moto(ctx: Ctx)
 		"MOTOCROSS",
 		Color3.fromRGB(30, 30, 32),
 		Color3.fromRGB(250, 210, 70),
-		true
+		true,
+		"Motocross"
 	)
 	for _ = 1, M.Tyres do
 		local a = random:NextNumber(0, math.pi * 2)
@@ -1394,7 +1395,9 @@ function CountryKit.gasStation(ctx: Ctx, at: Vector3, out: Vector3)
 		back * CFrame.new(s[1] * 0.12, s[3] - 0.6, front - 0.6),
 		"MART",
 		red,
-		WHITE
+		WHITE,
+		nil,
+		"Mart"
 	)
 	-- by the shop: an ice chest, an air stand and two bins (knockable)
 	local ice = prop(ctx.props, "IceChest")
@@ -1441,7 +1444,8 @@ function CountryKit.gasStation(ctx: Ctx, at: Vector3, out: Vector3)
 		"GAS",
 		WHITE,
 		red,
-		true
+		true,
+		"Gas"
 	)
 	Places.sign(
 		station,
@@ -1450,7 +1454,8 @@ function CountryKit.gasStation(ctx: Ctx, at: Vector3, out: Vector3)
 		G.Price,
 		Color3.fromRGB(26, 26, 30),
 		yellow,
-		true
+		true,
+		"GasPrice"
 	)
 end
 
