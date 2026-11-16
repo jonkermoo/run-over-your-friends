@@ -17,6 +17,7 @@ return table.freeze({
 	-- paint or price, the button); the picture takes the rest of the sheet's height
 	GarageListWidth = 330,
 	GarageDetailBottom = 196,
+	GoalsWidth = 420, -- the goals sheet, which hangs from the top left
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,
