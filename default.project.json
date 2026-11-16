@@ -34,6 +34,7 @@
         "ModelStreamingBehavior": "Improved"
       },
       "Terrain": {
+        "$path": "assets/Terrain.rbxm",
         "$properties": {
           "Decoration": true,
           "GrassLength": 0.55

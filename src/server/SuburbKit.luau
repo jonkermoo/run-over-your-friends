@@ -15,7 +15,9 @@ local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local LotKit = require(script.Parent.LotKit)
+local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
+local Terra = require(script.Parent.Terra)
 
 local SuburbKit = {}
 
@@ -68,7 +70,7 @@ end
 -- meshes lie just above it). Only voxels whose middle is well inside a road are painted, so no grey shows at
 -- the edges. `segs` are { a, b, half-width }, `discs` { centre, radius }; `r` the rect to work in.
 local VOXEL = 4
-local function paveTerrain(
+local function paveNow(
 	r: Rect,
 	segs: { { a: Vector3, b: Vector3, half: number } },
 	discs: { { c: Vector3, r: number } }
@@ -137,6 +139,13 @@ local function paveTerrain(
 	end
 	workspace.Terrain:WriteVoxels(region, VOXEL, mats, occ)
 end
+local function paveTerrain(
+	r: Rect,
+	segs: { { a: Vector3, b: Vector3, half: number } },
+	discs: { { c: Vector3, r: number } }
+)
+	Terra.run("pave", paveNow, r, segs, discs)
+end
 
 -- the unit way along a polyline at point i, and the unit way to its right
 local function frame(pts: { Vector3 }, i: number): (Vector3, Vector3)
@@ -147,7 +156,7 @@ end
 
 -- terrain off the ground (hill feet, mounds) over a rect, so roads and lawns lie flat
 local function flatten(r: Rect)
-	workspace.Terrain:FillBlock(
+	Terra.terrain:FillBlock(
 		CFrame.new(r.x, 150.5, r.z),
 		Vector3.new(r.w, 300, r.d),
 		Enum.Material.Air
@@ -574,7 +583,7 @@ local function hood(
 				)
 			end
 		end
-		task.wait() -- many houses: yield between streets so the build doesn't time out
+		Pace.step() -- many houses: yield now and then so the build doesn't time out
 	end
 
 	-- small clumps of trees on the open grass left between the gardens

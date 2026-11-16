@@ -134,8 +134,11 @@ return table.freeze({
 		MaxBottom = 0.2,
 		MaxTop = 1.5,
 		Grow = 1, -- a voxel column is cleared when its middle is this close to a part's footprint
-		Batch = 300,
 		CityMargin = 8,
+	}),
+	-- the map build at a server's start (server/Pace): it yields a frame once this many seconds of work have gone by
+	Build = table.freeze({
+		YieldEvery = 0.1,
 	}),
 	Map = table.freeze({
 		GroundSize = 6000,

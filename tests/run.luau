@@ -3610,6 +3610,31 @@ local function checkDayNight()
 end
 checkDayNight()
 
+-- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
+local function checkBakedTerrain()
+	local fs = require("@lune/fs")
+	local roblox = require("@lune/roblox")
+	local serde = require("@lune/serde")
+	local project = serde.decode("json", fs.readFile("default.project.json"))
+	local entry = project.tree.Workspace.Terrain
+	check("terrain: the project puts the baked terrain in", entry["$path"] == "assets/Terrain.rbxm")
+	local roots = roblox.deserializeModel(fs.readFile("assets/Terrain.rbxm"))
+	local terrain = roots[1]
+	check("terrain: the bake is one Terrain", #roots == 1 and terrain.ClassName == "Terrain")
+	local label = terrain:GetAttribute("BakedTerrain")
+	check(
+		"terrain: labelled with its fingerprint",
+		type(label) == "string" and string.match(label, "^%d+%-%x+$") ~= nil
+	)
+	check("terrain: holds voxels", #(terrain :: any).SmoothGrid > 1000000)
+	check("terrain: nothing else inside it", #terrain:GetChildren() == 0)
+	check(
+		"map build: yields at least every half second",
+		World.Build.YieldEvery > 0 and World.Build.YieldEvery <= 0.5
+	)
+end
+checkBakedTerrain()
+
 if failures > 0 then
 	error(`{failures} test(s) failed`)
 end

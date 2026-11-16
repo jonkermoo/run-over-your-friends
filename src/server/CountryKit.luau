@@ -13,7 +13,9 @@ local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Greenery = require(script.Parent.Greenery)
 local PaintKit = require(script.Parent.PaintKit)
+local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
+local Terra = require(script.Parent.Terra)
 
 local CountryKit = {}
 
@@ -130,7 +132,7 @@ type Ball = { x: number, z: number, cy: number, r: number, h: number?, peak: num
 -- `floor` up (the ground's underside if not given); given a floor (islands from the sea bed), water counts as
 -- empty.
 local BELL_TILE = 128
-local function bell(
+local function bellNow(
 	x: number,
 	z: number,
 	radius: number,
@@ -185,9 +187,18 @@ local function bell(
 		end
 	end
 end
+local function bell(
+	x: number,
+	z: number,
+	radius: number,
+	height: number,
+	material: Enum.Material,
+	floor: number?
+)
+	Terra.run("bell", bellNow, x, z, radius, height, material, floor)
+end
 CountryKit.bell = bell
 
-local mounds = 0
 local function mound(
 	hills: { Ball }?,
 	x: number,
@@ -196,22 +207,15 @@ local function mound(
 	height: number,
 	material: Enum.Material
 )
-	mounds += 1
-	if mounds % 6 == 0 then
-		task.wait() -- terrain is slow to fill: yield so the map's build doesn't time out
-	end
+	Pace.step() -- terrain is slow to fill: yield now and then so the map's build doesn't time out
 	local PK = Cfg.Edge.Peak
 	if height >= PK.From then
 		-- a mountain: concave slopes up to a point (each layer's radius shrinks as (1 - t)^Shape), grass on the
 		-- lower slopes, rock above, snow on the tallest peaks' tops; stacked in flat discs from the sea floor up
 		local y = -SEA_DEPTH
-		local terrain = workspace.Terrain
-		local layers = 0
+		local terrain = Terra.terrain
 		while y < height do
-			layers += 1
-			if layers % 40 == 0 then
-				task.wait() -- a tall peak is many fills: yield so the build doesn't time out
-			end
+			Pace.step() -- a tall peak is many fills
 			local top = math.min(y + MOUND_STEP, height)
 			local t = math.max((y + top) / 2, 0) / height
 			local d = radius * (1 - t) ^ PK.Shape
@@ -246,7 +250,7 @@ local function mound(
 		local mid = (y + top) / 2
 		local d = math.sqrt(math.max(r * r - (mid - cy) ^ 2, 0))
 		if d > 1 then
-			workspace.Terrain:FillCylinder(
+			Terra.terrain:FillCylinder(
 				CFrame.new(x, mid, z),
 				top - y,
 				math.min(d, radius * 1.1),
@@ -306,13 +310,9 @@ local function edges(ctx: Ctx)
 	-- calls `fn(theta)` every `step` studs round the edge
 	local function around(step: number, fn: (theta: number) -> ())
 		local theta = 0
-		local count = 0
 		while theta < math.pi * 2 do
 			fn(theta)
-			count += 1
-			if count % 8 == 0 then
-				task.wait() -- terrain is slow to fill: yield so the build doesn't time out
-			end
+			Pace.step() -- terrain is slow to fill: yield now and then so the build doesn't time out
 			theta += step / Land.edge(LandCfg, theta)
 		end
 	end
@@ -789,7 +789,7 @@ local function farm(ctx: Ctx)
 		local p = (barnCf * CFrame.new(c[1] * (B.w / 2 + 16), 0, -B.d / 2 - c[2] * F.Yard)).Position
 		lo, hi = lo:Min(p), hi:Max(p)
 	end
-	workspace.Terrain:ReplaceMaterial(
+	Terra.terrain:ReplaceMaterial(
 		Region3.new(Vector3.new(lo.X, -10, lo.Z), Vector3.new(hi.X, 4, hi.Z)):ExpandToGrid(4),
 		4,
 		Enum.Material.Grass,

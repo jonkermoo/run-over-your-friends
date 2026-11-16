@@ -17,8 +17,10 @@ local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
 local SuburbKit = require(script.Parent.SuburbKit)
+local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
+local Terra = require(script.Parent.Terra)
 
 local OutskirtsKit = {}
 
@@ -227,7 +229,7 @@ end
 -- a buried terrain ball: a mound `height` tall covering a circle `radius` wide on the ground
 local function mound(x: number, z: number, radius: number, height: number, material: Enum.Material)
 	local r = (radius * radius / height + height) / 2
-	workspace.Terrain:FillBall(Vector3.new(x, height - r, z), r, material)
+	Terra.terrain:FillBall(Vector3.new(x, height - r, z), r, material)
 end
 
 local function spots(
@@ -252,17 +254,17 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local static, buildings, props, random = ctx.static, ctx.buildings, ctx.props, ctx.random
 	local walkPoints: { Vector3 } = {}
 	local places: { Places.Place } = {}
-	local terrain = workspace.Terrain
+	local terrain = Terra.terrain
 	terrain:Clear()
 	-- terrain grass draws lighter than the ground part's Grass, so it gets a darker tint to blend in
-	terrain:SetMaterialColor(Enum.Material.Grass, rgb(Country.TerrainGrass))
+	workspace.Terrain:SetMaterialColor(Enum.Material.Grass, rgb(Country.TerrainGrass))
 	-- terrain Asphalt lies only under the suburb road meshes (what cars drive on there); grass-coloured, so far
 	-- terrain detail, which spreads it past the road's edge, still reads as grass
-	terrain:SetMaterialColor(Enum.Material.Asphalt, rgb(Country.TerrainGrass))
-	terrain:SetMaterialColor(Enum.Material.LeafyGrass, rgb(Country.TerrainLeafy))
-	terrain:SetMaterialColor(Enum.Material.Rock, rgb(Country.TerrainRock))
-	terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
-	terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
+	workspace.Terrain:SetMaterialColor(Enum.Material.Asphalt, rgb(Country.TerrainGrass))
+	workspace.Terrain:SetMaterialColor(Enum.Material.LeafyGrass, rgb(Country.TerrainLeafy))
+	workspace.Terrain:SetMaterialColor(Enum.Material.Rock, rgb(Country.TerrainRock))
+	workspace.Terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
+	workspace.Terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
 	terrain.WaterColor = rgb(C.water)
 	terrain.WaterWaveSize = LandCfg.WaterWave
 	terrain.WaterTransparency = LandCfg.WaterClear
@@ -333,9 +335,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	end
 	for z = -fill, fill - tile, tile do
 		local zc = z + tile / 2
-		if z % (tile * 32) == 0 then
-			task.wait() -- the fill is long: yield so the build doesn't time out
-		end
+		Pace.step() -- the fill is long: yield now and then so the build doesn't time out
 		local coastX = Land.coast(L, seaEdge, zc)
 		local quay = math.abs(zc - port.z) < port.d / 2
 		local runFrom, runKind = 0, nil :: Enum.Material?
@@ -398,9 +398,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	-- the sand along the coast (the beaches, and a strip everywhere else but the port), painted over the grass in
 	-- 4-stud rows, so its inland edge is smooth rather than stepped in whole cells
 	for z = -fill, fill - 4, 4 do
-		if z % 512 == 0 then
-			task.wait()
-		end
+		Pace.step()
 		local zc = z + 2
 		local width = math.max(beachWidth(zc), L.Shore)
 		if math.abs(zc - port.z) > port.d / 2 + 10 then
@@ -1646,7 +1644,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	-- the suburbs' lawns are all one grass: the darker patches (Wilds Fill.Patches) are taken back out of them,
 	-- so neighbouring plots match
 	for _, r in suburbs.rects do
-		workspace.Terrain:ReplaceMaterial(
+		Terra.terrain:ReplaceMaterial(
 			Region3.new(
 				Vector3.new(r.x - r.w / 2, -16, r.z - r.d / 2),
 				Vector3.new(r.x + r.w / 2, 4, r.z + r.d / 2)
