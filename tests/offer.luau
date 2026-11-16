@@ -75,8 +75,12 @@ return function(check: (string, boolean) -> ())
 			and Offer.clock(59.2) == "1:00"
 			and Offer.clock(0) == "0:00"
 			and Offer.clock(-5) == "0:00"
-			and Offer.clock(3723) == "1:02:03"
+			and Offer.clock(3599) == "59:59"
+			and Offer.clock(3600) == "1h 00m"
+			and Offer.clock(3723) == "1h 03m"
+			and Offer.clock(172800) == "48h 00m"
 	)
+	check("starter deal window is 24 h or more", Products.StarterDealSeconds >= 86400)
 	local until_ = prices[Products.StarterUntil]
 	check(
 		"eligible near the start",
