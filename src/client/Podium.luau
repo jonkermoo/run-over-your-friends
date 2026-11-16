@@ -97,6 +97,7 @@ local function show(r: Result)
 				head.Image = headshot(e.id)
 			end)
 			local name = Style.label(card, e.name, 15, F.heavy, C.text)
+			name.AutoLocalize = false -- a player's name, never translated
 			name.Position = UDim2.fromOffset(left, top - 46)
 			name.Size = UDim2.fromOffset(COLUMN, 18)
 			name.TextTruncate = Enum.TextTruncate.AtEnd

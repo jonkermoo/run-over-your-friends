@@ -125,6 +125,7 @@ local function build(m: Model)
 	local subSize = math.max(10, math.floor(size * 0.5 + 0.5))
 	local top = height - size - subSize - 2
 	local nameLabel = label(gui, name, Style.fonts.display, size, color, top)
+	nameLabel.AutoLocalize = false -- a player's name, never translated
 	local subLabel = label(gui, sub, Style.fonts.bold, subSize, Color3.new(1, 1, 1), top + size + 2)
 	subLabel.AutoLocalize = false -- already in the player's language (src/shared/Loc)
 	local strokes = {}
