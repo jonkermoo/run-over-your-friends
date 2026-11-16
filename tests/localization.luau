@@ -12,6 +12,7 @@ local Onboarding = require("../src/shared/Config/Onboarding")
 local PaintConfig = require("../src/shared/Config/Paints")
 local Products = require("../src/shared/Config/Products")
 local QuestConfig = require("../src/shared/Config/Quests")
+local Vehicles = require("../src/shared/Config/Vehicles")
 local ServerGoals = require("../src/shared/Config/ServerGoals")
 
 local LOCALES = { "es", "pt" }
@@ -199,6 +200,9 @@ return function(check: (string, boolean) -> ())
 		goalsOk = goalsOk and keys["ServerGoal_" .. k.kind] == k.text
 	end
 	check("translations: every goal kind has its line", goalsOk)
+	for _, v in Vehicles.List do
+		table.insert(plain, v.blurb)
+	end
 	for _, paint in PaintConfig.List do
 		table.insert(plain, paint.name)
 	end
