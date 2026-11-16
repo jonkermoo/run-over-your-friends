@@ -145,6 +145,15 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 	if (targetPos - chassis.Position).Magnitude > chassis.Size.Magnitude / 2 + 25 + speed * 0.3 then
 		return
 	end
+	if
+		HitRules.inSafeZone(
+			targetPos,
+			workspace:GetAttribute("SafeZoneCentre"),
+			workspace:GetAttribute("SafeZoneHalf")
+		)
+	then
+		return
+	end
 	local terms = HitRules.terms(stats.price, HitConfig)
 	local energy = Impact.energy(stats.weight, speed / spm)
 	local dir = (velocity * Vector3.new(1, 0, 1)).Unit

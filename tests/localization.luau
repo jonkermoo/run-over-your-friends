@@ -7,6 +7,7 @@ local fs = require("@lune/fs")
 local Loc = require("../src/shared/Loc")
 local DriveHud = require("../src/shared/Rules/DriveHud")
 local EventConfig = require("../src/shared/Config/Events")
+local Leaderboards = require("../src/shared/Config/Leaderboards")
 local LoadingConfig = require("../src/shared/Config/Loading")
 local Onboarding = require("../src/shared/Config/Onboarding")
 local PaintConfig = require("../src/shared/Config/Paints")
@@ -200,6 +201,17 @@ return function(check: (string, boolean) -> ())
 		goalsOk = goalsOk and keys["ServerGoal_" .. k.kind] == k.text
 	end
 	check("translations: every goal kind has its line", goalsOk)
+	for _, board in Leaderboards.Boards do
+		table.insert(plain, board.title)
+		if board.tag then
+			table.insert(plain, board.tag)
+		end
+		local unit = string.match(board.suffix or "", "^ (%a+)$")
+		check(
+			"translations: board unit " .. tostring(unit),
+			unit == nil or keys["Amount_" .. unit] ~= nil
+		)
+	end
 	for _, v in Vehicles.List do
 		table.insert(plain, v.blurb)
 	end

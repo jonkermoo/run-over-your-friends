@@ -29,9 +29,11 @@ local function week(): number
 	return Lb.week(now(), Config.WeekSeconds, Config.WeekStartOffset)
 end
 
-local function store(key: string): OrderedDataStore?
+-- this week's store for a weekly board; one store for good for an all-time board
+local function store(board: Config.Board): OrderedDataStore?
+	local name = if board.allTime then `Lb_{board.key}` else `Lb_{board.key}_w{week()}`
 	local ok, result = pcall(function()
-		return DataStoreService:GetOrderedDataStore(`Lb_{key}_w{week()}`)
+		return DataStoreService:GetOrderedDataStore(name)
 	end)
 	return if ok then result else nil
 end
@@ -102,7 +104,7 @@ local function save(player: Player)
 	dirty[player] = nil
 	for _, board in Config.Boards do
 		local value = math.floor(Lb.value(s, board.key))
-		local ds = store(board.key)
+		local ds = store(board)
 		if ds and value > 0 then
 			pcall(function()
 				(ds :: OrderedDataStore):SetAsync(tostring(player.UserId), value)
@@ -113,7 +115,7 @@ end
 
 local function readStores()
 	for _, board in Config.Boards do
-		local ds = store(board.key)
+		local ds = store(board)
 		local entries: { Lb.Entry } = {}
 		if ds then
 			local ok, pages = pcall(function()

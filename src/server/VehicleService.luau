@@ -176,6 +176,18 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, -1)
 	local at = ground(root.Position, ignore)
 	local cf = CFrame.lookAt(at, at + look)
+	-- a long car whose back end would hit something behind you (the spawn plaza's tower) comes out further
+	-- ahead along the way you face, before trying the nearest road
+	for _, share in { 0.25, 0.5 } do
+		if not blocked(cf, size, ignore) then
+			break
+		end
+		local ahead = ground(root.Position + look * size.Z * share, ignore)
+		local moved = CFrame.lookAt(ahead, ahead + look)
+		if not blocked(moved, size, ignore) then
+			cf = moved
+		end
+	end
 	if blocked(cf, size, ignore) then
 		local best, bestD = nil, math.huge
 		for _, p in spawnPoints do
