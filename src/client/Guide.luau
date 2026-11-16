@@ -817,6 +817,13 @@ local function update()
 			end
 		end
 	end
+	-- a card over the screen (the Starter Pack, the "need more money" card) has the player's attention: no
+	-- arrow on top of it
+	local upsell = hud and hud:FindFirstChild("Upsell") :: GuiObject?
+	local starter = hud and hud:FindFirstChild("StarterCard") :: GuiObject?
+	if (upsell and upsell.Visible) or (starter and starter.Visible) then
+		pressTarget = nil
+	end
 	showTarget(target, root)
 	showPress(pressTarget, pressFromSide)
 	-- an arrow under a menu tab lands on the card: the card (and its hint) step down out of its way

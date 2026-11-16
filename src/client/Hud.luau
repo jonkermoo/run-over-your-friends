@@ -143,14 +143,40 @@ local function pushFeed(item: GuiObject, hold: number, height: number)
 	end)
 end
 
--- one feed plate: paint colour, text colour, size
-local function plate(text: string, fill: Color3, ink: Color3, size: number, font: Font): TextLabel
+-- one feed plate: paint colour, text colour, size, and a picture at its front (Config/Icons), tinted when given
+local function plate(
+	text: string,
+	fill: Color3,
+	ink: Color3,
+	size: number,
+	font: Font,
+	icon: number?,
+	tint: Color3?
+): TextLabel
 	local l = Style.label(feed, text, size, font, ink)
 	l.BackgroundColor3 = fill
 	l.BackgroundTransparency = 0
 	l.AnchorPoint = Vector2.new(1, 0)
 	l.Position = UDim2.fromScale(1, 0)
-	Style.fitText(l, 12, 4)
+	local iconW = if icon then size + 10 else 0
+	if icon then
+		-- the padding keeps the words clear of the picture, which sits in the padded strip
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, iconW)
+		pad.Parent = l
+		local img = Style.image(l, icon, tint)
+		img.AnchorPoint = Vector2.new(0, 0.5)
+		img.Position = UDim2.new(0, -iconW + 4, 0.5, 0)
+		img.Size = UDim2.fromOffset(size + 6, size + 6)
+	end
+	-- TextBounds are real pixels: undo the screen's scale and the pop-in's (pushFeed grows the plate in)
+	local function fit()
+		local pop = l:FindFirstChildOfClass("UIScale")
+		local s = Style.scale() * (if pop then pop.Scale else 1)
+		l.Size = UDim2.fromOffset(l.TextBounds.X / s + 24 + iconW, l.TextBounds.Y / s + 8)
+	end
+	l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
+	fit()
 	Style.shadow(l, C.ink, 4)
 	return l
 end
@@ -159,21 +185,28 @@ local function popup(text: string, kind: string)
 	local item: TextLabel
 	local hold = 1.4
 	if kind == "goal" then
-		item =
-			plate(`<font color="#FFD000">GOAL DONE</font>   {text}`, C.panel, C.text, 15, F.heavy)
+		item = plate(
+			`<font color="#FFD000">GOAL DONE</font>   {text}`,
+			C.panel,
+			C.text,
+			15,
+			F.heavy,
+			Icons.Pin,
+			C.yellow
+		)
 		item.RichText = true
 		hold = 3
 	elseif kind == "big" then
 		item = plate(text, C.yellow, C.ink, 26, F.display)
 		hold = 2.4
 	elseif kind == "social" then
-		item = plate(text, C.pink, C.text, 18, F.display)
+		item = plate(text, C.pink, C.text, 18, F.display, Icons.Sign)
 		hold = 2.6
 	elseif kind == "info" then
-		item = plate(text, C.panel, C.text, 15, F.heavy)
+		item = plate(text, C.panel, C.text, 15, F.heavy, Icons.Sign, C.yellow)
 		hold = 2.4
 	else
-		item = plate(text, C.money, C.ink, 24, F.display)
+		item = plate(text, C.money, C.ink, 24, F.display, Icons.Coin)
 	end
 	pushFeed(item, hold, item.TextSize + 8)
 end
@@ -1207,16 +1240,17 @@ local function sectionHead(order: number, text: string): Frame
 	return h
 end
 
--- "R$ 99": the configured label until the product exists, then Roblox's real price
-local function robuxText(product: Products.Product, label: TextButton)
-	label.Text = "R$ " .. product.robux
+-- "R$ 99" (after prefix, if given): the configured price until the product exists, then Roblox's real one
+local function robuxText(product: Products.Product, label: TextButton, prefix: string?)
+	local before = prefix or ""
+	label.Text = before .. "R$ " .. product.robux
 	if product.id ~= 0 then
 		task.spawn(function()
 			local ok, info = pcall(function()
 				return MarketplaceService:GetProductInfo(product.id, Enum.InfoType.Product)
 			end)
 			if ok and info and info.PriceInRobux then
-				label.Text = "R$ " .. info.PriceInRobux
+				label.Text = before .. "R$ " .. info.PriceInRobux
 			end
 		end)
 	elseif RunService:IsStudio() then
@@ -1741,50 +1775,84 @@ end
 
 ---------------------------------------------------------------- offers
 
+-- the "can't afford it" card, a poster like the Starter Pack's: how far you are from the car (its picture and a
+-- bar), the smallest cash pack that covers the gap, GET IT and KEEP DRIVING
+local OFFER_W, OFFER_H = 500, 410
 local offer = Style.panel(gui)
+offer.Name = "Upsell"
 offer.AnchorPoint = Vector2.new(0.5, 0.5)
 offer.Position = UDim2.fromScale(0.5, 0.5)
-offer.Size = UDim2.fromOffset(440, 270)
+offer.Size = UDim2.fromOffset(OFFER_W, OFFER_H)
 offer.ZIndex = 10
 offer.Visible = false
 Style.stroke(offer, C.yellow, 4, 0)
 Style.setShadow(offer, C.pink)
-local hazard = Instance.new("Frame")
-hazard.BackgroundColor3 = C.yellow
-hazard.BorderSizePixel = 0
-hazard.Size = UDim2.new(1, 0, 0, 14)
-hazard.ClipsDescendants = true
-hazard.ZIndex = 11
-hazard.Parent = offer
-for x = -20, 460, 28 do
-	local stripe = Instance.new("Frame")
-	stripe.BackgroundColor3 = C.ink
-	stripe.BorderSizePixel = 0
-	stripe.Position = UDim2.fromOffset(x, -10)
-	stripe.Size = UDim2.fromOffset(12, 40)
-	stripe.Rotation = 40
-	stripe.ZIndex = 11
-	stripe.Parent = hazard
+Style.hazard(offer, OFFER_W, 14)
+local offerTitle = Style.label(offer, "", 40, F.display, C.yellow)
+offerTitle.Position = UDim2.fromOffset(0, 26)
+offerTitle.Size = UDim2.new(1, 0, 0, 44)
+Style.outline(offerTitle, 2)
+-- the car you're saving for, and how far along you are
+local offerPic = Instance.new("Frame")
+offerPic.Name = "Picture"
+offerPic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+offerPic.BorderSizePixel = 0
+offerPic.ClipsDescendants = true
+offerPic.Position = UDim2.fromOffset(24, 84)
+offerPic.Size = UDim2.fromOffset(120, 70)
+offerPic.Parent = offer
+local offerCar = Style.label(offer, "", 20, F.display, C.text)
+offerCar.Position = UDim2.fromOffset(158, 84)
+offerCar.Size = UDim2.new(1, -182, 0, 24)
+offerCar.TextXAlignment = Enum.TextXAlignment.Left
+local offerBack, offerFill = Style.bar(offer, C.money)
+offerBack.BackgroundTransparency = 0
+offerBack.Position = UDim2.fromOffset(158, 112)
+offerBack.Size = UDim2.new(1, -182, 0, 16)
+Style.laneGaps(offerBack, C.ink)
+local offerAmount = Style.label(offer, "", 14, F.bold, C.dim)
+offerAmount.Position = UDim2.fromOffset(158, 132)
+offerAmount.Size = UDim2.new(1, -182, 0, 18)
+offerAmount.TextXAlignment = Enum.TextXAlignment.Left
+-- the pack that covers it
+local offerPack = Style.card(offer)
+offerPack.Position = UDim2.fromOffset(24, 172)
+offerPack.Size = UDim2.new(1, -48, 0, 76)
+do
+	local edge = Instance.new("Frame")
+	edge.BackgroundColor3 = C.money
+	edge.BorderSizePixel = 0
+	edge.Size = UDim2.new(0, 8, 1, 0)
+	edge.Parent = offerPack
+	local packBill = Style.image(offerPack, Icons.Bill)
+	packBill.AnchorPoint = Vector2.new(0, 0.5)
+	packBill.Position = UDim2.new(0, 20, 0.5, 0)
+	packBill.Size = UDim2.fromOffset(58, 58)
 end
-local offerTitle = Style.label(offer, "", 32, F.display, C.yellow)
-offerTitle.Position = UDim2.fromOffset(0, 28)
-offerTitle.Size = UDim2.new(1, 0, 0, 38)
-offerTitle.ZIndex = 11
-local offerText = Style.label(offer, "", 15, F.bold, C.text)
-offerText.Position = UDim2.fromOffset(28, 72)
-offerText.Size = UDim2.new(1, -56, 0, 64)
-offerText.TextWrapped = true
-offerText.ZIndex = 11
-local offerBuy = Style.button(offer, "", "gold", 22)
-offerBuy.AnchorPoint = Vector2.new(0.5, 0)
-offerBuy.Position = UDim2.new(0.5, 0, 0, 146)
-offerBuy.Size = UDim2.fromOffset(300, 54)
-offerBuy.ZIndex = 11
+local offerPackName = Style.label(offerPack, "", 24, F.display, C.money)
+offerPackName.Position = UDim2.fromOffset(90, 10)
+offerPackName.Size = UDim2.new(1, -102, 0, 30)
+offerPackName.TextXAlignment = Enum.TextXAlignment.Left
+offerPackName.TextScaled = true
+do
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 24
+	fit.Parent = offerPackName
+end
+local offerText = Style.label(offerPack, "", 14, F.bold, C.dim)
+offerText.Position = UDim2.fromOffset(90, 42)
+offerText.Size = UDim2.new(1, -102, 0, 20)
+offerText.TextXAlignment = Enum.TextXAlignment.Left
+local offerBuy = Style.button(offer, "", "gold", 26)
+offerBuy.Name = "UpsellBuy"
+offerBuy.AnchorPoint = Vector2.new(0.5, 1)
+offerBuy.Position = UDim2.new(0.5, 0, 1, -62)
+offerBuy.Size = UDim2.fromOffset(320, 58)
 local offerNo = Style.button(offer, "KEEP DRIVING", "dark", 16)
-offerNo.AnchorPoint = Vector2.new(0.5, 0)
-offerNo.Position = UDim2.new(0.5, 0, 0, 214)
-offerNo.Size = UDim2.fromOffset(200, 40)
-offerNo.ZIndex = 11
+offerNo.Name = "UpsellNo"
+offerNo.AnchorPoint = Vector2.new(0.5, 1)
+offerNo.Position = UDim2.new(0.5, 0, 1, -14)
+offerNo.Size = UDim2.fromOffset(200, 38)
 local offerKey = ""
 local offerIsUpsell = false -- the "can't afford it" card, which a successful buy closes
 offerBuy.Activated:Connect(function()
@@ -1794,26 +1862,15 @@ end)
 offerNo.Activated:Connect(function()
 	offer.Visible = false
 end)
-
-local function showOffer(
-	title: string,
-	text: string,
-	product: Products.Product,
-	buyLabel: string,
-	noLabel: string
-)
-	offerTitle.Text = title
-	offerText.Text = text
-	offerKey = product.key
-	robuxText(product, offerBuy)
-	offerBuy.Text = buyLabel .. "  ·  " .. offerBuy.Text
-	offerNo.Text = noLabel
-	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
-	scale.Parent = offer
-	scale.Scale = 0.8
-	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	offer.Visible = true
-end
+-- gamepad: it starts on GET IT, and B is KEEP DRIVING
+Pad.menu(offer, {
+	first = function()
+		return offerBuy
+	end,
+	close = function()
+		offer.Visible = false
+	end,
+})
 
 -- tapping BUY on a car you can't afford: suggest the smallest pack that covers the gap
 offerFor = function(stats: Vehicles.Vehicle)
@@ -1824,7 +1881,8 @@ offerFor = function(stats: Vehicles.Vehicle)
 		return
 	end
 	local cash = (player:GetAttribute("Money") or 0) :: number
-	local gap = priceOf(stats) - cash
+	local price = priceOf(stats)
+	local gap = price - cash
 	local pick = Products.MoneyPacks[#Products.MoneyPacks]
 	for _, pack in Products.MoneyPacks do
 		if pack.money >= gap then
@@ -1833,13 +1891,21 @@ offerFor = function(stats: Vehicles.Vehicle)
 		end
 	end
 	offerIsUpsell = true
-	showOffer(
-		`NEED {money(gap)} MORE`,
-		`Keep running people over to earn it, or grab {pick.title} ({money(pick.money)}) for the {stats.name} right now.`,
-		pick,
-		"GET " .. money(pick.money),
-		"KEEP DRIVING"
-	)
+	offerTitle.Text = `NEED {money(gap)} MORE`
+	offerCar.Text = string.upper(stats.name)
+	offerFill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
+	offerAmount.Text = `{money(cash)} / {money(price)}`
+	offerPic:ClearAllChildren()
+	preview(offerPic, stats, true)
+	offerPackName.Text = `{string.upper(pick.title)}  ·  {money(pick.money)}`
+	offerText.Text = "covers it now, or keep running people over"
+	offerKey = pick.key
+	robuxText(pick, offerBuy, "GET IT  ·  ")
+	local scale = offer:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+	scale.Parent = offer
+	scale.Scale = 0.8
+	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	offer.Visible = true
 end
 
 -- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds
