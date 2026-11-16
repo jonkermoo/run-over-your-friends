@@ -65,6 +65,7 @@ end
 -- the parts that need the engine: loaded on first use (client or server), never in Lune
 type Engine = {
 	byKey: (key: string, args: Args) -> string?,
+	byTemplate: (text: string) -> (string?, string?),
 	bySource: (text: string, args: Args) -> string?,
 }
 local engine: Engine? = nil
@@ -133,8 +134,28 @@ local function load(): Engine?
 		return Loc.fill(sources[key], args)
 	end
 
+	-- English with one {n} slot as a pattern: "Land {n} jumps" -> "^Land (%d+) jumps$"
+	local templates: { { key: string, pattern: string } } = {}
+	for key, source in sources do
+		local _, slotCount = string.gsub(source, "{[%w_]+}", "")
+		if slotCount == 1 and string.find(source, "{n}", 1, true) then
+			local escaped = string.gsub(source, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+			local pattern = "^" .. string.gsub(escaped, "{n}", "(%%d+)") .. "$"
+			table.insert(templates, { key = key, pattern = pattern })
+		end
+	end
+
 	engine = {
 		byKey = byKey,
+		byTemplate = function(text: string): (string?, string?)
+			for _, t in templates do
+				local n = string.match(text, t.pattern)
+				if n then
+					return t.key, n
+				end
+			end
+			return nil, nil
+		end,
 		bySource = function(text: string, args: Args): string?
 			local key = keyOfSource[text]
 			if key then
@@ -224,7 +245,7 @@ function Loc.upper(text: string): string
 end
 
 -- a goal's line (Config/Quests, Config/ServerGoals) in the player's language: its kind's line (Quest_<kind>,
--- ServerGoal_<kind>) with the target, else its English text
+-- ServerGoal_<kind>) with the target, else the line whose English matches its text with a number in the {n}
 function Loc.goal(g: { kind: string?, target: number?, text: string? }, server: boolean?): string
 	local e = load()
 	if e and typeof(g.kind) == "string" and typeof(g.target) == "number" then
@@ -234,7 +255,21 @@ function Loc.goal(g: { kind: string?, target: number?, text: string? }, server: 
 			return out
 		end
 	end
-	return Loc.source(g.text or "")
+	local text = g.text or ""
+	if e then
+		local key, n = e.byTemplate(text)
+		if key then
+			return e.byKey(key, { n = n }) or text
+		end
+	end
+	return Loc.source(text)
+end
+
+-- set a label to English text or a Loc.msg line, translated here; for a label that also shows keyed lines
+-- (Loc.set turns Roblox's own matching off on it, so its plain words come through here too)
+function Loc.say(label: TextLabel | TextButton, line: string | Msg)
+	label.AutoLocalize = false
+	label.Text = resolve(line)
 end
 
 -- set a label to a translated line and keep Roblox's own matching off it (the text is already translated, and

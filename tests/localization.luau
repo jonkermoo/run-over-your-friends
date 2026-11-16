@@ -134,7 +134,7 @@ return function(check: (string, boolean) -> ())
 					table.insert(found, word)
 				end
 			end
-			if string.find(line, "Loc%.") then
+			if string.find(line, "Loc%.set%(") then
 				-- Loc.set(label, if one then "KeyA" else "KeyB", ...)
 				for a, b in string.gmatch(line, 'then "([%w_]+)" else "([%w_]+)"') do
 					table.insert(found, a)
@@ -144,6 +144,21 @@ return function(check: (string, boolean) -> ())
 			for _, word in found do
 				if not keys[word] then
 					table.insert(missing, `{path}: {word}`)
+				end
+			end
+			-- English passed as plain text: Loc.say(label, "TEXT"), Loc.source("TEXT"), if a then "A" else "B"
+			local english = {}
+			for word in string.gmatch(line, 'Loc%.source%(%s*"([^"]+)"') do
+				table.insert(english, word)
+			end
+			if string.find(line, "Loc%.say%(") then
+				for word in string.gmatch(line, '"([^"]+)"') do
+					table.insert(english, word)
+				end
+			end
+			for _, word in english do
+				if not sources[word] then
+					table.insert(missing, `{path}: "{word}" (plain text)`)
 				end
 			end
 		end

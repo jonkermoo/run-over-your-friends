@@ -1122,7 +1122,7 @@ function refreshCards()
 		c.rowPrice.TextColor3 = C.money
 		if mine then
 			local inIt = driving == c.stats.id
-			c.action.Text = if inIt then "DRIVING" else "SPAWN"
+			Loc.say(c.action, if inIt then "DRIVING" else "SPAWN")
 			Style.setKind(c.action, if inIt then "dark" else "green")
 			c.sale.Visible = false
 			c.was.Visible = false
@@ -1151,7 +1151,7 @@ function refreshCards()
 				Style.setKind(c.action, "orange")
 			elseif c.stats.id == "Roadster" then
 				-- a pass car: the pass is the way in; the cash price stays as a small "or"
-				c.action.Text = "GET PASS"
+				Loc.say(c.action, "GET PASS")
 				Style.setKind(c.action, "blue")
 				c.price.Text = "GAME PASS"
 				c.price.TextColor3 = C.blue
