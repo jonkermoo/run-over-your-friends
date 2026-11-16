@@ -9,7 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Net = require(ReplicatedStorage.Shared.Net)
-local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Sfx = require(script.Parent.Sfx)
 local Style = require(script.Parent.Style)
 
@@ -63,7 +63,8 @@ local function show(r: Result)
 	card.Position = UDim2.fromScale(0.5, 0.45)
 	card.Size = UDim2.fromOffset(COLUMN * 3 + 40, 340)
 	Style.stroke(card, C.yellow, 3, 0)
-	local title = Style.label(card, `{r.title} RESULTS`, 28, F.display, C.yellow)
+	local title = Style.label(card, "", 28, F.display, C.yellow)
+	Loc.set(title, "PodiumTitle", { event = Loc.src(r.title) })
 	title.Position = UDim2.fromOffset(0, 10)
 	title.Size = UDim2.new(1, 0, 0, 34)
 	Style.outline(title, 2)
@@ -78,7 +79,9 @@ local function show(r: Result)
 		step.Position = UDim2.fromOffset(left + 8, floor - slot.height)
 		step.Size = UDim2.fromOffset(COLUMN - 16, slot.height)
 		step.Parent = card
-		local num = Style.label(step, Contest.ordinal(slot.place), 26, F.display, C.ink)
+		local num = Style.label(step, "", 26, F.display, C.ink)
+		num.AutoLocalize = false
+		num.Text = Loc.resolve(Loc.ordinal(slot.place))
 		num.Size = UDim2.new(1, 0, 0, 30)
 		num.Position = UDim2.fromOffset(0, 4)
 		if e then
@@ -97,26 +100,27 @@ local function show(r: Result)
 			name.Position = UDim2.fromOffset(left, top - 46)
 			name.Size = UDim2.fromOffset(COLUMN, 18)
 			name.TextTruncate = Enum.TextTruncate.AtEnd
-			local line = Style.label(
-				card,
-				`{Contest.amount(e.score, r.unit)}  +{Style.money(e.prize)}`,
-				13,
-				F.heavy,
-				C.money
-			)
+			local line = Style.label(card, "", 13, F.heavy, C.money)
+			Loc.set(line, "PodiumPrize", {
+				amount = Loc.amount(e.score, r.unit),
+				prize = Style.money(e.prize),
+			})
 			line.Position = UDim2.fromOffset(left, top - 26)
 			line.Size = UDim2.fromOffset(COLUMN, 16)
 		end
 	end
-	local mine = if r.place == 0
-		then "You didn't take part. Join the next one!"
-		elseif r.place <= #r.top then `YOU CAME {Contest.ordinal(r.place)}!  +{Style.money(
-			r.prize
-		)}`
-		else `YOU: {Contest.ordinal(r.place)}  ({Contest.amount(r.score, r.unit)})  +{Style.money(
-			r.prize
-		)}`
-	local you = Style.label(card, mine, 16, F.heavy, if r.place > 0 then C.money else C.dim)
+	local you = Style.label(card, "", 16, F.heavy, if r.place > 0 then C.money else C.dim)
+	if r.place == 0 then
+		Loc.set(you, "PodiumNone")
+	elseif r.place <= #r.top then
+		Loc.set(you, "PodiumCame", { place = Loc.ordinal(r.place), prize = Style.money(r.prize) })
+	else
+		Loc.set(you, "PodiumYou", {
+			place = Loc.ordinal(r.place),
+			amount = Loc.amount(r.score, r.unit),
+			prize = Style.money(r.prize),
+		})
+	end
 	you.Position = UDim2.fromOffset(0, floor + 14)
 	you.Size = UDim2.new(1, 0, 0, 22)
 

@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Config = require(ReplicatedStorage.Shared.Config.Stunts)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -48,7 +49,7 @@ function Stunts.start()
 		upSince = upSince or now
 		local air = now - (upSince :: number)
 		ticker.Visible = air >= Config.TickerAfter
-		ticker.Text = `AIR {string.format("%.1f", air)}s`
+		Loc.set(ticker, "AirTime", { t = string.format("%.1f", air) })
 		ticker.TextColor3 = if air >= 3 then C.money elseif air >= 1.5 then C.orange else C.yellow
 		scale.Scale = 1 + math.min(air, 4) * 0.08
 	end)

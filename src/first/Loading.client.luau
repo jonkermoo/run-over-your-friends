@@ -222,6 +222,9 @@ if not (configModule and configModule:IsA("ModuleScript")) then
 	return
 end
 local Config = require(configModule) :: any
+-- the translated progress line (src/shared/Loc); plain English if it is missing
+local locModule = sharedFolder:FindFirstChild("Loc")
+local Loc = if locModule and locModule:IsA("ModuleScript") then require(locModule) :: any else nil
 
 local done = false
 local progress = 0
@@ -241,7 +244,11 @@ local function reach(step: string)
 		TweenInfo.new(Config.CarDrive, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{ Size = UDim2.fromOffset(carAt(p).X.Offset - ROAD_X + 20, 10) }
 	):Play()
-	status.Text = string.format("LOADING THE CITY... %d%%", math.floor(p * 100 + 0.5))
+	local pct = math.floor(p * 100 + 0.5)
+	status.AutoLocalize = Loc == nil
+	status.Text = if Loc
+		then Loc.text("LoadingPct", { pct = pct })
+		else string.format("LOADING THE CITY... %d%%", pct)
 end
 reach("start")
 reach("game")
@@ -309,6 +316,7 @@ end
 -- the finish: the car hits the friend, the friend flies off with a BONK!, then the cover fades
 done = true
 progress = 1
+status.AutoLocalize = true
 status.Text = "LET'S GO!"
 TweenService
 	:Create(car, TweenInfo.new(Config.Finish.hit, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {

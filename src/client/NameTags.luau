@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
@@ -107,20 +108,25 @@ local function build(m: Model)
 	if typeof(hp) == "number" then
 		name, sub, color, size, bold =
 			"GIANT",
-			`{hp} {if hp == 1 then "hit" else "hits"} left`,
+			Loc.text(if hp == 1 then "GiantHitLeft" else "GiantHitsLeft", { n = hp }),
 			rgb(T.Giant),
 			T.GiantSize,
 			true
 	else
 		mine = true
 		name, sub, color, size, bold =
-			string.upper(friendName :: string), "friend of You", rgb(T.Mine), T.MineSize, true
+			string.upper(friendName :: string),
+			Loc.source("friend of You"),
+			rgb(T.Mine),
+			T.MineSize,
+			true
 	end
 	size = math.floor(size * k + 0.5)
 	local subSize = math.max(10, math.floor(size * 0.5 + 0.5))
 	local top = height - size - subSize - 2
 	local nameLabel = label(gui, name, Style.fonts.display, size, color, top)
 	local subLabel = label(gui, sub, Style.fonts.bold, subSize, Color3.new(1, 1, 1), top + size + 2)
+	subLabel.AutoLocalize = false -- already in the player's language (src/shared/Loc)
 	local strokes = {}
 	for _, l in { nameLabel, subLabel } do
 		local s = Instance.new("UIStroke")

@@ -4,7 +4,8 @@
 
 local DriveHud = {}
 
-export type Row = { key: string, label: string }
+-- label is English; wait: the unstuck countdown in it (its translated line is UnstuckWait, src/shared/Loc)
+export type Row = { key: string, label: string, wait: number? }
 
 export type Car = {
 	feature: string?, -- "TAXI!", "JINGLE", "WATER" or nil
@@ -24,7 +25,11 @@ function DriveHud.rows(car: Car): { Row }
 		{ key = "SPACE", label = "Get out" },
 		{ key = "V", label = "View" },
 		{ key = "H", label = "Horn" },
-		{ key = "T", label = if wait > 0 then `Unstuck ({wait})` else "Unstuck" },
+		{
+			key = "T",
+			label = if wait > 0 then `Unstuck ({wait})` else "Unstuck",
+			wait = if wait > 0 then wait else nil,
+		},
 	}
 	if car.feature == "JINGLE" then
 		table.insert(

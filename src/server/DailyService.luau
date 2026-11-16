@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Daily)
 local Daily = require(ReplicatedStorage.Shared.Rules.Daily)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Analytics = require(script.Parent.Analytics)
@@ -92,7 +93,8 @@ local function claim(player: Player)
 		Enum.AnalyticsEconomyTransactionType.TimedReward,
 		"DailyStreak"
 	)
-	Net.remote("Popup"):FireClient(player, `DAY {streak} STREAK  +${reward}`, "big")
+	Net.remote("Popup")
+		:FireClient(player, Loc.msg("StreakPay", { n = streak, pay = reward }), "big")
 	send(player, true)
 	task.spawn(Data.saveNow, player)
 end

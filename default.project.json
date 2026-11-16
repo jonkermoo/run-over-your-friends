@@ -11,6 +11,9 @@
     "ReplicatedFirst": {
       "Loading": { "$path": "src/first/Loading.client.luau" }
     },
+    "LocalizationService": {
+      "GameText": { "$path": "src/localization/GameText.csv" }
+    },
     "TextChatService": {
       "$properties": { "ChatVersion": "TextChatService" }
     },

@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Rules = require(ReplicatedStorage.Shared.Rules.Events)
 local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
@@ -118,9 +119,13 @@ local function finishContest()
 		if player and pay then
 			Data.addMoney(player, pay)
 			local label = if p.place <= #Config.ContestPrizes
-				then `{Contest.ordinal(p.place)} IN {c.event.title}!`
-				else "FOR TAKING PART"
-			Net.remote("Popup"):FireClient(player, `+${pay}  {label}`, "big")
+				then Loc.msg(
+					"ContestPlace",
+					{ place = Loc.ordinal(p.place), event = Loc.src(c.event.title) }
+				)
+				else Loc.src("FOR TAKING PART")
+			Net.remote("Popup")
+				:FireClient(player, Loc.msg("ContestPay", { pay = pay, label = label }), "big")
 		end
 	end
 	if #st == 0 then

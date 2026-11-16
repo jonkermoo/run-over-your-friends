@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -211,5 +212,5 @@ Net.remote("ClaimGroup").OnServerEvent:Connect(function(player)
 		"GroupReward"
 	)
 	Net.remote("Popup")
-		:FireClient(player, "+$" .. Economy.GroupReward .. "  Thanks for joining!", "big")
+		:FireClient(player, Loc.msg("GroupPay", { pay = Economy.GroupReward }), "big")
 end)

@@ -23,6 +23,7 @@ local GarageRules = require(ReplicatedStorage.Shared.Rules.Garage)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local LayoutRules = require(ReplicatedStorage.Shared.Rules.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
 local SmashConfig = require(ReplicatedStorage.Shared.Config.Smash)
@@ -97,7 +98,7 @@ local function refreshFriends()
 	local n = (player:GetAttribute("Friends") or 0) :: number
 	local pct =
 		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
-	friendChip.Text = `{n} FRIEND{if n == 1 then "" else "S"} HERE  +{pct}% MONEY`
+	Loc.set(friendChip, if n == 1 then "FriendsHere1" else "FriendsHere", { n = n, pct = pct })
 	friendChip.Visible = n > 0
 	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 98 else 76)
 end
@@ -143,6 +144,7 @@ end
 -- one feed plate: paint colour, text colour, size
 local function plate(text: string, fill: Color3, ink: Color3, size: number, font: Font): TextLabel
 	local l = Style.label(feed, text, size, font, ink)
+	l.AutoLocalize = false -- already in the player's language (popup)
 	l.BackgroundColor3 = fill
 	l.BackgroundTransparency = 0
 	l.AnchorPoint = Vector2.new(1, 0)
@@ -152,12 +154,19 @@ local function plate(text: string, fill: Color3, ink: Color3, size: number, font
 	return l
 end
 
-local function popup(text: string, kind: string)
+-- text: English (matched in the translation table) or a Loc.msg line from the server (src/shared/Loc)
+local function popup(line: string | Loc.Msg, kind: string)
+	local text = Loc.resolve(line)
 	local item: TextLabel
 	local hold = 1.4
 	if kind == "goal" then
-		item =
-			plate(`<font color="#FFD000">GOAL DONE</font>   {text}`, C.panel, C.text, 15, F.heavy)
+		item = plate(
+			`<font color="#FFD000">{Loc.text("GoalDone")}</font>   {text}`,
+			C.panel,
+			C.text,
+			15,
+			F.heavy
+		)
 		item.RichText = true
 		hold = 3
 	elseif kind == "big" then
@@ -402,7 +411,9 @@ local function setRows(rows: { DriveHudRules.Row })
 		end
 	end
 	for i, r in rows do
-		keyRows[i].label.Text = r.label
+		local l = keyRows[i].label
+		l.AutoLocalize = false
+		l.Text = if r.wait then Loc.text("UnstuckWait", { n = r.wait }) else Loc.source(r.label)
 	end
 end
 
@@ -1466,7 +1477,13 @@ local function holdButton(
 	lip.Size = UDim2.new(1, 0, 0, 7)
 	lip.Parent = face
 	local caption = Style.label(face, text, 16, F.display, C.text)
-	caption.Size = UDim2.new(1, 0, 1, -7)
+	caption.Size = UDim2.new(1, -6, 1, -7)
+	caption.Position = UDim2.fromOffset(3, 0)
+	-- a longer word in another language (¿ATORADO?) shrinks to fit the key
+	caption.TextScaled = true
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 16
+	fit.Parent = caption
 	b:GetPropertyChangedSignal("Text"):Connect(function()
 		caption.Text = b.Text
 	end)

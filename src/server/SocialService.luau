@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Social)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Social = require(ReplicatedStorage.Shared.Rules.Social)
 local Analytics = require(script.Parent.Analytics)
@@ -60,10 +61,17 @@ local function checkPair(newcomer: Player, other: Player)
 	publish(newcomer)
 	publish(other)
 	local pct = math.floor(Config.FriendBonusPer * 100 + 0.5)
+	Net.remote("Popup"):FireClient(
+		other,
+		Loc.msg("FriendJoined", { name = newcomer.DisplayName, pct = pct }),
+		"social"
+	)
 	Net.remote("Popup")
-		:FireClient(other, `Your friend {newcomer.DisplayName} joined!  +{pct}% money`, "social")
-	Net.remote("Popup")
-		:FireClient(newcomer, `Your friend {other.DisplayName} is here!  +{pct}% money`, "social")
+		:FireClient(
+			newcomer,
+			Loc.msg("FriendHere", { name = other.DisplayName, pct = pct }),
+			"social"
+		)
 end
 
 -- watch how far `part` flies after `by` launched `victim`, then toast both if it went far enough
@@ -85,9 +93,19 @@ function SocialService.launched(by: Player?, victim: Player?, part: BasePart?)
 			return
 		end
 		if Social.allowToast(toasts, by.UserId, victim.UserId, far, os.clock(), Config) then
-			local mine, theirs = Social.toastText(by.DisplayName, victim.DisplayName, far)
-			Net.remote("Popup"):FireClient(by, mine, "social")
-			Net.remote("Popup"):FireClient(victim, theirs, "social")
+			local n = math.floor(far + 0.5)
+			Net.remote("Popup")
+				:FireClient(
+					by,
+					Loc.msg("YouLaunched", { name = victim.DisplayName, n = n }),
+					"social"
+				)
+			Net.remote("Popup")
+				:FireClient(
+					victim,
+					Loc.msg("LaunchedYou", { name = by.DisplayName, n = n }),
+					"social"
+				)
 		end
 	end)
 end
@@ -100,7 +118,7 @@ local function waitReady(player: Player): boolean
 	return player.Parent ~= nil and player:GetAttribute("DataReady") == true
 end
 
-local function grant(player: Player, amount: number, text: string)
+local function grant(player: Player, amount: number, text: Loc.Msg)
 	local profile = Data.get(player)
 	if not profile or amount <= 0 then
 		return
@@ -139,11 +157,15 @@ local function checkInvite(newcomer: Player)
 	)
 	if forInviter > 0 then
 		mine.invited[tostring(newcomer.UserId)] = true
-		grant(inviter, forInviter, `{newcomer.DisplayName} CAME!  +${forInviter}`)
+		grant(
+			inviter,
+			forInviter,
+			Loc.msg("InviteCame", { name = newcomer.DisplayName, pay = forInviter })
+		)
 	end
 	if forNewcomer > 0 then
 		theirs.welcomed = true
-		grant(newcomer, forNewcomer, `WELCOME BONUS  +${forNewcomer}`)
+		grant(newcomer, forNewcomer, Loc.msg("WelcomeBonus", { pay = forNewcomer }))
 	end
 end
 

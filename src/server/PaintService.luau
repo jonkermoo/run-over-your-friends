@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Paints)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
 local Analytics = require(script.Parent.Analytics)
@@ -32,7 +33,7 @@ local function repaint(player: Player)
 	VehicleBuilder.paint(model, PaintRules.colour(vehicleId, paint), PaintRules.material(paint))
 end
 
-local function popup(player: Player, text: string)
+local function popup(player: Player, text: string | Loc.Msg)
 	Net.remote("Popup"):FireClient(player, text, "info")
 end
 
@@ -84,7 +85,7 @@ local function buyPaint(player: Player, paintId: any)
 	profile.paints[paint.id] = true
 	Data.changed(player)
 	Analytics.spent(player, paint.price, "Paint" .. paint.id)
-	Net.remote("Popup"):FireClient(player, paint.name .. " paint unlocked for every car", "big")
+	Net.remote("Popup"):FireClient(player, Loc.msg("PaintUnlocked", { paint = paint.name }), "big")
 end
 
 function PaintService.start()

@@ -11,7 +11,7 @@ local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
-local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Popups = require(script.Parent.Popups)
@@ -57,6 +57,11 @@ title.Position = UDim2.fromOffset(14, Card.Height / 2)
 title.Size = UDim2.new(1, -28, 0, Card.TitleText + 4)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextTruncate = Enum.TextTruncate.AtEnd
+title.TextScaled = true -- a longer title in another language shrinks before it gets cut
+local titleFit = Instance.new("UITextSizeConstraint")
+titleFit.MaxTextSize = Card.TitleText
+titleFit.MinTextSize = math.ceil(Card.TitleText * 0.6)
+titleFit.Parent = title
 local timer = Style.label(banner, "", Card.TimerText, F.display, C.yellow)
 timer.AnchorPoint = Vector2.new(1, 0.5)
 timer.Position = UDim2.new(1, -14, 0, Card.Height / 2)
@@ -169,6 +174,13 @@ local function showTitle(event: Config.Event)
 	t.Size = UDim2.new(1, 0, 0, 92)
 	t.ZIndex = 2
 	Style.outline(t, 4)
+	-- a longer title in another language shrinks to the 900 px instead of spilling past the screen
+	for _, l in { back, t } do
+		l.TextScaled = true
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = 84
+		fit.Parent = l
+	end
 	local s = Style.label(holder, event.text, 20, F.heavy, C.text)
 	s.BackgroundColor3 = C.ink
 	s.BackgroundTransparency = 0
@@ -222,17 +234,23 @@ local function fillStandings(event: Config.Event, ink: Color3): number
 	contest.TextColor3, contestYou.TextColor3 = ink, ink
 	local lead = s.top[1]
 	if not lead then
+		contest.AutoLocalize = true
 		contest.Text = "NO SCORES YET: BE THE FIRST!"
 		contestYou.Visible = false
 		contest.Size = UDim2.new(1, -28, 0, Card.ContestRow)
 		return Card.ContestRow - 2
 	end
-	local first = `1st {lead.name} {Contest.amount(lead.score, c.unit)}`
-	local mine = if s.place > 0
-		then `YOU: {Contest.ordinal(s.place)} OF {s.count}`
-		else "YOU: NOT SCORED YET"
-	contest.Text = first
-	contestYou.Text = mine
+	Loc.set(contest, "ContestLeader", {
+		place = Loc.ordinal(1),
+		name = lead.name,
+		amount = Loc.amount(lead.score, c.unit),
+	})
+	if s.place > 0 then
+		Loc.set(contestYou, "ContestYou", { place = Loc.ordinal(s.place), count = s.count })
+	else
+		contestYou.AutoLocalize = true
+		contestYou.Text = "YOU: NOT SCORED YET"
+	end
 	contest.Size =
 		UDim2.new(1, -(28 + contestYou.TextBounds.X / Style.scale() + 12), 0, Card.ContestRow)
 	return Card.ContestRow - 2
@@ -318,7 +336,7 @@ local function update()
 		title.Text = event.title
 		title.TextColor3 = ink
 		title.Position = UDim2.fromOffset(14 + pill.AbsoluteSize.X / k + 8, Card.Height / 2)
-		timer.Text = (if phase == "live" then "ENDS " else "IN ") .. fmt(left)
+		Loc.set(timer, if phase == "live" then "EventEnds" else "EventIn", { time = fmt(left) })
 		timer.TextColor3 = ink
 		-- the warning blinks its shadow
 		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0

@@ -14,6 +14,7 @@ local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Particles = require(ReplicatedStorage.Shared.Config.Particles)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -271,6 +272,7 @@ local function announce(word: string, color: Color3, size: number, x: number?, t
 		}
 	do
 		local l = Style.label(slam, word, size, F.display, look[1])
+		l.AutoLocalize = false -- callers pass text already in the player's language (src/shared/Loc)
 		l.Position = UDim2.fromOffset(look[2], look[2])
 		l.Size = UDim2.fromScale(1, 1)
 		l.ZIndex = i
@@ -311,6 +313,7 @@ local function worldText(at: Vector3, text: string, color: Color3)
 	bb.Size = UDim2.fromOffset(size * 8, size * 2)
 	bb.Parent = playerGui
 	local l = Style.label(bb, text, size, F.display, color)
+	l.AutoLocalize = false
 	l.Size = UDim2.fromScale(1, 1)
 	Style.outline(l, 2)
 	local scale = Instance.new("UIScale")
@@ -386,7 +389,9 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 				local hits = math.min(b, Callouts.ComboMaxHits) - 2
 				local word = COMBO_WORDS[i]
 				announce(
-					if word ~= "" then `{b} HITS! {word}` else `{b} HITS!`,
+					if word ~= ""
+						then Loc.text("ComboWord", { n = b, word = Loc.source(word) })
+						else Loc.text("Combo", { n = b }),
 					COMBO_COLORS[i],
 					math.floor(Callouts.ComboSize + hits * Callouts.ComboStep + 0.5)
 				)
@@ -401,11 +406,11 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		play("Yelp", at)
 	elseif kind == "Land" then
 		local studs = math.floor(a)
-		local word, color = `{studs} STUDS!`, C.text
+		local word, color = Loc.text("Studs", { n = studs }), C.text
 		if studs >= 300 then
-			word, color = `{studs} STUDS!! ORBIT!`, C.purple
+			word, color = Loc.text("StudsOrbit", { n = studs }), C.purple
 		elseif studs >= 150 then
-			word, color = `{studs} STUDS! HOME RUN!`, C.gold
+			word, color = Loc.text("StudsHomeRun", { n = studs }), C.gold
 		elseif studs >= 80 then
 			color = C.money
 		end
@@ -442,7 +447,7 @@ end
 -- the money shot, in the middle of the screen, with the till
 function Fx.announceBig(word: string, amount: string)
 	task.delay(Style.stage(Callouts.BigHold), function()
-		announce(word, C.yellow, Callouts.BigSize, 0.5, Callouts.BigTop)
+		announce(Loc.source(word), C.yellow, Callouts.BigSize, 0.5, Callouts.BigTop)
 		announce(amount, C.money, Callouts.BigAmountSize, 0.5, Callouts.BigAmountTop)
 		play("Sting", nil, 0.85)
 		play("Cash", nil, 0.9)

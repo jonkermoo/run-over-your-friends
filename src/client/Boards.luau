@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Leaderboards)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Style = require(script.Parent.Style)
 
@@ -213,7 +214,11 @@ function Boards.start()
 		last = os.clock()
 		local left = endsAt - (os.time() + clockOffset)
 		for _, view in views do
-			view.countdown.Text = if endsAt > 0 then "resets in " .. fmt(left) else ""
+			if endsAt > 0 then
+				Loc.set(view.countdown, "BoardResets", { time = fmt(left) })
+			else
+				view.countdown.Text = ""
+			end
 		end
 	end)
 end

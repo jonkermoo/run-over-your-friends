@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.ServerGoals)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Rules = require(ReplicatedStorage.Shared.Rules.ServerGoals)
 local Analytics = require(script.Parent.Analytics)
@@ -52,7 +53,7 @@ local function send(player: Player?)
 end
 
 -- kind: the feed plate ("goal" reads GOAL DONE first, so a goal that ran out uses "big")
-local function payHelper(player: Player, amount: number, text: string, kind: string)
+local function payHelper(player: Player, amount: number, text: Loc.Msg, kind: string)
 	local profile = Data.get(player)
 	if not profile then
 		return
@@ -68,7 +69,12 @@ local function finish(g: Rules.Goal)
 	local early = EventService.hurry()
 	for _, player in Players:GetPlayers() do
 		if g.helpers[player.UserId] then
-			payHelper(player, Config.Reward, `SERVER GOAL!  +${Config.Reward}`, "goal")
+			payHelper(
+				player,
+				Config.Reward,
+				Loc.msg("ServerGoalPay", { pay = Config.Reward }),
+				"goal"
+			)
 		end
 		Net.remote("Celebrate"):FireClient(
 			player,
@@ -89,15 +95,15 @@ local function timeUp(g: Rules.Goal)
 	for _, player in Players:GetPlayers() do
 		local helped = g.helpers[player.UserId] == true
 		if pay > 0 and helped then
-			payHelper(player, pay, `SO CLOSE!  +${pay}`, "big")
+			payHelper(player, pay, Loc.msg("SoClosePay", { pay = pay }), "big")
 		end
 		Net.remote("Celebrate"):FireClient(
 			player,
 			if pay > 0 then "SO CLOSE!" else "TIME'S UP!",
 			if pay > 0 and helped
-				then `Server goal {score}. You still get +${pay} for helping!`
-				elseif pay > 0 then `Server goal {score}. Helpers get +${pay}. Join the next one!`
-				else `Server goal {score}. The next one starts soon!`
+				then Loc.msg("ServerGoalHelped", { score = score, pay = pay })
+				elseif pay > 0 then Loc.msg("ServerGoalHelpers", { score = score, pay = pay })
+				else Loc.msg("ServerGoalSoon", { score = score })
 		)
 	end
 end

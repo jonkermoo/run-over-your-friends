@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
@@ -64,11 +65,15 @@ local function grant(player: Player, product: Products.Product): boolean
 	end
 	Data.changed(player)
 	Analytics.source(player, product.money, Enum.AnalyticsEconomyTransactionType.IAP, product.key)
-	local extra = if #names > 0 then ` + the {table.concat(names, " + the ")}` else ""
 	Net.remote("Celebrate"):FireClient(
 		player,
 		string.upper(product.title) .. "!",
-		`+{money(product.money)}{extra}. Thanks for the support!`
+		if #names > 0
+			then Loc.msg(
+				"ProductThanksExtra",
+				{ money = money(product.money), items = table.concat(names, " + ") }
+			)
+			else Loc.msg("ProductThanks", { money = money(product.money) })
 	)
 	return true
 end

@@ -10,6 +10,7 @@ local TweenService = game:GetService("TweenService")
 
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
@@ -255,12 +256,15 @@ function NpcService.knock(
 			pay *= Economy.RookieMultiplier
 		end
 		Data.addMoney(player, pay)
-		local text = "+$" .. tostring(math.floor(pay + 0.5))
+		local text: string | Loc.Msg = "+$" .. tostring(math.floor(pay + 0.5))
 		if combo.count > 1 then
-			text ..= `  x{string.format(
-				"%.1f",
-				Impact.comboMultiplier(combo.count, Economy.ComboStep, Economy.ComboMax)
-			)} COMBO`
+			text = Loc.msg("HitCombo", {
+				pay = math.floor(pay + 0.5),
+				mult = string.format(
+					"%.1f",
+					Impact.comboMultiplier(combo.count, Economy.ComboStep, Economy.ComboMax)
+				),
+			})
 		end
 		Net.remote("Popup"):FireClient(player, text, "money")
 		for _, listener in knockListeners do
@@ -544,7 +548,7 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 				* SocialService.multiplier(player)
 		)
 		Data.addMoney(player, pay)
-		Net.remote("Popup"):FireClient(player, `+${pay}  GIANT HIT!`, "big")
+		Net.remote("Popup"):FireClient(player, Loc.msg("GiantHitPay", { pay = pay }), "big")
 		Net.remote("Fx"):FireAllClients("Hit", root.Position, 1, 0, player.UserId)
 		return
 	end
@@ -552,8 +556,11 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 		Data.addMoney(player, EventConfig.GiantToppleBonus)
 		Analytics.custom(player, "GiantToppled")
 		for _, everyone in Players:GetPlayers() do
-			Net.remote("Celebrate")
-				:FireClient(everyone, "GIANT TOPPLED!", `{player.DisplayName} brought it down.`)
+			Net.remote("Celebrate"):FireClient(
+				everyone,
+				"GIANT TOPPLED!",
+				Loc.msg("GiantToppledSub", { name = player.DisplayName })
+			)
 		end
 	end
 	-- the toppling hit throws the giant like any other fling, never softer than the softest

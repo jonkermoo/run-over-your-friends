@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Guide = require(script.Parent.Guide)
 local Sfx = require(script.Parent.Sfx)
@@ -126,8 +127,8 @@ local function arrived(stats: Vehicles.Vehicle)
 		Guide.celebrate(
 			"NEW RIDE!",
 			if garage and garage.Visible
-				then `{stats.name} is yours. Tap SPAWN to drive it!`
-				else `{stats.name} is yours. Open the GARAGE to drive it!`
+				then Loc.msg("NewRideTouch", { car = stats.name })
+				else Loc.msg("NewRideKeys", { car = stats.name })
 		)
 	end)
 end

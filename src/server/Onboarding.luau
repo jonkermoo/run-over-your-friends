@@ -8,6 +8,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Rules = require(ReplicatedStorage.Shared.Rules.Onboarding)
@@ -80,7 +81,11 @@ local function cheer(player: Player, done: number)
 			Enum.AnalyticsEconomyTransactionType.Onboarding,
 			"Tutorial" .. done
 		)
-		Net.remote("Popup"):FireClient(player, `{Onboarding.Cheers[done]}  +${amount}`, "big")
+		Net.remote("Popup"):FireClient(
+			player,
+			Loc.msg("CheerPay", { cheer = Loc.src(Onboarding.Cheers[done]), amount = amount }),
+			"big"
+		)
 	end
 	if FUNNEL[done] then
 		Analytics.step(player, FUNNEL[done])
@@ -154,7 +159,7 @@ function OnboardingService.start()
 			Net.remote("Celebrate"):FireClient(
 				player,
 				"FIRST RAMPAGE!",
-				`+${Onboarding.HitsReward} bonus. Now find a ramp and send it!`
+				Loc.msg("FirstRampageSub", { n = Onboarding.HitsReward })
 			)
 			moveOn(player, Steps.Hits)
 		end

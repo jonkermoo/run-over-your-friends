@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local DailyConfig = require(ReplicatedStorage.Shared.Config.Daily)
@@ -244,10 +245,16 @@ tip.TextWrapped = true
 tip.TextXAlignment = Enum.TextXAlignment.Left
 local tipToken = 0
 
+-- a line in the player's language: English text (matched in the table) or a Loc.msg (src/shared/Loc)
+local function say(l: TextLabel, text: string | Loc.Msg)
+	l.AutoLocalize = false
+	l.Text = Loc.resolve(text)
+end
+
 local function showTip(text: string)
 	tipToken += 1
 	local mine = tipToken
-	tip.Text = text
+	say(tip, text)
 	tipBox.Visible = true
 	task.delay(7, function()
 		if tipToken == mine then
@@ -261,9 +268,10 @@ cheer.SoundId = "rbxasset://sounds/electronicpingshort.wav"
 cheer.Volume = 0.8
 cheer.Parent = gui
 
-local function showCelebrate(title: string, subtitle: string)
+local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg)
 	cheer:Play()
-	local t = label(gui, title, Callouts.CheerSize, BOLD, GOLD)
+	local t = label(gui, "", Callouts.CheerSize, BOLD, GOLD)
+	say(t, title)
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop)
 	t.Size = UDim2.fromOffset(760, Callouts.CheerSize + 10)
@@ -273,7 +281,8 @@ local function showCelebrate(title: string, subtitle: string)
 	scale.Scale = 0.3
 	scale.Parent = t
 	-- the subtitle on a black paint strip
-	local s = label(gui, subtitle, Callouts.CheerSubSize, F.heavy, WHITE)
+	local s = label(gui, "", Callouts.CheerSubSize, F.heavy, WHITE)
+	say(s, subtitle)
 	s.BackgroundColor3 = INK
 	s.BackgroundTransparency = 0
 	s.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -318,7 +327,8 @@ local function showCelebrate(title: string, subtitle: string)
 end
 
 -- waits its turn for the middle of the screen (Style.stage) so two moments never land at once
-local function celebrate(title: string, subtitle: string)
+-- title, subtitle: English text or Loc.msg lines (the server sends either)
+local function celebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg)
 	task.delay(Style.stage(Callouts.CheerHold), showCelebrate, title, subtitle)
 end
 Guide.celebrate = celebrate -- client/NewRide's cheer after the turntable
@@ -512,7 +522,10 @@ local function showTarget(target: Target?, root: BasePart?)
 		edgeText.Position = UDim2.new(0.5, -math.cos(away) * gap, 0.5, -math.sin(away) * gap)
 		paint(edgeBars, target.color)
 		local metres = (target.at - root.Position).Magnitude / Vehicles.StudsPerMetre
-		edgeText.Text = `{target.text} {math.floor(metres)}M`
+		say(
+			edgeText,
+			Loc.msg("EdgeDistance", { text = Loc.src(target.text), m = math.floor(metres) })
+		)
 	end
 end
 
@@ -656,13 +669,13 @@ local function update()
 		end
 		glowGarage = true
 		pressTarget = garageButton
-		hintText.Text = "Spawn your car from the GARAGE"
+		say(hintText, "Spawn your car from the GARAGE")
 		hintText.Visible = true
 		return true
 	end
 
 	if stepValue == Steps.Spawn then
-		goalText.Text = "Spawn your Hatchback from the GARAGE"
+		say(goalText, "Spawn your Hatchback from the GARAGE")
 		barFill.Size = UDim2.fromScale(0, 1)
 		glowGarage = true
 		glowCard = Vehicles.Starter
@@ -670,11 +683,11 @@ local function update()
 			pressTarget = garageButton
 		end
 		if stuck then
-			hintText.Text = "Tap GARAGE at the top left, then SPAWN"
+			say(hintText, "Tap GARAGE at the top left, then SPAWN")
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Hits then
-		goalText.Text = `Run over {Onboarding.HitsGoal} people!   {count} / {Onboarding.HitsGoal}`
+		say(goalText, Loc.msg("GuideHits", { goal = Onboarding.HitsGoal, n = count }))
 		barFill.Size = UDim2.fromScale(math.clamp(count / Onboarding.HitsGoal, 0, 1), 1)
 		local ped = root and nearestPedestrian(root.Position)
 		if ped then
@@ -682,16 +695,19 @@ local function update()
 		end
 		if not driving then
 			glowGarage = true
-			hintText.Text = "Spawn your car from the GARAGE"
+			say(hintText, "Spawn your car from the GARAGE")
 			hintText.Visible = stuck
 		elseif stuck then
-			hintText.Text = if touch
-				then "Use the thumbstick to drive at the arrow"
-				else "Hold W to drive, A/D to steer. Aim for the arrow!"
+			say(
+				hintText,
+				if touch
+					then "Use the thumbstick to drive at the arrow"
+					else "Hold W to drive, A/D to steer. Aim for the arrow!"
+			)
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Ramp then
-		goalText.Text = "Take a RAMP and land the jump!"
+		say(goalText, "Take a RAMP and land the jump!")
 		barFill.Size = UDim2.fromScale(0, 1)
 		if root then
 			rampTarget = nearestRamp(root.Position, rampTarget)
@@ -710,12 +726,17 @@ local function update()
 			end
 		end
 		if not needCar() and stuck then
-			hintText.Text = "Follow the beam, then drive up the ramp as fast as you can"
+			say(hintText, "Follow the beam, then drive up the ramp as fast as you can")
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Smash then
-		goalText.Text =
-			`Smash a building!   {math.min(count, Onboarding.SmashGoal)} / {Onboarding.SmashGoal} pieces`
+		say(
+			goalText,
+			Loc.msg(
+				"GuideSmash",
+				{ n = math.min(count, Onboarding.SmashGoal), goal = Onboarding.SmashGoal }
+			)
+		)
 		barFill.Size = UDim2.fromScale(math.clamp(count / Onboarding.SmashGoal, 0, 1), 1)
 		if root then
 			buildingTarget = nearestBuilding(root.Position, buildingTarget)
@@ -730,11 +751,11 @@ local function update()
 			end
 		end
 		if not needCar() and stuck then
-			hintText.Text = "Hit the walls at full speed"
+			say(hintText, "Hit the walls at full speed")
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Goal then
-		goalText.Text = `Open GOALS and claim your first ${Onboarding.Rewards[Steps.Goal]}`
+		say(goalText, Loc.msg("GuideGoal", { reward = Onboarding.Rewards[Steps.Goal] }))
 		barFill.Size = UDim2.fromScale(0, 1)
 		if sheetOpen then
 			pressTarget = goalsGui and goalsGui:FindFirstChild("TutorialClaim", true) :: GuiObject?
@@ -747,16 +768,21 @@ local function update()
 		local car, price = cheapestCar()
 		local cash = (player:GetAttribute("Money") or 0) :: number
 		if not car then
-			goalText.Text = "Buy a new ride from the GARAGE"
+			say(goalText, "Buy a new ride from the GARAGE")
 			barFill.Size = UDim2.fromScale(0, 1)
 		elseif cash >= price then
-			goalText.Text = `Buy your next ride: {car.name} for {Style.money(price)}`
+			say(goalText, Loc.msg("GuideBuyNext", { car = car.name, price = Style.money(price) }))
 			barFill.Size = UDim2.fromScale(1, 1)
 		else
-			goalText.Text =
-				`Save up for the {car.name}:  {Style.money(cash)} / {Style.money(price)}`
+			say(
+				goalText,
+				Loc.msg(
+					"GuideSaveUp",
+					{ car = car.name, cash = Style.money(cash), price = Style.money(price) }
+				)
+			)
 			barFill.Size = UDim2.fromScale(math.clamp(cash / price, 0, 1), 1)
-			hintText.Text = "Keep hitting people for cash, or SKIP this for now"
+			say(hintText, "Keep hitting people for cash, or SKIP this for now")
 			hintText.Visible = stuck
 		end
 		if car and cash >= price then
@@ -774,14 +800,19 @@ local function update()
 		local left = if typeof(endsAt) == "number" then endsAt - workspace:GetServerTimeNow() else 0
 		local waited = os.clock() - stepEntered
 		if phase == "live" and event then
-			goalText.Text = `{event.title} is LIVE! Hit, smash or jump to join`
+			say(goalText, Loc.msg("GuideEventLive", { event = Loc.src(event.title) }))
 			barFill.Size = UDim2.fromScale(1, 1)
 		elseif phase == "warn" and event then
-			goalText.Text = `{event.title} starts in {clock(left)}. Get ready!`
+			say(
+				goalText,
+				Loc.msg("GuideEventSoon", { event = Loc.src(event.title), time = clock(left) })
+			)
 			barFill.Size = UDim2.fromScale(1 - math.clamp(left / EventConfig.WarnSeconds, 0, 1), 1)
 		else
-			goalText.Text =
-				`Events show up here. Next one in {clock(left + EventConfig.WarnSeconds)}`
+			say(
+				goalText,
+				Loc.msg("GuideEventNext", { time = clock(left + EventConfig.WarnSeconds) })
+			)
 			barFill.Size = UDim2.fromScale(math.clamp(waited / Onboarding.EventWait, 0, 1), 1)
 		end
 		local signs = playerGui:FindFirstChild("EventBanner")
