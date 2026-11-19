@@ -26,6 +26,9 @@ Net.Messages = table.freeze({
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
 	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
+	-- (kind: "Open" | "View" | "Offer" | "State" | "Ready", a, b): client-only facts for analytics, each value
+	-- from a fixed set in Config/Analytics (server/Analytics checks and rate-limits them)
+	Track = "Track",
 	-- server -> client
 	FriendNames = "FriendNames", -- ({ [friendKey: string]: name }): names of this player's own friends in the crowd (FriendKey attribute)
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
@@ -83,6 +86,7 @@ export type MessageName =
 	| "SetMusic"
 	| "Podium"
 	| "ServerGoal"
+	| "Track"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

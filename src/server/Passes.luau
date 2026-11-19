@@ -84,12 +84,12 @@ function Passes.start()
 		task.spawn(check, p)
 	end
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, bought)
-		if not bought then
-			return
-		end
 		for name, id in Economy.Passes do
 			if id == passId then
-				grant(player, name, true)
+				Analytics.promptDone(player, "Pass:" .. name, bought == true)
+				if bought then
+					grant(player, name, true)
+				end
 			end
 		end
 	end)
@@ -103,13 +103,16 @@ function Passes.start()
 		end
 		local id = Economy.Passes[name]
 		if id ~= 0 then
+			Analytics.prompted(player, "Pass:" .. name)
 			MarketplaceService:PromptGamePassPurchase(player, id)
 		elseif RunService:IsStudio() then
 			-- test toggle until the pass exists
 			if Passes.has(player, name) then
 				player:SetAttribute("Pass" .. name, false)
 			else
+				Analytics.prompted(player, "Pass:" .. name)
 				grant(player, name)
+				Analytics.promptDone(player, "Pass:" .. name, true)
 			end
 		else
 			Net.remote("Popup"):FireClient(player, "Coming soon", "info")

@@ -98,6 +98,15 @@ function ProductService.start()
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
+	-- the prompt's answer, for the purchase funnel (granting stays in ProcessReceipt)
+	MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, bought)
+		local player = Players:GetPlayerByUserId(userId)
+		local product = byId[productId]
+		if player and product then
+			Analytics.promptDone(player, "Product:" .. product.key, bought == true)
+		end
+	end)
+
 	Net.remote("BuyProduct").OnServerEvent:Connect(function(player, key)
 		if not RateLimit.allow(player, "product", 1) then
 			return
@@ -111,10 +120,14 @@ function ProductService.start()
 		then
 			return
 		end
+		local item = "Product:" .. product.key
 		if product.id ~= 0 then
+			Analytics.prompted(player, item)
 			MarketplaceService:PromptProductPurchase(player, product.id)
 		elseif RunService:IsStudio() then
+			Analytics.prompted(player, item)
 			grant(player, product) -- test purchase until the product exists
+			Analytics.promptDone(player, item, true)
 		else
 			Net.remote("Popup"):FireClient(player, "Coming soon", "info")
 		end

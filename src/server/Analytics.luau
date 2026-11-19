@@ -1,12 +1,31 @@
 --!strict
--- Roblox analytics (Creator Hub > Analytics): the first-session funnel, money in and out, and a few
--- custom events. Every call is wrapped so analytics can never break the game. Money earned by playing
--- is added up and sent once a minute per player, so busy players don't flood the economy log.
+-- Roblox analytics (Creator Hub > Analytics): the first-session funnel, money in and out, and custom events
+-- for the purchase funnel, joins and leaves, load time, goals and live events (all listed in docs/ANALYTICS.md).
+-- Every call is wrapped so analytics can never break the game. Money earned by playing is added up and sent
+-- once a minute per player, so busy players don't flood the economy log. Client-only facts (store opened, item
+-- viewed, the offer cards, menu / idle state, load time and device) come in on Net "Track", each value checked
+-- against a fixed set in Config/Analytics and rate-limited. Custom fields: 01 and 02 per event, 03 the device.
 
 local AnalyticsService = game:GetService("AnalyticsService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Cfg = require(ReplicatedStorage.Shared.Config.Analytics)
+local Net = require(ReplicatedStorage.Shared.Net)
+local Offer = require(ReplicatedStorage.Shared.Rules.Offer)
+local Products = require(ReplicatedStorage.Shared.Config.Products)
+local Rules = require(ReplicatedStorage.Shared.Rules.Analytics)
+local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 local Analytics = {}
+
+-- in Studio every custom event is also printed, so a play test shows what would be sent
+local echo = RunService:IsStudio()
+
+local F1 = Enum.AnalyticsCustomFieldKeys.CustomField01.Name
+local F2 = Enum.AnalyticsCustomFieldKeys.CustomField02.Name
+local F3 = Enum.AnalyticsCustomFieldKeys.CustomField03.Name
 
 -- the first-session funnel, in order
 Analytics.Steps = table.freeze({
@@ -37,6 +56,23 @@ local STEP_NAMES = {
 local reached: { [Player]: { [number]: boolean } } = {}
 local pendingEarn: { [Player]: number } = {}
 
+-- per player, for this session
+type Session = {
+	joinedAt: number, -- os.clock
+	playersAtJoin: number,
+	joinLogged: boolean,
+	ready: boolean, -- the client's Ready came in
+	device: string,
+	state: string, -- Config/Analytics States, from the client
+	where: string, -- where the next purchase comes from: Store, Garage, Starter, Upsell, Other
+	prompts: { [string]: string }, -- item -> where, for prompts not answered yet
+	viewed: { [string]: boolean },
+	eventRun: number, -- the live event run this player last took part in
+	bucket: Rules.Bucket,
+}
+local sessions: { [Player]: Session } = {}
+local eventRun = 0
+
 local function safe(f: () -> ())
 	local ok, err = pcall(f)
 	if not ok then
@@ -46,6 +82,45 @@ end
 
 local function balance(player: Player): number
 	return math.floor((player:GetAttribute("Money") or 0) :: number)
+end
+
+local function session(player: Player): Session
+	local s = sessions[player]
+	if not s then
+		s = {
+			joinedAt = os.clock(),
+			playersAtJoin = #Players:GetPlayers(),
+			joinLogged = false,
+			ready = false,
+			device = "Unknown",
+			state = "Active",
+			where = "Other",
+			prompts = {},
+			viewed = {},
+			eventRun = 0,
+			bucket = { tokens = Cfg.TrackBurst, at = os.clock() },
+		}
+		sessions[player] = s
+	end
+	return s
+end
+
+-- a custom event with up to two fixed-set fields; field 03 is always the player's device
+local function log(player: Player, name: string, value: number, f1: string?, f2: string?)
+	local s = session(player)
+	local fields = { [F3] = s.device }
+	if f1 then
+		fields[F1] = f1
+	end
+	if f2 then
+		fields[F2] = f2
+	end
+	if echo then
+		print(`[analytics] {name} value={value} f1={f1 or "-"} f2={f2 or "-"} device={s.device}`)
+	end
+	safe(function()
+		AnalyticsService:LogCustomEvent(player, name, value, fields :: any)
+	end)
 end
 
 -- each step once per session
@@ -59,6 +134,9 @@ function Analytics.step(player: Player, step: number)
 		return
 	end
 	seen[step] = true
+	if echo then
+		print(`[analytics] funnel step {step} {STEP_NAMES[step]}`)
+	end
 	safe(function()
 		AnalyticsService:LogOnboardingFunnelStepEvent(player, step, STEP_NAMES[step])
 	end)
@@ -136,9 +214,194 @@ function Analytics.custom(
 	end)
 end
 
+---------------- joins and leaves
+
+local function logJoin(player: Player)
+	local s = session(player)
+	if s.joinLogged then
+		return
+	end
+	s.joinLogged = true
+	log(
+		player,
+		"PlayerJoined",
+		s.playersAtJoin,
+		Rules.countBucket(s.playersAtJoin, Cfg.PlayerBuckets)
+	)
+end
+
+local function driving(player: Player): boolean
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	local seat = humanoid and humanoid.SeatPart
+	return seat ~= nil and seat.Name == "DriverSeat"
+end
+
+-- the server's player count (the leaver included), how long they played and what they were doing
+local function logLeave(player: Player)
+	local s = session(player)
+	logJoin(player) -- left before the client was ready: the join still counts
+	local minutes = (os.clock() - s.joinedAt) / 60
+	local rounded = math.floor(minutes * 10 + 0.5) / 10
+	local span = Rules.rangeBucket(minutes, Cfg.MinuteBuckets)
+	local hitAt = player:GetAttribute("HitAt") -- PlayerHitService: when another player's car last flung them
+	local activity = Rules.activity({
+		driving = driving(player),
+		menu = s.state == "Menu",
+		idle = s.state == "Idle",
+		wreckedAgo = if typeof(hitAt) == "number"
+			then workspace:GetServerTimeNow() - hitAt
+			else nil,
+	}, Cfg)
+	log(
+		player,
+		"PlayerLeft",
+		rounded,
+		Rules.countBucket(#Players:GetPlayers(), Cfg.PlayerBuckets),
+		span
+	)
+	log(player, "LeftWhile", rounded, activity, span)
+end
+
+---------------- the purchase funnel: store opened -> item viewed -> prompt shown -> bought / cancelled
+-- items: "Product:<key>" (Config/Products), "Pass:<name>" (Config/Economy Passes), "Car:<vehicle id>"
+
+-- a Robux purchase prompt is about to show
+function Analytics.prompted(player: Player, item: string)
+	safe(function()
+		local s = session(player)
+		s.prompts[item] = s.where
+		log(player, "PurchasePrompted", 1, item, s.where)
+	end)
+end
+
+-- the prompt closed (MarketplaceService's finished signals): bought, or closed without buying
+function Analytics.promptDone(player: Player, item: string, bought: boolean)
+	safe(function()
+		local s = session(player)
+		local where = s.prompts[item] or s.where
+		s.prompts[item] = nil
+		log(player, if bought then "PurchaseBought" else "PurchaseCancelled", 1, item, where)
+	end)
+end
+
+-- a vehicle bought with game money (no prompt: bought straight from the garage)
+function Analytics.boughtWithMoney(player: Player, vehicleId: string, price: number)
+	safe(function()
+		log(player, "PurchaseBought", math.floor(price), "Car:" .. vehicleId, session(player).where)
+	end)
+end
+
+-- before a car bought with game money: is it the player's first? Cars from the Roadster pass or the Starter
+-- Pack don't count as bought
+function Analytics.isFirstCar(
+	owned: { [string]: boolean },
+	roadsterPass: boolean,
+	bought: { [string]: boolean }
+): boolean
+	local gifted: { [string]: boolean } = {}
+	if roadsterPass then
+		gifted.Roadster = true
+	end
+	if bought[Offer.onceKey(Products.Starter)] then
+		for _, id in Products.Starter.vehicles or {} do
+			gifted[id] = true
+		end
+	end
+	return Rules.firstBought(owned, Vehicles.Starter, gifted)
+end
+
+-- the first vehicle the player bought beyond the starter, and their total minutes played until then
+function Analytics.firstVehicle(player: Player, vehicleId: string, playSeconds: number)
+	safe(function()
+		local minutes = playSeconds / 60
+		log(
+			player,
+			"FirstVehicleBought",
+			math.floor(minutes + 0.5),
+			vehicleId,
+			Rules.rangeBucket(minutes, Cfg.PlayMinuteBuckets)
+		)
+	end)
+end
+
+-- an hourly or daily goal reached and paid (set: "Hourly" | "Daily", kind: the goal template's kind)
+function Analytics.goal(player: Player, set: string, kind: string)
+	safe(function()
+		log(player, "GoalClaimed", 1, kind, set)
+	end)
+end
+
+-- a hit, smash or stunt while an event is live counts as joining it, once per event run
+function Analytics.tookPart(player: Player)
+	safe(function()
+		local key = workspace:GetAttribute("Event")
+		local s = sessions[player]
+		if typeof(key) ~= "string" or not s or s.eventRun == eventRun then
+			return
+		end
+		s.eventRun = eventRun
+		log(player, "EventJoined", 1, key)
+	end)
+end
+
+---------------- client-only facts (Net "Track")
+
+local function onTrack(player: Player, kind: any, a: any, b: any, c: any)
+	local s = sessions[player] -- none once the player has left: a late message is dropped
+	if not s or not Rules.take(s.bucket, os.clock(), Cfg) then
+		return
+	end
+	if kind == "Open" and Rules.oneOf(Cfg.Sheets, a) then
+		s.where = a
+		log(player, "StoreOpened", 1, a)
+	elseif kind == "View" and Rules.oneOf(Cfg.Sheets, a) then
+		local item: string? = nil
+		if a == "Garage" and typeof(b) == "string" and Vehicles.ById[b] then
+			item = "Car:" .. b
+		elseif a == "Store" and Rules.oneOf(Cfg.StoreSections, b) then
+			item = "Section:" .. b
+		end
+		if item and not s.viewed[item] then
+			s.viewed[item] = true
+			log(player, "ItemViewed", 1, item, a)
+		end
+	elseif kind == "Offer" and Rules.oneOf(Cfg.Offers, a) and Rules.oneOf(Cfg.OfferStages, b) then
+		if b == "Pressed" then
+			s.where = a
+		end
+		log(player, "OfferPopup", 1, a, b)
+	elseif kind == "State" and Rules.oneOf(Cfg.States, a) then
+		s.state = a
+	elseif kind == "Ready" and not s.ready and Rules.oneOf(Cfg.Devices, a) then
+		s.ready = true
+		s.device = a
+		local seconds = Rules.seconds(b, Cfg.MaxLoadSeconds)
+		if seconds then
+			log(
+				player,
+				"LoadTime",
+				math.floor(seconds * 10 + 0.5) / 10,
+				Rules.rangeBucket(seconds, Cfg.LoadBuckets),
+				if c == true then "Ready" else "Timeout"
+			)
+		end
+		logJoin(player)
+	end
+end
+
 function Analytics.start()
 	local function onPlayer(player: Player)
+		session(player)
 		Analytics.step(player, Analytics.Steps.Joined)
+		-- no Ready from the client in time: log the join anyway
+		task.delay(Cfg.ReadyWaitSeconds, function()
+			if player.Parent and sessions[player] then
+				safe(function()
+					logJoin(player)
+				end)
+			end
+		end)
 	end
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, p in Players:GetPlayers() do
@@ -146,7 +409,27 @@ function Analytics.start()
 	end
 	Players.PlayerRemoving:Connect(function(p)
 		flushEarn(p)
+		safe(function()
+			logLeave(p)
+		end)
 		reached[p] = nil
+		sessions[p] = nil
+	end)
+	Net.remote("Track").OnServerEvent:Connect(function(player, kind, a, b, c)
+		safe(function()
+			onTrack(player, kind, a, b, c)
+		end)
+	end)
+	-- each live event: who was in the server when it started (EventSeen); EventJoined counts who took part
+	workspace:GetAttributeChangedSignal("Event"):Connect(function()
+		local key = workspace:GetAttribute("Event")
+		if typeof(key) ~= "string" then
+			return
+		end
+		eventRun += 1
+		for _, p in Players:GetPlayers() do
+			log(p, "EventSeen", 1, key)
+		end
 	end)
 	task.spawn(function()
 		while true do

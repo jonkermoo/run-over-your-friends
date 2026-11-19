@@ -82,6 +82,11 @@ local function isBusy(): boolean
 	return false
 end
 
+-- a menu or card is open over the game (client/Track: what a player was doing when they left)
+function Popups.busy(): boolean
+	return isBusy()
+end
+
 local function tick()
 	local now = os.clock()
 	local s = Drive.state

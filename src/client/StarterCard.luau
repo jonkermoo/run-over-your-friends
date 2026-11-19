@@ -19,6 +19,7 @@ local Products = require(ReplicatedStorage.Shared.Config.Products)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Pad = require(script.Parent.Pad)
 local Style = require(script.Parent.Style)
+local Track = require(script.Parent.Track)
 
 local StarterCard = {}
 
@@ -287,6 +288,7 @@ local function build(gui: ScreenGui, preview: Preview)
 
 	buy.Activated:Connect(function()
 		local product = StarterCard.current()
+		Track.offer("Starter", "Pressed")
 		StarterCard.hide()
 		Net.waitFor("BuyProduct"):FireServer(product.key)
 	end)
@@ -347,6 +349,7 @@ function StarterCard.show(closed: (() -> ())?)
 	scale.Scale = 0.8
 	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	card.Visible = true
+	Track.offer("Starter", "Shown")
 end
 
 -- the store's banner: its line, the deal's % off, struck-through full price and countdown, and the price

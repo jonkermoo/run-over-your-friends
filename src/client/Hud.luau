@@ -859,6 +859,8 @@ local function choose(id: string)
 		chosenId = id
 		refreshCards()
 	end
+	-- client/Track is required where it's used: this file is at Luau's limit of 200 top-level locals
+	require(script.Parent.Track).viewed("Garage", id)
 end
 
 for _, stats in Vehicles.List do
@@ -1630,6 +1632,9 @@ local function visibleSections(): { Section }
 end
 
 local function markSection(s: Section)
+	if store.Visible then
+		require(script.Parent.Track).viewed("Store", s.key)
+	end
 	pageTitle.Text = s.title
 	for _, other in SECTIONS do
 		local t = other.tab
@@ -1846,6 +1851,9 @@ local offerKey = ""
 local offerIsUpsell = false -- the "can't afford it" card, which a successful buy closes
 offerBuy.Activated:Connect(function()
 	offer.Visible = false
+	if offerIsUpsell then
+		require(script.Parent.Track).offer("Upsell", "Pressed")
+	end
 	Net.waitFor("BuyProduct"):FireServer(offerKey)
 end)
 offerNo.Activated:Connect(function()
@@ -1899,6 +1907,7 @@ offerFor = function(stats: Vehicles.Vehicle)
 	scale.Scale = 0.8
 	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 	offer.Visible = true
+	require(script.Parent.Track).offer("Upsell", "Shown")
 end
 
 -- the Starter Pack ad waits until the player has had a proper go: Products.StarterOfferAfter seconds
@@ -1943,6 +1952,8 @@ garageButton.Activated:Connect(function()
 	else
 		refreshCards()
 		open(garage)
+		require(script.Parent.Track).opened("Garage")
+		require(script.Parent.Track).viewed("Garage", chosenId)
 	end
 end)
 storeButton.Activated:Connect(function()
@@ -1951,6 +1962,7 @@ storeButton.Activated:Connect(function()
 		store.Visible = false
 	else
 		refreshStore()
+		require(script.Parent.Track).opened("Store")
 		open(store)
 	end
 end)

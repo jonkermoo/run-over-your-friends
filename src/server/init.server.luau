@@ -135,6 +135,13 @@ VehicleService.onSpawn(function(player, id)
 end)
 NpcService.onKnock(function(player)
 	Analytics.step(player, Analytics.Steps.FirstHit)
+	Analytics.tookPart(player)
+end)
+BuildingService.onBreak(function(player)
+	Analytics.tookPart(player)
+end)
+StuntService.onStunt(function(player)
+	Analytics.tookPart(player)
 end)
 
 -- shop: buy a vehicle with in-game money (the Roadster can also come from its pass)
@@ -152,11 +159,18 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 		Net.remote("Popup"):FireClient(player, "Not enough money yet", "info")
 		return
 	end
+	-- for analytics only, so it can never stop the purchase
+	local checked, first =
+		pcall(Analytics.isFirstCar, profile.owned, profile.roadsterPassPaid, profile.bought)
 	profile.money -= price
 	profile.owned[stats.id] = true
 	Data.changed(player)
 	Analytics.spent(player, price, stats.id)
 	Analytics.step(player, Analytics.Steps.FirstPurchase)
+	Analytics.boughtWithMoney(player, stats.id, price)
+	if checked and first then
+		Analytics.firstVehicle(player, stats.id, Data.playSeconds(player))
+	end
 	OnboardingService.purchased(player, stats)
 end)
 

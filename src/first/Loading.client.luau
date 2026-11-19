@@ -308,6 +308,9 @@ end)
 while not ready and os.clock() - shownAt < Config.Timeout do
 	task.wait(0.1)
 end
+-- for analytics (client/Track): seconds from client start to spawn-ready, and whether it got there in time
+ReplicatedFirst:SetAttribute("LoadReady", ready)
+ReplicatedFirst:SetAttribute("LoadSeconds", time())
 local left = Config.MinShow - (os.clock() - shownAt)
 if left > 0 then
 	task.wait(left)

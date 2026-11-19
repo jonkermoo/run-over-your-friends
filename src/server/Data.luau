@@ -33,6 +33,7 @@ export type Profile = {
 	welcomed: boolean, -- got the welcome bonus for joining from an invite
 	musicOff: boolean, -- turned the background music off (client/Music)
 	starterDealEnds: number, -- os.time the Starter Pack discount ends; 0 = not started (Config/Products)
+	playSeconds: number, -- seconds played in all sessions, counted up to the last save (analytics)
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -48,6 +49,17 @@ local profiles: { [Player]: Profile } = {}
 local loadFailed: { [Player]: boolean } = {}
 local saving: { [Player]: boolean } = {}
 local inFlight = 0
+local playCounted: { [Player]: number } = {} -- os.clock up to which play time is in profile.playSeconds
+
+-- add the play time since it was last counted
+local function countPlay(player: Player, p: Profile)
+	local since = playCounted[player]
+	if since then
+		local t = os.clock()
+		p.playSeconds += t - since
+		playCounted[player] = t
+	end
+end
 
 local function default(): Profile
 	return {
@@ -67,6 +79,7 @@ local function default(): Profile
 		welcomed = false,
 		musicOff = false,
 		starterDealEnds = 0,
+		playSeconds = 0,
 	}
 end
 
@@ -118,6 +131,16 @@ function Data.get(player: Player): Profile?
 	return profiles[player]
 end
 
+-- seconds played in all sessions, this one included
+function Data.playSeconds(player: Player): number
+	local p = profiles[player]
+	if not p then
+		return 0
+	end
+	countPlay(player, p)
+	return p.playSeconds
+end
+
 function Data.changed(player: Player)
 	local p = profiles[player]
 	if p then
@@ -162,6 +185,7 @@ local function save(player: Player, release: boolean?): boolean
 	end
 	saving[player] = true
 	inFlight += 1
+	countPlay(player, p)
 	local blob = withLock(p, release == true)
 	local ok, err = pcall(function()
 		(store :: DataStore):SetAsync("u" .. player.UserId, blob)
@@ -247,6 +271,7 @@ local function load(player: Player)
 				profile.welcomed = decoded.welcomed == true
 				profile.musicOff = decoded.musicOff == true
 				profile.starterDealEnds = tonumber(decoded.starterDealEnds) or 0
+				profile.playSeconds = math.max(0, tonumber(decoded.playSeconds) or 0)
 				if typeof(decoded.invited) == "table" then
 					for id, yes in decoded.invited do
 						if yes == true and tonumber(id) then
@@ -298,6 +323,7 @@ local function load(player: Player)
 	end
 	if player.Parent then
 		profiles[player] = profile
+		playCounted[player] = os.clock()
 		publish(player, profile)
 		player:SetAttribute("DataReady", true)
 	end
@@ -312,6 +338,7 @@ function Data.start()
 		saveWhenFree(player, true)
 		profiles[player] = nil
 		loadFailed[player] = nil
+		playCounted[player] = nil
 	end)
 	task.spawn(function()
 		while true do

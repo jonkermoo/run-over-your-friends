@@ -89,6 +89,7 @@ function QuestService.event(player: Player, kind: string, amount: number)
 		if set then
 			for _, goal in Quests.advance(set.goals, kind, amount) do
 				paid += goal.reward
+				Analytics.goal(player, name, goal.kind)
 				Analytics.source(
 					player,
 					goal.reward,
