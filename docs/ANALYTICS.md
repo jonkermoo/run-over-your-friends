@@ -39,6 +39,8 @@ Item names in the purchase events: `Product:<key>` (Robux products in `Config/Pr
 | `LoadTime` | seconds | seconds bucket (`0-5`, `5-10`, `10-20`, `20-40`, `40+`) | `Ready` / `Timeout` | Load time per device: from client start to spawn-ready (the loading cover's ready check). `Timeout`: the cover gave up waiting. |
 | `FirstVehicleBought` | total minutes played | vehicle id | total minutes bucket (`0-10`, `10-30`, `30-60`, `60-120`, `120-240`, `240+`) | The money curve: how long until players afford their first car beyond the starter, and which car it is. Logged on the first car bought with game money; cars from the Roadster pass or the Starter Pack don't count as bought. Minutes count all sessions (saved as `playSeconds` in the profile from this release on). |
 | `GoalClaimed` | 1 | goal kind (`Hits`, `Earn`, `Drive`, ...) | `Hourly` / `Daily` | Which goals players finish. |
+| `ChallengeDone` | 1 | challenge id (`Config/Challenges`: `CarHits`, `Spin`, `WeekHits`, ...) | `Daily` / `Weekly` | Which daily and weekly challenges players finish, and how many come back for them. |
+| `ChestOpened` | cash it paid | `Daily` / `Weekly` | `Paint:<id>` (a chest-only paint, `Config/Paints`) or `Cash` | What challenge chests give out. |
 | `EventSeen` | 1 | event key (`Config/Events`) | | Players in the server when a live event started. |
 | `EventJoined` | 1 | event key | | Players who took part (a hit, smash or stunt while it was live), once per event run. With `EventSeen`: the join rate per event. |
 
@@ -55,7 +57,8 @@ of the first session.
 ## Economy events (`LogEconomyEvent`)
 
 Currency `Money`. Sources: play earnings (batched per minute, `Gameplay`), goal and tutorial rewards, packs
-(`IAP`, sku = product key), the Roadster pass, group, invite and server-goal rewards. Sinks: vehicles (sku =
+(`IAP`, sku = product key), the Roadster pass, group, invite and server-goal rewards, challenge chests (`TimedReward`, sku `DailyChest` /
+`WeeklyChest`). Sinks: vehicles (sku =
 vehicle id) and paints. Answers: where money comes from and goes to (Creator Hub's Economy page).
 
 ## Reading it in Creator Hub

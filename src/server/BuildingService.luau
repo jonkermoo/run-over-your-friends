@@ -363,6 +363,7 @@ local function loosen(
 end
 
 local breakListeners: { (Player, number, boolean) -> () } = {}
+local collapseListeners: { (Player) -> () } = {}
 -- is this part of a real building (a model in the Buildings folder at least Onboarding.SmashMinHeight tall,
 -- the ones the tutorial points at), not a fence, tree or shed? Cached per model.
 local tallModels: { [Model]: boolean } = {}
@@ -387,6 +388,11 @@ end
 -- called with the player, how many pieces they broke and whether any were a real building's
 function BuildingService.onBreak(listener: (Player, number, boolean) -> ())
 	table.insert(breakListeners, listener)
+end
+
+-- called with the player whose hit brought a whole building down
+function BuildingService.onCollapse(listener: (Player) -> ())
+	table.insert(collapseListeners, listener)
 end
 
 -- break everything within radius of pos; push is the hitter's velocity (studs/s); `way` keeps the hitter's path
@@ -533,6 +539,9 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 		end
 	end)
 	Analytics.custom(player, "Demolished")
+	for _, listener in collapseListeners do
+		task.spawn(listener, player)
+	end
 	task.delay(COLLAPSE.HideSeconds, function()
 		for _, p in parts do
 			if p.Anchored and p:GetAttribute("Broken") then

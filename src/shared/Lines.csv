@@ -106,3 +106,22 @@ PinnedServer,SERVER  {time},,,SERVIDOR  {time},SERVIDOR  {time}
 PaintOn,{paint}  ON,,,{paint}  PUESTA,{paint}  EM USO
 PaintVip,{paint}  VIP ONLY,,,{paint}  SOLO VIP,{paint}  SÓ VIP
 PaintBuy,{paint}  {price}  ALL CARS,,,{paint}  {price}  TODOS LOS AUTOS,{paint}  {price}  TODOS OS CARROS
+Challenge_CarHits,Flatten {n} people in the {car},,,Aplasta a {n} personas en el {car},Esmague {n} pessoas no {car}
+Challenge_CarBreaks,Smash {n} building pieces in the {car},,,Rompe {n} pedazos de edificios en el {car},Quebre {n} pedaços de prédios no {car}
+Challenge_CarJumps,Land {n} jumps in the {car},,,Aterriza {n} saltos en el {car},Acerte {n} saltos no {car}
+Challenge_Spin,Land a 360,,,Aterriza un 360,Acerte um 360
+Challenge_ParkJumps,Land {n} jumps in the stunt park,,,Aterriza {n} saltos en el parque de acrobacias,Acerte {n} saltos no parque de manobras
+Challenge_BigAir,Stay in the air {n} seconds in one jump,,,Quédate {n} segundos en el aire en un salto,Fique {n} segundos no ar em um salto
+Challenge_Collapse,Bring down {n} whole buildings,,,Derriba {n} edificios enteros,Derrube {n} prédios inteiros
+Challenge_Event,Join a live event,,,Únete a un evento en vivo,Entre em um evento ao vivo
+Challenge_WeekHits,Flatten {n} people,,,Aplasta a {n} personas,Esmague {n} pessoas
+Challenge_WeekSpins,Land {n} 360s,,,Aterriza {n} 360s,Acerte {n} 360s
+Challenge_WeekEvents,Join {n} live events,,,Únete a {n} eventos en vivo,Entre em {n} eventos ao vivo
+ChallengeDoneDaily,DAILY CHALLENGE DONE!  +1 DAILY CHEST,,,¡DESAFÍO DIARIO HECHO!  +1 COFRE DIARIO,DESAFIO DIÁRIO FEITO!  +1 BAÚ DIÁRIO
+ChallengeDoneWeekly,WEEKLY CHALLENGE DONE!  +1 WEEKLY CHEST,,,¡DESAFÍO SEMANAL HECHO!  +1 COFRE SEMANAL,DESAFIO SEMANAL FEITO!  +1 BAÚ SEMANAL
+ChestDailyHolds,"Cash, or a chest-only paint ({pct}% chance)",,,"Dinero, o una pintura exclusiva de cofre ({pct}% de probabilidad)","Grana, ou uma pintura exclusiva de baú ({pct}% de chance)"
+ChestWeeklyHolds,A chest-only paint and {n},,,Una pintura exclusiva de cofre y {n},Uma pintura exclusiva de baú e {n}
+ChestPaintAndCash,New paint and {n}! Put it on any car in the GARAGE,,,¡Pintura nueva y {n}! Úsala en cualquier auto en el GARAJE,Pintura nova e {n}! Use em qualquer carro na GARAGEM
+ChestsWaiting,Chests to open in GOALS: {n},,,Cofres por abrir en METAS: {n},Baús para abrir em METAS: {n}
+ChallengesNew,{n} new challenges today. Each one you finish gives a chest!,,,{n} desafíos nuevos hoy. ¡Cada uno que completes da un cofre!,{n} desafios novos hoje. Cada um que você completar dá um baú!
+PaintChest,{paint}  FROM CHALLENGE CHESTS,,,{paint}  DE COFRES DE DESAFÍOS,{paint}  DE BAÚS DE DESAFIOS

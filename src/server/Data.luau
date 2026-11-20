@@ -34,6 +34,7 @@ export type Profile = {
 	musicOff: boolean, -- turned the background music off (client/Music)
 	starterDealEnds: number, -- os.time the Starter Pack discount ends; 0 = not started (Config/Products)
 	playSeconds: number, -- seconds played in all sessions, counted up to the last save (analytics)
+	challenges: { [string]: any }, -- daily/weekly challenge progress and unopened chests, checked by ChallengeService
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -80,6 +81,7 @@ local function default(): Profile
 		musicOff = false,
 		starterDealEnds = 0,
 		playSeconds = 0,
+		challenges = {},
 	}
 end
 
@@ -284,6 +286,9 @@ local function load(player: Player)
 					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)
 				if typeof(decoded.quests) == "table" then
 					profile.quests = decoded.quests
+				end
+				if typeof(decoded.challenges) == "table" then
+					profile.challenges = decoded.challenges
 				end
 				if typeof(decoded.stats) == "table" then
 					profile.stats = decoded.stats

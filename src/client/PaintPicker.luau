@@ -207,6 +207,7 @@ function PaintPicker.attach(
 				then "F"
 				elseif open then ""
 				elseif Config.ById[id].vip then "V"
+				elseif Config.ById[id].chest then "?"
 				else "$"
 			s.edge.Color = if id == selected then C.yellow else C.ink
 			s.edge.Thickness = if id == selected then 3 else 2
@@ -226,6 +227,13 @@ function PaintPicker.attach(
 			caption.TextColor3 = C.gold
 			action.Text = "GET VIP"
 			Style.setKind(action, "gold")
+		elseif p.chest then
+			-- never sold: won from a challenge chest
+			Loc.set(caption, "PaintChest", { paint = Loc.upper(Loc.source(p.name)) })
+			caption.TextColor3 = C.purple
+			action.AutoLocalize = true
+			action.Text = "IN CHESTS"
+			Style.setKind(action, "dark")
 		else
 			Loc.set(
 				caption,
@@ -258,6 +266,8 @@ function PaintPicker.attach(
 		local p = Config.ById[selected]
 		if p and p.vip then
 			Net.waitFor("BuyPass"):FireServer("VIP")
+		elseif p and p.chest then
+			return true -- nothing to buy: it comes from a challenge chest
 		else
 			Net.waitFor("BuyPaint"):FireServer(selected)
 		end

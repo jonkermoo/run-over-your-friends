@@ -26,6 +26,7 @@ Net.Messages = table.freeze({
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
 	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
+	OpenChest = "OpenChest", -- (set: "Daily" | "Weekly"): open one of your unopened challenge chests
 	-- (kind: "Open" | "View" | "Offer" | "State" | "Ready", a, b): client-only facts for analytics, each value
 	-- from a fixed set in Config/Analytics (server/Analytics checks and rate-limits them)
 	Track = "Track",
@@ -46,6 +47,10 @@ Net.Messages = table.freeze({
 	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
+	-- ({ daily: { View }, dailyEnds: number, weekly: { View }, weeklyEnds: number, chests: { Daily: number,
+	-- Weekly: number }, day: number }, now: number): this player's challenges (Rules/Challenges view)
+	Challenges = "Challenges",
+	ChestPrize = "ChestPrize", -- (set: string, cash: number, paint: string): what the chest just opened held ("" = no paint)
 	-- ({ title: string, unit: string, top: { { id: number, name: string, score: number, prize: number } }, place: number,
 	-- score: number, prize: number }): a contest just ended; place 0 when you didn't take part
 	Podium = "Podium",
@@ -87,6 +92,9 @@ export type MessageName =
 	| "Podium"
 	| "ServerGoal"
 	| "Track"
+	| "OpenChest"
+	| "Challenges"
+	| "ChestPrize"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

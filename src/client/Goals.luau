@@ -1,5 +1,6 @@
 --!strict
--- The goals sheet: the shared SERVER goal on its own card, then HOURLY and DAILY sets with reset countdowns, progress
+-- The goals sheet: today's and this week's challenges and their chests on top (Challenges.luau builds them), the
+-- shared SERVER goal on its own card, then HOURLY and DAILY sets with reset countdowns, progress
 -- and rewards. It hangs from the top left under the menu strip, opens from the GOALS tab and closes from its X, the
 -- tab or B on a gamepad. Not
 -- available until the tutorial's goal step, which puts a first goal to claim on top. Each unfinished goal,
@@ -15,6 +16,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
+local Challenges = require(script.Parent.Challenges)
 local Pad = require(script.Parent.Pad)
 local PinnedGoals = require(script.Parent.PinnedGoals)
 local Style = require(script.Parent.Style)
@@ -123,7 +125,8 @@ local function maxHeight(): number
 end
 
 local function shape(): string
-	local parts = { tostring(open), tostring(claiming()), tostring(maxHeight()) }
+	local parts =
+		{ tostring(open), tostring(claiming()), tostring(maxHeight()), Challenges.shape() }
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -168,6 +171,7 @@ local function height(): number
 		if claiming() then
 			h += CLAIM_H
 		end
+		h += Challenges.height()
 		for _, name in ORDER do
 			local set = state[name]
 			if set then
@@ -263,6 +267,7 @@ local function rebuild()
 		end)
 		y += CLAIM_H
 	end
+	y = Challenges.build(body, y)
 	for _, name in ORDER do
 		local set = state[name]
 		if not set then
@@ -386,8 +391,17 @@ end
 
 function Goals.toggle()
 	open = not open
+	if open then
+		Challenges.sheetOpened()
+	end
 	PinnedGoals.setSheetOpen(open)
 	rebuild()
+end
+
+function Goals.open()
+	if not open then
+		Goals.toggle()
+	end
 end
 
 function Goals.close()
@@ -402,6 +416,8 @@ close.Activated:Connect(Goals.close)
 Pad.menu(panel, {
 	first = function()
 		local claim = body:FindFirstChild("TutorialClaim", true)
+			or body:FindFirstChild("OpenDaily", true)
+			or body:FindFirstChild("OpenWeekly", true)
 		if claim and claim:IsA("GuiObject") then
 			return claim
 		end
@@ -457,6 +473,12 @@ function Goals.start()
 		end
 		PinnedGoals.setServer(serverSet, if typeof(serverNow) == "number" then serverNow else nil)
 		apply()
+	end)
+	-- challenges or chests changed: redraw
+	Challenges.changed:Connect(function()
+		if open and shape() ~= builtShape then
+			rebuild()
+		end
 	end)
 	-- pins changed (here or from a card's X): redraw the pin buttons
 	PinnedGoals.changed:Connect(function()

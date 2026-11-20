@@ -332,6 +332,20 @@ function Analytics.goal(player: Player, set: string, kind: string)
 	end)
 end
 
+-- a daily or weekly challenge finished (set: "Daily" | "Weekly", id: its Config/Challenges template id)
+function Analytics.challenge(player: Player, set: string, id: string)
+	safe(function()
+		log(player, "ChallengeDone", 1, id, set)
+	end)
+end
+
+-- a challenge chest opened: value is the cash it paid, field 2 the paint it gave ("Cash" for none)
+function Analytics.chest(player: Player, set: string, cash: number, paint: string?)
+	safe(function()
+		log(player, "ChestOpened", cash, set, if paint then "Paint:" .. paint else "Cash")
+	end)
+end
+
 -- a hit, smash or stunt while an event is live counts as joining it, once per event run
 function Analytics.tookPart(player: Player)
 	safe(function()
