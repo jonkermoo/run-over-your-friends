@@ -81,7 +81,7 @@ return table.freeze({
 		Inset = 0.6,
 	}),
 	-- the spawn plaza (MapBuilder spawnPlaza, dressSpawnPlaza): a roundabout hub. A grass island in the middle
-	-- holds the champions' podium (Config/Champions: a slowly turning stage, the gold trophy behind it); the spawn
+	-- holds the champions' podium (Config/Champions: a slowly turning stage); the spawn
 	-- pads stand in a ring round it, each facing out onto a painted one-way ring road with four exits to the
 	-- streets; the crowd waits at the four corners by the food stalls. All distances in studs from the middle.
 	SpawnPlaza = table.freeze({
@@ -103,7 +103,7 @@ return table.freeze({
 		RingArrows = 8, -- white one-way arrows (anticlockwise seen from above)
 		ExitWidth = 28, -- asphalt from the ring out to each side street
 		-- the champions' podium on the island: a round turntable with three steps in a row on it (left, middle,
-		-- right as Config/Champions.Steps) and the trophy on a post behind the middle one. Steps are { r, g, b }.
+		-- right as Config/Champions.Steps) (nothing else on it). Colours are { r, g, b }.
 		Podium = table.freeze({
 			Keys = table.freeze({ "Earned", "HitsAll", "Hits" }), -- the steps' boards, as Config/Champions.Steps
 			Radius = 19, -- the turntable
@@ -116,10 +116,8 @@ return table.freeze({
 				table.freeze({ 255, 196, 48 }), -- gold
 				table.freeze({ 232, 52, 52 }), -- red
 			}),
-			PostHeight = 34, -- the trophy's post, behind the middle step
 			WallHeight = 34, -- the invisible wall round the turning steps, up past the avatars' heads
-			WallRadius = 18.5, -- covers the circle the steps and the trophy post sweep (tests/champions)
-			TrophyScale = 1.2,
+			WallRadius = 18.5, -- covers the circle the steps sweep (tests/champions)
 		}),
 		Corner = table.freeze({ reach = 92, spread = 11, people = 6 }), -- the crowd at each corner
 		Planters = table.freeze({ { 56, 88 }, { 88, 56 } }), -- x, z out from the middle, each corner

@@ -21,15 +21,11 @@ return function(check: (string, boolean) -> ())
 			and Champ.Poses[step.pose] ~= nil
 	end
 	check("podium: steps match the map's steps, a board and a pose each", stepsOk)
-	-- the far corners of the outer steps, and the trophy post behind the middle one (1.5 out, 0.8 thick)
+	-- the far corners of the outer steps
 	local corner = math.sqrt((1.5 * P.StepWidth) ^ 2 + (P.StepDepth / 2) ^ 2)
-	local post = P.StepDepth / 2 + 1.5 + 0.8
 	check(
-		"podium: its wall covers the turning steps and post and stays on the turntable",
-		P.WallRadius > corner
-			and P.WallRadius > post
-			and P.WallRadius < P.Radius
-			and P.WallHeight >= P.Heights[2] + 16
+		"podium: its wall covers the turning steps and stays on the turntable",
+		P.WallRadius > corner and P.WallRadius < P.Radius and P.WallHeight >= P.Heights[2] + 16
 	)
 	check(
 		"podium: the middle step is the tallest",

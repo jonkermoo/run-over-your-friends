@@ -366,8 +366,8 @@ end
 
 -- the champions' podium on the spawn plaza's island (World.SpawnPlaza.Podium): a round concrete turntable and,
 -- on it, a stage the client turns (model ChampionStage, kept loaded): three steps in a row (parts named
--- Step_<key>; the client puts the plates and the avatars on them) and the gold trophy (cup,
--- handles, star) on a post behind the middle step. The steps don't collide: they turn on screen only.
+-- Step_<key>; the client puts the plates and the avatars on them). Nothing else stands on the stage, so no
+-- angle shows anything passing through an avatar. The steps turn on screen only: an invisible wall collides.
 local function champions(static: Instance, cx: number, cz: number)
 	local SP = World.SpawnPlaza
 	local P = SP.Podium
@@ -419,53 +419,6 @@ local function champions(static: Instance, cx: number, cz: number)
 	wall.Name = "PodiumWall"
 	wall.CanQuery = false -- the camera sees through it
 	wall.CastShadow = false
-	local postZ = cz + P.StepDepth / 2 + 1.5 -- behind the steps (their plates and avatars face -Z)
-	part(
-		stage,
-		Vector3.new(1.6, P.PostHeight, 1.6),
-		CFrame.new(cx, floor + P.PostHeight / 2, postZ),
-		PAINT_BLACK
-	).CanCollide =
-		false
-	-- the trophy, built from its foot at `top` and scaled by TrophyScale
-	local trophy = Instance.new("Model")
-	trophy.Name = "Trophy"
-	trophy.Parent = stage
-	local gold = rgb(SP.Gold)
-	local s, top = P.TrophyScale, floor + P.PostHeight
-	local function piece(size: Vector3, x: number, y: number, shape: Enum.PartType?): Part
-		local p = part(
-			trophy,
-			size * s,
-			CFrame.new(cx + x * s, top + y * s, postZ),
-			gold,
-			Enum.Material.Foil
-		)
-		p.CanCollide = false
-		if shape then
-			p.Shape = shape
-		end
-		return p
-	end
-	local function cyl(height: number, dia: number, y: number): Part
-		local p = piece(Vector3.new(height, dia, dia), 0, y + height / 2, Enum.PartType.Cylinder)
-		p.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
-		return p
-	end
-	piece(Vector3.new(7.4, 0.6, 7.4), 0, 0.3)
-	cyl(1.2, 5, 0.6)
-	cyl(4, 2, 1.8)
-	piece(Vector3.one * 9, 0, 8.8, Enum.PartType.Ball)
-	cyl(5, 9, 8.8)
-	cyl(0.8, 9.8, 13.6)
-	for _, e in { -1, 1 } do
-		piece(Vector3.new(1, 6, 1), e * 6.6, 10.6)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 13.2)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 8)
-	end
-	local star = piece(Vector3.one * 2.6, 0, 15.6, Enum.PartType.Ball)
-	star.Color = PAINT_YELLOW
-	star.Material = Enum.Material.Neon
 end
 
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`

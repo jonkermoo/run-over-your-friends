@@ -52,6 +52,7 @@ return table.freeze({
 	TurnSeconds = 90, -- one full turn of the stage; the same angle for everyone (server time)
 	BobStuds = 0.12, -- the slow breathing bob, per 1x of Scale
 	BobSeconds = 3.2,
+	StandGap = 0.05, -- studs between the avatar's lowest point and its step, so the feet never touch it
 	ShowDistance = 450, -- studs from the camera: past this the stage stops turning
 	PlateDistance = 450, -- the step plates draw up to this far
 	BuildGap = 2, -- seconds between two avatar builds on the server

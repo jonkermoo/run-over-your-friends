@@ -1,6 +1,6 @@
 --!strict
 -- The champions' podium in the middle of the spawn plaza (Config/Champions). MapBuilder builds the stage
--- (model ChampionStage: steps named Step_<key>, the trophy on its post); the server puts each step's #1 avatar
+-- (model ChampionStage: steps named Step_<key>); the server puts each step's #1 avatar
 -- in ReplicatedStorage.Champions (server/ChampionService). Here: a plate on the front and back of each step
 -- (the board's title and tag, or LAST WEEK, the player's name and score), each avatar cloned, scaled, posed by
 -- bending its joints and stood on its step, banknotes drifting round the richest, and the whole stage turning
@@ -198,8 +198,15 @@ local function place(slot: Slot)
 	-- feet on the step's top, facing the step's front (-Z), measured at the stage's built angle
 	local top = base * slot.stepLocal * CFrame.new(0, slot.step.Size.Y / 2, 0)
 	m:PivotTo(CFrame.new(top.Position) * CFrame.new(0, 5, 0))
+	-- the bent joints move the limbs on the next physics step: measure after it
+	RunService.Stepped:Wait()
+	RunService.Heartbeat:Wait()
+	if slot.source ~= src or not m.Parent then
+		m:Destroy()
+		return
+	end
 	local box, size = m:GetBoundingBox()
-	local lift = (top.Position.Y - (box.Position.Y - size.Y / 2))
+	local lift = top.Position.Y - (box.Position.Y - size.Y / 2) + Champions.StandGap
 	local pivot = m:GetPivot() + Vector3.new(0, lift, 0)
 	slot.offset = base:Inverse() * pivot
 	if stepCfg and stepCfg.bills then
@@ -311,7 +318,9 @@ function ChampionsClient.start()
 		local turn = base
 			* CFrame.Angles(0, (t % Champions.TurnSeconds) / Champions.TurnSeconds * math.pi * 2, 0)
 		s:PivotTo(turn)
-		local bob = math.sin(t / Champions.BobSeconds * math.pi * 2)
+		-- up from standing only, so feet never sink into the step
+		local bob = (1 - math.cos(t / Champions.BobSeconds * math.pi * 2))
+			/ 2
 			* Champions.BobStuds
 			* Champions.Scale
 		for _, slot in slots do
