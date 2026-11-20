@@ -136,6 +136,15 @@ function Greenery.tree(folder: Instance, at: Vector3, random: Random)
 	crown.CanTouch = true
 end
 
+-- take the random draws a tree takes, without planting it (so a skipped tree moves nothing after it)
+function Greenery.skipTree(random: Random)
+	local T = P.Tree
+	random:NextNumber(T.Trunk[1], T.Trunk[2])
+	random:NextNumber(T.Crown[1], T.Crown[2])
+	random:NextNumber(0, math.pi * 2)
+	random:NextInteger(1, #P.Greens)
+end
+
 -- a low chunky bush (one of two shapes, picked by its spot); the same random draws as the old two-ball bush,
 -- so nothing after it moves
 function Greenery.bush(folder: Instance, at: Vector3, random: Random)

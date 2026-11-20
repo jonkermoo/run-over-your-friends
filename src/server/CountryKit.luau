@@ -1540,6 +1540,24 @@ local function turbine(parent: Instance, at: Vector3, out: Vector3, spin: number
 	end
 end
 
+-- the wind farm: a row of turbines across its rect's long side, rotors facing the same way (its own stream)
+local function windFarm(ctx: Ctx)
+	local W = Cfg.WindFarm
+	local r = W.Rect
+	local own = Random.new(W.Seed)
+	local alongX = r.w >= r.d
+	local long = if alongX then r.w else r.d
+	for k = 0, W.Turbines - 1 do
+		local t = (k + 0.5) / W.Turbines - 0.5
+		local at = Vector3.new(
+			r.x + (if alongX then t * long else own:NextNumber(-r.w / 4, r.w / 4)),
+			0,
+			r.z + (if alongX then own:NextNumber(-r.d / 4, r.d / 4) else t * long)
+		)
+		turbine(ctx.static, at, Vector3.new(0, 0, 1), own:NextNumber(0, math.pi))
+	end
+end
+
 -- one cell between the city and the ring, x/z its centre, w x d its size, `out` toward the ring
 function CountryKit.cell(
 	ctx: Ctx,
@@ -1566,14 +1584,22 @@ function CountryKit.cell(
 			F.Wobble * F.CellWobble,
 			F.CropMaterials[random:NextInteger(1, #F.CropMaterials)]
 		)
-	elseif use == "turbines" then
-		for _, e in { -1, 1 } do
-			turbine(
-				ctx.static,
-				centre + along * e * long * 0.25,
-				out,
-				random:NextNumber(0, math.pi)
-			)
+	elseif use == "orchard" then
+		-- rows of fruit trees (their own stream); the two draws the turbines that stood here took are still
+		-- taken, so nothing after this cell moves
+		random:NextNumber(0, math.pi)
+		random:NextNumber(0, math.pi)
+		local O = Cfg.Cells.Orchard
+		local own = Random.new(O.seed + math.floor(x) * 31 + math.floor(z) * 7)
+		local nl = math.floor(long * O.share / O.gap)
+		local nd = math.floor(deep * O.share / O.gap)
+		for a = 0, nl do
+			for b = 0, nd do
+				local at = centre
+					+ along * ((a - nl / 2) * O.gap + own:NextNumber(-O.jitter, O.jitter))
+					+ out * ((b - nd / 2) * O.gap + own:NextNumber(-O.jitter, O.jitter))
+				Greenery.tree(ctx.props, at, own)
+			end
 		end
 		for _ = 1, 2 do
 			Greenery.tree(
@@ -1674,12 +1700,14 @@ function CountryKit.build(ctx: Ctx): { Rect }
 	beaches(ctx)
 	forest(ctx)
 	desertEdge(ctx)
+	windFarm(ctx)
 	local half = ctx.half
 	-- (the hills round the edge are kept clear by ctx.allowed)
 	return {
 		Cfg.Farm.Rect,
 		Cfg.Moto.Rect,
 		Cfg.Forest.Rect,
+		Cfg.WindFarm.Rect,
 		{ x = ctx.seaEdge + Cfg.Beach.Width / 2, z = 0, w = Cfg.Beach.Width + 40, d = half * 2 },
 	}
 end

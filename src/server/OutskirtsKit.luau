@@ -1694,10 +1694,11 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		terrain:FillCylinder(CFrame.new(p.x, -2.5, p.z), 4, W.PondRadius - 7, Enum.Material.Water)
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
 	end
-	-- what the roll keeps level (GroundKit): all of the above but the farm, where only the yard stays flat
+	-- what the roll keeps level (GroundKit): all of the above but the farm (only its yard stays flat) and the
+	-- wind farm (its turbines rise with the land)
 	local level: { Rules.Rect } = {}
 	for _, r in exclude do
-		if r ~= Country.Farm.Rect then
+		if r ~= Country.Farm.Rect and r ~= Country.WindFarm.Rect then
 			table.insert(level, r)
 		end
 	end

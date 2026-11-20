@@ -246,15 +246,17 @@ return table.freeze({
 		Uses = table.freeze({
 			"trees",
 			"field",
-			"turbines",
+			"orchard",
 			"field",
 			"gas",
 			"trees",
-			"turbines",
+			"orchard",
 			"field",
 		}), -- gas on odd cells (billboards take the even ones)
 		CornerTrees = 5, -- the four corner cells get a small grove
 		Turbine = table.freeze({ h = 90, blade = 34, dia = 4.5 }),
+		-- an orchard: rows of fruit trees `gap` apart filling the cell's middle `share` (its own random stream)
+		Orchard = table.freeze({ gap = 26, share = 0.62, seed = 6120, jitter = 2 }),
 		Gas = table.freeze({
 			pad = { 96, 70 },
 			canopy = { 48, 24, 15 },
@@ -264,6 +266,14 @@ return table.freeze({
 			Price = "$2.49",
 		}),
 		GasRed = { 214, 58, 48 } :: RGB,
+	}),
+
+	-- the wind turbines stand out in the countryside, a row along a rise north of Sunny Vale (they used to stand in
+	-- the cells by the ring, inside town); the land rolls under them
+	WindFarm = table.freeze({
+		Rect = table.freeze({ x = 3600, z = -1950, w = 900, d = 220 }),
+		Turbines = 6,
+		Seed = 4410,
 	}),
 
 	-- lakes on the new land (terrain water in a sandy bowl), trees round the shore

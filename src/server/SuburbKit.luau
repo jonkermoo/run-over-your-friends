@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Suburbs)
 local Roadside = require(ReplicatedStorage.Shared.Config.Roadside)
+local Yards = require(ReplicatedStorage.Shared.Config.Yards)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Lots = require(ReplicatedStorage.Shared.Config.Lots)
 local RoadMeshes = require(ReplicatedStorage.Shared.Config.RoadMeshes)
@@ -17,6 +18,7 @@ local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local LotKit = require(script.Parent.LotKit)
 local RoadsideKit = require(script.Parent.RoadsideKit)
+local YardKit = require(script.Parent.YardKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
 local Terra = require(script.Parent.Terra)
@@ -251,8 +253,11 @@ function SuburbKit.garden(
 	local C = Cfg.Chances
 	local right = Vector3.new(-face.Z, 0, face.X)
 	local g = c - face * (depth / 2 + Cfg.Garden / 2)
+	local treeSide = 0
+	local pool = false
 	if random:NextNumber() < C.backTree then
 		local sx = if random:NextNumber() < 0.5 then 1 else -1
+		treeSide = sx
 		Greenery.tree(props, g - face * (Cfg.Garden / 2 - 4) + right * sx * (width / 2 - 3), random)
 	end
 	if random:NextNumber() < C.fence then
@@ -278,6 +283,7 @@ function SuburbKit.garden(
 			)
 		end
 		if random:NextNumber() < C.pool / C.fence then
+			pool = true
 			local P = Cfg.Pool
 			part(
 				folder,
@@ -297,6 +303,16 @@ function SuburbKit.garden(
 			water.Reflectance = 0.2
 			water.CanCollide = false
 		end
+	end
+	-- maybe a shed, a trampoline or a swing set in the corner away from the tree (not beside a pool)
+	if not pool then
+		local side = if treeSide ~= 0 then -treeSide else 1
+		local inset = Yards.Garden.Inset
+		YardKit.garden(
+			props,
+			g + right * side * (width / 2 - inset) - face * (Cfg.Garden / 2 - inset),
+			face
+		)
 	end
 end
 

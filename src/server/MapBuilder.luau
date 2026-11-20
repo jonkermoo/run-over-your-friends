@@ -34,6 +34,7 @@ local RoadKit = require(script.Parent.RoadKit)
 local SkylineKit = require(script.Parent.SkylineKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
+local YardKit = require(script.Parent.YardKit)
 local Pace = require(script.Parent.Pace)
 local Terra = require(script.Parent.Terra)
 
@@ -921,6 +922,13 @@ function MapBuilder.build(fresh: boolean?): Result
 				end
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
+				-- a street front: awnings either side of the door, planters, a bench (YardKit)
+				YardKit.officeFront(
+					props,
+					door,
+					out,
+					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
+				)
 				-- its own crown, taken in turn so neighbours differ (TowerKit)
 				TowerKit.crown(
 					model,
@@ -1170,13 +1178,21 @@ function MapBuilder.build(fresh: boolean?): Result
 						end
 					end
 				end
+				-- the lawn in the middle: hedges, flower beds, sometimes a playground (YardKit)
+				local taken = YardKit.blockMiddle(props, centre, inner)
 				for _ = 1, Parks.HomeTrees do
 					local at = Vector3.new(
 						random:NextNumber(-inner / 2.4, inner / 2.4),
 						0,
 						random:NextNumber(-20, 20)
 					)
-					Greenery.tree(props, centre + at, random)
+					-- a tree that would stand in a hedge, a bed or the playground isn't planted (its draws
+					-- are still taken, so nothing after it moves)
+					if YardKit.inside(taken, centre + at, Parks.TreeClear) then
+						Greenery.skipTree(random)
+					else
+						Greenery.tree(props, centre + at, random)
+					end
 				end
 			elseif kind == "restaurant" then
 				-- the burger place, facing the middle of town, with a car park behind
