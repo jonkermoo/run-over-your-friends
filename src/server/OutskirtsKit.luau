@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Outskirts)
+local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
@@ -14,8 +15,13 @@ local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local CountryKit = require(script.Parent.CountryKit)
 local Country = require(ReplicatedStorage.Shared.Config.Country)
+local Roadside = require(ReplicatedStorage.Shared.Config.Roadside)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
+local GroundKit = require(script.Parent.GroundKit)
+local RoadsideKit = require(script.Parent.RoadsideKit)
+local FoliageKit = require(script.Parent.FoliageKit)
+local ZoneKit = require(script.Parent.ZoneKit)
 local SuburbKit = require(script.Parent.SuburbKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -265,6 +271,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	workspace.Terrain:SetMaterialColor(Enum.Material.Rock, rgb(Country.TerrainRock))
 	workspace.Terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	workspace.Terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
+	GroundKit.tint() -- the farm's soil and crops
 	terrain.WaterColor = rgb(C.water)
 	terrain.WaterWaveSize = LandCfg.WaterWave
 	terrain.WaterTransparency = LandCfg.WaterClear
@@ -494,6 +501,34 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			Enum.Material.Asphalt,
 			1
 		)
+		-- split-rail fences down both sides, a pole line with wires down one (RoadsideKit)
+		local along = if alongX
+			then Vector3.new(math.sign(z.x), 0, 0)
+			else Vector3.new(0, 0, math.sign(z.z))
+		local across = Vector3.new(-along.Z, 0, along.X)
+		local halfRoad = RG.Connector / 2
+		local from = along * ring
+		local to = along * (ring + len)
+		local RF = Roadside.Fence
+		for _, s in { -1, 1 } do
+			local off = across * s * (halfRoad + RF.Out)
+			RoadsideKit.fence(
+				static,
+				from + along * RF.EndGap + off,
+				to - along * RF.EndGap + off,
+				function()
+					return false
+				end
+			)
+		end
+		local poleOff = across * (halfRoad + Roadside.Poles.RoadOut)
+		RoadsideKit.poles(
+			static,
+			{ from + along * RF.EndGap + poleOff, to - along * RF.EndGap + poleOff },
+			function()
+				return false
+			end
+		)
 	end
 
 	-- the cells between the city and the ring: trees, and a billboard facing the ring every other cell
@@ -584,8 +619,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			folder,
 			Vector3.new(st.w, 1, st.d),
 			CFrame.new(st.x, -0.42, st.z),
-			COLORS.concrete,
-			Enum.Material.Concrete
+			rgb(Zones.Stunt.Ground),
+			Enum.Material.Asphalt
 		)
 		local function deck(x0: number, x1: number, z: number, width: number, color: Color3)
 			paint(
@@ -904,15 +939,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			Color3.fromRGB(230, 200, 40),
 			Enum.Material.Concrete
 		)
-		for k = 0, P.Bollards - 1 do
-			post(
-				static,
-				2.4,
-				1.6,
-				Vector3.new(qx + 5, 0, pt.z - pt.d / 2 + (k + 0.5) * pt.d / P.Bollards),
-				COLORS.stripe
-			)
-		end
+		-- (the bollards, lifebuoys and floodlights are laid with the other zone dressing: ZoneKit)
 		-- black tyre fenders hung on the quay's face
 		for k = 0, P.Fenders - 1 do
 			local f = part(
@@ -1233,6 +1260,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			local z = ds.z + random:NextNumber(-ds.d / 2 + f, ds.d / 2 - f)
 			mound(x, z, f, h, Enum.Material.Sand)
 		end
+		local mesas: { Vector3 } = {} -- x, z and the sand skirt's radius (cacti keep out)
 		for k = 0, D.Mesas - 1 do
 			local side = if k % 2 == 0 then -1 else 1
 			local x = ds.x + side * (ds.w / 2 - 70 - (k // 2) * 160)
@@ -1242,12 +1270,42 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				random:NextNumber(30, 50),
 				random:NextNumber(60, 100)
 			)
-			terrain:FillBlock(
-				CFrame.new(x, size.Y / 2 - 2, z)
-					* CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
-				size,
-				Enum.Material.Sandstone
+			local turn = random:NextNumber(0, math.pi)
+			-- stepped: tiers of a few overlapping turned slabs, each tier smaller, on a sand skirt (its own
+			-- stream, so the rest of the outskirts keeps its layout)
+			local own = Random.new(D.MesaSeed + k)
+			local tall = size.Y * D.MesaTall
+			table.insert(mesas, Vector3.new(x, z, math.max(size.X, size.Z) / 2 * (1 + D.MesaTalus)))
+			mound(
+				x,
+				z,
+				math.max(size.X, size.Z) / 2 * (1 + D.MesaTalus),
+				tall * D.MesaTalusRise,
+				Enum.Material.Sand
 			)
+			local tierH = tall / D.MesaTiers
+			local scale = 1
+			for t = 0, D.MesaTiers - 1 do
+				local bottom = t * tierH - 2
+				for _ = 1, own:NextInteger(D.MesaSlabs[1], D.MesaSlabs[2]) do
+					local sx = size.X * scale * own:NextNumber(D.MesaSlabSize[1], D.MesaSlabSize[2])
+					local sz = size.Z * scale * own:NextNumber(D.MesaSlabSize[1], D.MesaSlabSize[2])
+					local off = Vector3.new(
+						own:NextNumber(-D.MesaOffset, D.MesaOffset) * size.X * scale,
+						0,
+						own:NextNumber(-D.MesaOffset, D.MesaOffset) * size.Z * scale
+					)
+					local h = tierH * own:NextNumber(D.MesaSlabHeight[1], D.MesaSlabHeight[2])
+						+ (if t == 0 then 2 else 0)
+					terrain:FillBlock(
+						CFrame.new(x + off.X, bottom + h / 2, z + off.Z)
+							* CFrame.Angles(0, turn + own:NextNumber(-D.MesaTwist, D.MesaTwist), 0),
+						Vector3.new(sx, h, sz),
+						Enum.Material.Sandstone
+					)
+				end
+				scale *= own:NextNumber(D.MesaShrink[1], D.MesaShrink[2])
+			end
 		end
 		-- sandstone outcrops: a few rock balls half sunk in the sand, round the dunes
 		for _ = 1, D.Outcrops do
@@ -1273,6 +1331,16 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				0,
 				ds.z + random:NextNumber(-ds.d / 2 + 30, ds.d / 2 - 30)
 			)
+			local buried = false
+			for _, me in mesas do
+				if Vector2.new(at.X - me.X, at.Z - me.Y).Magnitude < me.Z then
+					buried = true
+					break
+				end
+			end
+			if buried then
+				continue
+			end
 			local m = prop(props, "Cactus")
 			post(m, 14, 2.4, at, green)
 			post(m, 5, 1.6, at + Vector3.new(2.6, 6, 0), green)
@@ -1620,6 +1688,15 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		terrain:FillCylinder(CFrame.new(p.x, -2.5, p.z), 4, W.PondRadius - 7, Enum.Material.Water)
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
 	end
+	-- what the roll keeps level (GroundKit): all of the above but the farm (only its yard stays flat) and the
+	-- wind farm (its turbines rise with the land)
+	local level: { Rules.Rect } = {}
+	for _, r in exclude do
+		if r ~= Country.Farm.Rect and r ~= Country.WindFarm.Rect then
+			table.insert(level, r)
+		end
+	end
+	table.insert(level, CountryKit.farmYard())
 	-- what's still open: strips of woods, then low hills between them (Config/Country Meadow)
 	local M = Country.Meadow
 	local woodRadius = CountryKit.beltLength * M.WoodScale[2] / 2
@@ -1654,6 +1731,29 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			Enum.Material.Grass
 		)
 	end
+	-- the open grass rolls, worn paths cross it, and what stands on it rises with it (GroundKit)
+	local paths = GroundKit.paths(level, seaEdge, reach, Random.new(Country.Roll.Seed))
+	GroundKit.roll(level, paths, seaEdge, reach)
+	GroundKit.lift({ static, props, buildings }, level, seaEdge)
+	-- the zones' dressing on the finished ground (ZoneKit), before the greenery so palms keep off it
+	local farmYard = CountryKit.farmYard()
+	for _, place in
+		ZoneKit.build({
+			static = static,
+			buildings = buildings,
+			props = props,
+			port = zones.port,
+			stunt = zones.stunt,
+			seaEdge = seaEdge,
+			connector = RG.Connector,
+			yard = Vector3.new(farmYard.x, 0, farmYard.z),
+			beaches = CountryKit.beaches,
+		})
+	do
+		table.insert(places, place)
+	end
+	-- tufts, bushes, rocks, crop rows and palms on the finished ground (FoliageKit)
+	FoliageKit.build(static, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 

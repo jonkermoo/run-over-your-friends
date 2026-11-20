@@ -45,4 +45,5 @@ return table.freeze({
 		Lamps = 1, -- per path arm
 	}),
 	HomeTrees = 3, -- in the gardens behind each street of homes
+	TreeClear = 4, -- they keep this far off the hedges, beds and playground in the block's middle
 })

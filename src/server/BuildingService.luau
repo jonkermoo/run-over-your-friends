@@ -31,7 +31,16 @@ local CFG = World.Debris
 local COLLAPSE = Smash.Collapse
 local CRUMBLE = Smash.Crumble
 
-type Chunk = { cf: CFrame, transparency: number, glass: boolean, group: string? }
+-- `ghost` / `unhit`: built not to collide (window trim, a tree crown over a road) / not to be hit by a query (that
+-- crown); a part stood back up keeps how it was built
+type Chunk = {
+	cf: CFrame,
+	transparency: number,
+	glass: boolean,
+	group: string?,
+	ghost: boolean?,
+	unhit: boolean?,
+}
 local chunks: { [BasePart]: Chunk } = {}
 -- whole buildings that can come down: their Fixed floors and roofs, every part, and which are down right now
 local structure: { [BasePart]: Chunk } = {}
@@ -56,6 +65,8 @@ function BuildingService.register(folder: Folder)
 				cf = p.CFrame,
 				transparency = p.Transparency,
 				glass = p:GetAttribute("Glass") == true,
+				ghost = not p.CanCollide or nil,
+				unhit = not p.CanQuery or nil,
 			}
 			if p:GetAttribute("Fixed") then
 				structure[p] = chunk
@@ -93,6 +104,8 @@ function BuildingService.registerProps(folder: Folder)
 				transparency = p.Transparency,
 				glass = false,
 				group = p.CollisionGroup,
+				ghost = not p.CanCollide or nil,
+				unhit = not p.CanQuery or nil,
 			}
 		end
 	end
@@ -140,8 +153,8 @@ local function restore(part: BasePart, always: boolean?)
 	part.CFrame = c.cf
 	part.CollisionGroup = c.group or "Default"
 	part.Transparency = c.transparency
-	part.CanCollide = true
-	part.CanQuery = true
+	part.CanCollide = not c.ghost
+	part.CanQuery = not c.unhit
 	part:SetAttribute("Broken", nil)
 end
 

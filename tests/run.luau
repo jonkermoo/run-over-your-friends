@@ -3306,6 +3306,52 @@ local function checkLand()
 end
 checkLand()
 
+-- the countryside's roll and paths (Rules/Ground, Config/Country Roll): level on and near kept rects, gentle
+-- everywhere, and the repeatable every run
+local function checkGround()
+	local Country = require("../src/shared/Config/Country")
+	local LandCfg = require("../src/shared/Config/Land")
+	local Ground = require("../src/shared/Rules/Ground")
+	local Roll = Country.Roll
+	local rects = { { x = 0, z = 0, w = 400, d = 400 }, { x = 1500, z = 0, w = 100, d = 100 } }
+	local index = Ground.index(rects, Roll.Margin + Roll.Fade, Roll.Cell)
+	local seaEdge = -2100
+	check(
+		"ground: no roll inside a kept rect",
+		Ground.lift(Roll, index, LandCfg, seaEdge, 100, 50) == 0
+	)
+	check(
+		"ground: no roll just past its edge",
+		Ground.lift(Roll, index, LandCfg, seaEdge, 200 + Roll.Margin - 1, 0) == 0
+	)
+	check("ground: weight is full far from rects", Ground.weight(Roll, index, 1000, 1000) == 1)
+	local most, steep, repeatable = 0, 0, true
+	for i = 1, 400 do
+		local x, z = 600 + i * 7.3, -900 + (i % 37) * 41
+		local h = Ground.lift(Roll, index, LandCfg, seaEdge, x, z)
+		local h2 = Ground.lift(Roll, index, LandCfg, seaEdge, x + 4, z)
+		most = math.max(most, h)
+		steep = math.max(steep, math.abs(h2 - h) / 4)
+		repeatable = repeatable and h == Ground.lift(Roll, index, LandCfg, seaEdge, x, z)
+	end
+	check("ground: the roll rises somewhere", most > 2)
+	check("ground: never past its octaves' sum", most <= Ground.maxRise(Roll))
+	check("ground: gentle (under 1 in 3) for cars", steep < 1 / 3)
+	check("ground: the same every run", repeatable)
+	check("ground: none at sea", Ground.lift(Roll, index, LandCfg, seaEdge, seaEdge - 300, 0) == 0)
+	-- paths
+	local paths = { { { 0, 0 }, { 100, 0 }, { 100, 100 } } }
+	local pi = Ground.segIndex(paths, 10, Roll.Cell)
+	check("ground: on a path", Ground.pathDistance(pi, 50, 2) < 2.01)
+	check("ground: off a path", Ground.pathDistance(pi, 50, 60) >= 10)
+	-- fields
+	local FW = Country.Farm.WobbleWaves
+	local waves = { u = FW.u, v = FW.v, second = Country.Farm.WobbleSecond }
+	check("ground: a field covers its middle", Ground.inField(0, 0, 200, 100, 0.2, 9, waves, 0, 0))
+	check("ground: not far outside it", not Ground.inField(0, 0, 200, 100, 0.2, 9, waves, 0, 200))
+end
+checkGround()
+
 -- the road meshes were built from this exact layout (rebuild them with tools/roads when it changes)
 local function checkRoads()
 	local RoadLayout = require("../src/shared/Rules/RoadLayout")

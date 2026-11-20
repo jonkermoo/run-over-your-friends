@@ -5,6 +5,7 @@
 #   Blooms     a row of flower heads for a flower bed, 10 x 4 footprint (Greenery.flowerBed)
 #   Belt       a long strip of tree crowns on trunks for the woods round the map's edge (OutskirtsKit)
 #   Pine       a conifer: trunk and three stacked cones (forests)
+#   ...and the later sets below (low-poly greenery, roadside, window trim, suburb front yards)
 # Roblox (x, y, z) = Blender (-x, z, y); the shapes are symmetric enough that only up matters.
 import bpy, bmesh, sys, math, random
 from mathutils import Vector, Matrix
@@ -79,7 +80,13 @@ while x < 100:
         cyl(bm, (cx, cy, 0), 1.2, h + r * 0.5, segs=6)
         ico(bm, (cx, cy, h + r * 0.6), r, subdiv=2, squash=1.1)
     x += rng.uniform(14, 20)
-finish("Belt", bm, 12)
+# faceted like the low-poly set below: each vertex pushed in or out a little (its own stream, so the layout
+# of the strip above stays the same), drawn flat
+facet = random.Random(7)
+for v in bm.verts:
+    if v.co.z > 4:
+        v.co += Vector((facet.uniform(-0.9, 0.9), facet.uniform(-0.9, 0.9), facet.uniform(-0.9, 0.9)))
+finish("Belt", bm, 12, smooth=False)
 
 # Pine: 1 tall (trunk to tip), three cones
 bm = bmesh.new()
@@ -88,6 +95,322 @@ cone(bm, (0, 0, 0.15), 0.28, 0.4)
 cone(bm, (0, 0, 0.38), 0.22, 0.35)
 cone(bm, (0, 0, 0.6), 0.15, 0.4)
 finish("Pine", bm, 16, smooth=False)
+
+# ---- the chunky low-poly set (map redo, greenery): faceted, flat-shaded shapes. Their own random stream, so
+# the meshes above keep their exact shapes. Every new mesh is about 1 tall or 1 across; the game scales it.
+lp = random.Random(20261120)
+
+
+def lump(bm, centre, radius, squash=1.0, jitter=0.12, subdiv=1):
+    """A faceted lump: an icosphere with its vertices pushed in and out a little."""
+    m = Matrix.Translation(Vector(centre)) @ Matrix.Diagonal((radius, radius, radius * squash, 1))
+    geom = bmesh.ops.create_icosphere(bm, subdivisions=subdiv, radius=1.0, matrix=m)
+    for v in geom["verts"]:
+        d = v.co - Vector(centre)
+        v.co = Vector(centre) + d * (1 + lp.uniform(-jitter, jitter))
+
+
+def blade(bm, base, height, width, lean, turn):
+    """A thin three-sided spike leaning out (a grass blade, a palm frond rib): solid, so seen from both sides."""
+    bx, by, bz = base
+    tip = Vector((bx + math.cos(turn) * lean, by + math.sin(turn) * lean, bz + height))
+    w = width / 2
+    a = Vector((bx + math.cos(turn + 1.57) * w, by + math.sin(turn + 1.57) * w, bz))
+    b = Vector((bx + math.cos(turn - 1.57) * w, by + math.sin(turn - 1.57) * w, bz))
+    c = Vector((bx - math.cos(turn) * w * 0.6, by - math.sin(turn) * w * 0.6, bz))
+    vs = [bm.verts.new(p) for p in (a, b, c, tip)]
+    for f in ((vs[0], vs[1], vs[3]), (vs[1], vs[2], vs[3]), (vs[2], vs[0], vs[3]), (vs[0], vs[2], vs[1])):
+        bm.faces.new(f)
+
+
+def anchors(bm, lo, hi):
+    """Two specks at opposite corners: meshes that are placed together (a tuft and its flowers, a palm's trunk
+    and leaves) get the same box, so the game puts both at the same CFrame and size."""
+    for c in (lo, hi):
+        m = Matrix.Translation(Vector(c))
+        bmesh.ops.create_cone(bm, cap_ends=True, segments=3, radius1=0.004, radius2=0.0, depth=0.004, matrix=m)
+
+
+TUFT_BOX = ((-0.45, -0.45, 0.0), (0.45, 0.45, 1.05))
+PALM_BOX = ((-0.45, -0.45, 0.0), (0.6, 0.45, 1.12))
+
+# CrownA/B/C: three tree crowns, 1 across at their widest, bottom at z 0 (the game sits the crown on the trunk)
+for name, lumps in (
+    ("CrownA", [((0, 0, 0.45), 0.42, 0.95), ((0.28, 0.1, 0.32), 0.28, 0.9), ((-0.26, -0.12, 0.3), 0.27, 0.9), ((0.02, 0.05, 0.72), 0.24, 0.9)]),
+    ("CrownB", [((0, 0, 0.5), 0.4, 1.25), ((0.2, -0.18, 0.3), 0.25, 1.0), ((-0.18, 0.2, 0.32), 0.24, 1.0)]),
+    ("CrownC", [((0, 0, 0.32), 0.48, 0.65), ((0.3, 0.15, 0.25), 0.25, 0.7), ((-0.3, -0.12, 0.24), 0.24, 0.7), ((0.05, -0.28, 0.28), 0.22, 0.7), ((0, 0.05, 0.5), 0.3, 0.7)]),
+):
+    bm = bmesh.new()
+    for c, r, sq in lumps:
+        lump(bm, c, r, squash=sq, jitter=0.08, subdiv=2)
+    finish(name, bm, 20 + len(name), smooth=False)
+
+# BushA/B: low faceted bushes, 1 across
+for name, lumps in (
+    ("BushA", [((0, 0, 0.28), 0.4, 0.75), ((0.3, 0.05, 0.2), 0.24, 0.8), ((-0.28, -0.08, 0.18), 0.22, 0.8)]),
+    ("BushB", [((0, 0, 0.22), 0.34, 0.7), ((0.22, 0.2, 0.2), 0.26, 0.8), ((-0.2, 0.18, 0.18), 0.22, 0.8), ((0.05, -0.25, 0.17), 0.2, 0.8)]),
+):
+    bm = bmesh.new()
+    for c, r, sq in lumps:
+        lump(bm, c, r, squash=sq, jitter=0.08, subdiv=2)
+    finish(name, bm, 30, smooth=False)
+
+# Tuft: a clump of grass blades, 1 tall
+bm = bmesh.new()
+for k in range(9):
+    a = lp.uniform(0, math.pi * 2)
+    d = lp.uniform(0, 0.12)
+    blade(bm, (math.cos(a) * d, math.sin(a) * d, 0), lp.uniform(0.6, 1.0), 0.09, lp.uniform(0.15, 0.35), a)
+anchors(bm, *TUFT_BOX)
+finish("Tuft", bm, 34, smooth=False)
+
+# Petals: flower heads for a Tuft (same 1-tall frame): a few small faceted heads at blade tips
+bm = bmesh.new()
+for k in range(5):
+    a = lp.uniform(0, math.pi * 2)
+    d = lp.uniform(0.1, 0.3)
+    lump(bm, (math.cos(a) * d, math.sin(a) * d, lp.uniform(0.55, 0.85)), 0.08, squash=0.7, jitter=0.05, subdiv=1)
+anchors(bm, *TUFT_BOX)
+finish("Petals", bm, 36, smooth=False)
+
+# RockA/B/C: faceted rocks, 1 across, half their height below z 0.3 so they sit sunk
+for name, sq in (("RockA", 0.6), ("RockB", 0.8), ("RockC", 0.45)):
+    bm = bmesh.new()
+    lump(bm, (0, 0, 0.25), 0.5, squash=sq, jitter=0.22, subdiv=1)
+    finish(name, bm, 38, smooth=False)
+
+# PalmTrunk: a gently bent trunk 1 tall, in ringed sections; PalmLeaves: drooping fronds round its top
+bm = bmesh.new()
+segs = 6
+for k in range(segs):
+    t0, t1 = k / segs, (k + 1) / segs
+    x0, x1 = 0.12 * t0 * t0, 0.12 * t1 * t1
+    m = Matrix.Translation(Vector(((x0 + x1) / 2, 0, (t0 + t1) / 2)))
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=6, radius1=0.045 - 0.012 * t0, radius2=0.04 - 0.012 * t1, depth=1 / segs * 1.02, matrix=m)
+anchors(bm, *PALM_BOX)
+finish("PalmTrunk", bm, 42, smooth=False)
+bm = bmesh.new()
+for k in range(8):
+    a = k / 8 * math.pi * 2 + lp.uniform(-0.2, 0.2)
+    # each frond: a flat leaf drooping from the crown: a long thin diamond bent down in two pieces
+    top = Vector((0.12, 0, 1.0))
+    mid = top + Vector((math.cos(a) * 0.22, math.sin(a) * 0.22, 0.06))
+    end = top + Vector((math.cos(a) * 0.42, math.sin(a) * 0.42, -0.14))
+    side = Vector((-math.sin(a), math.cos(a), 0)) * 0.07
+    pts = [top, mid + side, end, mid - side]
+    up = Vector((0, 0, 0.012))
+    vs = [bm.verts.new(p) for p in pts] + [bm.verts.new(p + up) for p in pts]
+    bm.faces.new((vs[0], vs[1], vs[2], vs[3]))
+    bm.faces.new((vs[7], vs[6], vs[5], vs[4]))
+    for i in range(4):
+        j = (i + 1) % 4
+        bm.faces.new((vs[i], vs[4 + i], vs[4 + j], vs[j]))
+lump(bm, (0.12, 0, 0.98), 0.07, squash=0.8, jitter=0.05)
+anchors(bm, *PALM_BOX)
+finish("PalmLeaves", bm, 44, smooth=False)
+
+# CropRows: a 1 x 1 tile of six low ridged crop rows (along x), 0.12 tall, flat bottom at z 0
+bm = bmesh.new()
+for k in range(6):
+    y = -0.5 + (k + 0.5) / 6
+    for seg in range(4):
+        x0 = -0.5 + seg / 4
+        m = Matrix.Translation(Vector((x0 + 0.125, y, 0.06))) @ Matrix.Diagonal((0.125, 0.05, 0.06, 1))
+        geom = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0, matrix=m)
+        for v in geom["verts"]:
+            v.co.z = max(v.co.z, 0.0) + lp.uniform(0, 0.02) * (1 if v.co.z > 0.05 else 0)
+finish("CropRows", bm, 46, smooth=False)
+
+# ---- streets (map redo, streets): a wooden power pole and a split-rail fence, one wood colour each
+
+# Pole: 1 tall; a crossbar near the top, an insulator on each end and one on top; wires hang from the
+# crossbar's ends (the game knows where: Config/Roadside Poles ArmAcross/ArmUp)
+bm = bmesh.new()
+cyl(bm, (0, 0, 0), 0.018, 1.0, segs=6)
+m = Matrix.Translation(Vector((0, 0, 0.93))) @ Matrix.Diagonal((0.15, 0.014, 0.014, 1))
+bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+for x in (-0.13, 0.13):
+    cyl(bm, (x, 0, 0.944), 0.008, 0.03, segs=6)
+cyl(bm, (0, 0, 1.0), 0.008, 0.025, segs=6)
+finish("Pole", bm, 50, smooth=False)
+
+# RailFence: one section 1 long (along x), 0.22 tall: three posts and two rails, the posts a little proud of
+# the rails so nothing shares a face
+bm = bmesh.new()
+for x in (-0.48, 0.0, 0.48):
+    m = Matrix.Translation(Vector((x, 0, 0.11))) @ Matrix.Diagonal((0.018, 0.018, 0.11, 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+for z in (0.08, 0.17):
+    m = Matrix.Translation(Vector((0, 0.022, z))) @ Matrix.Diagonal((0.5, 0.006, 0.014, 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+finish("RailFence", bm, 52, smooth=False)
+
+# ---- house window trim (part savings): pieces that were two parts each, joined, in studs for a 12-stud storey
+# with a 1-stud wall (Config/Houses). x runs along the wall (1 long; the game stretches it to the window), z up
+# from the storey's floor, y out from the wall's face (Roblox z = Blender y).
+
+
+def box(bm, lo, hi):
+    c = [(a + b) / 2 for a, b in zip(lo, hi)]
+    h = [(b - a) / 2 for a, b in zip(lo, hi)]
+    m = Matrix.Translation(Vector(c)) @ Matrix.Diagonal((h[0], h[1], h[2], 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+
+
+# WindowTrim: a real window's sill (3.1-3.5 up, 0.8 into the wall to 1.2 out) and header (9.0-9.5 up, 0.65 in
+# to 0.85 out); the header is a little shorter than the sill (7 long sill over a 6.6 header)
+bm = bmesh.new()
+box(bm, (-0.5, -0.8, 3.1), (0.5, 1.2, 3.5))
+box(bm, (-0.4715, -0.65, 9.0), (0.4715, 0.85, 9.5))
+finish("WindowTrim", bm, 56, smooth=False)
+
+# PaneTrim: a framed pane's backing plate (3.2-10.0 up, 0.16 out) and its sill (2.875-3.225 up, 0.7 out),
+# the plate 5.8 long over a 6.2 sill
+bm = bmesh.new()
+box(bm, (-0.4677, 0.0, 3.2), (0.4677, 0.16, 10.0))
+box(bm, (-0.5, 0.0, 2.875), (0.5, 0.7, 3.225))
+finish("PaneTrim", bm, 58, smooth=False)
+
+# ---- suburb front yards (map redo, stage 5), in studs
+
+
+def rod(bm, a, b, r, segs=6):
+    """A round bar from a to b."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    rot = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    m = Matrix.Translation((a + b) / 2) @ rot
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=r, depth=d.length, matrix=m)
+
+
+def ring(bm, centre, radius, tube, segs=14, sides=4):
+    """An upright ring (a wheel) in the x-z plane round `centre`."""
+    cx, cy, cz = centre
+    grid = []
+    for i in range(segs):
+        a = 2 * math.pi * i / segs
+        row = []
+        for j in range(sides):
+            b = 2 * math.pi * j / sides + math.pi / 4
+            r = radius + tube * math.cos(b)
+            row.append(bm.verts.new((cx + r * math.cos(a), cy + tube * math.sin(b), cz + r * math.sin(a))))
+        grid.append(row)
+    for i in range(segs):
+        for j in range(sides):
+            a, b = grid[i][j], grid[(i + 1) % segs][j]
+            c, d = grid[(i + 1) % segs][(j + 1) % sides], grid[i][(j + 1) % sides]
+            bm.faces.new((a, b, c, d))
+
+
+# Picket: a run of white picket fence 16 long (x), 3.6 tall: 20 pointed pickets in front of two rails, a square
+# post at each end with a cap; the rails' ends sit inside the posts, the pickets stand a little proud of the rails
+bm = bmesh.new()
+for k in range(20):
+    x = -7.4 + k * 14.8 / 19
+    box(bm, (x - 0.22, -0.06, 0.15), (x + 0.22, 0.06, 3.0))
+    tip = [bm.verts.new(p) for p in (
+        (x - 0.22, -0.06, 3.0), (x + 0.22, -0.06, 3.0), (x + 0.22, 0.06, 3.0), (x - 0.22, 0.06, 3.0),
+    )]
+    apex = bm.verts.new((x, 0, 3.4))
+    for i in range(4):
+        bm.faces.new((tip[i], tip[(i + 1) % 4], apex))
+    bm.faces.new(tip[::-1])
+for z in (0.9, 2.3):
+    box(bm, (-7.8, 0.07, z - 0.16), (7.8, 0.23, z + 0.16))
+for x in (-8.0, 8.0):
+    box(bm, (x - 0.3, -0.12, 0.0), (x + 0.3, 0.32, 3.3))
+    box(bm, (x - 0.38, -0.2, 3.3), (x + 0.38, 0.4, 3.55))
+finish("Picket", bm, 60, smooth=False)
+
+# Bike: a kid's bike 5.4 long (x), 3.5 tall, side on in x-z: two ring wheels, a diamond frame, a fork, bars
+# across and a saddle
+bm = bmesh.new()
+for x in (-1.75, 1.75):
+    ring(bm, (x, 0, 1.15), 1.0, 0.13)
+    rod(bm, (x, -0.12, 1.15), (x, 0.12, 1.15), 0.12)  # the hub
+rear, crank = (-1.75, 0, 1.15), (-0.15, 0, 1.05)
+seat, head = (-0.6, 0, 2.55), (1.25, 0, 2.45)
+for a, b in ((rear, crank), (rear, seat), (crank, seat), (seat, head), (crank, head), (head, (1.75, 0, 1.15))):
+    rod(bm, a, b, 0.09)
+rod(bm, head, (1.15, 0, 3.2), 0.08)
+rod(bm, (1.15, -0.85, 3.2), (1.15, 0.85, 3.2), 0.08)
+rod(bm, seat, (-0.7, 0, 3.0), 0.07)
+box(bm, (-1.15, -0.22, 3.0), (-0.3, 0.22, 3.2))
+finish("Bike", bm, 64, smooth=False)
+
+# ---- the zones (map redo, stage 6), in studs
+
+# Tractor + TractorWheels: a farm tractor 13 long (x, the front at -x... facing -x in Blender = +x in Roblox),
+# 8.6 tall; the body (hood, cab with a roof, exhaust, fenders) and the wheels (two big at the back, two small at
+# the front) are separate meshes for two colours, placed together (shared box)
+TRACTOR_BOX = ((-6.6, -3.4, 0.0), (6.6, 3.4, 8.6))
+bm = bmesh.new()
+box(bm, (-5.6, -1.6, 2.0), (1.0, 1.6, 4.6))  # hood
+box(bm, (0.6, -2.0, 1.6), (4.6, 2.0, 3.4))  # chassis under the cab
+box(bm, (1.0, -1.9, 3.4), (4.4, 1.9, 4.0))  # cab floor
+for x in (1.15, 4.25):  # cab posts
+    for y in (-1.75, 1.75):
+        box(bm, (x - 0.15, y - 0.15, 4.0), (x + 0.15, y + 0.15, 8.2))
+box(bm, (0.8, -2.2, 8.2), (4.7, 2.2, 8.6))  # roof
+box(bm, (2.2, -0.6, 4.0), (3.6, 0.6, 5.4))  # seat
+for y in (-2.9, 2.9):  # rear fenders over the big wheels
+    box(bm, (1.2, y - 0.6, 5.2), (5.4, y + 0.6, 5.6))
+cyl(bm, (-4.2, 0.9, 4.6), 0.18, 2.4, segs=6)  # exhaust
+box(bm, (-5.8, -1.2, 2.4), (-5.6, 1.2, 4.2))  # grille
+anchors(bm, *TRACTOR_BOX)
+finish("Tractor", bm, 70, smooth=False)
+bm = bmesh.new()
+
+
+def wheel(bm, x, y, r, w, segs=14):
+    m = Matrix.Translation(Vector((x, y, r))) @ Matrix.Rotation(math.pi / 2, 4, "X")
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=r, depth=w, matrix=m)
+
+
+for y in (-2.85, 2.85):
+    wheel(bm, 3.2, y, 2.9, 1.1)
+    wheel(bm, -4.2, y * 0.75, 1.6, 0.8)
+anchors(bm, *TRACTOR_BOX)
+finish("TractorWheels", bm, 70, smooth=False)
+
+# Lounger: a sun lounger 6.4 long (x), the back raised at +x, on four short legs
+bm = bmesh.new()
+box(bm, (-3.2, -1.2, 1.0), (1.4, 1.2, 1.35))
+v = [bm.verts.new(p) for p in ((1.4, -1.2, 1.0), (1.4, 1.2, 1.0), (1.4, 1.2, 1.35), (1.4, -1.2, 1.35))]
+w = [bm.verts.new(p) for p in ((3.0, -1.2, 2.7), (3.0, 1.2, 2.7), (2.85, 1.2, 3.0), (2.85, -1.2, 3.0))]
+for i in range(4):
+    bm.faces.new((v[i], v[(i + 1) % 4], w[(i + 1) % 4], w[i]))
+bm.faces.new(v[::-1])
+bm.faces.new(w)
+for x in (-2.9, 1.1):
+    for y in (-1.0, 1.0):
+        box(bm, (x - 0.15, y - 0.15, 0.0), (x + 0.15, y + 0.15, 1.0))
+finish("Lounger", bm, 76, smooth=False)
+
+# Bollard: a cast-iron mooring bollard 2.6 tall: a base plate, a waisted post and a wide cap
+bm = bmesh.new()
+cyl(bm, (0, 0, 0), 1.3, 0.3, segs=10)
+bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=0.95, radius2=0.7, depth=1.6,
+                      matrix=Matrix.Translation(Vector((0, 0, 1.1))))
+cyl(bm, (0, 0, 1.9), 1.15, 0.7, segs=10)
+finish("Bollard", bm, 78, smooth=False)
+
+# Barrier: a jersey barrier 12 long (x), 3.2 tall: a wide foot sloping in to a narrow top
+bm = bmesh.new()
+prof = ((-1.2, 0.0), (1.2, 0.0), (1.2, 0.3), (0.55, 1.0), (0.35, 3.2), (-0.35, 3.2), (-0.55, 1.0), (-1.2, 0.3))
+a = [bm.verts.new((-6.0, y, z)) for y, z in prof]
+b = [bm.verts.new((6.0, y, z)) for y, z in prof]
+n = len(prof)
+for i in range(n):
+    bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+bm.faces.new(a[::-1])
+bm.faces.new(b)
+finish("Barrier", bm, 80, smooth=False)
+
+# Lifebuoy: a ring 2.4 across standing up (x-z plane)
+bm = bmesh.new()
+ring(bm, (0, 0, 1.2), 0.9, 0.3, segs=16, sides=6)
+finish("Lifebuoy", bm, 84, smooth=True)
 
 bpy.ops.export_scene.fbx(
     filepath=out,
@@ -117,11 +440,17 @@ if preview:
     mat.use_nodes = True
     mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.2, 0.45, 0.2, 1)
     # show each at a viewable size side by side (preview copies, not exported)
-    for name, s, at in (("Crown", 6, -30), ("Blooms", 1.2, -15), ("Belt", 0.25, 5), ("Pine", 14, 35)):
+    for name, s, at in (
+        ("Crown", 6, -30), ("Blooms", 1.2, -15), ("Belt", 0.25, 5), ("Pine", 14, 35),
+        ("CrownA", 10, -45), ("CrownB", 10, -33), ("CrownC", 10, -21), ("BushA", 6, -10), ("BushB", 6, -3),
+        ("Tuft", 4, 3), ("Petals", 4, 3), ("RockA", 5, 9), ("RockB", 5, 15), ("RockC", 5, 21),
+        ("PalmTrunk", 14, 28), ("PalmLeaves", 14, 28), ("CropRows", 8, 42),
+        ("Picket", 1, 52), ("Bike", 2, 64),
+    ):
         src = bpy.data.objects[name]
         c = src.copy()
         c.data = src.data
-        c.location = (at, 0, 0)
+        c.location = (at, 0 if name in ("Crown", "Blooms", "Belt", "Pine") else -28, 0)
         c.scale = (s, s, s)
         c.data.materials.append(mat)
         sc.collection.objects.link(c)
