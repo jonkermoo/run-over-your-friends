@@ -220,6 +220,30 @@ for k in range(6):
             v.co.z = max(v.co.z, 0.0) + lp.uniform(0, 0.02) * (1 if v.co.z > 0.05 else 0)
 finish("CropRows", bm, 46, smooth=False)
 
+# ---- streets (map redo, streets): a wooden power pole and a split-rail fence, one wood colour each
+
+# Pole: 1 tall; a crossbar near the top, an insulator on each end and one on top; wires hang from the
+# crossbar's ends (the game knows where: Config/Roadside Poles ArmAcross/ArmUp)
+bm = bmesh.new()
+cyl(bm, (0, 0, 0), 0.018, 1.0, segs=6)
+m = Matrix.Translation(Vector((0, 0, 0.93))) @ Matrix.Diagonal((0.15, 0.014, 0.014, 1))
+bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+for x in (-0.13, 0.13):
+    cyl(bm, (x, 0, 0.944), 0.008, 0.03, segs=6)
+cyl(bm, (0, 0, 1.0), 0.008, 0.025, segs=6)
+finish("Pole", bm, 50, smooth=False)
+
+# RailFence: one section 1 long (along x), 0.22 tall: three posts and two rails, the posts a little proud of
+# the rails so nothing shares a face
+bm = bmesh.new()
+for x in (-0.48, 0.0, 0.48):
+    m = Matrix.Translation(Vector((x, 0, 0.11))) @ Matrix.Diagonal((0.018, 0.018, 0.11, 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+for z in (0.08, 0.17):
+    m = Matrix.Translation(Vector((0, 0.022, z))) @ Matrix.Diagonal((0.5, 0.006, 0.014, 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+finish("RailFence", bm, 52, smooth=False)
+
 bpy.ops.export_scene.fbx(
     filepath=out,
     use_selection=False,

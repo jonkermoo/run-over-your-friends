@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Suburbs)
+local Roadside = require(ReplicatedStorage.Shared.Config.Roadside)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
 local Lots = require(ReplicatedStorage.Shared.Config.Lots)
 local RoadMeshes = require(ReplicatedStorage.Shared.Config.RoadMeshes)
@@ -15,6 +16,7 @@ local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
 local Greenery = require(script.Parent.Greenery)
 local HouseKit = require(script.Parent.HouseKit)
 local LotKit = require(script.Parent.LotKit)
+local RoadsideKit = require(script.Parent.RoadsideKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
 local Terra = require(script.Parent.Terra)
@@ -405,6 +407,8 @@ local function hood(
 	local sideOff = roadHalf + Cfg.Verge + Cfg.Sidewalk / 2
 	local clearMouth = roadHalf + Cfg.Verge + Cfg.Sidewalk + 3
 	local lampSide = 1
+	-- what roadside poles keep clear of: lamps, driveways and paths (segments on the ground)
+	local blockers: { { a: Vector3, b: Vector3 } } = {}
 	for n, st in streets do
 		local last = st.pts[#st.pts]
 		for _, side in { -1, 1 } do
@@ -428,6 +432,7 @@ local function hood(
 				local p = st.pts[i] + right * lampSide * (roadHalf + Cfg.Verge + Cfg.Sidewalk + 1)
 				if nearest(p, n) > clearMouth + 4 then
 					LotKit.lamp(props, p)
+					table.insert(blockers, { a = p, b = p })
 					walked = 0
 					lampSide = -lampSide
 				end
@@ -495,6 +500,10 @@ local function hood(
 		local driveLen = setback - roadHalf
 		local dl = side * (T.width / 2 - Cfg.Driveway / 2 - 1)
 		local drive = c + face * (T.depth / 2 + driveLen / 2) + right * dl
+		table.insert(
+			blockers,
+			{ a = drive - face * (driveLen / 2 + 2), b = drive + face * (driveLen / 2 + 2) }
+		)
 		part(
 			folder,
 			Vector3.new(Cfg.Driveway, 0.6, driveLen + 0.5),
@@ -584,6 +593,62 @@ local function hood(
 			end
 		end
 		Pace.step() -- many houses: yield now and then so the build doesn't time out
+	end
+
+	-- roadside dressing (RoadsideKit, Config/Roadside): power poles on the verge along one side of every street
+	-- with wires between them, clear of junctions, cul-de-sacs, driveways and lamps; along the feeder road a pole
+	-- line on the side away from the name board, split-rail fences on both sides and a bus stop
+	local RP, RF, RB = Roadside.Poles, Roadside.Fence, Roadside.BusStop
+	local function nearBlocker(p: Vector3): boolean
+		for _, bl in blockers do
+			local ab = bl.b - bl.a
+			local len2 = ab:Dot(ab)
+			local t = if len2 > 0 then math.clamp((p - bl.a):Dot(ab) / len2, 0, 1) else 0
+			local q = bl.a + ab * t
+			if Vector2.new(q.X - p.X, q.Z - p.Z).Magnitude < RP.Clear + Cfg.Driveway / 2 then
+				return true
+			end
+		end
+		return false
+	end
+	local poleOff = roadHalf + Cfg.Verge / 2
+	for n, st in streets do
+		local side = if n % 2 == 0 then 1 else -1
+		local line = {}
+		for i = 1, #st.pts do
+			local _, right = frame(st.pts, i)
+			table.insert(line, st.pts[i] + right * side * poleOff)
+		end
+		local last = st.pts[#st.pts]
+		RoadsideKit.poles(folder, line, function(p: Vector3): boolean
+			return nearest(p, n) < clearMouth + RP.MouthClear
+				or (st.bulb and (p - last).Magnitude < Cfg.Bulb + RP.BulbClear)
+				or nearBlocker(p)
+		end)
+	end
+	local ground = Vector3.new(0, TERRAIN_TOP, 0)
+	local edge = F.width / 2
+	local stopAt = b - dir * (Cfg.SignBack + RB.Back) - perp * (edge + RB.Out + RB.Shelter[3] / 2)
+	RoadsideKit.busStop(props, stopAt + ground, perp)
+	local function nearStop(p: Vector3): boolean
+		return Vector2.new(p.X - stopAt.X, p.Z - stopAt.Z).Magnitude < RB.Shelter[1]
+	end
+	local feedFrom = rampTo * Vector3.new(1, 0, 1)
+	RoadsideKit.poles(folder, {
+		feedFrom - perp * (edge + RP.RoadOut) + ground,
+		b - perp * (edge + RP.RoadOut) + ground,
+	}, nearStop)
+	for _, s in { -1, 1 } do
+		local off = perp * s * (edge + RF.Out)
+		RoadsideKit.fence(
+			folder,
+			feedFrom + dir * RF.EndGap + off + ground,
+			b - dir * RF.EndGap + off + ground,
+			function(p: Vector3): boolean
+				return nearStop(p)
+					or Vector2.new(p.X - signAt.X, p.Z - signAt.Z).Magnitude < RF.SignClear
+			end
+		)
 	end
 
 	-- small clumps of trees on the open grass left between the gardens

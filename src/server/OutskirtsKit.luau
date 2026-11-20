@@ -14,9 +14,11 @@ local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local CountryKit = require(script.Parent.CountryKit)
 local Country = require(ReplicatedStorage.Shared.Config.Country)
+local Roadside = require(ReplicatedStorage.Shared.Config.Roadside)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
 local GroundKit = require(script.Parent.GroundKit)
+local RoadsideKit = require(script.Parent.RoadsideKit)
 local FoliageKit = require(script.Parent.FoliageKit)
 local SuburbKit = require(script.Parent.SuburbKit)
 local Pace = require(script.Parent.Pace)
@@ -496,6 +498,34 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			COLORS.road,
 			Enum.Material.Asphalt,
 			1
+		)
+		-- split-rail fences down both sides, a pole line with wires down one (RoadsideKit)
+		local along = if alongX
+			then Vector3.new(math.sign(z.x), 0, 0)
+			else Vector3.new(0, 0, math.sign(z.z))
+		local across = Vector3.new(-along.Z, 0, along.X)
+		local halfRoad = RG.Connector / 2
+		local from = along * ring
+		local to = along * (ring + len)
+		local RF = Roadside.Fence
+		for _, s in { -1, 1 } do
+			local off = across * s * (halfRoad + RF.Out)
+			RoadsideKit.fence(
+				static,
+				from + along * RF.EndGap + off,
+				to - along * RF.EndGap + off,
+				function()
+					return false
+				end
+			)
+		end
+		local poleOff = across * (halfRoad + Roadside.Poles.RoadOut)
+		RoadsideKit.poles(
+			static,
+			{ from + along * RF.EndGap + poleOff, to - along * RF.EndGap + poleOff },
+			function()
+				return false
+			end
 		)
 	end
 
