@@ -405,6 +405,20 @@ local function champions(static: Instance, cx: number, cz: number)
 		).CanCollide =
 			false
 	end
+	-- the steps turn on screen only, so an invisible round wall over the circle they sweep (up past the avatars'
+	-- heads) is what people and cars bump into
+	local wall = part(
+		static,
+		Vector3.new(P.WallHeight, P.WallRadius * 2, P.WallRadius * 2),
+		CFrame.new(cx, floor + P.WallHeight / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
+		COLORS.concrete,
+		nil,
+		1
+	)
+	wall.Shape = Enum.PartType.Cylinder
+	wall.Name = "PodiumWall"
+	wall.CanQuery = false -- the camera sees through it
+	wall.CastShadow = false
 	local postZ = cz + P.StepDepth / 2 + 1.5 -- behind the steps (their plates and avatars face -Z)
 	part(
 		stage,

@@ -117,6 +117,8 @@ return table.freeze({
 				table.freeze({ 232, 52, 52 }), -- red
 			}),
 			PostHeight = 34, -- the trophy's post, behind the middle step
+			WallHeight = 34, -- the invisible wall round the turning steps, up past the avatars' heads
+			WallRadius = 18.5, -- covers the circle the steps and the trophy post sweep (tests/champions)
 			TrophyScale = 1.2,
 		}),
 		Corner = table.freeze({ reach = 92, spread = 11, people = 6 }), -- the crowd at each corner
