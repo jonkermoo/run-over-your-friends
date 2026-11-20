@@ -12,6 +12,7 @@ local Outskirts = require(ReplicatedStorage.Shared.Config.Outskirts)
 local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Greenery = require(script.Parent.Greenery)
+local GroundKit = require(script.Parent.GroundKit)
 local PaintKit = require(script.Parent.PaintKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -462,26 +463,16 @@ local function edges(ctx: Ctx)
 	end
 end
 
--- crop rows on a field of soil, w along x
-local function field(parent: Instance, centre: Vector3, w: number, d: number, crop: Color3)
-	local F = Cfg.Farm
-	part(
-		parent,
-		Vector3.new(w, 1, d),
-		CFrame.new(centre + Vector3.new(0, -0.44, 0)),
-		rgb(F.Soil),
-		Enum.Material.Ground
-	)
-	local pitch = d / F.Rows
-	for k = 0, F.Rows - 1 do
-		paint(
-			parent,
-			Vector3.new(w - 6, F.RowHeight, pitch * 0.55),
-			CFrame.new(centre + Vector3.new(0, 0.06 + F.RowHeight / 2, -d / 2 + (k + 0.5) * pitch)),
-			crop
-		).Material =
-			Enum.Material.LeafyGrass
-	end
+-- a crop field drawn into the terrain (GroundKit): rows of crop and soil, w along the rows (x before turning)
+local function field(
+	centre: Vector3,
+	w: number,
+	d: number,
+	angle: number,
+	wobble: number,
+	crop: string
+)
+	GroundKit.field(centre.X, centre.Z, w, d, angle, wobble, crop)
 end
 
 -- a gable-roofed shed w x d (w along `along`), walls h, roof rising `roof` more; smashable
@@ -745,11 +736,16 @@ local function corral(parent: Instance, props: Instance, cf: CFrame)
 	)
 end
 
+-- the farm's yard (barn, silo, corral) middle: east of the fields
+local function yardCentre(): Vector3
+	local r = Cfg.Farm.Rect
+	return Vector3.new(r.x + r.w * Cfg.Farm.YardAt, 0, r.z)
+end
+
 local function farm(ctx: Ctx)
 	local F = Cfg.Farm
 	local r = F.Rect
 	local random = ctx.random
-	local folder = model(ctx.static, "Farm")
 	local cols, rows = F.Fields[1], F.Fields[2]
 	-- fields fill the western three quarters, the yard the east
 	local fw = (r.w * 0.72 - F.FieldGap * (cols + 1)) / cols
@@ -765,13 +761,18 @@ local function farm(ctx: Ctx)
 				0,
 				top + F.FieldGap + fd / 2 + j * (fd + F.FieldGap)
 			)
-			field(folder, c, fw, fd, rgb(F.Crops[(crop - 1) % #F.Crops + 1]))
-			-- a wind break of trees along the field's north side
+			-- its own stream, so the rest of the countryside's layout doesn't shift
+			local angle = Random.new(F.TurnSeed + crop):NextNumber(-F.Turn, F.Turn)
+			field(c, fw, fd, angle, F.Wobble, F.CropMaterials[(crop - 1) % #F.CropMaterials + 1])
+			-- a wind break of trees along the field's north side, turned with it (on its own, so the roll can
+			-- lift each one)
 			local belt = Greenery.mesh(
-				folder,
+				ctx.static,
 				"Belt",
 				fw / 230,
-				CFrame.new(c + Vector3.new(0, 0, -fd / 2 - F.FieldGap / 2))
+				CFrame.new(c)
+						* CFrame.Angles(0, -angle, 0)
+						* CFrame.new(0, 0, -fd / 2 - F.FieldGap / 2)
 					+ Vector3.new(0, 19 * fw / 230 - 2, 0),
 				pick(random, Cfg.Edge.BeltColours)
 			)
@@ -779,7 +780,7 @@ local function farm(ctx: Ctx)
 		end
 	end
 	-- the yard: barn and silo facing west toward the fields, hay bales round them
-	local yard = Vector3.new(r.x + r.w * 0.36, 0, r.z)
+	local yard = yardCentre()
 	local _, barnCf =
 		bigBarn(ctx.buildings, yard + Vector3.new(0, 0, -40), Vector3.new(-1, 0, 0), rgb(F.BarnRed))
 	-- a dirt yard in front of the doors (terrain), and a corral beside it
@@ -927,18 +928,21 @@ local function beaches(ctx: Ctx)
 	local half = ctx.half
 	local x0 = ctx.seaEdge
 	local folder = model(ctx.static, "Beaches")
+	local pierZ = ctx.port.z + ctx.port.d / 2 + B.Gap + (half - ctx.port.d / 2) * 0.4 -- the pier off the south beach
 	for _, side in { -1, 1 } do
 		local from = ctx.port.z + side * (ctx.port.d / 2 + B.Gap)
 		local len = half - math.abs(from)
 		local zc = from + side * len / 2
 		-- (the sand itself is terrain, laid with the ground: OutskirtsKit)
 		-- umbrellas with a towel under each
+		local taken: { Vector3 } = {}
 		for _ = 1, B.Umbrellas do
 			local at = Vector3.new(
 				x0 + random:NextNumber(25, B.Width - 30),
 				0,
 				zc + random:NextNumber(-len / 2 + 40, len / 2 - 120)
 			)
+			table.insert(taken, at)
 			local colour = pick(random, B.UmbrellaColours)
 			local m = prop(ctx.props, "Umbrella")
 			post(m, 10, 0.5, at, WHITE)
@@ -976,9 +980,51 @@ local function beaches(ctx: Ctx)
 			Color3.fromRGB(230, 70, 60)
 		)
 		part(tower, Vector3.new(11, 0.6, 11), CFrame.new(t + Vector3.new(0, 16.3, 0)), WHITE)
+		table.insert(taken, t)
+		-- dunes along the back of the beach, half on the grass (their own stream, so nothing else shifts)
+		local own = Random.new(B.DuneSeed + side)
+		local D = B.Dunes
+		for _ = 1, D.n do
+			local r = own:NextNumber(D.radius[1], D.radius[2])
+			local at = Vector3.new(
+				x0 + B.Width * own:NextNumber(D.from, D.to),
+				0,
+				zc + own:NextNumber(-len / 2 + D.endGap, len / 2 - D.endGap)
+			)
+			local clear = true
+			for _, p in taken do
+				if (Vector3.new(p.X, 0, p.Z) - at).Magnitude < r + D.clear then
+					clear = false
+					break
+				end
+			end
+			if clear then
+				bell(at.X, at.Z, r, own:NextNumber(D.height[1], D.height[2]), Enum.Material.Sand)
+			end
+		end
+		-- rocks at the water's edge
+		local RK = B.Rocks
+		for _ = 1, RK.n do
+			local cz = zc + own:NextNumber(-len / 2 + RK.endGap, len / 2 - RK.endGap)
+			if math.abs(cz - pierZ) < B.PierWidth + RK.pierGap then
+				continue
+			end
+			for _ = 1, own:NextInteger(RK.balls[1], RK.balls[2]) do
+				local size = own:NextNumber(RK.size[1], RK.size[2])
+				Terra.terrain:FillBall(
+					Vector3.new(
+						x0 + own:NextNumber(RK.spreadX[1], RK.spreadX[2]),
+						-size * 0.3,
+						cz + own:NextNumber(-RK.spreadZ, RK.spreadZ)
+					),
+					size / 2,
+					if own:NextNumber() < RK.rock then Enum.Material.Rock else Enum.Material.Slate
+				)
+			end
+		end
 	end
 	-- a pier out into the sea from the south beach
-	local pz = ctx.port.z + ctx.port.d / 2 + B.Gap + (half - ctx.port.d / 2) * 0.4
+	local pz = pierZ
 	local pier = model(ctx.buildings, "Pier")
 	part(
 		pier,
@@ -1496,14 +1542,15 @@ function CountryKit.cell(
 	local long = math.abs(along.X) * w + math.abs(along.Z) * d -- along the ring
 	local deep = math.abs(out.X) * w + math.abs(out.Z) * d -- toward the ring
 	if use == "field" then
-		local folder = model(ctx.static, "Field")
 		local fw, fd = long - 40, deep - 50
+		local F = Cfg.Farm
 		field(
-			folder,
 			centre,
 			math.abs(along.X) * fw + math.abs(along.Z) * fd,
 			math.abs(along.X) * fd + math.abs(along.Z) * fw,
-			pick(random, Cfg.Farm.Crops)
+			0,
+			F.Wobble * F.CellWobble,
+			F.CropMaterials[random:NextInteger(1, #F.CropMaterials)]
 		)
 	elseif use == "turbines" then
 		for _, e in { -1, 1 } do
@@ -1619,6 +1666,13 @@ function CountryKit.build(ctx: Ctx): { Rect }
 		Cfg.Forest.Rect,
 		{ x = ctx.seaEdge + Cfg.Beach.Width / 2, z = 0, w = Cfg.Beach.Width + 40, d = half * 2 },
 	}
+end
+
+-- the farm's yard (barn, silo, corral, bales): kept level when the land rolls round it
+function CountryKit.farmYard(): Rect
+	local keep = Cfg.Farm.YardKeep
+	local at = yardCentre()
+	return { x = at.X, z = at.Z, w = keep * 2, d = keep * 2 }
 end
 
 -- a low grass hill on the open ground inside the walls

@@ -16,6 +16,7 @@ local CountryKit = require(script.Parent.CountryKit)
 local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
+local GroundKit = require(script.Parent.GroundKit)
 local SuburbKit = require(script.Parent.SuburbKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -265,6 +266,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	workspace.Terrain:SetMaterialColor(Enum.Material.Rock, rgb(Country.TerrainRock))
 	workspace.Terrain:SetMaterialColor(Enum.Material.Sand, rgb(Cfg.Desert.TerrainSand))
 	workspace.Terrain:SetMaterialColor(Enum.Material.Ground, rgb(C.dirt))
+	GroundKit.tint() -- the farm's soil and crops
 	terrain.WaterColor = rgb(C.water)
 	terrain.WaterWaveSize = LandCfg.WaterWave
 	terrain.WaterTransparency = LandCfg.WaterClear
@@ -1242,12 +1244,41 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				random:NextNumber(30, 50),
 				random:NextNumber(60, 100)
 			)
-			terrain:FillBlock(
-				CFrame.new(x, size.Y / 2 - 2, z)
-					* CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
-				size,
-				Enum.Material.Sandstone
+			local turn = random:NextNumber(0, math.pi)
+			-- stepped: tiers of a few overlapping turned slabs, each tier smaller, on a sand skirt (its own
+			-- stream, so the rest of the outskirts keeps its layout)
+			local own = Random.new(D.MesaSeed + k)
+			local tall = size.Y * D.MesaTall
+			mound(
+				x,
+				z,
+				math.max(size.X, size.Z) / 2 * (1 + D.MesaTalus),
+				tall * D.MesaTalusRise,
+				Enum.Material.Sand
 			)
+			local tierH = tall / D.MesaTiers
+			local scale = 1
+			for t = 0, D.MesaTiers - 1 do
+				local bottom = t * tierH - 2
+				for _ = 1, own:NextInteger(D.MesaSlabs[1], D.MesaSlabs[2]) do
+					local sx = size.X * scale * own:NextNumber(D.MesaSlabSize[1], D.MesaSlabSize[2])
+					local sz = size.Z * scale * own:NextNumber(D.MesaSlabSize[1], D.MesaSlabSize[2])
+					local off = Vector3.new(
+						own:NextNumber(-D.MesaOffset, D.MesaOffset) * size.X * scale,
+						0,
+						own:NextNumber(-D.MesaOffset, D.MesaOffset) * size.Z * scale
+					)
+					local h = tierH * own:NextNumber(D.MesaSlabHeight[1], D.MesaSlabHeight[2])
+						+ (if t == 0 then 2 else 0)
+					terrain:FillBlock(
+						CFrame.new(x + off.X, bottom + h / 2, z + off.Z)
+							* CFrame.Angles(0, turn + own:NextNumber(-D.MesaTwist, D.MesaTwist), 0),
+						Vector3.new(sx, h, sz),
+						Enum.Material.Sandstone
+					)
+				end
+				scale *= own:NextNumber(D.MesaShrink[1], D.MesaShrink[2])
+			end
 		end
 		-- sandstone outcrops: a few rock balls half sunk in the sand, round the dunes
 		for _ = 1, D.Outcrops do
@@ -1620,6 +1651,14 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		terrain:FillCylinder(CFrame.new(p.x, -2.5, p.z), 4, W.PondRadius - 7, Enum.Material.Water)
 		table.insert(exclude, { x = p.x, z = p.z, w = W.PondRadius * 2, d = W.PondRadius * 2 })
 	end
+	-- what the roll keeps level (GroundKit): all of the above but the farm, where only the yard stays flat
+	local level: { Rules.Rect } = {}
+	for _, r in exclude do
+		if r ~= Country.Farm.Rect then
+			table.insert(level, r)
+		end
+	end
+	table.insert(level, CountryKit.farmYard())
 	-- what's still open: strips of woods, then low hills between them (Config/Country Meadow)
 	local M = Country.Meadow
 	local woodRadius = CountryKit.beltLength * M.WoodScale[2] / 2
@@ -1654,6 +1693,10 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			Enum.Material.Grass
 		)
 	end
+	-- the open grass rolls, worn paths cross it, and what stands on it rises with it (GroundKit)
+	local paths = GroundKit.paths(level, seaEdge, reach, Random.new(Country.Roll.Seed))
+	GroundKit.roll(level, paths, seaEdge, reach)
+	GroundKit.lift({ static, props, buildings }, level, seaEdge)
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 
