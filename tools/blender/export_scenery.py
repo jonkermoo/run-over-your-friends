@@ -338,6 +338,80 @@ rod(bm, seat, (-0.7, 0, 3.0), 0.07)
 box(bm, (-1.15, -0.22, 3.0), (-0.3, 0.22, 3.2))
 finish("Bike", bm, 64, smooth=False)
 
+# ---- the zones (map redo, stage 6), in studs
+
+# Tractor + TractorWheels: a farm tractor 13 long (x, the front at -x... facing -x in Blender = +x in Roblox),
+# 8.6 tall; the body (hood, cab with a roof, exhaust, fenders) and the wheels (two big at the back, two small at
+# the front) are separate meshes for two colours, placed together (shared box)
+TRACTOR_BOX = ((-6.6, -3.4, 0.0), (6.6, 3.4, 8.6))
+bm = bmesh.new()
+box(bm, (-5.6, -1.6, 2.0), (1.0, 1.6, 4.6))  # hood
+box(bm, (0.6, -2.0, 1.6), (4.6, 2.0, 3.4))  # chassis under the cab
+box(bm, (1.0, -1.9, 3.4), (4.4, 1.9, 4.0))  # cab floor
+for x in (1.15, 4.25):  # cab posts
+    for y in (-1.75, 1.75):
+        box(bm, (x - 0.15, y - 0.15, 4.0), (x + 0.15, y + 0.15, 8.2))
+box(bm, (0.8, -2.2, 8.2), (4.7, 2.2, 8.6))  # roof
+box(bm, (2.2, -0.6, 4.0), (3.6, 0.6, 5.4))  # seat
+for y in (-2.9, 2.9):  # rear fenders over the big wheels
+    box(bm, (1.2, y - 0.6, 5.2), (5.4, y + 0.6, 5.6))
+cyl(bm, (-4.2, 0.9, 4.6), 0.18, 2.4, segs=6)  # exhaust
+box(bm, (-5.8, -1.2, 2.4), (-5.6, 1.2, 4.2))  # grille
+anchors(bm, *TRACTOR_BOX)
+finish("Tractor", bm, 70, smooth=False)
+bm = bmesh.new()
+
+
+def wheel(bm, x, y, r, w, segs=14):
+    m = Matrix.Translation(Vector((x, y, r))) @ Matrix.Rotation(math.pi / 2, 4, "X")
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=r, depth=w, matrix=m)
+
+
+for y in (-2.85, 2.85):
+    wheel(bm, 3.2, y, 2.9, 1.1)
+    wheel(bm, -4.2, y * 0.75, 1.6, 0.8)
+anchors(bm, *TRACTOR_BOX)
+finish("TractorWheels", bm, 70, smooth=False)
+
+# Lounger: a sun lounger 6.4 long (x), the back raised at +x, on four short legs
+bm = bmesh.new()
+box(bm, (-3.2, -1.2, 1.0), (1.4, 1.2, 1.35))
+v = [bm.verts.new(p) for p in ((1.4, -1.2, 1.0), (1.4, 1.2, 1.0), (1.4, 1.2, 1.35), (1.4, -1.2, 1.35))]
+w = [bm.verts.new(p) for p in ((3.0, -1.2, 2.7), (3.0, 1.2, 2.7), (2.85, 1.2, 3.0), (2.85, -1.2, 3.0))]
+for i in range(4):
+    bm.faces.new((v[i], v[(i + 1) % 4], w[(i + 1) % 4], w[i]))
+bm.faces.new(v[::-1])
+bm.faces.new(w)
+for x in (-2.9, 1.1):
+    for y in (-1.0, 1.0):
+        box(bm, (x - 0.15, y - 0.15, 0.0), (x + 0.15, y + 0.15, 1.0))
+finish("Lounger", bm, 76, smooth=False)
+
+# Bollard: a cast-iron mooring bollard 2.6 tall: a base plate, a waisted post and a wide cap
+bm = bmesh.new()
+cyl(bm, (0, 0, 0), 1.3, 0.3, segs=10)
+bmesh.ops.create_cone(bm, cap_ends=True, segments=10, radius1=0.95, radius2=0.7, depth=1.6,
+                      matrix=Matrix.Translation(Vector((0, 0, 1.1))))
+cyl(bm, (0, 0, 1.9), 1.15, 0.7, segs=10)
+finish("Bollard", bm, 78, smooth=False)
+
+# Barrier: a jersey barrier 12 long (x), 3.2 tall: a wide foot sloping in to a narrow top
+bm = bmesh.new()
+prof = ((-1.2, 0.0), (1.2, 0.0), (1.2, 0.3), (0.55, 1.0), (0.35, 3.2), (-0.35, 3.2), (-0.55, 1.0), (-1.2, 0.3))
+a = [bm.verts.new((-6.0, y, z)) for y, z in prof]
+b = [bm.verts.new((6.0, y, z)) for y, z in prof]
+n = len(prof)
+for i in range(n):
+    bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))
+bm.faces.new(a[::-1])
+bm.faces.new(b)
+finish("Barrier", bm, 80, smooth=False)
+
+# Lifebuoy: a ring 2.4 across standing up (x-z plane)
+bm = bmesh.new()
+ring(bm, (0, 0, 1.2), 0.9, 0.3, segs=16, sides=6)
+finish("Lifebuoy", bm, 84, smooth=True)
+
 bpy.ops.export_scene.fbx(
     filepath=out,
     use_selection=False,

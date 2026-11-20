@@ -70,7 +70,6 @@ return table.freeze({
 		Rows = 6,
 		Cols = 4,
 		Cranes = 2,
-		Bollards = 10,
 		Fenders = 20, -- tyres on the quay's face
 		Dock = { 150, 150, 146 }, -- the yard's concrete (darker than the plazas, so it doesn't blow out in the sun)
 		LaneColour = { 240, 196, 40 },

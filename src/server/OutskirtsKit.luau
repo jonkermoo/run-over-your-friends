@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Outskirts)
+local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
@@ -20,6 +21,7 @@ local WildsKit = require(script.Parent.WildsKit)
 local GroundKit = require(script.Parent.GroundKit)
 local RoadsideKit = require(script.Parent.RoadsideKit)
 local FoliageKit = require(script.Parent.FoliageKit)
+local ZoneKit = require(script.Parent.ZoneKit)
 local SuburbKit = require(script.Parent.SuburbKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -617,8 +619,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			folder,
 			Vector3.new(st.w, 1, st.d),
 			CFrame.new(st.x, -0.42, st.z),
-			COLORS.concrete,
-			Enum.Material.Concrete
+			rgb(Zones.Stunt.Ground),
+			Enum.Material.Asphalt
 		)
 		local function deck(x0: number, x1: number, z: number, width: number, color: Color3)
 			paint(
@@ -937,15 +939,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			Color3.fromRGB(230, 200, 40),
 			Enum.Material.Concrete
 		)
-		for k = 0, P.Bollards - 1 do
-			post(
-				static,
-				2.4,
-				1.6,
-				Vector3.new(qx + 5, 0, pt.z - pt.d / 2 + (k + 0.5) * pt.d / P.Bollards),
-				COLORS.stripe
-			)
-		end
+		-- (the bollards, lifebuoys and floodlights are laid with the other zone dressing: ZoneKit)
 		-- black tyre fenders hung on the quay's face
 		for k = 0, P.Fenders - 1 do
 			local f = part(
@@ -1741,6 +1735,23 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local paths = GroundKit.paths(level, seaEdge, reach, Random.new(Country.Roll.Seed))
 	GroundKit.roll(level, paths, seaEdge, reach)
 	GroundKit.lift({ static, props, buildings }, level, seaEdge)
+	-- the zones' dressing on the finished ground (ZoneKit), before the greenery so palms keep off it
+	local farmYard = CountryKit.farmYard()
+	for _, place in
+		ZoneKit.build({
+			static = static,
+			buildings = buildings,
+			props = props,
+			port = zones.port,
+			stunt = zones.stunt,
+			seaEdge = seaEdge,
+			connector = RG.Connector,
+			yard = Vector3.new(farmYard.x, 0, farmYard.z),
+			beaches = CountryKit.beaches,
+		})
+	do
+		table.insert(places, place)
+	end
 	-- tufts, bushes, rocks, crop rows and palms on the finished ground (FoliageKit)
 	FoliageKit.build(static, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
