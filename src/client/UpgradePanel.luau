@@ -39,7 +39,8 @@ export type Parts = {
 export type Panel = { refresh: () -> () }
 
 local ROMAN = { "I", "II", "III" }
-local RIGHT = UDim2.new(0.5, 12, 0, 0) -- the right half of the bottom block, where the swatches sit
+local TABS_H = 30 -- the tab row on top of the right half of the bottom block (Config/Layout GarageDetailBottom has room)
+local RIGHT = UDim2.new(0.5, 12, 0, TABS_H) -- under the tabs, where the swatches sit
 local RIGHT_SIZE = UDim2.new(0.5, -12, 0, 124)
 
 local function json(name: string): { [string]: any }
@@ -90,7 +91,7 @@ function UpgradePanel.dress(model: Model, vehicleId: string, on: { number }, dec
 				else p:GetAttribute("BaseT") :: number
 		end
 	end
-	VehicleParts.decal(model, Rules.image(vehicleId, decalId))
+	VehicleParts.decal(model, vehicleId, decalId)
 end
 
 -- the share of each stat bar a car fills (the same scales as client/Hud's bars)
@@ -194,12 +195,13 @@ function UpgradePanel.attach(p: Parts): Panel
 	local tabs = Instance.new("Frame")
 	tabs.Name = "Tabs"
 	tabs.BackgroundTransparency = 1
-	tabs.Position = UDim2.new(0.5, 12, 0, -30)
+	tabs.Position = UDim2.new(0.5, 12, 0, 0)
 	tabs.Size = UDim2.new(0.5, -12, 0, 26)
 	tabs.Parent = p.bottom
 	local tabList = Instance.new("UIListLayout")
 	tabList.FillDirection = Enum.FillDirection.Horizontal
 	tabList.Padding = UDim.new(0, 6)
+	tabList.SortOrder = Enum.SortOrder.LayoutOrder
 	tabList.Parent = tabs
 	local tabButtons: { [string]: TextButton } = {}
 	local refresh: () -> ()
@@ -441,8 +443,10 @@ function UpgradePanel.attach(p: Parts): Panel
 		end
 		upFrame.Visible = mine and tab == "Upgrades"
 		decalFrame.Visible = mine and tab == "Decals"
-		if mine and tab ~= "Paint" then
-			p.paintSpot.Visible = false
+		if mine then
+			-- the swatches move under the tabs, and show only on the PAINT tab
+			p.paintSpot.Position = RIGHT
+			p.paintSpot.Visible = tab == "Paint"
 		end
 
 		-- upgrade cards

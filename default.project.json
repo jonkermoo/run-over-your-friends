@@ -5,6 +5,7 @@
     "ReplicatedStorage": {
       "Shared": { "$path": "src/shared" },
       "VehicleModels": { "$path": "assets/Vehicles.rbxm" },
+      "VehicleDecals": { "$path": "assets/Decals.rbxm" },
       "SceneryModels": { "$path": "assets/Scenery.rbxm" },
       "RoadModels": { "$path": "assets/Roads.rbxm" }
     },

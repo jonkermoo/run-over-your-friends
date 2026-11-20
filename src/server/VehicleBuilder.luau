@@ -299,7 +299,7 @@ function VehicleBuilder.decal(model: Model, decalId: string?)
 	if typeof(id) ~= "string" then
 		return
 	end
-	VehicleParts.decal(model, UpgradeRules.image(id, decalId))
+	VehicleParts.decal(model, id, decalId)
 	model:SetAttribute("Decal", decalId)
 end
 

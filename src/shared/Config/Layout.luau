@@ -16,7 +16,7 @@ return table.freeze({
 	-- the garage: the vehicle list's width, and the chosen vehicle's block under its picture (blurb, stats,
 	-- paint or price, the button); the picture takes the rest of the sheet's height
 	GarageListWidth = 330,
-	GarageDetailBottom = 196,
+	GarageDetailBottom = 226, -- +30 for the UPGRADES / PAINT / DECALS tabs (client/UpgradePanel)
 	GoalsWidth = 420, -- the goals sheet, which hangs from the top left
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks

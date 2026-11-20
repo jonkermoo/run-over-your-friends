@@ -42,11 +42,21 @@ function VehicleParts.paintParts(model: Model): { BasePart }
 	return out
 end
 
--- print a decal image on the painted parts (0 takes it off); clear pixels show the paint colour
-function VehicleParts.decal(model: Model, imageId: number)
+-- print a car's decal on its painted parts (nil or "None" takes it off): a copy of its SurfaceAppearance from
+-- ReplicatedStorage.VehicleDecals (tools/lune/build_decals), in Overlay mode so the paint colour shows where the
+-- decal is clear
+function VehicleParts.decal(model: Model, vehicleId: string, decalId: string?)
+	local folder = ReplicatedStorage:FindFirstChild("VehicleDecals")
+	local look = folder and decalId and folder:FindFirstChild(`{vehicleId}_{decalId}`)
 	for _, p in VehicleParts.paintParts(model) do
-		if p:IsA("MeshPart") then
-			p.TextureID = if imageId ~= 0 then `rbxassetid://{imageId}` else ""
+		local old = p:FindFirstChild("Decal")
+		if old then
+			old:Destroy()
+		end
+		if look then
+			local copy = look:Clone()
+			copy.Name = "Decal"
+			copy.Parent = p
 		end
 	end
 end
