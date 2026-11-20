@@ -455,28 +455,18 @@ check(
 	Lb.roll(st, 6) and st.hits == 0 and st.launch == 0 and st.allHits == 3 and st.allLaunch == 120
 )
 check("all-time board keeps counting", Lb.value(st, "HitsAll") == 3 and Lb.value(st, "Hits") == 0)
-do
-	local weeklyBoards, allTimeBoards = 0, 0
-	for _, board in LbConfig.Boards do
-		if board.allTime then
-			allTimeBoards += 1
-		else
-			weeklyBoards += 1
-		end
-	end
-	check(
-		"3 weekly boards on the stand, 1 all-time tower",
-		weeklyBoards == 3 and allTimeBoards == 1
-	)
-end
 
 -- spawn plaza (roundabout hub) fits together
 do
 	local SP = World.SpawnPlaza
-	local T = SP.Tower
+	local P = SP.Podium
 	local inner = World.Map.BlockSize - World.Map.SidewalkWidth * 2
 	local padIn, padOut = SP.PadRadius - SP.PadSize * 0.71, SP.PadRadius + SP.PadSize * 0.71
-	check("tower stands on the island", T.Width * 0.71 + 2 < SP.Island)
+	local halfRow = 1.5 * P.StepWidth
+	check(
+		"the turning podium fits on the island",
+		math.sqrt(halfRow ^ 2 + (P.StepDepth / 2 + 2.5) ^ 2) < P.Radius and P.Radius < SP.Island
+	)
 	check(
 		"pads sit between the island kerb and the ring road",
 		padIn > SP.Island + SP.Kerb and padOut < SP.RingInner
@@ -484,10 +474,10 @@ do
 	check("pads don't touch", 2 * math.pi * SP.PadRadius / SP.Pads > SP.PadSize * 1.5)
 	check("ring road inside the plaza", SP.RingOuter < inner / 2 - SP.Border)
 	check("corner crowd is past the ring road", SP.Corner.reach - SP.Corner.spread > SP.RingOuter)
-	check(
-		"board faces fit the tower",
-		T.FaceWidth < T.Width and T.FaceBottom + T.FaceHeight < T.Height
-	)
+	local LbC = LbConfig
+	local outer = (LbC.Stands - 1) / 2 * LbC.StandStep + LbC.StandWidth / 2 + 1.6
+	check("stands fit between the gantry posts", outer < 96 - 1.5)
+	check("stands don't overlap", LbC.StandStep > LbC.StandWidth + 3.2)
 end
 
 -- the spawn safe zone
@@ -533,6 +523,7 @@ require("./offer")(check)
 require("./vip")(check)
 require("./challenges")(check)
 require("./analytics")(check)
+require("./champions")(check)
 require("./localization")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
@@ -2557,14 +2548,42 @@ do
 		local Config = require("../src/shared/Config/Onboarding")
 		local Rules = require("../src/shared/Rules/Onboarding")
 		local S = Config.Steps
-		local none = { jumped = false, pieces = 0, ownsExtra = false }
+		local none = { pieces = 0, ownsExtra = false }
 		check(
-			"tutorial: the retired step and unknown saves count as done, live steps stay",
+			"tutorial: the retired steps and unknown saves count as done, live steps stay",
 			Rules.migrate(3, Config) == S.Done
 				and Rules.migrate(50, Config) == S.Done
 				and Rules.migrate(S.Done, Config) == S.Done
 				and Rules.migrate(S.Hits, Config) == S.Hits
 				and Rules.migrate(S.Event, Config) == S.Event
+		)
+		-- the ramp step (4) left on 2026-11-20: a save on it goes on to the smash step, and saves on the
+		-- steps after it keep their numbers
+		check(
+			"tutorial: a save on the removed ramp step lands on the smash step",
+			Rules.migrate(4, Config) == S.Smash
+				and S.Smash == 5
+				and S.Goal == 6
+				and S.Buy == 7
+				and S.Event == 8
+				and Rules.migrate(5, Config) == S.Smash
+				and Rules.migrate(6, Config) == S.Goal
+				and Rules.migrate(7, Config) == S.Buy
+				and Rules.migrate(8, Config) == S.Event
+		)
+		check(
+			"tutorial: no step in the order is retired, and retired steps land on a live step",
+			(function()
+				for old, to in Config.Retired do
+					if table.find(Config.Order, old) then
+						return false
+					end
+					if to ~= S.Done and not table.find(Config.Order, to) then
+						return false
+					end
+				end
+				return true
+			end)()
 		)
 		local order, at = {}, S.Spawn
 		while at ~= S.Done do
@@ -2572,35 +2591,33 @@ do
 			at = Rules.after(at, Config)
 		end
 		check(
-			"tutorial: the steps run spawn, hits, ramp, smash, goal, buy, event",
+			"tutorial: the steps run spawn, hits, smash, goal, buy, event",
 			table.concat(order, ",")
-				== table.concat({ S.Spawn, S.Hits, S.Ramp, S.Smash, S.Goal, S.Buy, S.Event }, ",")
+				== table.concat({ S.Spawn, S.Hits, S.Smash, S.Goal, S.Buy, S.Event }, ",")
 		)
-		local landing, passed = Rules.landing(S.Ramp, none, Config)
-		check("tutorial: nothing done early, no step passed", landing == S.Ramp and #passed == 0)
-		landing, passed = Rules.landing(
-			S.Ramp,
-			{ jumped = true, pieces = Config.SmashGoal, ownsExtra = false },
-			Config
-		)
-		check(
-			"tutorial: a jump and a smash done early pass both steps, and stop at the goal",
-			landing == S.Goal and #passed == 2
-		)
-		landing = Rules.landing(
-			S.Smash,
-			{ jumped = true, pieces = Config.SmashGoal - 1, ownsExtra = true },
-			Config
-		)
-		check("tutorial: too few pieces don't pass the smash step", landing == S.Smash)
+		check("tutorial: no ramp step", (S :: any).Ramp == nil)
+		local landing, passed = Rules.landing(S.Smash, none, Config)
+		check("tutorial: nothing done early, no step passed", landing == S.Smash and #passed == 0)
 		landing, passed =
-			Rules.landing(S.Buy, { jumped = false, pieces = 0, ownsExtra = true }, Config)
+			Rules.landing(S.Smash, { pieces = Config.SmashGoal, ownsExtra = false }, Config)
+		check(
+			"tutorial: a smash done early passes that step, and stops at the goal",
+			landing == S.Goal and #passed == 1
+		)
+		landing =
+			Rules.landing(S.Smash, { pieces = Config.SmashGoal - 1, ownsExtra = true }, Config)
+		check("tutorial: too few pieces don't pass the smash step", landing == S.Smash)
+		landing, passed = Rules.landing(S.Buy, { pieces = 0, ownsExtra = true }, Config)
 		check(
 			"tutorial: a car bought early passes the buy step",
 			landing == S.Event and #passed == 1
 		)
+		check(
+			"tutorial: the first goal is short and claims itself",
+			Config.GoalHits > 0 and Config.GoalHits <= 5 and Config.ClaimAutoAfter > 0
+		)
 		local skippable = true
-		for _, s in { S.Ramp, S.Smash, S.Goal, S.Buy, S.Event } do
+		for _, s in { S.Smash, S.Goal, S.Buy, S.Event } do
 			skippable = skippable and Rules.canSkip(s, Config)
 		end
 		check(

@@ -1,6 +1,7 @@
 --!strict
 -- Client entry.
 local Boards = require(script.Boards)
+local ChampionsClient = require(script.Champions)
 local CamLock = require(script.CamLock)
 local Cockpit = require(script.Cockpit)
 local Collapse = require(script.Collapse)
@@ -48,6 +49,7 @@ Crumble.start()
 Collapse.start()
 Features.start()
 Boards.start()
+ChampionsClient.start()
 EventBanner.start()
 Crowd.start()
 NameTags.start()

@@ -1,10 +1,9 @@
 --!strict
--- First-session guidance: the job card under the menu strip (spawn, run over 3, ramp, smash, goal, buy, event;
+-- First-session guidance: the job card under the menu strip (spawn, run over 3, smash, first goal, buy, event;
 -- after that the pinned goals sit there, PinnedGoals), a big bouncing marker over the target with a light
--- column and an off-screen edge pointer, an arrow at the button to press, timed hints for stuck players,
--- one-time tips when you first drive a vehicle with a feature, and the confetti moment.
+-- column and an off-screen edge pointer, an arrow at the button to press, timed hints for stuck players, the
+-- first goal's big CLAIM pop-up, one-time tips when you first drive a vehicle with a feature, and the confetti moment.
 
-local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -91,6 +90,50 @@ hintText.Size = UDim2.fromOffset(420, 22)
 hintText.TextXAlignment = Enum.TextXAlignment.Left
 Style.outline(hintText, 2)
 hintText.Visible = false
+
+---------------------------------------------------------------- first goal's CLAIM pop-up
+
+-- shown the moment the first goal is done (player attribute "TutorialClaim"); the bar runs down to the
+-- server's own claim (Config/Onboarding ClaimAutoAfter), so leaving it alone claims it too. That is also the
+-- gamepad's way: selecting the button would take A away from driving mid-run
+local claimBox = Style.panel(gui)
+claimBox.Name = "FirstGoalClaim"
+claimBox.AnchorPoint = Vector2.new(0.5, 0.5)
+claimBox.Position = UDim2.fromScale(0.5, 0.42)
+claimBox.Size = UDim2.fromOffset(440, 196)
+claimBox.ZIndex = 20
+claimBox.Visible = false
+Style.stroke(claimBox, GOLD, 4, 0)
+local claimScale = Instance.new("UIScale")
+claimScale.Parent = claimBox
+local claimTitle = label(claimBox, "FIRST GOAL DONE!", 30, BOLD, GOLD)
+claimTitle.Position = UDim2.fromOffset(0, 12)
+claimTitle.Size = UDim2.new(1, 0, 0, 36)
+claimTitle.ZIndex = 21
+Style.outline(claimTitle, 2)
+local claimSub = label(claimBox, "", 16, F.heavy, WHITE)
+claimSub.Position = UDim2.fromOffset(0, 50)
+claimSub.Size = UDim2.new(1, 0, 0, 22)
+claimSub.ZIndex = 21
+local claimButton = Style.button(
+	claimBox,
+	Loc.text("ClaimReward", { n = Onboarding.Rewards[Steps.Goal] }),
+	"green",
+	28
+)
+claimButton.AutoLocalize = false
+claimButton.Name = "TutorialClaim"
+claimButton.AnchorPoint = Vector2.new(0.5, 0)
+claimButton.Position = UDim2.new(0.5, 0, 0, 84)
+claimButton.Size = UDim2.fromOffset(280, 72)
+claimButton.ZIndex = 21
+local claimBack, claimFill = Style.bar(claimBox, GOLD)
+claimBack.Position = UDim2.fromOffset(50, 172)
+claimBack.Size = UDim2.new(1, -100, 0, 6)
+claimBack.ZIndex = 21
+claimFill.ZIndex = 22
+-- when it showed (0: not showing) and whether this one was pressed
+local claimState = { shownAt = 0, sent = false }
 
 ---------------------------------------------------------------- markers
 
@@ -329,23 +372,6 @@ local function nearestPedestrian(from: Vector3): BasePart?
 	return best
 end
 
--- the jump ramp nearest the player, kept unless another is clearly closer so the marker doesn't flip
-local function nearestRamp(from: Vector3, current: BasePart?): BasePart?
-	local best, bestD = nil, math.huge
-	for _, r in CollectionService:GetTagged("JumpRamp") do
-		if r:IsA("BasePart") then
-			local d = (r.Position - from).Magnitude
-			if r == current then
-				d *= 0.7
-			end
-			if d < bestD then
-				best, bestD = r, d
-			end
-		end
-	end
-	return best
-end
-
 -- the building nearest the player: its centre and roof line, measured once
 type Spot = { centre: Vector3, top: number }
 -- measured again every few seconds: buildings stream in and out round the player
@@ -435,7 +461,6 @@ local lastStep = -1
 local lastCount = 0
 local tipsShown: { [string]: boolean } = {}
 local lastVehicle = ""
-local rampTarget: BasePart? = nil
 local buildingTarget: Spot? = nil
 local scrolled = false -- the buy arrow's card was brought into view this time the garage opened
 
@@ -632,7 +657,7 @@ local function update()
 	local target: Target? = nil
 	local pressTarget: GuiObject? = nil
 	local pressFromSide = false
-	local glowGarage, glowGoals = false, false
+	local glowGarage = false
 	local glowCard: string? = nil
 	stroke.Transparency = 0.4 + 0.4 * math.sin(os.clock() * 5)
 	skip.Visible = Rules.canSkip(stepValue, Onboarding)
@@ -682,29 +707,6 @@ local function update()
 			)
 			hintText.Visible = true
 		end
-	elseif stepValue == Steps.Ramp then
-		say(goalText, "Take a RAMP and land the jump!")
-		barFill.Size = UDim2.fromScale(0, 1)
-		if root then
-			rampTarget = nearestRamp(root.Position, rampTarget)
-			local ramp = rampTarget
-			if ramp then
-				-- the foot of the ramp: its low end, where you drive on
-				local foot = ramp.Position
-					+ ramp.CFrame.LookVector * (ramp.Size.Z / 2)
-					- Vector3.new(0, ramp.Size.Y / 2, 0)
-				target = {
-					at = foot + Vector3.new(0, 8, 0),
-					text = "RAMP",
-					color = C.orange,
-					beacon = foot,
-				}
-			end
-		end
-		if not needCar() and stuck then
-			say(hintText, "Follow the beam, then drive up the ramp as fast as you can")
-			hintText.Visible = true
-		end
 	elseif stepValue == Steps.Smash then
 		say(
 			goalText,
@@ -731,14 +733,16 @@ local function update()
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Goal then
-		say(goalText, Loc.msg("GuideGoal", { reward = Onboarding.Rewards[Steps.Goal] }))
-		barFill.Size = UDim2.fromScale(0, 1)
-		if sheetOpen then
-			pressTarget = goalsGui and goalsGui:FindFirstChild("TutorialClaim", true) :: GuiObject?
-			pressFromSide = true -- from above, the arrow sat on the goal's own text
-		else
-			glowGoals = true
-			pressTarget = goalsButton
+		local n = math.min(count, Onboarding.GoalHits)
+		say(goalText, Loc.msg("GuideFirstGoal", { goal = Onboarding.GoalHits, n = n }))
+		barFill.Size = UDim2.fromScale(n / Onboarding.GoalHits, 1)
+		local ped = n < Onboarding.GoalHits and root and nearestPedestrian(root.Position)
+		if ped then
+			target = { at = ped.Position + Vector3.new(0, 5, 0), text = "HIT!", color = C.red }
+		end
+		if not needCar() and stuck then
+			say(hintText, "Run over people to finish your first goal")
+			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Buy then
 		local car, price = cheapestCar()
@@ -800,6 +804,28 @@ local function update()
 		card.Visible = false
 	end
 
+	-- the first goal's CLAIM pop-up: in from small when it shows, its bar running down to the auto-claim
+	local claimReady = stepValue == Steps.Goal and player:GetAttribute("TutorialClaim") == true
+	if not claimReady then
+		claimState.shownAt, claimState.sent = 0, false
+	elseif claimState.shownAt == 0 then
+		claimState.shownAt = os.clock()
+		say(claimSub, Loc.msg("FirstGoalSub", { goal = Onboarding.GoalHits }))
+		claimScale.Scale = 0.3
+		TweenService:Create(claimScale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 })
+			:Play()
+		cheer:Play()
+	end
+	claimBox.Visible = claimReady and not claimState.sent
+	if claimBox.Visible then
+		local left = 1 - (os.clock() - claimState.shownAt) / Onboarding.ClaimAutoAfter
+		claimFill.Size = UDim2.fromScale(math.clamp(left, 0, 1), 1)
+		claimButton.Rotation = 2 * math.sin(os.clock() * 8)
+		target = nil
+		pressTarget = claimButton
+		pressFromSide = true -- from above it would sit on the pop-up's title
+	end
+
 	-- sheets cover the card's corner and the world markers would only clutter them
 	local storeOpen = store ~= nil and store.Visible
 	if sheetOpen then
@@ -813,7 +839,6 @@ local function update()
 		hintText.Visible = false
 	end
 	glow(garageButton, glowGarage and not garageOpen)
-	glow(goalsButton, glowGoals and not sheetOpen)
 	if garage then
 		if not garageOpen then
 			scrolled = false
@@ -876,6 +901,11 @@ end
 
 function Guide.start()
 	Net.waitFor("Celebrate").OnClientEvent:Connect(celebrate)
+	Style.onTap(claimButton, function()
+		claimState.sent = true
+		claimBox.Visible = false
+		Net.waitFor("TutorialClaim"):FireServer()
+	end)
 	Style.onTap(skip, function()
 		skip.Visible = false
 		stepEntered = os.clock()
