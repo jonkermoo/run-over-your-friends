@@ -46,9 +46,15 @@ Older custom events (kept): `VehicleSpawned` (field 01: vehicle id), `Demolished
 
 ## Onboarding funnel (`LogOnboardingFunnelStepEvent`)
 
-Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Took a ramp, 6 Smashed a
-building, 7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done.
-Steps 5, 6, 7 and 9 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it
+Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Smashed a building, 6 Claimed a
+goal, 7 First vehicle bought, 8 Joined an event, 9 Tutorial done.
+
+Renumbered on 2026-11-20 when the tutorial's ramp step was removed. Data from before that release used: 5 Took
+a ramp, 6 Smashed a building, 7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done.
+Compare across the change by step name, not number. The same release made the goal step a short goal of its
+own (a few hits, then a CLAIM pop-up that claims itself after a few seconds) instead of opening the GOALS sheet.
+
+Steps 5, 6 and 8 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it
 was done before the step came up); a step the player skips is not logged. Answers: where new players drop out
 of the first session.
 

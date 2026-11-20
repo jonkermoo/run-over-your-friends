@@ -1490,6 +1490,7 @@ local PASSES = {
 	{
 		name = "Roadster",
 		title = "ROADSTER",
+		icon = Icons.PassRoadster,
 		accent = C.red,
 		ink = C.text,
 		text = Loc.text("PassRoadsterText", { money = money(Economy.RoadsterPassMoney) }),
@@ -1497,6 +1498,7 @@ local PASSES = {
 	{
 		name = "DoubleMoney",
 		title = "2x MONEY",
+		icon = Icons.PassDoubleMoney,
 		accent = C.money,
 		ink = C.ink,
 		text = "Double money from every hit.",
@@ -1504,6 +1506,7 @@ local PASSES = {
 	{
 		name = "VIP",
 		title = "VIP",
+		icon = Icons.PassVIP,
 		accent = C.gold,
 		ink = C.ink,
 		text = Loc.text("PassVipText", { pct = math.floor((Economy.VipMoney - 1) * 100 + 0.5) }),
@@ -1525,10 +1528,21 @@ for i, p in PASSES do
 	local card = Style.card(passRow)
 	card.LayoutOrder = i
 	local band = paint(card, p.accent, UDim2.new(1, 0, 0, 56))
+	-- the pass's picture at the band's right end; the title shrinks to fit beside it
+	local pic = Style.image(band, p.icon)
+	pic.Name = "Icon"
+	pic.AnchorPoint = Vector2.new(1, 0.5)
+	pic.Position = UDim2.new(1, -8, 0.5, 0)
+	pic.Size = UDim2.fromOffset(64, 64)
+	pic.ZIndex = 2
 	local t = Style.label(band, p.title, 30, F.display, p.ink)
 	t.Position = UDim2.fromOffset(16, 6)
-	t.Size = UDim2.new(1, -32, 1, -6)
+	t.Size = UDim2.new(1, -96, 1, -6)
 	t.TextXAlignment = Enum.TextXAlignment.Left
+	t.TextScaled = true
+	local tSize = Instance.new("UITextSizeConstraint")
+	tSize.MaxTextSize = 30
+	tSize.Parent = t
 	local d = Style.label(card, p.text, 15, F.bold, C.text)
 	d.Position = UDim2.fromOffset(16, 68)
 	d.Size = UDim2.new(1, -32, 0, 86)

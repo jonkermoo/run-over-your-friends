@@ -22,7 +22,7 @@ Net.Messages = table.freeze({
 	BuyPaint = "BuyPaint", -- (paintId): pay once for a colour (Config/Paints)
 	SetPaint = "SetPaint", -- (vehicleId, paintId): the colour that vehicle wears
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
-	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from the goals sheet
+	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from its CLAIM pop-up (client/Guide)
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
 	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
@@ -43,7 +43,7 @@ Net.Messages = table.freeze({
 	Crumble = "Crumble",
 	Collapse = "Collapse", -- (building: Model, at: Vector3, push: Vector3, pay: number, userId: number): a whole building comes down
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
-	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
+	Boards = "Boards", -- ({ endsAt, now, boards: { [key]: { Entry } }, you: { [key]: You } }): the leaderboards, per player
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 	-- ({ title: string, unit: string, top: { { id: number, name: string, score: number, prize: number } }, place: number,

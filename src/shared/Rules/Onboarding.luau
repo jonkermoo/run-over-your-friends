@@ -6,16 +6,20 @@ local Rules = {}
 export type Config = {
 	Steps: { [string]: number },
 	Order: { number },
+	Retired: { [number]: number },
 	SmashGoal: number,
 	EventWait: number,
 }
 
 -- what the player has done this session
-export type Facts = { jumped: boolean, pieces: number, ownsExtra: boolean }
+export type Facts = { pieces: number, ownsExtra: boolean }
 
--- a saved step: the retired one (3) and anything unknown count as finished
+-- a saved step: a retired one goes where Retired sends it, anything unknown counts as finished
 function Rules.migrate(saved: number, config: Config): number
-	return if table.find(config.Order, saved) then saved else config.Steps.Done
+	if table.find(config.Order, saved) then
+		return saved
+	end
+	return config.Retired[saved] or config.Steps.Done
 end
 
 function Rules.after(step: number, config: Config): number
@@ -25,8 +29,7 @@ end
 
 function Rules.alreadyDone(step: number, facts: Facts, config: Config): boolean
 	local S = config.Steps
-	return (step == S.Ramp and facts.jumped)
-		or (step == S.Smash and facts.pieces >= config.SmashGoal)
+	return (step == S.Smash and facts.pieces >= config.SmashGoal)
 		or (step == S.Buy and facts.ownsExtra)
 end
 
@@ -42,7 +45,7 @@ end
 
 function Rules.canSkip(step: number, config: Config): boolean
 	local S = config.Steps
-	return step == S.Ramp or step == S.Smash or step == S.Goal or step == S.Buy or step == S.Event
+	return step == S.Smash or step == S.Goal or step == S.Buy or step == S.Event
 end
 
 -- the event step ends by itself once nothing is live or about to start and it has waited long enough

@@ -231,7 +231,7 @@ local function dressSpawnPlaza(
 	local half = inner / 2
 	local band = rgb(SP.Band)
 	local yBand = 0.1 + World.Look.PaintLift / 2
-	-- the grass island in the middle with a terracotta kerb (the Hall of Fame tower stands on it), and a
+	-- the grass island in the middle with a terracotta kerb (the champions' podium stands on it), and a
 	-- border inside the plaza's edge
 	local function slab(radius: number, top: number, colour: Color3, material: Enum.Material)
 		local p = part(
@@ -365,86 +365,63 @@ local function dressSpawnPlaza(
 	end
 end
 
--- the Hall of Fame tower on the spawn plaza's island (World.SpawnPlaza.Tower): a black block on a concrete
--- step with an all-time board face on each side (parts named Board_<key>; the client draws them), yellow
--- bands, and the gold trophy (cup, handles, star) standing on its roof
-local function hallOfFame(boards: Instance, static: Instance, cx: number, cz: number, key: string)
+-- the champions' podium on the spawn plaza's island (World.SpawnPlaza.Podium): a round concrete turntable and,
+-- on it, a stage the client turns (model ChampionStage, kept loaded): three steps in a row (parts named
+-- Step_<key>; the client puts the plates and the avatars on them). Nothing else stands on the stage, so no
+-- angle shows anything passing through an avatar. The steps turn on screen only: an invisible wall collides.
+local function champions(static: Instance, cx: number, cz: number)
 	local SP = World.SpawnPlaza
-	local T = SP.Tower
-	local w, h, base = T.Width, T.Height, SP.IslandTop
-	part(
-		boards,
-		Vector3.new(w + 4, 1, w + 4),
-		CFrame.new(cx, base + 0.5, cz),
+	local P = SP.Podium
+	local base = SP.IslandTop
+	local table_ = part(
+		static,
+		Vector3.new(P.Rise, P.Radius * 2, P.Radius * 2),
+		CFrame.new(cx, base + P.Rise / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
 		COLORS.concrete,
 		Enum.Material.Concrete
 	)
-	part(
-		boards,
-		Vector3.new(w, h - base - 1, w),
-		CFrame.new(cx, (h + base + 1) / 2, cz),
-		PAINT_BLACK
-	)
-	part(boards, Vector3.new(w + 1.6, 1.6, w + 1.6), CFrame.new(cx, h + 0.8, cz), PAINT_YELLOW)
-	local faceY = T.FaceBottom + T.FaceHeight / 2
-	for _, out in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
-		local at = Vector3.new(cx, faceY, cz) + out * (w / 2 + 0.3)
-		local frame = CFrame.lookAt(at, at + out)
-		local face = part(
-			boards,
-			Vector3.new(T.FaceWidth, T.FaceHeight, 0.6),
-			frame,
-			Color3.fromRGB(24, 24, 38)
-		)
-		face.Name = "Board_" .. key
-		for _, e in { -1, 1 } do
-			part(
-				boards,
-				Vector3.new(T.FaceWidth + 1, 1.2, 1),
-				frame * CFrame.new(0, e * (T.FaceHeight / 2 + 0.6), 0),
-				PAINT_YELLOW
-			)
-		end
-	end
-	-- the trophy, built from its foot at `top` and scaled by TrophyScale
-	local trophy = Instance.new("Model")
-	trophy.Name = "Trophy"
-	trophy.Parent = static
-	local gold = rgb(SP.Gold)
-	local s, top = T.TrophyScale, h + 1.6
-	local function piece(size: Vector3, x: number, y: number, shape: Enum.PartType?): Part
+	table_.Shape = Enum.PartType.Cylinder
+	local stage = Instance.new("Model")
+	stage.Name = "ChampionStage"
+	stage.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client turns it
+	stage.Parent = static
+	local floor = base + P.Rise
+	for i, key in P.Keys do
+		local h = P.Heights[i]
+		local x = (2 - i) * P.StepWidth -- step 1 on the left seen from the front (-Z)
 		local p = part(
-			trophy,
-			size * s,
-			CFrame.new(cx + x * s, top + y * s, cz),
-			gold,
-			Enum.Material.Foil
+			stage,
+			Vector3.new(P.StepWidth, h, P.StepDepth),
+			CFrame.new(cx + x, floor + h / 2, cz),
+			rgb(P.Colours[i])
 		)
+		p.Name = "Step_" .. key
 		p.CanCollide = false
-		if shape then
-			p.Shape = shape
-		end
-		return p
+		-- a white cap on top, a little bigger than the step every way (sides LipOut out, top LipRaise up) so no
+		-- face of it lies in a face of the step: shared faces flicker
+		local lipH = 0.4 + P.LipRaise
+		part(
+			stage,
+			Vector3.new(P.StepWidth + P.LipOut * 2, lipH, P.StepDepth + P.LipOut * 2),
+			CFrame.new(cx + x, floor + h + P.LipRaise - lipH / 2, cz),
+			COLORS.concrete
+		).CanCollide =
+			false
 	end
-	local function cyl(height: number, dia: number, y: number): Part
-		local p = piece(Vector3.new(height, dia, dia), 0, y + height / 2, Enum.PartType.Cylinder)
-		p.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
-		return p
-	end
-	piece(Vector3.new(7.4, 0.6, 7.4), 0, 0.3)
-	cyl(1.2, 5, 0.6)
-	cyl(4, 2, 1.8)
-	piece(Vector3.one * 9, 0, 8.8, Enum.PartType.Ball)
-	cyl(5, 9, 8.8)
-	cyl(0.8, 9.8, 13.6)
-	for _, e in { -1, 1 } do
-		piece(Vector3.new(1, 6, 1), e * 6.6, 10.6)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 13.2)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 8)
-	end
-	local star = piece(Vector3.one * 2.6, 0, 15.6, Enum.PartType.Ball)
-	star.Color = PAINT_YELLOW
-	star.Material = Enum.Material.Neon
+	-- the steps turn on screen only, so an invisible round wall over the circle they sweep (up past the avatars'
+	-- heads) is what people and cars bump into
+	local wall = part(
+		static,
+		Vector3.new(P.WallHeight, P.WallRadius * 2, P.WallRadius * 2),
+		CFrame.new(cx, floor + P.WallHeight / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
+		COLORS.concrete,
+		nil,
+		1
+	)
+	wall.Shape = Enum.PartType.Cylinder
+	wall.Name = "PodiumWall"
+	wall.CanQuery = false -- the camera sees through it
+	wall.CastShadow = false
 end
 
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
@@ -828,8 +805,8 @@ function MapBuilder.build(fresh: boolean?): Result
 				workspace:SetAttribute("SafeZoneHalf", B / 2 + HitConfig.SafeZoneMargin)
 				paintPlaza(static, cx, cz, inner)
 				dressSpawnPlaza(static, props, cx, cz, inner)
-				-- leaderboard stands on the north sidewalk, facing the plaza, and the Hall of Fame tower on the
-				-- island (the client draws the boards)
+				-- leaderboard stands on the north sidewalk, facing the plaza (parts named Stand_<n>; the client
+				-- draws the boards, Config/Leaderboards), and the champions' podium on the island
 				local boards = Instance.new("Model")
 				boards.Name = "Boards"
 				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
@@ -845,43 +822,39 @@ function MapBuilder.build(fresh: boolean?): Result
 						PAINT_BLACK
 					)
 				end
-				local k = 0
-				for _, board in Leaderboards.Boards do
-					if board.allTime then
-						hallOfFame(boards, static, cx, cz, board.key)
-						continue
-					end
-					k += 1
-					local bx = cx + (k - 2) * 62
+				champions(static, cx, cz)
+				local STW, SH = Leaderboards.StandWidth, Leaderboards.StandHeight
+				for k = 1, Leaderboards.Stands do
+					local bx = cx + (k - (Leaderboards.Stands + 1) / 2) * Leaderboards.StandStep
 					local bz = cz - B / 2 + 6
 					local face = part(
 						boards,
-						Vector3.new(52, 46, 1.2),
+						Vector3.new(STW, SH, 1.2),
 						CFrame.lookAt(Vector3.new(bx, 30, bz), Vector3.new(bx, 30, bz + 10)),
 						Color3.fromRGB(24, 24, 38)
 					)
-					face.Name = "Board_" .. board.key
+					face.Name = "Stand_" .. k
 					-- a frame (yellow top and bottom, black sides) and two lamps leaning over the top
 					local frame =
 						CFrame.lookAt(Vector3.new(bx, 30, bz - 0.4), Vector3.new(bx, 30, bz + 10))
 					for _, e in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(55, 1.6, 1.6),
-							frame * CFrame.new(0, e * 23.8, 0),
+							Vector3.new(STW + 3, 1.6, 1.6),
+							frame * CFrame.new(0, e * (SH / 2 + 0.8), 0),
 							PAINT_YELLOW
 						)
 						part(
 							boards,
-							Vector3.new(1.6, 46, 1.6),
-							frame * CFrame.new(e * 26.8, 0, 0),
+							Vector3.new(1.6, SH, 1.6),
+							frame * CFrame.new(e * (STW / 2 + 0.8), 0, 0),
 							PAINT_BLACK
 						)
 						local lamp = part(
 							boards,
 							Vector3.new(3, 1.4, 2.4),
 							frame
-								* CFrame.new(e * 14, 25.6, -2.6)
+								* CFrame.new(e * STW * 0.27, SH / 2 + 2.6, -2.6)
 								* CFrame.Angles(math.rad(-35), 0, 0),
 							PAINT_BLACK
 						)
@@ -896,8 +869,8 @@ function MapBuilder.build(fresh: boolean?): Result
 					for _, side in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(2, 8, 2),
-							CFrame.new(bx + side * 20, 3, bz - 0.5),
+							Vector3.new(2, 7.4, 2), -- ends inside the frame's bottom bar: equal tops flicker
+							CFrame.new(bx + side * (STW / 2 - 2), 2.7, bz - 0.5),
 							COLORS.concrete
 						)
 					end

@@ -4,9 +4,10 @@ Key,Source,Context,Example,es,pt
 ,MONSTER!,,,¡MONSTRUOSO!,MONSTRO!
 ,RAMPAGE!,,,¡FRENESÍ!,FÚRIA TOTAL!
 ,DEMOLISHED!,,,¡DEMOLIDO!,DEMOLIDO!
-,NICE JUMP!,,,¡BUEN SALTO!,BELO SALTO!
 ,BUILDING SMASHED!,,,¡EDIFICIO DESTRUIDO!,PRÉDIO DESTRUÍDO!
 ,FIRST GOAL CLAIMED!,,,¡PRIMERA META COBRADA!,PRIMEIRA META RESGATADA!
+,FIRST GOAL DONE!,,,¡PRIMERA META LISTA!,PRIMEIRA META CONCLUÍDA!
+,Run over people to finish your first goal,,,Atropella gente para terminar tu primera meta,Atropele pessoas para concluir sua primeira meta
 ,YOU JOINED AN EVENT!,,,¡TE UNISTE A UN EVENTO!,VOCÊ ENTROU NUM EVENTO!
 ,FIRST RAMPAGE!,,,¡PRIMER FRENESÍ!,PRIMEIRA FÚRIA!
 ,YOU'RE ALL SET!,,,¡LISTO!,TUDO PRONTO!
@@ -51,7 +52,6 @@ Key,Source,Context,Example,es,pt
 ,SKIP,,,SALTAR,PULAR
 ,TIP,,,CONSEJO,DICA
 ,HIT!,,,¡GOLPEA!,BATE!
-,RAMP,,,RAMPA,RAMPA
 ,SMASH,,,ROMPE,QUEBRE
 ,"Hold FLY to jet upward; let go and you drop. Steer as normal; hold ROLL L/R to roll, hold BOOST for the rear jet.",,,Mantén VOLAR para subir con el jet; suéltalo y caes. Gira como siempre; mantén GIRA I/D para rodar y TURBO para el jet trasero.,Segure VOAR para subir com o jato; solte e você cai. Vire como sempre; segure GIRA E/D para girar e TURBO para o jato traseiro.
 ,"Hold SHIFT to jet upward; let go and you drop. A/D steer, S jets backwards, hold Q/E to roll, hold R for the rear jet.",,,"Mantén SHIFT para subir con el jet; suéltalo y caes. A/D para girar, S va hacia atrás, mantén Q/E para rodar y R para el jet trasero.","Segure SHIFT para subir com o jato; solte e você cai. A/D para virar, S vai para trás, segure Q/E para girar e R para o jato traseiro."
@@ -68,8 +68,6 @@ Key,Source,Context,Example,es,pt
 ,"Tap GARAGE at the top left, then SPAWN",,,Toca GARAJE arriba a la izquierda y luego USAR,Toque em GARAGEM no canto superior esquerdo e depois em USAR
 ,Use the thumbstick to drive at the arrow,,,Usa el joystick para ir hacia la flecha,Use o analógico para ir até a seta
 ,"Hold W to drive, A/D to steer. Aim for the arrow!",,,Mantén W para avanzar y A/D para girar. ¡Ve hacia la flecha!,Segure W para acelerar e A/D para virar. Vá até a seta!
-,Take a RAMP and land the jump!,,,¡Sube a una RAMPA y aterriza el salto!,Suba numa RAMPA e acerte o salto!
-,"Follow the beam, then drive up the ramp as fast as you can",,,Sigue el rayo y sube la rampa lo más rápido que puedas,Siga o feixe e suba a rampa o mais rápido que puder
 ,Hit the walls at full speed,,,Choca contra las paredes a toda velocidad,Bata nas paredes a toda velocidade
 ,Buy a new ride from the GARAGE,,,Compra un auto nuevo en el GARAJE,Compre um carro novo na GARAGEM
 ,"Keep hitting people for cash, or SKIP this for now",,,"Sigue atropellando gente para ganar dinero, o SALTA esto por ahora","Continue atropelando gente para ganhar grana, ou PULE isso por enquanto"
@@ -110,11 +108,12 @@ Key,Source,Context,Example,es,pt
 ,GIANT,,,GIGANTE,GIGANTE
 ,friend of You,,,tu amigo,seu amigo
 ,THIS WEEK,,,ESTA SEMANA,ESTA SEMANA
+,ALL TIME,,,HISTÓRICO,DE SEMPRE
+,LAST WEEK,,,SEMANA PASADA,SEMANA PASSADA
+,RICHEST EVER,,,EL MÁS RICO,O MAIS RICO
 ,MOST RUN OVER,,,MÁS ATROPELLADOS,MAIS ATROPELADOS
 ,BIGGEST LAUNCH,,,LANZAMIENTO MÁS LARGO,MAIOR ARREMESSO
 ,BIGGEST COMBO,,,COMBO MÁS GRANDE,MAIOR COMBO
-,HALL OF FAME,,,SALÓN DE LA FAMA,HALL DA FAMA
-,"MOST RUN OVER, ALL TIME",,,"MÁS ATROPELLADOS, HISTÓRICO","MAIS ATROPELADOS, DE SEMPRE"
 ,Nobody yet. Be the first!,,,Nadie todavía. ¡Sé el primero!,Ninguém ainda. Seja o primeiro!
 ,GARAGE,,,GARAJE,GARAGEM
 ,STORE,,,TIENDA,LOJA
@@ -178,7 +177,6 @@ Key,Source,Context,Example,es,pt
 ,BANK JOB!,,,¡ATRACO AL BANCO!,ASSALTO AO BANCO!
 ,MONEY TRUCK!,,,¡CAMIÓN DE DINERO!,CARRO-FORTE!
 ,STARTER PACK!,,,¡PAQUETE INICIAL!,PACOTE INICIAL!
-,Your first goal: open GOALS!,,,Tu primera meta: ¡abre METAS!,Sua primeira meta: abra METAS!
 ,DONE,,,HECHA,FEITA
 ,SERVER GOAL  ·  EVERYONE HERE,,,META DEL SERVIDOR  ·  TODOS AQUÍ,META DO SERVIDOR  ·  TODOS AQUI
 ,SERVER,,,SERVIDOR,SERVIDOR

@@ -81,7 +81,7 @@ return table.freeze({
 		Inset = 0.6,
 	}),
 	-- the spawn plaza (MapBuilder spawnPlaza, dressSpawnPlaza): a roundabout hub. A grass island in the middle
-	-- holds the Hall of Fame tower (an all-time board on all four sides, the gold trophy on its roof); the spawn
+	-- holds the champions' podium (Config/Champions: a slowly turning stage); the spawn
 	-- pads stand in a ring round it, each facing out onto a painted one-way ring road with four exits to the
 	-- streets; the crowd waits at the four corners by the food stalls. All distances in studs from the middle.
 	SpawnPlaza = table.freeze({
@@ -102,13 +102,24 @@ return table.freeze({
 		RingDashes = 24, -- yellow dashes along its middle
 		RingArrows = 8, -- white one-way arrows (anticlockwise seen from above)
 		ExitWidth = 28, -- asphalt from the ring out to each side street
-		Tower = table.freeze({
-			Width = 28, -- square footprint
-			Height = 42, -- top of the block; the trophy stands on it
-			FaceWidth = 26, -- a board face on each side
-			FaceHeight = 32,
-			FaceBottom = 7,
-			TrophyScale = 1.6, -- the gold trophy on its roof, against the old 16-stud plaza trophy
+		-- the champions' podium on the island: a round turntable with three steps in a row on it (left, middle,
+		-- right as Config/Champions.Steps) (nothing else on it). Colours are { r, g, b }.
+		Podium = table.freeze({
+			Keys = table.freeze({ "Earned", "HitsAll", "Hits" }), -- the steps' boards, as Config/Champions.Steps
+			Radius = 19, -- the turntable
+			Rise = 0.8, -- its top above the island
+			StepWidth = 11,
+			StepDepth = 9,
+			Heights = table.freeze({ 6, 9, 6 }),
+			LipOut = 0.15, -- the white cap on each step sticks out this far past its sides
+			LipRaise = 0.04, -- and sits this far above its top (the avatars stand on the cap)
+			Colours = table.freeze({
+				table.freeze({ 43, 220, 90 }), -- money green
+				table.freeze({ 255, 196, 48 }), -- gold
+				table.freeze({ 232, 52, 52 }), -- red
+			}),
+			WallHeight = 34, -- the invisible wall round the turning steps, up past the avatars' heads
+			WallRadius = 18.5, -- covers the circle the steps sweep (tests/champions)
 		}),
 		Corner = table.freeze({ reach = 92, spread = 11, people = 6 }), -- the crowd at each corner
 		Planters = table.freeze({ { 56, 88 }, { 88, 56 } }), -- x, z out from the middle, each corner
