@@ -93,6 +93,45 @@ function Kit.put(
 end
 local put = Kit.put
 
+-- a window's trim as one mesh (WindowTrim, PaneTrim in assets/Scenery.rbxm, built for a house storey and wall):
+-- `size` its box, centred at building-frame (x, y, z), its front facing out of the wall (`s` 1 front, -1
+-- back); it counts for the two parts it replaces
+local TRIMS = ReplicatedStorage:WaitForChild("SceneryModels")
+function Kit.trimMesh(
+	ctx: Ctx,
+	name: string,
+	size: Vector3,
+	x: number,
+	y: number,
+	z: number,
+	s: number
+): BasePart
+	local template = TRIMS:FindFirstChild(name)
+	assert(template and template:IsA("MeshPart"), `no scenery mesh "{name}" in assets/Scenery.rbxm`)
+	local m = template:Clone()
+	m.Anchored = true
+	-- a mesh's collision box would fill the window between sill and header: it never collides (smashing finds
+	-- it by query, not by touch)
+	m.CanCollide = false
+	m.CanQuery = true
+	m.CanTouch = true
+	m.CastShadow = true
+	m.Size = size
+	m.CFrame = ctx.base
+		* CFrame.new(x * ctx.m, y, -z)
+		* (if s == 1 then CFrame.Angles(0, math.pi, 0) else CFrame.identity)
+	m.Color = ctx.trim
+	m.Material = Enum.Material.SmoothPlastic
+	m:SetAttribute("Pieces", 2)
+	m.Parent = ctx.model
+	return m
+end
+
+-- trims fit a house storey (12 tall, 1-stud wall); other storeys keep their separate trim parts
+local function houseStorey(ctx: Ctx, h: number): boolean
+	return h == H.FloorHeight and ctx.t == H.Wall
+end
+
 function Kit.wallPart(ctx: Ctx, size: Vector3, x: number, y: number, z: number): BasePart
 	return put(ctx, size, x, y, z, ctx.wall, ctx.material)
 end
@@ -168,15 +207,28 @@ function Kit.row(
 			wallPart(ctx, Vector3.new(len, 3.5, T), mid, y0 + 1.75, zc)
 			glassPane(ctx, Vector3.new(len, gh, T * 0.5), mid, y0 + 3.5 + gh / 2, zc, 0.3)
 			wallPart(ctx, Vector3.new(len, 3, T), mid, y0 + h - 1.5, zc)
-			put(ctx, Vector3.new(len + 1, 0.4, T + 1), mid, y0 + 3.3, zFace + s * 0.2, ctx.trim)
-			put(
-				ctx,
-				Vector3.new(len + 0.6, 0.5, T + 0.5),
-				mid,
-				y0 + h - 2.75,
-				zFace + s * 0.1,
-				ctx.trim
-			)
+			if houseStorey(ctx, h) then
+				-- sill and header as one mesh (WindowTrim: 3.1-9.5 up, 0.8 in to 1.2 out)
+				Kit.trimMesh(
+					ctx,
+					"WindowTrim",
+					Vector3.new(len + 1, 6.4, 2),
+					mid,
+					y0 + 6.3,
+					zFace + s * 0.2,
+					s
+				)
+			else
+				put(ctx, Vector3.new(len + 1, 0.4, T + 1), mid, y0 + 3.3, zFace + s * 0.2, ctx.trim)
+				put(
+					ctx,
+					Vector3.new(len + 0.6, 0.5, T + 0.5),
+					mid,
+					y0 + h - 2.75,
+					zFace + s * 0.1,
+					ctx.trim
+				)
+			end
 			if g.sh then
 				shutters(ctx, mid, len / 2, y0 + 3.5 + gh / 2, gh, zFace + s * 0.15)
 			end
@@ -220,7 +272,21 @@ function Kit.row(
 			wallPart(ctx, Vector3.new(len, h, T), mid, y0 + h / 2, zc)
 			local ww, wh = math.min(len - 1.6, 5), h * 0.5
 			local wy = y0 + h * 0.55
-			put(ctx, Vector3.new(ww + 0.8, wh + 0.8, 0.16), mid, wy, zFace + s * 0.08, ctx.trim)
+			local joined = houseStorey(ctx, h)
+			if joined then
+				-- the backing plate and the sill as one mesh (PaneTrim: 2.875-10.0 up, 0.7 out)
+				Kit.trimMesh(
+					ctx,
+					"PaneTrim",
+					Vector3.new(ww + 1.2, 7.125, 0.7),
+					mid,
+					y0 + 6.4375,
+					zFace + s * 0.35,
+					s
+				)
+			else
+				put(ctx, Vector3.new(ww + 0.8, wh + 0.8, 0.16), mid, wy, zFace + s * 0.08, ctx.trim)
+			end
 			local glass = put(
 				ctx,
 				Vector3.new(ww, wh, 0.22),
@@ -231,14 +297,16 @@ function Kit.row(
 				Enum.Material.Glass
 			)
 			glass.Reflectance = 0.15
-			put(
-				ctx,
-				Vector3.new(ww + 1.2, 0.35, 0.7),
-				mid,
-				wy - wh / 2 - 0.55,
-				zFace + s * 0.35,
-				ctx.trim
-			)
+			if not joined then
+				put(
+					ctx,
+					Vector3.new(ww + 1.2, 0.35, 0.7),
+					mid,
+					wy - wh / 2 - 0.55,
+					zFace + s * 0.35,
+					ctx.trim
+				)
+			end
 			if g.sh then
 				shutters(ctx, mid, ww / 2 + 0.4, wy, wh + 0.8, zFace + s * 0.15)
 			end
@@ -315,7 +383,34 @@ function Kit.row(
 	return found
 end
 
--- plain side walls (x = ±xHalf), in panels about 12 studs long; optional framed window on the middle panel
+-- a framed window on the middle of each side wall (x = ±xHalf) of a storey y0..y0+h
+function Kit.sideWindows(
+	ctx: Ctx,
+	xHalf: number,
+	zFront: number,
+	zBack: number,
+	y0: number,
+	h: number
+)
+	for _, e in { -1, 1 } do
+		local zc = (zFront + zBack) / 2
+		local wy = y0 + h * 0.55
+		put(ctx, Vector3.new(0.16, h * 0.5 + 0.8, 4.8), e * (xHalf + 0.08), wy, zc, ctx.trim)
+		local glass = put(
+			ctx,
+			Vector3.new(0.22, h * 0.5, 4),
+			e * (xHalf + 0.12),
+			wy,
+			zc,
+			GLASS,
+			Enum.Material.Glass
+		)
+		glass.Reflectance = 0.15
+	end
+end
+
+-- plain side walls (x = ±xHalf), one part each side; it counts for as many pieces as the 12-stud panels it
+-- used to be built from ("Pieces"), so smashing it pays the same. Optional framed window on the middle.
 function Kit.sides(
 	ctx: Ctx,
 	xHalf: number,
@@ -323,33 +418,21 @@ function Kit.sides(
 	zBack: number,
 	y0: number,
 	h: number,
-	window: boolean?
+	window: boolean?,
+	storeys: number? -- the storeys it stands for, when it replaces one wall per storey
 )
 	local T = ctx.t
 	local len = zFront - zBack - 2 * T
-	local n = math.max(1, math.floor(len / 12 + 0.5))
-	local pl = len / n
+	local n = math.max(1, math.floor(len / B.SidePanel + 0.5)) * (storeys or 1)
 	for _, e in { -1, 1 } do
 		local xc = e * (xHalf - T / 2)
-		for k = 0, n - 1 do
-			local zc = zBack + T + (k + 0.5) * pl
-			wallPart(ctx, Vector3.new(T, h, pl), xc, y0 + h / 2, zc)
+		local wall = wallPart(ctx, Vector3.new(T, h, len), xc, y0 + h / 2, (zFront + zBack) / 2)
+		if n > 1 then
+			wall:SetAttribute("Pieces", n)
 		end
-		if window then
-			local zc = (zFront + zBack) / 2
-			local wy = y0 + h * 0.55
-			put(ctx, Vector3.new(0.16, h * 0.5 + 0.8, 4.8), e * (xHalf + 0.08), wy, zc, ctx.trim)
-			local glass = put(
-				ctx,
-				Vector3.new(0.22, h * 0.5, 4),
-				e * (xHalf + 0.12),
-				wy,
-				zc,
-				GLASS,
-				Enum.Material.Glass
-			)
-			glass.Reflectance = 0.15
-		end
+	end
+	if window then
+		Kit.sideWindows(ctx, xHalf, zFront, zBack, y0, h)
 	end
 end
 

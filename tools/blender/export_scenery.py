@@ -244,6 +244,32 @@ for z in (0.08, 0.17):
     bmesh.ops.create_cube(bm, size=2.0, matrix=m)
 finish("RailFence", bm, 52, smooth=False)
 
+# ---- house window trim (part savings): pieces that were two parts each, joined, in studs for a 12-stud storey
+# with a 1-stud wall (Config/Houses). x runs along the wall (1 long; the game stretches it to the window), z up
+# from the storey's floor, y out from the wall's face (Roblox z = Blender y).
+
+
+def box(bm, lo, hi):
+    c = [(a + b) / 2 for a, b in zip(lo, hi)]
+    h = [(b - a) / 2 for a, b in zip(lo, hi)]
+    m = Matrix.Translation(Vector(c)) @ Matrix.Diagonal((h[0], h[1], h[2], 1))
+    bmesh.ops.create_cube(bm, size=2.0, matrix=m)
+
+
+# WindowTrim: a real window's sill (3.1-3.5 up, 0.8 into the wall to 1.2 out) and header (9.0-9.5 up, 0.65 in
+# to 0.85 out); the header is a little shorter than the sill (7 long sill over a 6.6 header)
+bm = bmesh.new()
+box(bm, (-0.5, -0.8, 3.1), (0.5, 1.2, 3.5))
+box(bm, (-0.4715, -0.65, 9.0), (0.4715, 0.85, 9.5))
+finish("WindowTrim", bm, 56, smooth=False)
+
+# PaneTrim: a framed pane's backing plate (3.2-10.0 up, 0.16 out) and its sill (2.875-3.225 up, 0.7 out),
+# the plate 5.8 long over a 6.2 sill
+bm = bmesh.new()
+box(bm, (-0.4677, 0.0, 3.2), (0.4677, 0.16, 10.0))
+box(bm, (-0.5, 0.0, 2.875), (0.5, 0.7, 3.225))
+finish("PaneTrim", bm, 58, smooth=False)
+
 bpy.ops.export_scene.fbx(
     filepath=out,
     use_selection=False,

@@ -91,8 +91,9 @@ BUILD.B = function(ctx)
 	})
 	row(ctx, zb, -1, Y0, fh, { seg(-17, -5, "s"), seg(-5, 1, "p"), seg(1, 17, "s") })
 	row(ctx, zb, -1, Y0 + fh, fh, { seg(-17, 0, "p"), seg(0, 17, "p") })
-	sides(ctx, w / 2, zf, zb, Y0, fh, false)
-	sides(ctx, w / 2, zf, zb, Y0 + fh, fh, true)
+	-- both storeys' side walls as one part each side (pieces counted the same), the upper window on top
+	sides(ctx, w / 2, zf, zb, Y0, 2 * fh, false, 2)
+	Kit.sideWindows(ctx, w / 2, zf, zb, Y0 + fh, fh)
 	put(
 		ctx,
 		Vector3.new(w - 2 * H.Wall, 0.8, d - 2 * H.Wall),
