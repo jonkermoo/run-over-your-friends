@@ -1,5 +1,5 @@
 --!strict
--- Turn the uploaded scenery model (MeshParts named Crown, Blooms, Belt, Pine; tools/blender/export_scenery.py)
+-- Turn the uploaded scenery model (one MeshPart per mesh; tools/blender/export_scenery.py lists them)
 -- into assets/Scenery.rbxm: a Folder of template MeshParts at the origin, anchored, plain plastic. The game
 -- clones them and sets Size, Color and CFrame (Greenery, OutskirtsKit), so the import scale doesn't matter.
 -- lune run tools/lune/import_scenery <raw.rbxm> <out.rbxm>

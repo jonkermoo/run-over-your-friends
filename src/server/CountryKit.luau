@@ -13,6 +13,7 @@ local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Greenery = require(script.Parent.Greenery)
 local GroundKit = require(script.Parent.GroundKit)
+local FoliageKit = require(script.Parent.FoliageKit)
 local PaintKit = require(script.Parent.PaintKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -463,7 +464,12 @@ local function edges(ctx: Ctx)
 	end
 end
 
--- a crop field drawn into the terrain (GroundKit): rows of crop and soil, w along the rows (x before turning)
+-- what the greenery pass (FoliageKit) dresses after the build: each field drawn and each beach; filled anew by
+-- every build
+CountryKit.fields = {} :: { FoliageKit.Field }
+CountryKit.beaches = {} :: { FoliageKit.Beach }
+
+-- a crop field drawn into the terrain (GroundKit), w along its rows (x before turning); kept for its crop rows
 local function field(
 	centre: Vector3,
 	w: number,
@@ -473,6 +479,10 @@ local function field(
 	crop: string
 )
 	GroundKit.field(centre.X, centre.Z, w, d, angle, wobble, crop)
+	table.insert(
+		CountryKit.fields,
+		{ cx = centre.X, cz = centre.Z, w = w, d = d, angle = angle, wobble = wobble, crop = crop }
+	)
 end
 
 -- a gable-roofed shed w x d (w along `along`), walls h, roof rising `roof` more; smashable
@@ -981,6 +991,10 @@ local function beaches(ctx: Ctx)
 		)
 		part(tower, Vector3.new(11, 0.6, 11), CFrame.new(t + Vector3.new(0, 16.3, 0)), WHITE)
 		table.insert(taken, t)
+		table.insert(
+			CountryKit.beaches,
+			{ x0 = x0, zc = zc, len = len, taken = taken, seed = B.DuneSeed + 10 + side }
+		)
 		-- dunes along the back of the beach, half on the grass (their own stream, so nothing else shifts)
 		local own = Random.new(B.DuneSeed + side)
 		local D = B.Dunes
@@ -1652,6 +1666,8 @@ end
 
 -- everything past the ring that isn't a zone; returns the rects groves and ponds must keep clear of
 function CountryKit.build(ctx: Ctx): { Rect }
+	table.clear(CountryKit.fields)
+	table.clear(CountryKit.beaches)
 	edges(ctx)
 	farm(ctx)
 	moto(ctx)

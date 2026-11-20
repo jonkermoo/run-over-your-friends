@@ -17,6 +17,7 @@ local Country = require(ReplicatedStorage.Shared.Config.Country)
 local Greenery = require(script.Parent.Greenery)
 local WildsKit = require(script.Parent.WildsKit)
 local GroundKit = require(script.Parent.GroundKit)
+local FoliageKit = require(script.Parent.FoliageKit)
 local SuburbKit = require(script.Parent.SuburbKit)
 local Pace = require(script.Parent.Pace)
 local Places = require(script.Parent.Places)
@@ -1709,6 +1710,8 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local paths = GroundKit.paths(level, seaEdge, reach, Random.new(Country.Roll.Seed))
 	GroundKit.roll(level, paths, seaEdge, reach)
 	GroundKit.lift({ static, props, buildings }, level, seaEdge)
+	-- tufts, bushes, rocks, crop rows and palms on the finished ground (FoliageKit)
+	FoliageKit.build(static, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 
