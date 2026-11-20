@@ -43,7 +43,7 @@ Net.Messages = table.freeze({
 	Crumble = "Crumble",
 	Collapse = "Collapse", -- (building: Model, at: Vector3, push: Vector3, pay: number, userId: number): a whole building comes down
 	Contest = "Contest", -- (state: { key: string, top: { { name: string, score: number } }, place: number, score: number, count: number })
-	Boards = "Boards", -- ({ endsAt: number, now: number, boards: { [key]: { Entry } } }): weekly leaderboards
+	Boards = "Boards", -- ({ endsAt, now, boards: { [key]: { Entry } }, you: { [key]: You } }): the leaderboards, per player
 	ServerGoal = "ServerGoal", -- (set: { goals: { Goal }, endsAt: number }?, now: number): the shared server goal, nil between goals
 	Daily = "Daily", -- ({ streak: number, ready: boolean }): the streak (what collecting would make it when ready)
 	-- ({ title: string, unit: string, top: { { id: number, name: string, score: number, prize: number } }, place: number,

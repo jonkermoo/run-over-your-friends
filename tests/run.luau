@@ -455,28 +455,18 @@ check(
 	Lb.roll(st, 6) and st.hits == 0 and st.launch == 0 and st.allHits == 3 and st.allLaunch == 120
 )
 check("all-time board keeps counting", Lb.value(st, "HitsAll") == 3 and Lb.value(st, "Hits") == 0)
-do
-	local weeklyBoards, allTimeBoards = 0, 0
-	for _, board in LbConfig.Boards do
-		if board.allTime then
-			allTimeBoards += 1
-		else
-			weeklyBoards += 1
-		end
-	end
-	check(
-		"3 weekly boards on the stand, 1 all-time tower",
-		weeklyBoards == 3 and allTimeBoards == 1
-	)
-end
 
 -- spawn plaza (roundabout hub) fits together
 do
 	local SP = World.SpawnPlaza
-	local T = SP.Tower
+	local P = SP.Podium
 	local inner = World.Map.BlockSize - World.Map.SidewalkWidth * 2
 	local padIn, padOut = SP.PadRadius - SP.PadSize * 0.71, SP.PadRadius + SP.PadSize * 0.71
-	check("tower stands on the island", T.Width * 0.71 + 2 < SP.Island)
+	local halfRow = 1.5 * P.StepWidth
+	check(
+		"the turning podium fits on the island",
+		math.sqrt(halfRow ^ 2 + (P.StepDepth / 2 + 2.5) ^ 2) < P.Radius and P.Radius < SP.Island
+	)
 	check(
 		"pads sit between the island kerb and the ring road",
 		padIn > SP.Island + SP.Kerb and padOut < SP.RingInner
@@ -484,10 +474,10 @@ do
 	check("pads don't touch", 2 * math.pi * SP.PadRadius / SP.Pads > SP.PadSize * 1.5)
 	check("ring road inside the plaza", SP.RingOuter < inner / 2 - SP.Border)
 	check("corner crowd is past the ring road", SP.Corner.reach - SP.Corner.spread > SP.RingOuter)
-	check(
-		"board faces fit the tower",
-		T.FaceWidth < T.Width and T.FaceBottom + T.FaceHeight < T.Height
-	)
+	local LbC = LbConfig
+	local outer = (LbC.Stands - 1) / 2 * LbC.StandStep + LbC.StandWidth / 2 + 1.6
+	check("stands fit between the gantry posts", outer < 96 - 1.5)
+	check("stands don't overlap", LbC.StandStep > LbC.StandWidth + 3.2)
 end
 
 -- the spawn safe zone
@@ -532,6 +522,7 @@ check("starter ad waits at least a minute of play", Products.StarterOfferAfter >
 require("./offer")(check)
 require("./vip")(check)
 require("./analytics")(check)
+require("./champions")(check)
 require("./localization")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning

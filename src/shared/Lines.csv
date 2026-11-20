@@ -68,6 +68,11 @@ UnstuckWait,Unstuck ({n}),,,Desatascar ({n}),Desatolar ({n})
 GiantHitLeft,{n} hit left,,,falta {n} golpe,falta {n} batida
 GiantHitsLeft,{n} hits left,,,faltan {n} golpes,faltam {n} batidas
 BoardResets,resets in {time},,,se reinicia en {time},reinicia em {time}
+BoardYou,YOU,,,TÚ,VOCÊ
+BoardNoScore,Play to get on this board!,,,¡Juega para entrar en esta tabla!,Jogue para entrar neste placar!
+BoardTop,You're number 1!,,,¡Eres el número 1!,Você é o número 1!
+BoardPass,{gap} more to pass #{place},,,{gap} más para pasar al #{place},mais {gap} para passar o #{place}
+BoardClimb,Keep going to climb the board!,,,¡Sigue así para subir en la tabla!,Continue para subir no placar!
 LoadingPct,LOADING THE CITY... {pct}%,,,CARGANDO LA CIUDAD... {pct}%,CARREGANDO A CIDADE... {pct}%
 Quest_Hits,Run over {n} people,,,Atropella a {n} personas,Atropele {n} pessoas
 Quest_Earn,Earn ${n},,,Gana ${n},Ganhe ${n}
