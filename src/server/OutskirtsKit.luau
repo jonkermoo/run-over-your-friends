@@ -1235,6 +1235,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			local z = ds.z + random:NextNumber(-ds.d / 2 + f, ds.d / 2 - f)
 			mound(x, z, f, h, Enum.Material.Sand)
 		end
+		local mesas: { Vector3 } = {} -- x, z and the sand skirt's radius (cacti keep out)
 		for k = 0, D.Mesas - 1 do
 			local side = if k % 2 == 0 then -1 else 1
 			local x = ds.x + side * (ds.w / 2 - 70 - (k // 2) * 160)
@@ -1249,6 +1250,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			-- stream, so the rest of the outskirts keeps its layout)
 			local own = Random.new(D.MesaSeed + k)
 			local tall = size.Y * D.MesaTall
+			table.insert(mesas, Vector3.new(x, z, math.max(size.X, size.Z) / 2 * (1 + D.MesaTalus)))
 			mound(
 				x,
 				z,
@@ -1304,6 +1306,16 @@ function OutskirtsKit.build(ctx: Ctx): Result
 				0,
 				ds.z + random:NextNumber(-ds.d / 2 + 30, ds.d / 2 - 30)
 			)
+			local buried = false
+			for _, me in mesas do
+				if Vector2.new(at.X - me.X, at.Z - me.Y).Magnitude < me.Z then
+					buried = true
+					break
+				end
+			end
+			if buried then
+				continue
+			end
 			local m = prop(props, "Cactus")
 			post(m, 14, 2.4, at, green)
 			post(m, 5, 1.6, at + Vector3.new(2.6, 6, 0), green)
