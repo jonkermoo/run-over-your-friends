@@ -1,11 +1,10 @@
 --!strict
 -- First session: steps, goals, rewards and hint timings.
 
--- player attribute "Tutorial". 3 is retired: it meant "save for the next car", and saves holding it count as done.
+-- player attribute "Tutorial". Numbers never change meaning; retired ones are in Retired below.
 local Steps = table.freeze({
 	Spawn = 1,
 	Hits = 2,
-	Ramp = 4,
 	Smash = 5,
 	Goal = 6,
 	Buy = 7,
@@ -18,24 +17,31 @@ return table.freeze({
 	Order = table.freeze({
 		Steps.Spawn,
 		Steps.Hits,
-		Steps.Ramp,
 		Steps.Smash,
 		Steps.Goal,
 		Steps.Buy,
 		Steps.Event,
 	}),
+	-- saved steps no longer in Order, and where they go: 3 meant "save for the next car", 4 was "take a ramp"
+	-- (removed 2026-11-20: a quarter of new players quit there)
+	Retired = table.freeze({
+		[3] = Steps.Done,
+		[4] = Steps.Smash,
+	}),
 	HitsGoal = 3,
 	HitsReward = 250,
 	SmashGoal = 5, -- building pieces
+	-- the first goal: a few more hits, then a big CLAIM pop-up that claims itself if left alone
+	GoalHits = 4,
+	ClaimAutoAfter = 6, -- seconds the CLAIM pop-up waits for a press
+	ClaimDelay = 0.6, -- seconds between the last hit and the pop-up, so the hit lands first
 	-- paid when the step is done (or was done before you got to it), not when it's skipped
 	Rewards = table.freeze({
-		[Steps.Ramp] = 100,
 		[Steps.Smash] = 150,
 		[Steps.Goal] = 200,
 		[Steps.Event] = 300,
 	}),
 	Cheers = table.freeze({
-		[Steps.Ramp] = "NICE JUMP!",
 		[Steps.Smash] = "BUILDING SMASHED!",
 		[Steps.Goal] = "FIRST GOAL CLAIMED!",
 		[Steps.Event] = "YOU JOINED AN EVENT!",
@@ -49,7 +55,7 @@ return table.freeze({
 	EdgeBox = 120, -- layout px: the edge pointer's size, kept off the controls card and speedometer (Rules/Clear)
 	ClearGap = 10, -- layout px between it and them
 	TabArrowDrop = 96, -- layout px the job card steps down while the arrow points at a menu tab above it
-	BeaconHeight = 500, -- studs: the light column over a ramp or a building
+	BeaconHeight = 500, -- studs: the light column over a building
 	BeaconWidth = 14,
 	BeaconNear = 70, -- studs: closer than this the column thins out
 	SmashMinHeight = 10, -- studs: shorter models in the Buildings folder are not smash targets

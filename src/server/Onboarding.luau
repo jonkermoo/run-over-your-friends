@@ -1,9 +1,10 @@
 --!strict
--- First session: spawn a car, run over three people (bonus and confetti), take a ramp, smash a building, claim a
--- first goal, buy a car, join an event. The step is saved in the profile and shown as the player attribute
--- "Tutorial"; "TutorialCount" counts toward the step (hits, building pieces). The client draws the job card,
--- markers and hints. Things done before their step comes up (Rules/Onboarding) pass that step when it does, and
--- every new step can be skipped (no event on, a car that can't jump, no money yet).
+-- First session: spawn a car, run over three people (bonus and confetti), smash a building, finish a short first
+-- goal (a few more hits, then a big CLAIM pop-up that claims itself if left alone), buy a car, join an event. The
+-- step is saved in the profile and shown as the player attribute "Tutorial"; "TutorialCount" counts toward the
+-- step (hits, building pieces) and "TutorialClaim" is set while the first goal waits to be claimed. The client
+-- draws the job card, markers, hints and the CLAIM pop-up. Things done before their step comes up
+-- (Rules/Onboarding) pass that step when it does, and every new step can be skipped (no event on, no money yet).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,7 +24,6 @@ local VehicleService = require(script.Parent.VehicleService)
 
 local Steps = Onboarding.Steps
 local FUNNEL = {
-	[Steps.Ramp] = Analytics.Steps.TookRamp,
 	[Steps.Smash] = Analytics.Steps.SmashedBuilding,
 	[Steps.Goal] = Analytics.Steps.ClaimedGoal,
 	[Steps.Event] = Analytics.Steps.JoinedEvent,
@@ -31,13 +31,13 @@ local FUNNEL = {
 
 local OnboardingService = {}
 
-type Session = { count: number, jumped: boolean, pieces: number, enteredAt: number }
+type Session = { count: number, pieces: number, enteredAt: number, claimable: boolean }
 local sessions: { [Player]: Session } = {}
 
 local function sessionOf(player: Player): Session
 	local s = sessions[player]
 	if not s then
-		s = { count = 0, jumped = false, pieces = 0, enteredAt = os.clock() }
+		s = { count = 0, pieces = 0, enteredAt = os.clock(), claimable = false }
 		sessions[player] = s
 	end
 	return s
@@ -95,13 +95,15 @@ end
 -- on to the step after `from`, passing any already done
 local function moveOn(player: Player, from: number)
 	local s = sessionOf(player)
-	local facts = { jumped = s.jumped, pieces = s.pieces, ownsExtra = ownsExtra(player) }
+	local facts = { pieces = s.pieces, ownsExtra = ownsExtra(player) }
 	local landing, passed = Rules.landing(Rules.after(from, Onboarding), facts, Onboarding)
 	for _, done in passed do
 		cheer(player, done)
 	end
 	s.count = 0
 	s.enteredAt = os.clock()
+	s.claimable = false
+	player:SetAttribute("TutorialClaim", nil)
 	-- pieces smashed earlier still show on the smash step's bar
 	player:SetAttribute("TutorialCount", if landing == Steps.Smash then s.pieces else 0)
 	setStep(player, landing)
@@ -120,6 +122,23 @@ local function complete(player: Player, done: number)
 		cheer(player, done)
 		moveOn(player, done)
 	end
+end
+
+-- the first goal is done: the CLAIM pop-up shows, and claims by itself if the player leaves it
+local function goalDone(player: Player)
+	local s = sessionOf(player)
+	s.claimable = true
+	local entered = s.enteredAt
+	task.delay(Onboarding.ClaimDelay, function()
+		if player.Parent and s.claimable and s.enteredAt == entered then
+			player:SetAttribute("TutorialClaim", true)
+		end
+	end)
+	task.delay(Onboarding.ClaimDelay + Onboarding.ClaimAutoAfter, function()
+		if player.Parent and s.claimable and s.enteredAt == entered then
+			complete(player, Steps.Goal)
+		end
+	end)
 end
 
 -- a hit, a smash or a landed jump while an event is live counts as joining it
@@ -147,10 +166,18 @@ function OnboardingService.start()
 	end)
 	NpcService.onKnock(function(player)
 		tookPart(player)
+		local s = sessionOf(player)
+		if step(player) == Steps.Goal and not s.claimable then
+			s.count += 1
+			player:SetAttribute("TutorialCount", s.count)
+			if s.count >= Onboarding.GoalHits then
+				goalDone(player)
+			end
+			return
+		end
 		if step(player) ~= Steps.Hits then
 			return
 		end
-		local s = sessionOf(player)
 		s.count += 1
 		player:SetAttribute("TutorialCount", s.count)
 		if s.count >= Onboarding.HitsGoal then
@@ -164,14 +191,11 @@ function OnboardingService.start()
 			moveOn(player, Steps.Hits)
 		end
 	end)
-	-- the ramp step wants a jump off a jump ramp, not any kerb or crest
+	-- a jump off a jump ramp joins a live event
 	StuntService.onStunt(function(player, kind)
-		if kind ~= "RampJumps" then
-			return
+		if kind == "RampJumps" then
+			tookPart(player)
 		end
-		sessionOf(player).jumped = true
-		tookPart(player)
-		complete(player, Steps.Ramp)
 	end)
 	BuildingService.onBreak(function(player, count, building)
 		local s = sessionOf(player)
@@ -188,7 +212,7 @@ function OnboardingService.start()
 		end
 	end)
 	Net.remote("TutorialClaim").OnServerEvent:Connect(function(player)
-		if RateLimit.allow(player, "tutorialClaim", 0.5) then
+		if RateLimit.allow(player, "tutorialClaim", 0.5) and sessionOf(player).claimable then
 			complete(player, Steps.Goal)
 		end
 	end)

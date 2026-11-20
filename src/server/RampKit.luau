@@ -38,7 +38,7 @@ local function trim(
 end
 
 function RampKit.dress(w: WedgePart)
-	CollectionService:AddTag(w, "JumpRamp") -- the tutorial's marker looks for these
+	CollectionService:AddTag(w, "JumpRamp") -- jumps off these count as ramp jumps (StuntService)
 	local parent = w.Parent :: Instance
 	local s = w.Size
 	w.Material = (Enum.Material :: any)[R.Deck]

@@ -27,25 +27,23 @@ local F1 = Enum.AnalyticsCustomFieldKeys.CustomField01.Name
 local F2 = Enum.AnalyticsCustomFieldKeys.CustomField02.Name
 local F3 = Enum.AnalyticsCustomFieldKeys.CustomField03.Name
 
--- the first-session funnel, in order
+-- the first-session funnel, in order (renumbered 2026-11-20 when the ramp step left: docs/ANALYTICS.md)
 Analytics.Steps = table.freeze({
 	Joined = 1,
 	SpawnedCar = 2,
 	FirstHit = 3,
 	FirstRampage = 4,
-	TookRamp = 5,
-	SmashedBuilding = 6,
-	ClaimedGoal = 7,
-	FirstPurchase = 8,
-	JoinedEvent = 9,
-	TutorialDone = 10,
+	SmashedBuilding = 5,
+	ClaimedGoal = 6,
+	FirstPurchase = 7,
+	JoinedEvent = 8,
+	TutorialDone = 9,
 })
 local STEP_NAMES = {
 	"Joined",
 	"Spawned a car",
 	"First hit",
 	"First rampage",
-	"Took a ramp",
 	"Smashed a building",
 	"Claimed a goal",
 	"First vehicle bought",
