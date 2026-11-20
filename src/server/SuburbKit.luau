@@ -158,6 +158,22 @@ local function frame(pts: { Vector3 }, i: number): (Vector3, Vector3)
 	return along, Vector3.new(-along.Z, 0, along.X)
 end
 
+-- call `fn` at points along a polyline `gap` apart (the first half a gap in); where `fn` says no (the spot is
+-- taken), try again `step` further on
+local function every(pts: { Vector3 }, gap: number, step: number, fn: (Vector3) -> boolean)
+	local walked = gap / 2
+	for i = 2, #pts do
+		local a, b = pts[i - 1], pts[i]
+		local seg = (b - a).Magnitude
+		local t = 0
+		while seg > 0 and walked + (seg - t) >= gap do
+			t += gap - walked
+			walked = if fn(a:Lerp(b, t / seg)) then 0 else gap - step
+		end
+		walked += seg - t
+	end
+end
+
 -- terrain off the ground (hill feet, mounds) over a rect, so roads and lawns lie flat
 local function flatten(r: Rect)
 	Terra.terrain:FillBlock(
@@ -418,9 +434,20 @@ local function hood(
 		end
 		return math.sqrt(best)
 	end
+	local function nearestPoint(p: Vector3): Vector3
+		local best, at = math.huge, p
+		for _, d in dense do
+			local dx, dz = d.p.X - p.X, d.p.Z - p.Z
+			if dx * dx + dz * dz < best then
+				best, at = dx * dx + dz * dz, d.p
+			end
+		end
+		return at
+	end
 
 	-- the streets and sidewalks themselves are meshes (RoadKit); here only the sidewalks' walk points
 	local sideOff = roadHalf + Cfg.Verge + Cfg.Sidewalk / 2
+	local walkOuter = roadHalf + Cfg.Verge + Cfg.Sidewalk
 	local clearMouth = roadHalf + Cfg.Verge + Cfg.Sidewalk + 3
 	local lampSide = 1
 	-- what roadside poles keep clear of: lamps, driveways and paths (segments on the ground)
@@ -498,13 +525,14 @@ local function hood(
 		end
 		local pal = HouseRules.pickPalette(#Houses.Palettes, lastPalette, random:NextNumber())
 		lastPalette = pal
+		local mirror = random:NextNumber() < 0.5
 		local place = HouseKit.build(
 			buildings,
 			kind,
 			c,
 			face,
 			Houses.Palettes[pal],
-			random:NextNumber() < 0.5,
+			mirror,
 			"SuburbHome" .. (#out.places + 1)
 		)
 		table.insert(out.places, place)
@@ -528,7 +556,9 @@ local function hood(
 			Enum.Material.Concrete
 		)
 		local doorLat = math.clamp((place.door - c):Dot(right), -T.width / 2 + 3, T.width / 2 - 3)
+		local gaps = { { dl - Cfg.Driveway / 2, dl + Cfg.Driveway / 2 } }
 		if math.abs(doorLat - dl) > Cfg.Driveway / 2 + Cfg.Path then
+			table.insert(gaps, { doorLat - Cfg.Path / 2, doorLat + Cfg.Path / 2 })
 			local path = c + face * (T.depth / 2 + Cfg.Lawn / 2) + right * doorLat
 			part(
 				folder,
@@ -541,6 +571,8 @@ local function hood(
 		local box = c
 			+ face * (T.depth / 2 + Cfg.Lawn - 1.5)
 			+ right * (dl + side * (Cfg.Driveway / 2 + 2))
+		local mailLat = dl + side * (Cfg.Driveway / 2 + 2)
+		table.insert(gaps, { mailLat - Cfg.MailboxGap, mailLat + Cfg.MailboxGap })
 		local mail = prop(props, "Mailbox")
 		part(
 			mail,
@@ -563,10 +595,34 @@ local function hood(
 				random
 			)
 		end
-		if random:NextNumber() < C.car then
+		local car = random:NextNumber() < C.car
+		if car then
 			local at = c + face * (T.depth / 2 + 14) + right * dl + Vector3.new(0, 0.3, 0)
 			LotKit.car(props, Lots.Cars, CFrame.lookAt(at, at - face), random)
 		end
+		-- the front lawn's border, planting and driveway toys (YardKit.front, its own random stream); nothing
+		-- planted in front of a garage door (type C's wing)
+		local wallGaps = {}
+		if kind == "C" then
+			local g = (T.width / 2 - Cfg.GarageWing / 2) * (if mirror then -1 else 1)
+			table.insert(wallGaps, { g - Cfg.GarageWing / 2, g + Cfg.GarageWing / 2 })
+		end
+		YardKit.front(props, {
+			c = c,
+			face = face,
+			width = T.width,
+			depth = T.depth,
+			lawn = Cfg.Lawn,
+			door = doorLat,
+			drive = dl,
+			driveWidth = Cfg.Driveway,
+			car = car,
+			gaps = gaps,
+			wallGaps = wallGaps,
+			clear = function(p: Vector3): boolean
+				return nearest(p) > walkOuter + Cfg.BorderClear
+			end,
+		})
 
 		-- the back garden: a fence round it (if it doesn't run into a neighbour or a street), maybe a pool
 		local g = c - face * (T.depth / 2 + Cfg.Garden / 2)
@@ -642,6 +698,30 @@ local function hood(
 				or nearBlocker(p)
 		end)
 	end
+	-- street trees on the verge of the other side, clear of the same things (their own random streams)
+	local ST = Cfg.StreetTrees
+	for n, st in streets do
+		local side = if n % 2 == 0 then -1 else 1
+		local line = {}
+		for i = 1, #st.pts do
+			local _, right = frame(st.pts, i)
+			table.insert(line, st.pts[i] + right * side * poleOff)
+		end
+		local last = st.pts[#st.pts]
+		every(line, ST.Every, ST.Step, function(p: Vector3): boolean
+			if
+				nearest(p, n) < clearMouth + ST.Clear
+				or (st.bulb and (p - last).Magnitude < Cfg.Bulb + ST.Clear)
+				or nearBlocker(p)
+			then
+				return false
+			end
+			local own = Random.new(ST.Seed + math.floor(p.X) * 7 + math.floor(p.Z) * 3)
+			Greenery.tree(props, p, own, ST.Scale, true)
+			return true
+		end)
+	end
+
 	local ground = Vector3.new(0, TERRAIN_TOP, 0)
 	local edge = F.width / 2
 	local stopAt = b - dir * (Cfg.SignBack + RB.Back) - perp * (edge + RB.Out + RB.Shelter[3] / 2)
@@ -667,7 +747,88 @@ local function hood(
 		)
 	end
 
-	-- small clumps of trees on the open grass left between the gardens
+	-- pocket parks (YardKit.pocketPark) on open grass: of the spots on a grid clear of streets and gardens, the
+	-- ones nearest a street, far enough apart
+	local K = Yards.Pocket
+	local parks: { Vector3 } = {}
+	local spots: { { p: Vector3, d: number } } = {}
+	for u = h.start, h.start + h.length, K.Grid do
+		for v = -h.half, h.half, K.Grid do
+			local p = origin + dir * u + perp * v
+			local d = nearest(p)
+			local ok = inArea(p)
+				and d > walkOuter + K.Radius
+				and (p - origin):Dot(dir) > h.start + K.Radius -- not by the feeder road or the name board
+			for _, l in lots do
+				if ok and (l.c - p).Magnitude < l.depth / 2 + Cfg.Garden + K.Radius then
+					ok = false
+				end
+			end
+			if ok then
+				table.insert(spots, { p = p, d = d })
+			end
+		end
+	end
+	table.sort(spots, function(p, q)
+		return p.d < q.d
+	end)
+	-- whether a point is on a lot: the house, its front lawn and its back garden
+	local function onLot(p: Vector3): boolean
+		for _, l in lots do
+			local right = Vector3.new(-l.out.Z, 0, l.out.X)
+			local rel = p - l.c
+			local f, x = rel:Dot(l.out), rel:Dot(right)
+			if
+				math.abs(x) < l.w / 2 + 4
+				and f > -(l.depth / 2 + Cfg.Garden + 2)
+				and f < l.depth / 2 + Cfg.Lawn
+			then
+				return true
+			end
+		end
+		return false
+	end
+	for _, sp in spots do
+		if #parks >= K.PerHood then
+			break
+		end
+		local to = nearestPoint(sp.p)
+		local way = Vector3.new(to.X - sp.p.X, 0, to.Z - sp.p.Z).Unit
+		local apart = true -- far enough from the other parks, and its path clear of every lot
+		for f = K.Square / 2, sp.d - walkOuter, 4 do
+			if onLot(sp.p + way * f) then
+				apart = false
+				break
+			end
+		end
+		for _, q in parks do
+			if (q - sp.p).Magnitude < K.Apart then
+				apart = false
+			end
+		end
+		if apart then
+			local reach = sp.d - walkOuter + 0.3
+			YardKit.pocketPark(folder, props, sp.p, way, reach)
+			table.insert(parks, sp.p)
+			-- no grass blades through the paving (the same grass-tinted paint as under the sidewalks)
+			paveTerrain(
+				{ x = sp.p.X, z = sp.p.Z, w = reach * 2 + 8, d = reach * 2 + 8 },
+				{ { a = sp.p, b = sp.p + way * reach, half = K.PathWidth / 2 + Cfg.Pave } },
+				{ { c = sp.p, r = K.Square / 2 + Cfg.Pave } }
+			)
+		end
+	end
+	local function inPark(p: Vector3, pad: number): boolean
+		for _, q in parks do
+			if (q - p).Magnitude < K.Radius + pad then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- small clumps of trees on the open grass left between the gardens (none in a pocket park: those take the
+	-- same random draws without planting, so nothing after them moves)
 	local S = Cfg.Spinney
 	local placed = 0
 	for _ = 1, S.n * S.tries do
@@ -689,11 +850,12 @@ local function hood(
 			for _ = 1, random:NextInteger(S.trees[1], S.trees[2]) do
 				local ang, dist =
 					random:NextNumber(0, math.pi * 2), random:NextNumber(0, S.clear - 8)
-				Greenery.tree(
-					props,
-					p + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist),
-					random
-				)
+				local at = p + Vector3.new(math.cos(ang) * dist, 0, math.sin(ang) * dist)
+				if inPark(at, S.ParkPad) then
+					Greenery.skipTree(random)
+				else
+					Greenery.tree(props, at, random)
+				end
 			end
 		end
 	end

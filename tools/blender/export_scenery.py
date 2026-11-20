@@ -5,6 +5,7 @@
 #   Blooms     a row of flower heads for a flower bed, 10 x 4 footprint (Greenery.flowerBed)
 #   Belt       a long strip of tree crowns on trunks for the woods round the map's edge (OutskirtsKit)
 #   Pine       a conifer: trunk and three stacked cones (forests)
+#   ...and the later sets below (low-poly greenery, roadside, window trim, suburb front yards)
 # Roblox (x, y, z) = Blender (-x, z, y); the shapes are symmetric enough that only up matters.
 import bpy, bmesh, sys, math, random
 from mathutils import Vector, Matrix
@@ -270,6 +271,73 @@ box(bm, (-0.4677, 0.0, 3.2), (0.4677, 0.16, 10.0))
 box(bm, (-0.5, 0.0, 2.875), (0.5, 0.7, 3.225))
 finish("PaneTrim", bm, 58, smooth=False)
 
+# ---- suburb front yards (map redo, stage 5), in studs
+
+
+def rod(bm, a, b, r, segs=6):
+    """A round bar from a to b."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    rot = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+    m = Matrix.Translation((a + b) / 2) @ rot
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=segs, radius1=r, radius2=r, depth=d.length, matrix=m)
+
+
+def ring(bm, centre, radius, tube, segs=14, sides=4):
+    """An upright ring (a wheel) in the x-z plane round `centre`."""
+    cx, cy, cz = centre
+    grid = []
+    for i in range(segs):
+        a = 2 * math.pi * i / segs
+        row = []
+        for j in range(sides):
+            b = 2 * math.pi * j / sides + math.pi / 4
+            r = radius + tube * math.cos(b)
+            row.append(bm.verts.new((cx + r * math.cos(a), cy + tube * math.sin(b), cz + r * math.sin(a))))
+        grid.append(row)
+    for i in range(segs):
+        for j in range(sides):
+            a, b = grid[i][j], grid[(i + 1) % segs][j]
+            c, d = grid[(i + 1) % segs][(j + 1) % sides], grid[i][(j + 1) % sides]
+            bm.faces.new((a, b, c, d))
+
+
+# Picket: a run of white picket fence 16 long (x), 3.6 tall: 20 pointed pickets in front of two rails, a square
+# post at each end with a cap; the rails' ends sit inside the posts, the pickets stand a little proud of the rails
+bm = bmesh.new()
+for k in range(20):
+    x = -7.4 + k * 14.8 / 19
+    box(bm, (x - 0.22, -0.06, 0.15), (x + 0.22, 0.06, 3.0))
+    tip = [bm.verts.new(p) for p in (
+        (x - 0.22, -0.06, 3.0), (x + 0.22, -0.06, 3.0), (x + 0.22, 0.06, 3.0), (x - 0.22, 0.06, 3.0),
+    )]
+    apex = bm.verts.new((x, 0, 3.4))
+    for i in range(4):
+        bm.faces.new((tip[i], tip[(i + 1) % 4], apex))
+    bm.faces.new(tip[::-1])
+for z in (0.9, 2.3):
+    box(bm, (-7.8, 0.07, z - 0.16), (7.8, 0.23, z + 0.16))
+for x in (-8.0, 8.0):
+    box(bm, (x - 0.3, -0.12, 0.0), (x + 0.3, 0.32, 3.3))
+    box(bm, (x - 0.38, -0.2, 3.3), (x + 0.38, 0.4, 3.55))
+finish("Picket", bm, 60, smooth=False)
+
+# Bike: a kid's bike 5.4 long (x), 3.5 tall, side on in x-z: two ring wheels, a diamond frame, a fork, bars
+# across and a saddle
+bm = bmesh.new()
+for x in (-1.75, 1.75):
+    ring(bm, (x, 0, 1.15), 1.0, 0.13)
+    rod(bm, (x, -0.12, 1.15), (x, 0.12, 1.15), 0.12)  # the hub
+rear, crank = (-1.75, 0, 1.15), (-0.15, 0, 1.05)
+seat, head = (-0.6, 0, 2.55), (1.25, 0, 2.45)
+for a, b in ((rear, crank), (rear, seat), (crank, seat), (seat, head), (crank, head), (head, (1.75, 0, 1.15))):
+    rod(bm, a, b, 0.09)
+rod(bm, head, (1.15, 0, 3.2), 0.08)
+rod(bm, (1.15, -0.85, 3.2), (1.15, 0.85, 3.2), 0.08)
+rod(bm, seat, (-0.7, 0, 3.0), 0.07)
+box(bm, (-1.15, -0.22, 3.0), (-0.3, 0.22, 3.2))
+finish("Bike", bm, 64, smooth=False)
+
 bpy.ops.export_scene.fbx(
     filepath=out,
     use_selection=False,
@@ -303,6 +371,7 @@ if preview:
         ("CrownA", 10, -45), ("CrownB", 10, -33), ("CrownC", 10, -21), ("BushA", 6, -10), ("BushB", 6, -3),
         ("Tuft", 4, 3), ("Petals", 4, 3), ("RockA", 5, 9), ("RockB", 5, 15), ("RockC", 5, 21),
         ("PalmTrunk", 14, 28), ("PalmLeaves", 14, 28), ("CropRows", 8, 42),
+        ("Picket", 1, 52), ("Bike", 2, 64),
     ):
         src = bpy.data.objects[name]
         c = src.copy()

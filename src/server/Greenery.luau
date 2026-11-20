@@ -100,19 +100,27 @@ local function spotPick(at: Vector3, n: number): number
 	return (math.floor(at.X) * 7 + math.floor(at.Z) * 13) % n + 1
 end
 
--- a leafy tree: a trunk and a chunky low-poly crown (one of three shapes, picked by its spot), turned a random way
-function Greenery.tree(folder: Instance, at: Vector3, random: Random)
+-- a leafy tree: a trunk and a chunky low-poly crown (one of three shapes, picked by its spot), turned a random way;
+-- `scale` sizes it (1 when nil), and an `overhead` tree's crown (over a road) never collides, only its trunk
+function Greenery.tree(
+	folder: Instance,
+	at: Vector3,
+	random: Random,
+	scale: number?,
+	overhead: boolean?
+)
 	local T = P.Tree
+	local k = scale or 1
 	local m = prop(folder, "Tree")
-	local h = random:NextNumber(T.Trunk[1], T.Trunk[2])
+	local h = random:NextNumber(T.Trunk[1], T.Trunk[2]) * k
 	block(
 		m,
-		Vector3.new(T.TrunkWidth, h, T.TrunkWidth),
+		Vector3.new(T.TrunkWidth * k, h, T.TrunkWidth * k),
 		CFrame.new(at + Vector3.new(0, h / 2, 0)),
 		rgb(P.Trunk),
 		Enum.Material.Wood
 	)
-	local r = random:NextNumber(T.Crown[1], T.Crown[2])
+	local r = random:NextNumber(T.Crown[1], T.Crown[2]) * k
 	local turn = random:NextNumber(0, math.pi * 2)
 	local name = Foliage.Crowns[spotPick(at, #Foliage.Crowns)]
 	local template = MESHES:FindFirstChild(name)
@@ -131,9 +139,9 @@ function Greenery.tree(folder: Instance, at: Vector3, random: Random)
 		green(random)
 	)
 	crown.Material = Enum.Material.Grass
-	crown.CanCollide = true
-	crown.CanQuery = true
-	crown.CanTouch = true
+	crown.CanCollide = not overhead
+	crown.CanQuery = not overhead
+	crown.CanTouch = not overhead
 end
 
 -- take the random draws a tree takes, without planting it (so a skipped tree moves nothing after it)
