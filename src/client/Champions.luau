@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Champions = require(ReplicatedStorage.Shared.Config.Champions)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Leaderboards = require(ReplicatedStorage.Shared.Config.Leaderboards)
+local World = require(ReplicatedStorage.Shared.Config.World)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -196,7 +197,9 @@ local function place(slot: Slot)
 		pose(m, stepCfg.pose)
 	end
 	-- feet on the step's top, facing the step's front (-Z), measured at the stage's built angle
-	local top = base * slot.stepLocal * CFrame.new(0, slot.step.Size.Y / 2, 0)
+	local top = base
+		* slot.stepLocal
+		* CFrame.new(0, slot.step.Size.Y / 2 + World.SpawnPlaza.Podium.LipRaise, 0) -- on the step's cap
 	m:PivotTo(CFrame.new(top.Position) * CFrame.new(0, 5, 0))
 	-- the bent joints move the limbs on the next physics step: measure after it
 	RunService.Stepped:Wait()

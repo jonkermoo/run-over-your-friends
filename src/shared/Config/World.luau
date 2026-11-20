@@ -111,6 +111,8 @@ return table.freeze({
 			StepWidth = 11,
 			StepDepth = 9,
 			Heights = table.freeze({ 6, 9, 6 }),
+			LipOut = 0.15, -- the white cap on each step sticks out this far past its sides
+			LipRaise = 0.04, -- and sits this far above its top (the avatars stand on the cap)
 			Colours = table.freeze({
 				table.freeze({ 43, 220, 90 }), -- money green
 				table.freeze({ 255, 196, 48 }), -- gold

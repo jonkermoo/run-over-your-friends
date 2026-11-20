@@ -396,11 +396,13 @@ local function champions(static: Instance, cx: number, cz: number)
 		)
 		p.Name = "Step_" .. key
 		p.CanCollide = false
-		-- a white lip along the top
+		-- a white cap on top, a little bigger than the step every way (sides LipOut out, top LipRaise up) so no
+		-- face of it lies in a face of the step: shared faces flicker
+		local lipH = 0.4 + P.LipRaise
 		part(
 			stage,
-			Vector3.new(P.StepWidth, 0.4, P.StepDepth + 0.2),
-			CFrame.new(cx + x, floor + h - 0.2, cz),
+			Vector3.new(P.StepWidth + P.LipOut * 2, lipH, P.StepDepth + P.LipOut * 2),
+			CFrame.new(cx + x, floor + h + P.LipRaise - lipH / 2, cz),
 			COLORS.concrete
 		).CanCollide =
 			false
@@ -812,8 +814,8 @@ function MapBuilder.build(fresh: boolean?): Result
 					for _, side in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(2, 8, 2),
-							CFrame.new(bx + side * (STW / 2 - 2), 3, bz - 0.5),
+							Vector3.new(2, 7.4, 2), -- ends inside the frame's bottom bar: equal tops flicker
+							CFrame.new(bx + side * (STW / 2 - 2), 2.7, bz - 0.5),
 							COLORS.concrete
 						)
 					end
