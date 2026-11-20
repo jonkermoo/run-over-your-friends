@@ -623,6 +623,60 @@ local function clearGrassUnder(size: Vector3, cf: CFrame, lo: Vector3, hi: Vecto
 	end
 end
 
+-- a city home's small front garden (YardKit.front, compact): a picket fence or hedge along the sidewalk with
+-- a gap at the door and wherever the house reaches out low toward it (a porch, a stoop), small bushes
+local function frontGarden(
+	props: Instance,
+	buildings: Instance,
+	home: Places.Place,
+	c: Vector3,
+	face: Vector3,
+	t: Houses.HouseType
+)
+	local G = Houses.Garden
+	local right = Vector3.new(-face.Z, 0, face.X)
+	local door = (home.door - c):Dot(right)
+	local gaps = { { door - G.DoorGap, door + G.DoorGap } }
+	local model = buildings:FindFirstChild(home.name)
+	if model then
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") then
+				local cf, size = p.CFrame, p.Size
+				local function reach(dir: Vector3): number
+					return math.abs(cf.RightVector:Dot(dir)) * size.X / 2
+						+ math.abs(cf.UpVector:Dot(dir)) * size.Y / 2
+						+ math.abs(cf.LookVector:Dot(dir)) * size.Z / 2
+				end
+				local rel = p.Position - c
+				if
+					rel:Dot(face) + reach(face) > t.depth / 2 + G.Proud
+					and p.Position.Y - reach(Vector3.yAxis) < G.Low
+				then
+					local x, half = rel:Dot(right), reach(right)
+					table.insert(gaps, { x - half, x + half })
+				end
+			end
+		end
+	end
+	YardKit.front(props, {
+		c = c,
+		face = face,
+		width = t.width,
+		depth = t.depth,
+		lawn = Houses.Yard,
+		door = door,
+		drive = 0,
+		driveWidth = 0,
+		car = false,
+		gaps = gaps,
+		wallGaps = {},
+		clear = function(_: Vector3): boolean
+			return true
+		end,
+		compact = true,
+	})
+end
+
 -- `fresh` (the bake) draws all the terrain even when the place already holds it (Terra)
 function MapBuilder.build(fresh: boolean?): Result
 	Terra.begin(fresh)
@@ -1163,6 +1217,14 @@ function MapBuilder.build(fresh: boolean?): Result
 								"Home" .. count
 							)
 							addPlace(home, i, j)
+							frontGarden(
+								props,
+								buildings,
+								home,
+								centre + Vector3.new(x, 0, z),
+								out,
+								t
+							)
 							-- detached homes get a back garden: a tree, a fence, maybe a pool (SuburbKit)
 							if t.perLot == 1 then
 								SuburbKit.garden(

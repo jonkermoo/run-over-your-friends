@@ -243,6 +243,7 @@ export type Lot = {
 	gaps: { { number } }, -- stretches across the lot (lo, hi, the same way) the border leaves open
 	wallGaps: { { number } }, -- and more along the house's front kept clear of planting (a garage door)
 	clear: (Vector3) -> boolean, -- whether a point on the ground is far enough off every street for the border
+	compact: boolean?, -- a city home's small front garden: the border and small bushes only (Front.Compact)
 }
 
 -- a suburb house's front lawn (Config/Yards Front): maybe a picket fence or a hedge along its street edge, bushes
@@ -273,8 +274,8 @@ function YardKit.front(folder: Instance, lot: Lot)
 				0.2
 			)
 			else rgb(Suburbs.Picket)
-		local line = wall + face * (lot.lawn - F.Inset)
-		local half = w / 2 + F.Reach
+		local line = wall + face * (lot.lawn - (if lot.compact then F.Compact.Inset else F.Inset))
+		local half = w / 2 + (if lot.compact then F.Compact.Reach else F.Reach)
 		local cuts = {}
 		for _, g in lot.gaps do
 			table.insert(cuts, { g[1] - F.Gap, g[2] + F.Gap })
@@ -298,7 +299,15 @@ function YardKit.front(folder: Instance, lot: Lot)
 			local a, b = line + right * r[1], line + right * r[2]
 			if r[2] - r[1] >= F.MinRun and lot.clear(a) and lot.clear(b) then
 				if hedge then
-					strip(m, Foliage.Bushes[1], a, b, F.HedgeHeight, F.HedgeDepth, colour).Material =
+					strip(
+						m,
+						Foliage.Bushes[1],
+						a,
+						b,
+						F.HedgeHeight,
+						if lot.compact then F.Compact.HedgeDepth else F.HedgeDepth,
+						colour
+					).Material =
 						Enum.Material.Grass
 				else
 					strip(m, "Picket", a, b, F.PicketHeight, F.PicketDepth, colour)
@@ -314,7 +323,7 @@ function YardKit.front(folder: Instance, lot: Lot)
 	-- bush at each front corner that is clear (not where the bed went)
 	local away = if lot.drive > 0 then -1 else 1
 	local bedSide = 0
-	if own:NextNumber() < F.Bed then
+	if own:NextNumber() < F.Bed and not lot.compact then
 		local P = Parks.FlowerBed
 		local bx = away * (w / 2 - F.Corner - P.width / 2)
 		if
@@ -328,15 +337,20 @@ function YardKit.front(folder: Instance, lot: Lot)
 	if own:NextNumber() < F.Bushes then
 		for _, s in { -1, 1 } do
 			local x = s * (w / 2 - F.Corner)
-			local size = own:NextNumber(F.BushSize[1], F.BushSize[2])
+			local sizes = if lot.compact then F.Compact.BushSize else F.BushSize
+			local size = own:NextNumber(sizes[1], sizes[2])
 			if
 				s ~= bedSide
 				and math.abs(x - lot.door) > F.DoorClear
 				and not inGap(x - size / 2, x + size / 2)
 			then
-				frontBush(folder, wall + face * F.BushOut + right * x, size, own)
+				local out = if lot.compact then F.Compact.BushOut else F.BushOut
+				frontBush(folder, wall + face * out + right * x, size, own)
 			end
 		end
+	end
+	if lot.compact then
+		return -- no driveway in a city front garden
 	end
 
 	-- by the driveway: a bike leaning near the house, or a basketball hoop at its street end

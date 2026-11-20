@@ -109,6 +109,15 @@ return table.freeze({
 		Rim = { 240, 110, 30 } :: RGB,
 		HoopPole = { 60, 62, 68 } :: RGB,
 		Seed = 5170,
+		-- a city home's front garden (Config/Houses Yard deep): the border right by the sidewalk, smaller bushes
+		-- tucked against the house, no bed or driveway toys
+		Compact = table.freeze({
+			Inset = 1, -- (a hedge here is HedgeDepth deep, so it stays off the sidewalk)
+			HedgeDepth = 1.6,
+			Reach = -0.2, -- just short of the house's sides (townhouses side by side each have their own)
+			BushOut = 1.1,
+			BushSize = table.freeze({ 2, 2.2 }), -- (clear of the hedge)
+		}),
 	}),
 
 	-- a pocket park in each suburb, on open grass near a street: a round paved square with a fountain, benches
