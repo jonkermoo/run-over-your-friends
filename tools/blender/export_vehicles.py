@@ -1766,6 +1766,9 @@ for vid in vehicles:
         exported.append(shell)
         print(f"PAINT {vid} {len(shell.data.polygons)} faces {cols[0]}")
 
+# ---- mastery upgrades (rebuilt zones, new wheel sets) and the decal layout on every painted part
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "vehicle_upgrades.py"), encoding="utf-8").read())
+
 # ---- export
 tri = 0
 for o in exported:

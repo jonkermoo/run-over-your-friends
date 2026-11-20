@@ -233,6 +233,23 @@ return function(check: (string, boolean) -> ())
 	for _, paint in PaintConfig.List do
 		table.insert(plain, paint.name)
 	end
+	-- the garage's mastery upgrades and decals (client/UpgradePanel shows them upper case)
+	local UpgradeConfig = require("../src/shared/Config/Upgrades")
+	for _, list in UpgradeConfig.ByVehicle do
+		for _, up in list do
+			table.insert(plain, string.upper(up.name))
+			table.insert(plain, up.text)
+			table.insert(plain, up.zone)
+		end
+	end
+	for _, d in UpgradeConfig.Decals do
+		if d.id ~= "Signature" then -- shown by each car's own signature name
+			table.insert(plain, string.upper(d.name))
+		end
+	end
+	for _, name in UpgradeConfig.Signature do
+		table.insert(plain, string.upper(name))
+	end
 	for _, pack in Products.MoneyPacks do
 		table.insert(plain, string.upper(pack.title))
 		table.insert(plain, string.upper(pack.title) .. "!")

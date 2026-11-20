@@ -17,6 +17,7 @@ local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local SocialService = require(script.Parent.SocialService)
 local HitGuard = require(script.Parent.HitGuard)
+local MasteryService = require(script.Parent.MasteryService)
 local VehicleService = require(script.Parent.VehicleService)
 
 local PlayerHitService = {}
@@ -170,6 +171,7 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 		local launch = math.min(Impact.launchSpeed(energy), terms.launchCap)
 			* repeatScale(player, victim, stats.price)
 		flingCharacter(victim, (dir + Vector3.new(0, 0.7, 0)).Unit * launch, player, terms)
+		MasteryService.add(player, "Player")
 	elseif target.Parent == workspace:FindFirstChild("Vehicles") then
 		local owner = VehicleService.ownerOf(target)
 		if owner == player or (owner and protected(owner, terms)) then
@@ -187,6 +189,9 @@ local function onHit(player: Player, target: unknown, velocity: unknown)
 			launch *= repeatScale(player, owner, stats.price)
 		end
 		flingVehicle(target, owner, (dir + Vector3.new(0, 0.55, 0)).Unit * launch, player, terms)
+		if owner then
+			MasteryService.add(player, "Player")
+		end
 	end
 end
 

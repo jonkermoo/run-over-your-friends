@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Ground = require(ReplicatedStorage.Shared.Ground)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
+local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Data = require(script.Parent.Data)
 local RateLimit = require(script.Parent.RateLimit)
@@ -59,9 +60,22 @@ function VehicleService.ownerOf(model: Model): Player?
 	return nil
 end
 
+-- the vehicle's row with its switched-on mastery upgrades (the model's Upgrades attribute) applied
 function VehicleService.stats(model: Model): Vehicles.Vehicle?
 	local id = model:GetAttribute("VehicleId")
-	return if typeof(id) == "string" then Vehicles.ById[id] else nil
+	local row = if typeof(id) == "string" then Vehicles.ById[id] else nil
+	return if row
+		then UpgradeRules.stats(row, UpgradeRules.decode(model:GetAttribute("Upgrades")))
+		else nil
+end
+
+-- rebuild the player's car where they are (new mastery upgrades fitted), with them back in it
+function VehicleService.refit(player: Player)
+	local model = owned[player]
+	local id = model and model:GetAttribute("VehicleId")
+	if typeof(id) == "string" then
+		VehicleService.spawn(player, id)
+	end
 end
 
 function VehicleService.setSpawnPoints(points: { Vector3 })
@@ -164,12 +178,13 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	end
 	VehicleService.despawn(player)
 
-	local model = VehicleBuilder.build(id)
+	local model = VehicleBuilder.build(id, UpgradeRules.onList(profile.upgrades[id]))
 	-- the driver's own car never streams out under them; everyone else gets it whole (like Atomic)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer
 	model:AddPersistentPlayer(player)
 	local paint = PaintRules.shown(profile.paint[id], player:GetAttribute("PassVIP") == true)
 	VehicleBuilder.paint(model, PaintRules.colour(id, paint), PaintRules.material(paint))
+	VehicleBuilder.decal(model, profile.decal[id])
 	local _, size = model:GetBoundingBox()
 	local ignore = { character, folder }
 	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)

@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Guide = require(script.Parent.Guide)
@@ -65,6 +66,7 @@ local function turntable(stats: Vehicles.Vehicle)
 	sweep.Parent = vf
 
 	local m = template:Clone()
+	VehicleParts.fit(m, {}) -- a new car comes stock
 	for _, part in m:GetChildren() do
 		if MARKERS[part.Name] then
 			part:Destroy()

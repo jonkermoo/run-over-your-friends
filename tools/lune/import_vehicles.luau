@@ -2,8 +2,10 @@
 -- Turn the uploaded vehicle model (one flat model, every part named <Id>_Body or <Id>_Wheel_<Corner><n>, plus
 -- cabin parts and <Id>_Paint, the painted panels, which get no texture and the factory colour from Config/Paints)
 -- into assets/Vehicles.rbxm: one Model per vehicle, true size in studs, centred on X/Z, wheels' bottom at Y = 0.
--- The centre comes from the Body, Paint and wheels alone (as tools/blender/export_vehicles.py places them), so cabin
--- parts that reach out (untilted handlebars, track plates) don't shift the seat spots in Config/Vehicles.
+-- The centre comes from the stock Body, Paint and wheels alone (as tools/blender/export_vehicles.py places them), so
+-- cabin parts that reach out (untilted handlebars, track plates) and upgrade pieces don't shift the seat spots in
+-- Config/Vehicles. The stock zones cut out for mastery upgrades (Z<n>, Z<n>_Paint) count as stock body; the
+-- rebuilt zones (U<n>, U<n>_Paint) and upgrade wheel sets (U<n>W_<Corner><n>) don't (tools/blender/vehicle_upgrades.py).
 -- lune run tools/lune/import_vehicles <raw.rbxm> <out.rbxm> <studsInBlender> <paletteImageId>
 -- <studsInBlender>: how big the importer made one Blender unit (measured: 47.344, from the export spacing).
 local fs = require("@lune/fs")
@@ -37,7 +39,12 @@ for id, parts in groups do
 	local hi = -lo
 	for _, p in parts do
 		local name = string.sub(p.Name, #id + 2)
-		if name ~= "Body" and name ~= "Paint" and string.sub(name, 1, 6) ~= "Wheel_" then
+		local stock = name == "Body"
+			or name == "Paint"
+			or string.sub(name, 1, 6) == "Wheel_"
+			or string.match(name, "^Z%d+$") ~= nil
+			or string.match(name, "^Z%d+_Paint$") ~= nil
+		if not stock then
 			continue
 		end
 		local half = p.Size * factor / 2
@@ -59,7 +66,8 @@ for id, parts in groups do
 	for _, p in parts do
 		p.Size = p.Size * factor
 		p.CFrame = CFrame.new(p.CFrame.Position * factor - origin)
-		if string.sub(p.Name, #id + 2) == "Paint" then
+		local short = string.sub(p.Name, #id + 2)
+		if short == "Paint" or string.sub(short, -6) == "_Paint" then
 			-- the painted panels take a plain colour the game sets (Config/Paints); this is the factory one
 			local rgb = assert(Paints.Factory[id], "no factory paint for " .. id)
 			p.Color = roblox.Color3.fromRGB(rgb[1], rgb[2], rgb[3])
@@ -74,7 +82,12 @@ for id, parts in groups do
 		p.Name = string.sub(p.Name, #id + 2)
 		-- some source bodies have open or flipped panels (the Roadster's door seams), and glass is one sheet
 		-- seen from inside and out: draw both sides
-		if p.Name == "Body" or p.Name == "Glass" or p.Name == "Paint" then
+		if
+			p.Name == "Body"
+			or p.Name == "Glass"
+			or string.match(p.Name, "Paint$")
+			or string.match(p.Name, "^[ZU]%d+$")
+		then
 			p.DoubleSided = true
 		end
 		p.Parent = model

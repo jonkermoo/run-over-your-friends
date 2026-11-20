@@ -22,6 +22,7 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
+local MasteryService = require(script.Parent.MasteryService)
 local Passes = require(script.Parent.Passes)
 local HitGuard = require(script.Parent.HitGuard)
 local VehicleService = require(script.Parent.VehicleService)
@@ -533,6 +534,7 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 		end
 	end)
 	Analytics.custom(player, "Demolished")
+	MasteryService.add(player, "Collapse")
 	task.delay(COLLAPSE.HideSeconds, function()
 		for _, p in parts do
 			if p.Anchored and p:GetAttribute("Broken") then

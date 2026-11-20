@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Paints)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
@@ -94,10 +95,10 @@ function PaintPicker.attach(
 	caption.TextXAlignment = Enum.TextXAlignment.Left
 
 	local function show(paintId: string)
-		local part = model and model:FindFirstChild("Paint")
 		local rgb = PaintRules.colour(vehicleId, paintId)
-		if part and part:IsA("BasePart") and rgb then
-			part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		for _, part in (if model and rgb then VehicleParts.paintParts(model) else {}) do
+			local c = rgb :: { number }
+			part.Color = Color3.fromRGB(c[1], c[2], c[3])
 			if part:GetAttribute("BaseMaterial") == nil then
 				part:SetAttribute("BaseMaterial", part.Material.Name)
 			end

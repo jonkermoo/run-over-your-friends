@@ -106,3 +106,12 @@ PinnedServer,SERVER  {time},,,SERVIDOR  {time},SERVIDOR  {time}
 PaintOn,{paint}  ON,,,{paint}  PUESTA,{paint}  EM USO
 PaintVip,{paint}  VIP ONLY,,,{paint}  SOLO VIP,{paint}  SÓ VIP
 PaintBuy,{paint}  {price}  ALL CARS,,,{paint}  {price}  TODOS LOS AUTOS,{paint}  {price}  TODOS OS CARROS
+UpgradeLocked,Reach mastery {level} in this car first,,,Primero llega a maestría {level} con este auto,Primeiro chegue à maestria {level} com este carro
+UpgradeFitted,{name} fitted!,,,¡{name} instalado!,{name} instalado!
+MasteryPoints,MASTERY {have} / {need},,,MAESTRÍA {have} / {need},MAESTRIA {have} / {need}
+Mastered,MASTERED,,,DOMINADO,DOMINADO
+MasteryNeed,MASTERY {n},,,MAESTRÍA {n},MAESTRIA {n}
+MasteryGain,+{n} MASTERY,,,+{n} MAESTRÍA,+{n} MAESTRIA
+MasteryLevel,{car} MASTERY {n},,,{car} MAESTRÍA {n},{car} MAESTRIA {n}
+MasteryOpensBoth,UNLOCKED: {up} + {decal} DECAL,,,DESBLOQUEADO: {up} + CALCOMANÍA {decal},LIBERADO: {up} + ADESIVO {decal}
+MasteryOpensDecal,UNLOCKED: {decal} DECAL,,,DESBLOQUEADO: CALCOMANÍA {decal},LIBERADO: ADESIVO {decal}

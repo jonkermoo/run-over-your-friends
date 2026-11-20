@@ -742,6 +742,7 @@ type Card = {
 	priceBox: Frame,
 	frame: Frame,
 	picker: PaintPicker.Picker,
+	panel: { refresh: () -> () }, -- client/UpgradePanel: mastery, upgrades, decals
 	sale: TextLabel,
 	was: TextLabel,
 	strike: Frame,
@@ -783,6 +784,7 @@ local function statBar(parent: Instance, y: number, name: string, value: number,
 	l.Size = UDim2.fromOffset(96, 18)
 	l.TextXAlignment = Enum.TextXAlignment.Left
 	local back, fill = Style.bar(parent, color)
+	back.Name = name -- client/UpgradePanel adds the upgrades' share to it
 	back.BackgroundColor3 = C.card
 	back.BackgroundTransparency = 0
 	back.Position = UDim2.fromOffset(100, y + 3)
@@ -819,7 +821,12 @@ end
 
 -- a 3D picture of the vehicle: a card's top (122 px tall with a lane line under it, the Starter Pack card),
 -- or bare, a picture that fills its parent
-local function preview(parent: Instance, stats: Vehicles.Vehicle, bare: boolean?): Model?
+local function preview(
+	parent: Instance,
+	stats: Vehicles.Vehicle,
+	bare: boolean?,
+	full: boolean?
+): Model?
 	local vf = Instance.new("ViewportFrame")
 	vf.Position = if bare then UDim2.new() else UDim2.fromOffset(6, 6)
 	vf.Size = if bare then UDim2.fromScale(1, 1) else UDim2.new(1, -12, 0, 122)
@@ -839,6 +846,11 @@ local function preview(parent: Instance, stats: Vehicles.Vehicle, bare: boolean?
 		return nil
 	end
 	local m = template:Clone()
+	if not full then
+		-- pictures show the car stock; the garage's own picture (full) keeps every piece and client/UpgradePanel
+		-- shows the owner's upgrades on it
+		require(ReplicatedStorage.Shared.VehicleParts).fit(m, {})
+	end
 	posePreview(m, stats)
 	m.Parent = vf
 	local cf, size = m:GetBoundingBox()
@@ -925,7 +937,7 @@ for _, stats in Vehicles.List do
 	stage.Position = UDim2.fromOffset(24, 84)
 	stage.Size = UDim2.new(1, -48, 1, -(84 + DETAIL_BOTTOM + 30))
 	stage.Parent = card
-	local shown = preview(stage, stats, true)
+	local shown = preview(stage, stats, true, true)
 	local bay = Style.label(stage, string.format("%02d", stats.order), 56, F.display, C.yellow)
 	bay.Position = UDim2.fromOffset(14, 8)
 	bay.Size = UDim2.fromOffset(100, 58)
@@ -1034,6 +1046,17 @@ for _, stats in Vehicles.List do
 	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
 		refreshCards()
 	end, paintSpot)
+	local panel = require(script.Parent.UpgradePanel).attach({
+		card = card,
+		stats = stats,
+		shown = shown,
+		stage = stage,
+		info = info,
+		bottom = bottom,
+		paintSpot = paintSpot,
+		row = row,
+		rowTag = rowTag,
+	})
 	action.Activated:Connect(function()
 		if picker.action() then
 			return -- buying the paint colour shown
@@ -1075,6 +1098,7 @@ for _, stats in Vehicles.List do
 		priceBox = priceBox,
 		frame = card,
 		picker = picker,
+		panel = panel,
 		sale = sale,
 		was = was,
 		strike = strike,
@@ -1176,6 +1200,7 @@ function refreshCards()
 			c.rowPrice.TextColor3 = C.ink
 		end
 		c.picker.refresh()
+		c.panel.refresh()
 	end
 end
 

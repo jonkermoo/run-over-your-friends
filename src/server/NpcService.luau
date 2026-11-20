@@ -27,6 +27,7 @@ local Passes = require(script.Parent.Passes)
 local SocialService = require(script.Parent.SocialService)
 local HitGuard = require(script.Parent.HitGuard)
 local VehicleService = require(script.Parent.VehicleService)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 
 local NpcService = {}
 local CFG = World.Npc
@@ -510,8 +511,12 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 	local speed = HitGuard.speed(player, stats, chassis, velocity.Magnitude)
 	local giantHp = npc:GetAttribute("GiantHp")
 	local body = VehicleService.bodyNear(vehicle, root.Position) or chassis
+	local up = VehicleParts.effect(vehicle) -- mastery upgrades: longer, wider and rear hit boxes, a harder throw
 	local reach = body.Size.Magnitude / 2
 		+ 14
+		+ up.reach
+		+ up.rearReach
+		+ up.wide
 		+ speed * 0.3
 		+ (if typeof(giantHp) == "number" then 6 * EventConfig.GiantScale else 0)
 	if (root.Position - body.Position).Magnitude > reach then
@@ -530,6 +535,7 @@ local function onHit(player: Player, npc: unknown, velocity: unknown)
 			side = -side
 		end
 		dir = (side * 0.8 + dir * 0.4).Unit
+		energy *= up.throw
 	end
 	if typeof(giantHp) == "number" and giantHp > 1 then
 		if not rateOk(player, "giant", 0.8) then
@@ -644,20 +650,17 @@ local function setJingle(chassis: BasePart, on: boolean)
 			local cf = chassis.CFrame
 			local vehicle = chassis.Parent :: Model
 			local size = vehicle:GetExtentsSize()
-			for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange) do
+			local up = VehicleParts.effect(vehicle) -- mastery upgrades: a louder, further, faster jingle
+			local every = CFG.JingleEvery * up.jingleEvery
+			for _, npc in NpcService.inRadius(chassis.Position, CFG.JingleRange * up.jingleRange) do
 				if react.scaredUntil[npc] then
 					continue -- running from a crash first
 				end
 				local l = cf:PointToObjectSpace(npc:GetPivot().Position)
 				local x, z = CrowdRules.besideBox(l.X, l.Z, size.X / 2, size.Z / 2, CFG.JingleGap)
-				walkTo(
-					npc,
-					cf:PointToWorldSpace(Vector3.new(x, 0, z)),
-					CFG.JingleEvery + 0.4,
-					false
-				)
+				walkTo(npc, cf:PointToWorldSpace(Vector3.new(x, 0, z)), every + 0.4, false)
 			end
-			task.wait(CFG.JingleEvery)
+			task.wait(every)
 		end
 	end)
 end
@@ -674,14 +677,21 @@ local function onFeature(player: Player, feature: unknown, aim: unknown)
 	end
 	if feature == "Taxi" and rateOk(player, "Taxi", 2) then
 		bubble(chassis, "TAXI!")
-		local best, bestD = nil, CFG.TaxiRange
-		for _, npc in NpcService.inRadius(chassis.Position, CFG.TaxiRange) do
+		-- mastery upgrades: the call reaches further and can bring more than one person
+		local up = VehicleParts.effect(vehicle)
+		local range = CFG.TaxiRange * up.taxiRange
+		local near = {}
+		for _, npc in NpcService.inRadius(chassis.Position, range) do
 			local d = (npc:GetPivot().Position - chassis.Position).Magnitude
-			if d < bestD and not CrowdService.isBusy(npc) then
-				best, bestD = npc, d
+			if d < range and not CrowdService.isBusy(npc) then
+				table.insert(near, { npc = npc, d = d })
 			end
 		end
-		if best then
+		table.sort(near, function(a, b)
+			return a.d < b.d
+		end)
+		for k = 1, math.min(#near, math.max(1, up.taxiCount or 1)) do
+			local best = near[k].npc
 			bubble((best :: Model):FindFirstChild("Head") :: BasePart, "Me! Me!")
 			for i = 0, 10 do
 				task.delay(i * 0.6, function()
@@ -711,11 +721,13 @@ local function onFeature(player: Player, feature: unknown, aim: unknown)
 		-- every client draws the turret and the spray from these
 		chassis:SetAttribute("CannonAim", dir)
 		chassis:SetAttribute("CannonAt", workspace:GetServerTimeNow())
-		local push = (flat.Unit + Vector3.new(0, 0.5, 0)).Unit * 70
-		for _, npc in NpcService.inRadius(nozzle, CFG.CannonRange) do
+		-- mastery upgrades: further, wider and harder
+		local up = VehicleParts.effect(vehicle)
+		local push = (flat.Unit + Vector3.new(0, 0.5, 0)).Unit * 70 * up.cannonForce
+		for _, npc in NpcService.inRadius(nozzle, CFG.CannonRange * up.cannonRange) do
 			local to = npc:GetPivot().Position - nozzle
-			if to.Magnitude > 0.1 and to.Unit:Dot(dir) > CFG.CannonCone then
-				NpcService.knock(npc, push, 200000, player, Economy.CannonShare)
+			if to.Magnitude > 0.1 and to.Unit:Dot(dir) > CFG.CannonCone * up.cannonCone then
+				NpcService.knock(npc, push, 200000 * up.cannonForce, player, Economy.CannonShare)
 			end
 		end
 	end

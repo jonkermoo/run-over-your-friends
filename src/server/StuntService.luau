@@ -15,6 +15,7 @@ local Config = require(ReplicatedStorage.Shared.Config.Stunts)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Stunts = require(ReplicatedStorage.Shared.Rules.Stunts)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Data = require(script.Parent.Data)
 local VehicleService = require(script.Parent.VehicleService)
 
@@ -106,11 +107,16 @@ local function land(player: Player, t: Track, chassis: BasePart, stats: Vehicles
 		Net.remote("Popup"):FireClient(player, "WIPEOUT", "info")
 		return
 	end
-	Data.addMoney(player, result.pay)
+	-- mastery upgrades can raise jump pay (Config/Upgrades stuntPay)
+	local car = chassis.Parent
+	local pay = if car
+		then math.floor(result.pay * VehicleParts.effect(car).stuntPay)
+		else result.pay
+	Data.addMoney(player, pay)
 	local where = if inPark(chassis.Position) then `  STUNT PARK x{Config.Park}` else ""
 	Net.remote("Popup"):FireClient(
 		player,
-		`{result.label} {string.format("%.1f", result.air)}s  +${result.pay}{where}`,
+		`{result.label} {string.format("%.1f", result.air)}s  +${pay}{where}`,
 		"big"
 	)
 	t.airLeft += result.air
@@ -123,7 +129,7 @@ local function land(player: Player, t: Track, chassis: BasePart, stats: Vehicles
 	if j.ramp then
 		emit(player, "RampJumps", 1)
 	end
-	emit(player, "Stunt", result.pay)
+	emit(player, "Stunt", pay)
 end
 
 local function step(player: Player, now: number, dt: number)

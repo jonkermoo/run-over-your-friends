@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Game = require(ReplicatedStorage.Shared.Config.Game)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -49,24 +50,27 @@ end
 local function buildTurret(car: Model, chassis: BasePart, n: { number })
 	local mount = (car:FindFirstChild("Sprung", true) :: BasePart?) or chassis
 	local offset = Vector3.new(n[1], n[2], n[3])
+	-- the Big Cannon mastery upgrade (Config/Upgrades cannonRange): a longer, thicker barrel that sprays further
+	local k = VehicleParts.effect(car).cannonRange
+	local thick = math.sqrt(k)
 	local base = Instance.new("Part")
 	base.Name = "CannonBase"
 	base.Shape = Enum.PartType.Cylinder
-	base.Size = Vector3.new(1.3, 4.6, 4.6)
+	base.Size = Vector3.new(1.3, 4.6 * thick, 4.6 * thick)
 	base.Color = Color3.fromRGB(70, 72, 78)
 	base.Material = Enum.Material.Metal
 	cosmetic(base)
 	local barrel = Instance.new("Part")
 	barrel.Name = "CannonBarrel"
 	barrel.Shape = Enum.PartType.Cylinder
-	barrel.Size = Vector3.new(7, 1.5, 1.5)
+	barrel.Size = Vector3.new(7 * k, 1.5 * thick, 1.5 * thick)
 	barrel.Color = Color3.fromRGB(205, 205, 210)
 	barrel.Material = Enum.Material.Metal
 	cosmetic(barrel)
 	local tip = Instance.new("Part")
 	tip.Name = "CannonTip"
 	tip.Shape = Enum.PartType.Cylinder
-	tip.Size = Vector3.new(1, 2, 2)
+	tip.Size = Vector3.new(1, 2 * thick, 2 * thick)
 	tip.Color = C.yellow
 	tip.Material = Enum.Material.SmoothPlastic
 	cosmetic(tip)
@@ -83,7 +87,7 @@ local function buildTurret(car: Model, chassis: BasePart, n: { number })
 	local tw = Instance.new("Weld")
 	tw.Part0 = barrel
 	tw.Part1 = tip
-	tw.C0 = CFrame.new(-3.8, 0, 0)
+	tw.C0 = CFrame.new(-3.5 * k - 0.3, 0, 0)
 	tw.Parent = tip
 	-- the spray leaves the tip along the barrel (cylinders run along X, so -X is the muzzle)
 	local a = Instance.new("Attachment")
@@ -94,7 +98,7 @@ local function buildTurret(car: Model, chassis: BasePart, n: { number })
 	water.Color = ColorSequence.new(Color3.fromRGB(170, 210, 255))
 	water.Size = NumberSequence.new(1.2, 3)
 	water.Transparency = NumberSequence.new(0.2, 1)
-	water.Speed = NumberRange.new(90, 110)
+	water.Speed = NumberRange.new(90 * k, 110 * k)
 	water.Acceleration = Vector3.new(0, -80, 0)
 	water.Lifetime = NumberRange.new(0.6, 0.8)
 	water.SpreadAngle = Vector2.new(4, 4)

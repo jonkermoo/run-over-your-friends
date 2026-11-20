@@ -28,6 +28,7 @@ local UnstuckRules = require(ReplicatedStorage.Shared.Rules.Unstuck)
 local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local CFG = require(ReplicatedStorage.Shared.Config.World)
 
 local player = Players.LocalPlayer
@@ -166,6 +167,8 @@ type Shoe = { weld: Weld, side: string, offset: number, x: number, loop: Tracks.
 type CarState = {
 	car: Model,
 	stats: Vehicles.Vehicle,
+	flight: typeof(Flight), -- Config/Flight with this car's mastery upgrades (thruster, jet, flight) applied
+	up: { [string]: number }, -- what its mastery upgrades do (Rules/Upgrades.effect)
 	chassis: BasePart,
 	wheels: { Wheel },
 	spin: number,
@@ -251,8 +254,7 @@ local function track(car: Instance)
 	if not car:IsA("Model") or cars[car] then
 		return
 	end
-	local id = car:GetAttribute("VehicleId")
-	local stats = if typeof(id) == "string" then Vehicles.ById[id] else nil
+	local stats = VehicleParts.stats(car)
 	if not stats then
 		return
 	end
@@ -530,9 +532,19 @@ local function track(car: Instance)
 		end
 		return nil
 	end
+	local up = VehicleParts.effect(car)
+	local flight = table.clone(Flight) :: any
+	flight.thrust *= up.thrusterPush * up.jetPush
+	flight.thrustTop *= math.max(up.thrusterPush, up.jetPush)
+	flight.thrustDrain /= up.thrusterTime * up.jetTime
+	flight.top *= up.flySpeed
+	flight.climb *= up.flyClimb
+	flight.rollRate *= up.flyClimb
 	cars[car] = {
 		car = car,
 		stats = stats,
+		flight = table.freeze(flight),
+		up = up,
 		chassis = chassis,
 		wheels = wheels,
 		spin = 0,
@@ -779,14 +791,22 @@ local function detectHits(s: CarState, velocity: Vector3)
 	local chassis = s.chassis
 	-- the vehicle's outline plus a little look-ahead along the way it's going
 	local ahead = math.clamp(velocity.Magnitude * 0.12, 1, 40)
-	local size = Vector3.new(chassis.Size.X + 2, s.height + 2, chassis.Size.Z + ahead)
+	-- mastery upgrades reach further ahead, wider, and behind (Rules/Upgrades.effect)
+	local up = s.up
+	local back = up.rearReach
+	local size = Vector3.new(
+		chassis.Size.X + 2 + up.wide * 2,
+		s.height + 2,
+		chassis.Size.Z + ahead + up.reach + back
+	)
 	local localVel = chassis.CFrame:VectorToObjectSpace(velocity)
-	local shift = if localVel.Z < 0 then -ahead / 2 else ahead / 2
+	local shift = (if localVel.Z < 0 then -ahead / 2 else ahead / 2) + (back - up.reach) / 2
 	local box = chassis.CFrame * CFrame.new(0, s.height / 2 - chassis.Size.Y / 2, shift)
 	local parts = workspace:GetPartBoundsInBox(box, size, params)
 	local trailer = s.trailer
 	if trailer and trailer.Parent then
-		local tSize = Vector3.new(trailer.Size.X + 2, s.height + 2, trailer.Size.Z + 2)
+		local tSize =
+			Vector3.new(trailer.Size.X + 2 + up.trailerWide * 2, s.height + 2, trailer.Size.Z + 2)
 		local tBox = trailer.CFrame * CFrame.new(0, s.height / 2 - trailer.Size.Y / 2, 0)
 		for _, p in workspace:GetPartBoundsInBox(tBox, tSize, params) do
 			table.insert(parts, p)
@@ -1296,6 +1316,7 @@ local function step(dt: number)
 	if driving and seat and seat:IsA("VehicleSeat") then
 		local s = driving
 		local stats = s.stats
+		local fly = s.flight -- Config/Flight with this car's mastery upgrades
 		local chassis = s.chassis
 		local spm = Vehicles.StudsPerMetre
 		local drive = chassis:FindFirstChild("Drive") :: LinearVelocity
@@ -1360,19 +1381,19 @@ local function step(dt: number)
 		local lifting = canFly and Drive.input.boost and Drive.state.boost > 0
 		local thrusting = canFly and Drive.input.thrust and Drive.state.boost > 0
 		if thrusting then
-			Drive.state.boost = math.max(0, Drive.state.boost - Flight.thrustDrain * dt)
+			Drive.state.boost = math.max(0, Drive.state.boost - fly.thrustDrain * dt)
 		end
 		if lifting or thrusting then
 			boostUsedAt = now
-		elseif not flying and now - boostUsedAt > Flight.refillDelay then
-			Drive.state.boost = math.min(100, Drive.state.boost + Flight.refill * dt)
+		elseif not flying and now - boostUsedAt > fly.refillDelay then
+			Drive.state.boost = math.min(100, Drive.state.boost + fly.refill * dt)
 		end
 		rearOn = thrusting
 
 		local topSpeed = stats.topSpeed / MPH
 		if canFly and (thrusting or speed > topSpeed) then
 			-- the rear jet takes it past its top speed; let go and it eases back down
-			topSpeed = math.max(topSpeed, if thrusting then Flight.thrustTop else speed - 6 * dt)
+			topSpeed = math.max(topSpeed, if thrusting then fly.thrustTop else speed - 6 * dt)
 		end
 		local launch = stats.launch
 		local power = stats.power
@@ -1401,7 +1422,7 @@ local function step(dt: number)
 		local spare = math.sqrt(math.max(0, (grip * 0.98) ^ 2 - cornering * cornering))
 		local a = math.clamp(wanted, -math.max(spare, grip * 0.3), math.max(spare, 0.5))
 		if thrusting then
-			a += Flight.thrust -- the rear jet pushes the car, not the tyres
+			a += fly.thrust -- the rear jet pushes the car, not the tyres
 		end
 
 		local v = math.abs(speed)
@@ -1429,12 +1450,7 @@ local function step(dt: number)
 				flying = true
 				liftedAt = if lifting then now else 0
 				flyYaw = chassis.AssemblyAngularVelocity.Y
-			elseif
-				flying
-				and not s.airborne
-				and not lifting
-				and now - liftedAt > Flight.minLift
-			then
+			elseif flying and not s.airborne and not lifting and now - liftedAt > fly.minLift then
 				flying = false
 				drive.MaxAxesForce = GROUND_FORCE
 				speed, lateral = actualForward, actualLeft
@@ -1445,7 +1461,7 @@ local function step(dt: number)
 		-- S in the air fires the nose jets: they push it backwards along the nose, on the flight meter
 		reversing = flying and throttle < 0 and Drive.state.boost > 0
 		if reversing then
-			Drive.state.boost = math.max(0, Drive.state.boost - Flight.thrustDrain * dt)
+			Drive.state.boost = math.max(0, Drive.state.boost - fly.thrustDrain * dt)
 			boostUsedAt = now
 		end
 
@@ -1460,7 +1476,7 @@ local function step(dt: number)
 					side = actualLeft,
 					up = actual.Y,
 					fuel = Drive.state.boost,
-				}, math.max(throttle, 0), true, dt, Flight)
+				}, math.max(throttle, 0), true, dt, fly)
 				Drive.state.boost = f.fuel
 				local forward = f.forward
 				if thrustLeft > 0 then
@@ -1470,10 +1486,10 @@ local function step(dt: number)
 				local velocity = look * forward - right * f.side + Vector3.yAxis * f.up
 				if thrusting then
 					-- the rear jet pushes along wherever the nose points, up, down or rolled
-					velocity += nose * Flight.thrust * dt
+					velocity += nose * fly.thrust * dt
 				end
 				if reversing then
-					velocity -= nose * Flight.thrust * dt
+					velocity -= nose * fly.thrust * dt
 				end
 				drive.MaxAxesForce = FLY_FORCE
 				drive.Enabled = true
@@ -1482,10 +1498,10 @@ local function step(dt: number)
 				-- lift jet off: it drops, carried by its momentum; the rear jet still pushes along the nose
 				drive.Enabled = false
 				if reversing then
-					chassis.AssemblyLinearVelocity -= nose * Flight.thrust * spm * dt
+					chassis.AssemblyLinearVelocity -= nose * fly.thrust * spm * dt
 				end
 				if thrusting then
-					chassis.AssemblyLinearVelocity += nose * Flight.thrust * spm * dt
+					chassis.AssemblyLinearVelocity += nose * fly.thrust * spm * dt
 				end
 				if thrustLeft > 0 then
 					chassis.AssemblyLinearVelocity += nose * (THRUST_DV / THRUST_TIME) * spm * math.min(
@@ -1497,22 +1513,22 @@ local function step(dt: number)
 			end
 			-- A/D turn it, harder the faster it's going, so it can't spin on the spot
 			local moving =
-				math.clamp(Vector3.new(actual.X, 0, actual.Z).Magnitude / Flight.yawSpeed, 0.25, 1)
-			local wantYaw = -seat.SteerFloat * Flight.yawRate * moving
-			flyYaw += (wantYaw - flyYaw) * math.min(1, dt * Flight.yawRamp)
+				math.clamp(Vector3.new(actual.X, 0, actual.Z).Magnitude / fly.yawSpeed, 0.25, 1)
+			local wantYaw = -seat.SteerFloat * fly.yawRate * moving
+			flyYaw += (wantYaw - flyYaw) * math.min(1, dt * fly.yawRamp)
 			-- stay level (lean into turns, nose down speeding up); Q/E roll it for as long as they're held
 			local pose = CFrame.lookAt(Vector3.zero, look)
 				* CFrame.Angles(
-					math.rad(if jetOn then -Flight.tilt * throttle else 0),
+					math.rad(if jetOn then -fly.tilt * throttle else 0),
 					0,
-					math.rad(-Flight.bank * seat.SteerFloat * moving)
+					math.rad(-fly.bank * seat.SteerFloat * moving)
 				)
 			local axis, angle = (pose * chassis.CFrame.Rotation:Inverse()):ToAxisAngle()
 			local err = if angle == angle and angle > 1e-4 then axis * angle else Vector3.zero
 			local along = nose * err:Dot(nose)
 			local roll = Drive.input.roll
-			local spin = (err - along) * Flight.level
-				+ (if roll ~= 0 then nose * (roll * Flight.rollRate) else along * Flight.rollLevel)
+			local spin = (err - along) * fly.level
+				+ (if roll ~= 0 then nose * (roll * fly.rollRate) else along * fly.rollLevel)
 			turn.AngularVelocity = spin + Vector3.yAxis * flyYaw
 			speed, lateral, yawRate = actualForward, actualLeft, flyYaw
 		elseif not flung and not s.airborne then

@@ -15,6 +15,7 @@ local Paints = require(ReplicatedStorage.Shared.Config.Paints)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Drive = require(script.Parent.Drive)
 
 local Traffic = {}
@@ -25,7 +26,7 @@ type Copy = {
 	model: Model,
 	body: BasePart,
 	rel: CFrame, -- body from the car's bottom-centre frame
-	paint: BasePart?,
+	paint: { BasePart }, -- the painted parts (Paint and the stock zones' painted pieces)
 	wheels: { Motor6D },
 	halfW: number,
 	halfL: number,
@@ -73,10 +74,16 @@ local function build(kind: number): Copy?
 		return nil
 	end
 	local model = source:Clone() :: Model
+	VehicleParts.fit(model, {}) -- stock look: no mastery upgrades
 	model.WorldPivot = CFrame.identity
 	model:ScaleTo(Game.VehicleScale) -- as big as the players' own (VehicleBuilder)
 	for _, d in model:GetDescendants() do
-		if d:IsA("BasePart") and not KEEP[d.Name] and string.sub(d.Name, 1, 6) ~= "Wheel_" then
+		if
+			d:IsA("BasePart")
+			and not KEEP[d.Name]
+			and string.sub(d.Name, 1, 6) ~= "Wheel_"
+			and not string.match(d.Name, "^Z%d")
+		then
 			d:Destroy()
 		end
 	end
@@ -92,7 +99,7 @@ local function build(kind: number): Copy?
 		model = model,
 		body = body,
 		rel = bottom:Inverse() * body.CFrame,
-		paint = model:FindFirstChild("Paint") :: BasePart?,
+		paint = VehicleParts.paintParts(model),
 		wheels = {},
 		halfW = size.X / 2,
 		halfL = size.Z / 2,
@@ -125,8 +132,8 @@ local function build(kind: number): Copy?
 			end
 		end
 	end
-	if copy.paint then
-		copy.paint:SetAttribute("Factory", copy.paint.Color)
+	for _, part in copy.paint do
+		part:SetAttribute("Factory", part.Color)
 	end
 	model.Parent = folder
 	body.CFrame = CFrame.new(0, -500, 0)
@@ -155,14 +162,13 @@ local function give(copy: Copy)
 end
 
 local function setPaint(copy: Copy, paint: number)
-	if not copy.paint then
-		return
-	end
 	local p = Paints.List[paint]
 	local rgb = p and p.rgb
-	copy.paint.Color = if rgb
-		then Color3.fromRGB(rgb[1], rgb[2], rgb[3])
-		else copy.paint:GetAttribute("Factory") :: Color3
+	for _, part in copy.paint do
+		part.Color = if rgb
+			then Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+			else part:GetAttribute("Factory") :: Color3
+	end
 end
 
 -- send a drawn car flying; it tumbles on this screen only, then fades and goes back to the pool
@@ -367,7 +373,7 @@ local function step(dt: number)
 	if not (Drive.state.driving and chassis) then
 		return
 	end
-	local stats = Vehicles.ById[(mine :: Model):GetAttribute("VehicleId") :: any]
+	local stats = VehicleParts.stats(mine :: Model)
 	local vel = chassis.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
 	local cf = chassis.CFrame
 	local fwd = cf.LookVector * Vector3.new(1, 0, 1)

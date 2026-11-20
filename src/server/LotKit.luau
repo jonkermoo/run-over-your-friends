@@ -65,7 +65,11 @@ function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random
 		-- keep the body, paint, glass and wheels; drop the rest (interior, needles, the drivable model's
 		-- attachments, welds and sounds)
 		local keep = if d:IsA("BasePart")
-			then KEEP[d.Name] or string.sub(d.Name, 1, 6) == "Wheel_"
+			-- stock look: the body's zones cut out for mastery upgrades (Z<n>) stay, the rebuilt ones (U<n>) go
+			then KEEP[d.Name] or string.sub(d.Name, 1, 6) == "Wheel_" or string.match(
+				d.Name,
+				"^Z%d"
+			) ~= nil
 			else d:IsA("Model")
 		if not keep then
 			d:Destroy()
@@ -79,9 +83,13 @@ function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random
 	local box, size = model:GetBoundingBox()
 	model.WorldPivot = CFrame.new(box.Position - Vector3.new(0, size.Y / 2, 0))
 	model:PivotTo(cf * CFrame.new(0, Cfg.Ground - Cfg.CarSink, 0))
-	local paintPart = model:FindFirstChild("Paint") :: BasePart?
-	if paintPart and not Cfg.KeepFactory[id] then
-		paintPart.Color = rgb(Cfg.Paints[random:NextInteger(1, #Cfg.Paints)])
+	if not Cfg.KeepFactory[id] then
+		local colour = rgb(Cfg.Paints[random:NextInteger(1, #Cfg.Paints)])
+		for _, painted in model:GetChildren() do
+			if painted:IsA("BasePart") and string.match(painted.Name, "Paint$") then
+				painted.Color = colour
+			end
+		end
 	end
 	for _, p in model:GetDescendants() do
 		if p:IsA("BasePart") then

@@ -6,6 +6,8 @@
 -- a Sprung part the body hangs from (the client animates its weld for suspension), wheel welds
 -- tagged with Corner and Spin, a VehicleSeat and the sound loops. A vehicle with a trailer row also gets the
 -- trailer model as a child Model "Trailer": its own collider on a ball-joint hitch, with tyres that resist sliding.
+-- Mastery upgrades (Config/Upgrades) swap zones of the model: Shared/VehicleParts keeps the switched-on ones, and
+-- the collider and suspension are sized from the stock shape, so upgrades change the look and not the physics box.
 
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +15,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
+local UpgradeConfig = require(ReplicatedStorage.Shared.Config.Upgrades)
+local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
+local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 local VehicleBuilder = {}
@@ -94,21 +99,45 @@ end
 
 -- a fresh copy of a vehicle model at the game's body scale, about its centre-bottom (the origin), so studs
 -- given from the centre-bottom in Config scale by S too
-local function copyOf(template: Model): Model
+local function copyOf(template: Model, on: { number }): Model
 	local model = template:Clone()
+	VehicleParts.fit(model, on)
 	model.WorldPivot = CFrame.identity
 	model:ScaleTo(S)
 	return model
 end
 
+-- the box round the model without its rebuilt zones (U<n> parts): the stock shape the physics is sized from
+local function stockBox(model: Model): (CFrame, Vector3)
+	local lo = Vector3.one * math.huge
+	local hi = -lo
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") and not string.match(p.Name, "^U%d") then
+			local half = p.Size / 2
+			lo = lo:Min(p.Position - half)
+			hi = hi:Max(p.Position + half)
+		end
+	end
+	return CFrame.new((lo + hi) / 2), hi - lo
+end
+
+-- weld the zone pieces (stock Z<n> and rebuilt U<n>, plain and painted) to what carries the body
+local function weldZones(model: Model, carrier: BasePart)
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") and string.match(p.Name, "^[ZU]%d") then
+			weld(p.Name .. "Weld", carrier, p)
+		end
+	end
+end
+
 -- The trailer: moved so its kingpin sits on the tractor's hitch, an invisible collider riding on two rear
 -- balls (the hitch carries the front), a ball joint that lets it swing and pitch but not flip, and a capped
 -- sideways hold at the rear axle so it follows the tractor like real tyres until it's flung too hard.
-local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trailer)
+local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trailer, on: { number })
 	local template =
 		ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(spec.model) :: Model
 	assert(template, "no trailer model " .. spec.model)
-	local trailer = copyOf(template)
+	local trailer = copyOf(template, on)
 	trailer.Name = "Trailer"
 	local hitch = vec(spec.hitch) * S
 	local offset = CFrame.new(hitch - vec(spec.kingpin) * S)
@@ -126,7 +155,7 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 	end
 	axleZ /= math.max(#wheels, 1)
 	local body = trailer:FindFirstChild("Body") :: BasePart
-	local cf, size = trailer:GetBoundingBox()
+	local cf, size = stockBox(trailer)
 	local skid = math.clamp(wheelRadius * 0.8, 0.8 * S, 2 * S)
 	local height = math.clamp(body.Size.Y * 0.35, 1.6 * S, 5 * S)
 	local box = Instance.new("Part")
@@ -141,6 +170,7 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 		skidBall(trailer, box, Vector3.new(sx * (box.Size.X / 2 - skid), skid, axleZ), skid)
 	end
 	weld("BodyWeld", box, body)
+	weldZones(trailer, box)
 	for _, w in wheels do
 		local wl = weld("Wheel_" .. string.sub(w.Name, 7), box, w)
 		wl:SetAttribute("Corner", string.sub(w.Name, 7, 8))
@@ -246,34 +276,44 @@ end
 -- colour a vehicle's painted panels (0-255 sRGB) and finish (an Enum.Material name, nil = the model's own);
 -- everyone sees it, as the server sets it
 function VehicleBuilder.paint(model: Model, rgb: { number }?, material: string?)
-	local part = model:FindFirstChild("Paint")
-	if not (part and part:IsA("BasePart")) then
-		return
-	end
-	if rgb then
-		part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
-	end
-	if part:GetAttribute("BaseMaterial") == nil then
-		part:SetAttribute("BaseMaterial", part.Material.Name)
-	end
-	local name = material or part:GetAttribute("BaseMaterial") :: string
-	local ok, m = pcall(function()
-		return (Enum.Material :: any)[name]
-	end)
-	if ok and m then
-		part.Material = m
+	for _, part in VehicleParts.paintParts(model) do
+		if rgb then
+			part.Color = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		end
+		if part:GetAttribute("BaseMaterial") == nil then
+			part:SetAttribute("BaseMaterial", part.Material.Name)
+		end
+		local name = material or part:GetAttribute("BaseMaterial") :: string
+		local ok, m = pcall(function()
+			return (Enum.Material :: any)[name]
+		end)
+		if ok and m then
+			part.Material = m
+		end
 	end
 end
 
-function VehicleBuilder.build(id: string): Model
-	local stats = assert(Vehicles.ById[id], "unknown vehicle " .. id)
+-- print the car's decal (Config/Upgrades decal id, or nil for none) on its painted parts
+function VehicleBuilder.decal(model: Model, decalId: string?)
+	local id = model:GetAttribute("VehicleId")
+	if typeof(id) ~= "string" then
+		return
+	end
+	VehicleParts.decal(model, UpgradeRules.image(id, decalId))
+	model:SetAttribute("Decal", decalId)
+end
+
+-- `on`: the mastery upgrades switched on for this car (Config/Upgrades), nil for none
+function VehicleBuilder.build(id: string, on: { number }?): Model
+	local upgrades = on or {}
+	local stats = UpgradeRules.stats(assert(Vehicles.ById[id], "unknown vehicle " .. id), upgrades)
 	local template = ReplicatedStorage:WaitForChild("VehicleModels"):FindFirstChild(id) :: Model
 	assert(template, "no model for " .. id)
-	local model = copyOf(template)
+	local model = copyOf(template, upgrades)
 	model.Name = id
 
 	local body = model:FindFirstChild("Body") :: BasePart
-	local cf, size = model:GetBoundingBox()
+	local cf, size = stockBox(model)
 	local length, width = size.Z, size.X
 	local wheels: { BasePart } = {}
 	local wheelRadius = 0
@@ -329,6 +369,7 @@ function VehicleBuilder.build(id: string): Model
 	sprung.Parent = model
 	weld("Suspension", chassis, sprung):SetAttribute("Suspension", true)
 	weld("BodyWeld", sprung, body)
+	weldZones(model, sprung)
 	-- the painted panels: their own untextured part, so the server can recolour them (Config/Paints)
 	local paint = model:FindFirstChild("Paint") :: BasePart?
 	if paint then
@@ -504,7 +545,13 @@ function VehicleBuilder.build(id: string): Model
 	end
 
 	if stats.trailer then
-		buildTrailer(model, chassis, stats.trailer)
+		-- the trailer wears the tractor's trailer upgrades (its parts carry the same numbers)
+		buildTrailer(
+			model,
+			chassis,
+			stats.trailer,
+			if UpgradeConfig.TrailerOf[id] then upgrades else {}
+		)
 	end
 
 	for _, p in model:GetDescendants() do
@@ -529,6 +576,7 @@ function VehicleBuilder.build(id: string): Model
 	end
 
 	model:SetAttribute("VehicleId", id)
+	model:SetAttribute("Upgrades", UpgradeRules.encode(upgrades))
 	model:SetAttribute("StudsPerMetre", Vehicles.StudsPerMetre)
 	model:SetAttribute("WheelRadius", math.max(wheelRadius, 0.5))
 	-- clients wait until they have this many wheel welds before they start driving it

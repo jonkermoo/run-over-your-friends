@@ -12,6 +12,7 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
+local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
 export type Profile = {
@@ -34,6 +35,9 @@ export type Profile = {
 	musicOff: boolean, -- turned the background music off (client/Music)
 	starterDealEnds: number, -- os.time the Starter Pack discount ends; 0 = not started (Config/Products)
 	playSeconds: number, -- seconds played in all sessions, counted up to the last save (analytics)
+	mastery: { [string]: number }, -- vehicle id -> mastery points (Config/Upgrades)
+	upgrades: { [string]: { [string]: boolean } }, -- vehicle id -> bought upgrade ("1"-"3") -> switched on
+	decal: { [string]: string }, -- vehicle id -> decal id on it; missing = none
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -80,6 +84,9 @@ local function default(): Profile
 		musicOff = false,
 		starterDealEnds = 0,
 		playSeconds = 0,
+		mastery = {},
+		upgrades = {},
+		decal = {},
 	}
 end
 
@@ -125,6 +132,9 @@ local function publish(player: Player, profile: Profile)
 	end
 	table.sort(paints)
 	player:SetAttribute("Paints", table.concat(paints, ","))
+	player:SetAttribute("Mastery", HttpService:JSONEncode(profile.mastery))
+	player:SetAttribute("Upgrades", HttpService:JSONEncode(profile.upgrades))
+	player:SetAttribute("Decals", HttpService:JSONEncode(profile.decal))
 end
 
 function Data.get(player: Player): Profile?
@@ -295,6 +305,8 @@ local function load(player: Player)
 					profile.bought = decoded.bought
 				end
 				profile.paint, profile.paints = PaintRules.clean(decoded.paint, decoded.paints)
+				profile.mastery, profile.upgrades, profile.decal =
+					UpgradeRules.clean(decoded.mastery, decoded.upgrades, decoded.decal)
 				local daily = decoded.daily
 				if typeof(daily) == "table" and tonumber(daily.day) and tonumber(daily.streak) then
 					profile.daily = {

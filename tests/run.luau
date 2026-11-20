@@ -533,6 +533,7 @@ require("./offer")(check)
 require("./vip")(check)
 require("./analytics")(check)
 require("./localization")(check)
+require("./upgrades")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
 local function ph(t: number, offset: number?)
