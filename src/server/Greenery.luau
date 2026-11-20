@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local P = require(ReplicatedStorage.Shared.Config.Parks)
+local Foliage = require(ReplicatedStorage.Shared.Config.Foliage)
 
 -- one-piece meshes (assets/Scenery.rbxm, tools/blender/export_scenery.py): a tree's crown and a bed's flowers
 -- are one part each instead of four and fourteen
@@ -43,12 +44,6 @@ local function block(
 	return p
 end
 
-local function ball(parent: Instance, size: number, at: Vector3, color: Color3): Part
-	local b = block(parent, Vector3.one * size, CFrame.new(at), color, Enum.Material.Grass)
-	b.Shape = Enum.PartType.Ball
-	return b
-end
-
 local function green(random: Random): Color3
 	return rgb(P.Greens[random:NextInteger(1, #P.Greens)])
 end
@@ -72,46 +67,115 @@ function Greenery.mesh(
 	return m
 end
 
--- a leafy tree: a trunk and one crown (a main ball with two side lumps and a top lump), turned a random way
-function Greenery.tree(folder: Instance, at: Vector3, random: Random)
+-- a low-poly template from assets/Scenery.rbxm standing on `base`: scaled evenly so it is `width` across (or
+-- `height` tall when width is nil), turned `turn` about the vertical; it never collides or blocks a ray
+function Greenery.place(
+	parent: Instance,
+	name: string,
+	base: Vector3,
+	width: number?,
+	height: number?,
+	turn: number,
+	color: Color3
+): MeshPart
+	local template = MESHES:FindFirstChild(name)
+	assert(template and template:IsA("MeshPart"), `no scenery mesh "{name}" in assets/Scenery.rbxm`)
+	local m = template:Clone()
+	local k = if width
+		then width / math.max(template.Size.X, template.Size.Z)
+		else (height or 1) / template.Size.Y
+	m.Size = template.Size * k
+	m.CFrame = CFrame.new(base + Vector3.new(0, m.Size.Y / 2, 0)) * CFrame.Angles(0, turn, 0)
+	m.Color = color
+	m.Material = Enum.Material.SmoothPlastic
+	m.CanCollide = false
+	m.CanQuery = false
+	m.CanTouch = false
+	m.Parent = parent
+	return m
+end
+
+-- a whole number from a spot, to pick a shape without drawing from the layout's random stream
+local function spotPick(at: Vector3, n: number): number
+	return (math.floor(at.X) * 7 + math.floor(at.Z) * 13) % n + 1
+end
+
+-- a leafy tree: a trunk and a chunky low-poly crown (one of three shapes, picked by its spot), turned a random way;
+-- `scale` sizes it (1 when nil), and an `overhead` tree's crown (over a road) never collides, only its trunk
+function Greenery.tree(
+	folder: Instance,
+	at: Vector3,
+	random: Random,
+	scale: number?,
+	overhead: boolean?
+)
 	local T = P.Tree
+	local k = scale or 1
 	local m = prop(folder, "Tree")
-	local h = random:NextNumber(T.Trunk[1], T.Trunk[2])
+	local h = random:NextNumber(T.Trunk[1], T.Trunk[2]) * k
 	block(
 		m,
-		Vector3.new(T.TrunkWidth, h, T.TrunkWidth),
+		Vector3.new(T.TrunkWidth * k, h, T.TrunkWidth * k),
 		CFrame.new(at + Vector3.new(0, h / 2, 0)),
 		rgb(P.Trunk),
 		Enum.Material.Wood
 	)
-	local r = random:NextNumber(T.Crown[1], T.Crown[2])
-	-- the mesh's box is centred CrownLift main-ball sizes above the main ball's centre
-	local top = at + Vector3.new(0, h + r * (0.25 + T.CrownLift), 0)
-	local crown = Greenery.mesh(
+	local r = random:NextNumber(T.Crown[1], T.Crown[2]) * k
+	local turn = random:NextNumber(0, math.pi * 2)
+	local name = Foliage.Crowns[spotPick(at, #Foliage.Crowns)]
+	local template = MESHES:FindFirstChild(name)
+	assert(template and template:IsA("MeshPart"), `no scenery mesh "{name}" in assets/Scenery.rbxm`)
+	local height = template.Size.Y
+		* r
+		* Foliage.CrownWidth
+		/ math.max(template.Size.X, template.Size.Z)
+	local crown = Greenery.place(
 		m,
-		"Crown",
-		r,
-		CFrame.new(top) * CFrame.Angles(0, random:NextNumber(0, math.pi * 2), 0),
+		name,
+		at + Vector3.new(0, h - height * Foliage.CrownSink, 0),
+		r * Foliage.CrownWidth,
+		nil,
+		turn,
 		green(random)
 	)
-	crown.CanCollide = true
+	crown.Material = Enum.Material.Grass
+	crown.CanCollide = not overhead
+	crown.CanQuery = not overhead
+	crown.CanTouch = not overhead
 end
 
--- a low round bush of one or two balls
+-- take the random draws a tree takes, without planting it (so a skipped tree moves nothing after it)
+function Greenery.skipTree(random: Random)
+	local T = P.Tree
+	random:NextNumber(T.Trunk[1], T.Trunk[2])
+	random:NextNumber(T.Crown[1], T.Crown[2])
+	random:NextNumber(0, math.pi * 2)
+	random:NextInteger(1, #P.Greens)
+end
+
+-- a low chunky bush (one of two shapes, picked by its spot); the same random draws as the old two-ball bush,
+-- so nothing after it moves
 function Greenery.bush(folder: Instance, at: Vector3, random: Random)
 	local m = prop(folder, "Bush")
 	local r = random:NextNumber(P.Bush[1], P.Bush[2])
 	local c = green(random)
-	ball(m, r, at + Vector3.new(0, r * 0.4, 0), c)
+	local turn = 0
 	if random:NextNumber() < 0.6 then
-		local a = random:NextNumber(0, math.pi * 2)
-		ball(
-			m,
-			r * 0.7,
-			at + Vector3.new(math.cos(a), 0, math.sin(a)) * r * 0.5 + Vector3.new(0, r * 0.3, 0),
-			c:Lerp(Color3.new(0, 0, 0), 0.1)
-		)
+		turn = random:NextNumber(0, math.pi * 2)
 	end
+	local b = Greenery.place(
+		m,
+		Foliage.Bushes[spotPick(at, #Foliage.Bushes)],
+		at,
+		r * Foliage.BushWidth,
+		nil,
+		turn,
+		c
+	)
+	b.Material = Enum.Material.Grass
+	b.CanCollide = true
+	b.CanQuery = true
+	b.CanTouch = true
 end
 
 -- a raised bed of soil edged in wood, with a row of flowers, long side along `along`

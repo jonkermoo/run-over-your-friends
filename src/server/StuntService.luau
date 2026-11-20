@@ -44,7 +44,9 @@ type Track = {
 local tracks: { [Player]: Track } = {}
 
 local listeners: { (Player, string, number) -> () } = {}
--- kind: "Air" (whole seconds), "Jumps" (1 per clean landing), "RampJumps" (the same, off a jump ramp) or "Stunt" (one jump's pay, for contests)
+-- kind: "Air" (whole seconds), "Jumps" (1 per clean landing), "RampJumps" (the same, off a jump ramp), "Stunt" (one
+-- jump's pay, for contests), "Spins" (360s in a clean landing), "ParkJumps" (1 per clean landing in the stunt park)
+-- or "BestAir" (one clean jump's seconds of air)
 function StuntService.onStunt(listener: (Player, string, number) -> ())
 	table.insert(listeners, listener)
 end
@@ -129,6 +131,13 @@ local function land(player: Player, t: Track, chassis: BasePart, stats: Vehicles
 	if j.ramp then
 		emit(player, "RampJumps", 1)
 	end
+	if result.spins > 0 then
+		emit(player, "Spins", result.spins)
+	end
+	if inPark(chassis.Position) then
+		emit(player, "ParkJumps", 1)
+	end
+	emit(player, "BestAir", result.air)
 	emit(player, "Stunt", pay)
 end
 

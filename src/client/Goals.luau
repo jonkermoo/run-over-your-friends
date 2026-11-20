@@ -1,8 +1,9 @@
 --!strict
--- The goals sheet: the shared SERVER goal on its own card, then HOURLY and DAILY sets with reset countdowns, progress
+-- The goals sheet: today's and this week's challenges and their chests on top (Challenges.luau builds them), the
+-- shared SERVER goal on its own card, then HOURLY and DAILY sets with reset countdowns, progress
 -- and rewards. It hangs from the top left under the menu strip, opens from the GOALS tab and closes from its X, the
 -- tab or B on a gamepad. Not
--- available until the tutorial's goal step, which puts a first goal to claim on top. Each unfinished goal,
+-- available until the tutorial's goal step. Each unfinished goal,
 -- the server goal included, has a pin button that puts it on screen (PinnedGoals, up to three).
 
 local GuiService = game:GetService("GuiService")
@@ -15,6 +16,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
+local Challenges = require(script.Parent.Challenges)
 local Pad = require(script.Parent.Pad)
 local PinnedGoals = require(script.Parent.PinnedGoals)
 local Style = require(script.Parent.Style)
@@ -35,7 +37,6 @@ local HEAD_H = 66 -- the title row and its lane line
 local HERO_H = 112 -- the server goal's card (and the gap under it)
 local SECTION_H = 42 -- an HOURLY / DAILY heading
 local ROW_H = 76 -- a goal row (and the gap under it)
-local CLAIM_H = 78 -- the tutorial's first goal
 local PIN = 36 -- the pin button
 
 local gui = Instance.new("ScreenGui")
@@ -106,11 +107,6 @@ end
 local rowViews: { { fill: Frame, amount: TextLabel } } = {}
 local builtShape = ""
 
--- the tutorial's goal step: a first goal to claim sits on top of the sheet
-local function claiming(): boolean
-	return player:GetAttribute("Tutorial") == Onboarding.Steps.Goal
-end
-
 -- the screen's GUI height in layout pixels (the drawn scale undone)
 local function guiHeight(): number
 	local fit = gui:FindFirstChild("ScreenFit") :: UIScale?
@@ -123,7 +119,7 @@ local function maxHeight(): number
 end
 
 local function shape(): string
-	local parts = { tostring(open), tostring(claiming()), tostring(maxHeight()) }
+	local parts = { tostring(open), tostring(maxHeight()), Challenges.shape() }
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -165,9 +161,7 @@ end
 local function height(): number
 	local h = HEAD_H + 6
 	if open then
-		if claiming() then
-			h += CLAIM_H
-		end
+		h += Challenges.height()
 		for _, name in ORDER do
 			local set = state[name]
 			if set then
@@ -236,33 +230,7 @@ local function rebuild()
 	table.clear(countdowns)
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
-	if claiming() then
-		local row = Style.card(body)
-		row.Name = "TutorialGoal"
-		row.Position = UDim2.fromOffset(12, y)
-		row.Size = UDim2.new(1, -24, 0, CLAIM_H - 10)
-		Style.stroke(row, C.gold, 3, 0)
-		local text = label(row, "Your first goal: open GOALS!", 16, F.heavy, C.text)
-		text.Position = UDim2.fromOffset(14, 0)
-		text.Size = UDim2.new(1, -170, 1, 0)
-		text.TextWrapped = true
-		local claim = Style.button(
-			row,
-			Loc.text("ClaimReward", { n = Onboarding.Rewards[Onboarding.Steps.Goal] }),
-			"green",
-			18
-		)
-		claim.AutoLocalize = false
-		claim.Name = "TutorialClaim"
-		claim.AnchorPoint = Vector2.new(1, 0.5)
-		claim.Position = UDim2.new(1, -12, 0.5, 0)
-		claim.Size = UDim2.fromOffset(140, 46)
-		claim.Activated:Connect(function()
-			Net.waitFor("TutorialClaim"):FireServer()
-			Goals.close()
-		end)
-		y += CLAIM_H
-	end
+	y = Challenges.build(body, y)
 	for _, name in ORDER do
 		local set = state[name]
 		if not set then
@@ -386,8 +354,17 @@ end
 
 function Goals.toggle()
 	open = not open
+	if open then
+		Challenges.sheetOpened()
+	end
 	PinnedGoals.setSheetOpen(open)
 	rebuild()
+end
+
+function Goals.open()
+	if not open then
+		Goals.toggle()
+	end
 end
 
 function Goals.close()
@@ -398,12 +375,13 @@ end
 
 close.Activated:Connect(Goals.close)
 
--- gamepad: B closes; a gamepad player starts on the tutorial's CLAIM, else the first pin, else the X
+-- gamepad: B closes; a gamepad player starts on a chest's OPEN, else the first pin, else the X
 Pad.menu(panel, {
 	first = function()
-		local claim = body:FindFirstChild("TutorialClaim", true)
-		if claim and claim:IsA("GuiObject") then
-			return claim
+		local chest = body:FindFirstChild("OpenDaily", true)
+			or body:FindFirstChild("OpenWeekly", true)
+		if chest and chest:IsA("GuiObject") then
+			return chest
 		end
 		for _, d in body:GetDescendants() do
 			if d:IsA("TextButton") and string.sub(d.Name, 1, 3) == "Pin" then
@@ -457,6 +435,12 @@ function Goals.start()
 		end
 		PinnedGoals.setServer(serverSet, if typeof(serverNow) == "number" then serverNow else nil)
 		apply()
+	end)
+	-- challenges or chests changed: redraw
+	Challenges.changed:Connect(function()
+		if open and shape() ~= builtShape then
+			rebuild()
+		end
 	end)
 	-- pins changed (here or from a card's X): redraw the pin buttons
 	PinnedGoals.changed:Connect(function()

@@ -96,20 +96,57 @@ return table.freeze({
 		Patches = table.freeze({ n = 420, radius = 90, size = { 30, 75 } }),
 	}),
 
+	-- the open grass rolls (Rules/Ground, GroundKit): long smooth swells a few studs high, level on and round
+	-- everything that must stay flat (city, ring, roads, zones, suburbs, ponds, lakes, the farm's yard); what
+	-- stands on the grass is lifted with it. Octaves: `len` studs across a swell, `amp` studs high at most.
+	Roll = table.freeze({
+		Octaves = table.freeze({
+			table.freeze({ len = 340, amp = 9 }),
+			table.freeze({ len = 120, amp = 3.5 }),
+			table.freeze({ len = 45, amp = 0.8 }),
+		}),
+		Margin = 14,
+		Fade = 110,
+		EdgeFade = 160,
+		Seed = 4111,
+		Cell = 128,
+		MinLift = 0.4, -- lifts smaller than this are left out (things on the grass, voxels)
+		Container = 400, -- a model wider than this holds many things (a suburb, the roads): never lifted as one
+	}),
+
+	-- worn dirt paths across the open grass: wandering lines of terrain Ground, `width` studs wide, faded at
+	-- the sides; they keep to ground the roll reaches (`minWeight`), so they never cross a road or a lot
+	Paths = table.freeze({
+		n = 34,
+		steps = table.freeze({ 12, 34 }),
+		step = 36,
+		turn = 0.35,
+		width = 7,
+		minWeight = 0.7,
+	}),
+
 	-- north-east: fields of crop rows, wind breaks of trees, a red barn, a silo and hay bales
 	Farm = table.freeze({
 		Rect = table.freeze({ x = 2150, z = -2150, w = 1000, d = 1000 }),
 		Fields = table.freeze({ 2, 2 }), -- columns, rows
 		FieldGap = 70, -- between fields (grass tracks)
-		Rows = 8, -- crop rows per field
-		RowHeight = 0.4,
-		Crops = table.freeze({
-			{ 120, 170, 70 },
-			{ 214, 186, 80 },
-			{ 96, 150, 64 },
-			{ 170, 190, 90 },
-		}) :: { RGB },
-		Soil = { 116, 86, 60 } :: RGB,
+		-- the fields are drawn into the terrain, so they follow the roll of the land: a patchwork of whole fields
+		-- (wheat, ploughed dirt, green crop), each turned a little (Turn, radians either way), its edges wobbling
+		-- (Wobble studs), hedges of trees between them. Terrain materials by name: Sand (wheat, the desert's
+		-- tint), Ground (the island's dirt) and Limestone (tinted by TerrainCrops). Crop rows are too fine for
+		-- the terrain's 4-stud voxels (they blur into blotches).
+		Turn = 0.22,
+		TurnSeed = 5150,
+		Wobble = 6,
+		-- the outline's two waves along each edge: lengths (studs over 2 pi) along u and along v, the second
+		-- wave `WobbleSecond` as tall as the first
+		WobbleWaves = table.freeze({ u = { 97, 29 }, v = { 90, 31 } }),
+		WobbleSecond = 0.4,
+		CellWobble = 0.4, -- the fields in the cells by the ring wobble this share as much
+		YardAt = 0.36, -- the yard's middle, east of the farm's, as a share of its width
+		CropMaterials = table.freeze({ "Sand", "Ground", "Limestone", "Sand" }),
+		TerrainCrops = table.freeze({ Limestone = { 112, 146, 62 } }),
+		YardKeep = 150, -- the barn's yard stays level this far round its middle
 		-- the big barn: w across its front, d deep; a gambrel roof `roof` tall whose knee is Knee[1] of the half
 		-- width in from the eave and Knee[2] of the roof's height up; doors Door[1] of the width, Door[2] of the walls
 		Barn = table.freeze({
@@ -155,6 +192,32 @@ return table.freeze({
 			{ 250, 210, 70 },
 			{ 240, 240, 240 },
 		}) :: { RGB },
+		-- low sand dunes along the back of each beach, half on the grass, so the sand fades into it; `from`..`to`
+		-- are shares of the beach's width inland from the water; `endGap` keeps them off the beach's ends, `clear`
+		-- off umbrellas and the tower (past the dune's radius)
+		DuneSeed = 7301,
+		Dunes = table.freeze({
+			n = 30,
+			radius = { 22, 50 },
+			height = { 3, 8 },
+			from = 0.72,
+			to = 1.12,
+			endGap = 60,
+			clear = 8,
+		}),
+		-- clusters of rocks at the water's edge (terrain balls, half sunk): spread x from the water's edge and z
+		-- either way; `rock` of the balls are Rock, the rest Slate; `endGap` off the beach's ends, `pierGap` clear
+		-- of the pier past its width
+		Rocks = table.freeze({
+			n = 6,
+			balls = { 3, 6 },
+			size = { 6, 16 },
+			spreadX = { -12, 14 },
+			spreadZ = 16,
+			rock = 0.7,
+			endGap = 40,
+			pierGap = 40,
+		}),
 		PierLength = 160,
 		PierWidth = 16,
 		Lighthouse = table.freeze({
@@ -183,15 +246,17 @@ return table.freeze({
 		Uses = table.freeze({
 			"trees",
 			"field",
-			"turbines",
+			"orchard",
 			"field",
 			"gas",
 			"trees",
-			"turbines",
+			"orchard",
 			"field",
 		}), -- gas on odd cells (billboards take the even ones)
 		CornerTrees = 5, -- the four corner cells get a small grove
 		Turbine = table.freeze({ h = 90, blade = 34, dia = 4.5 }),
+		-- an orchard: rows of fruit trees `gap` apart filling the cell's middle `share` (its own random stream)
+		Orchard = table.freeze({ gap = 26, share = 0.62, seed = 6120, jitter = 2 }),
 		Gas = table.freeze({
 			pad = { 96, 70 },
 			canopy = { 48, 24, 15 },
@@ -201,6 +266,14 @@ return table.freeze({
 			Price = "$2.49",
 		}),
 		GasRed = { 214, 58, 48 } :: RGB,
+	}),
+
+	-- the wind turbines stand out in the countryside, a row along a rise north of Sunny Vale (they used to stand in
+	-- the cells by the ring, inside town); the land rolls under them
+	WindFarm = table.freeze({
+		Rect = table.freeze({ x = 3600, z = -1950, w = 900, d = 220 }),
+		Turbines = 6,
+		Seed = 4410,
 	}),
 
 	-- lakes on the new land (terrain water in a sandy bowl), trees round the shore

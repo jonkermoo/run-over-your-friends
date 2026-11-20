@@ -10,6 +10,7 @@ export type Colours = { wall: RGB, trim: RGB, accent: RGB, roof: RGB, material: 
 return table.freeze({
 	-- trim bands are laid in pieces no longer than this, so a hit knocks out a piece, not a whole strip
 	BandPiece = 48,
+	SidePanel = 12, -- a house's side wall counts for one piece per this many studs of its length
 	-- the whole map, measured in Studio (about 87,000 with the suburbs); with streaming on, each player only
 	-- loads what is near them, so this caps the server's map, not a phone's
 	PartBudget = 100000,

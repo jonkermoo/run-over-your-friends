@@ -58,6 +58,8 @@ return function(check: (string, boolean) -> ())
 		Plastic = true,
 		Neon = true,
 		Glass = true,
+		CrackedLava = true,
+		Ice = true,
 	}
 	local finishesOk = true
 	for _, p in PaintConfig.List do

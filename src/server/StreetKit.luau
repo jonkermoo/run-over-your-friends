@@ -11,6 +11,8 @@ local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
 local Places = require(script.Parent.Places)
+local Greenery = require(script.Parent.Greenery)
+local Foliage = require(ReplicatedStorage.Shared.Config.Foliage)
 
 local StreetKit = {}
 
@@ -207,14 +209,23 @@ local function tree(folder: Instance, at: Vector3)
 		Color3.fromRGB(110, 78, 52),
 		Enum.Material.Wood
 	)
-	local crown = block(
+	-- a chunky low-poly crown like the countryside's trees (Config/Streets TreeCrown), its shape, turn and
+	-- green picked by its spot (no random draws, so nothing else moves)
+	local T = S.TreeCrown
+	local spot = math.floor(at.X) * 7 + math.floor(at.Z) * 13
+	local crown = Greenery.place(
 		m,
-		Vector3.new(8, 8, 8),
-		CFrame.new(at + Vector3.new(0, 11, 0)),
-		Color3.fromRGB(76, 146, 70),
-		Enum.Material.Grass
+		Foliage.Crowns[spot % #Foliage.Crowns + 1],
+		at + Vector3.new(0, T.Base, 0),
+		T.Width,
+		nil,
+		(spot % 360) * math.pi / 180,
+		rgb(T.Greens[spot % #T.Greens + 1])
 	)
-	crown.Shape = Enum.PartType.Ball
+	crown.Material = Enum.Material.Grass
+	crown.CanCollide = true
+	crown.CanQuery = true
+	crown.CanTouch = true
 end
 
 local function shelter(folder: Instance, at: Vector3, out: Vector3, accent: Color3)

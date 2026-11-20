@@ -11,6 +11,9 @@ export type HouseType = { width: number, depth: number, floors: number, perLot: 
 return table.freeze({
 	PerSide = 3, -- lots along each of the north and south sidewalks of a home block
 	Yard = 4, -- front garden between the sidewalk and the house
+	-- its border (YardKit.front, compact) leaves a gap DoorGap either side of the door, and wherever a low part of
+	-- the house (lower than Low) reaches more than Proud out from the wall
+	Garden = table.freeze({ DoorGap = 2, Proud = 1.5, Low = 4 }), -- (window sills and flower boxes reach 1.2)
 	FloorHeight = 12,
 	Wall = 1,
 	Overhang = 1.5, -- roofs reach this far past the walls

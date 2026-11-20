@@ -70,7 +70,6 @@ return table.freeze({
 		Rows = 6,
 		Cols = 4,
 		Cranes = 2,
-		Bollards = 10,
 		Fenders = 20, -- tyres on the quay's face
 		Dock = { 150, 150, 146 }, -- the yard's concrete (darker than the plazas, so it doesn't blow out in the sun)
 		LaneColour = { 240, 196, 40 },
@@ -116,6 +115,21 @@ return table.freeze({
 		DuneRadius = table.freeze({ 30, 80 }),
 		DuneSlope = table.freeze({ 20, 35 }), -- height as a percent of the dune's radius
 		Mesas = 7,
+		-- each mesa is stepped: `Tiers` layers of a few overlapping turned slabs, each layer `Shrink` of the one
+		-- below, on a skirt of sand (talus) `Talus` of its width out
+		MesaTiers = 3,
+		MesaSeed = 8800,
+		MesaShrink = table.freeze({ 0.62, 0.8 }),
+		MesaSlabs = table.freeze({ 2, 4 }),
+		MesaTalus = 0.3,
+		-- each slab: its size a share of its tier's, off the middle by up to MesaOffset of it, its height a share of
+		-- the tier's, turned up to MesaTwist radians from the mesa's turn
+		MesaSlabSize = table.freeze({ 0.6, 1 }),
+		MesaOffset = 0.2,
+		MesaSlabHeight = table.freeze({ 0.85, 1.15 }),
+		MesaTwist = 0.4,
+		MesaTall = 2.2, -- the old flat slabs' heights times this
+		MesaTalusRise = 0.15, -- the sand skirt's height, as a share of the mesa's
 		Cacti = 36,
 		Outcrops = 26, -- clusters of half-sunk sandstone balls (terrain)
 		OutcropSize = table.freeze({ 10, 26 }),

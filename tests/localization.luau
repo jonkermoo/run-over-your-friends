@@ -15,6 +15,7 @@ local Products = require("../src/shared/Config/Products")
 local QuestConfig = require("../src/shared/Config/Quests")
 local Vehicles = require("../src/shared/Config/Vehicles")
 local ServerGoals = require("../src/shared/Config/ServerGoals")
+local ChallengeConfig = require("../src/shared/Config/Challenges")
 
 local LOCALES = { "es", "pt" }
 -- where the code names a key: Loc.text("Key"), Loc.msg("Key"), Loc.set(label, "Key")
@@ -216,6 +217,22 @@ return function(check: (string, boolean) -> ())
 		goalsOk = goalsOk and keys["ServerGoal_" .. k.kind] == k.text
 	end
 	check("translations: every goal kind has its line", goalsOk)
+	-- challenge lines: Challenge_<id> (or the template's own line key), with the template's English
+	local challengesOk = true
+	local templates = table.clone(ChallengeConfig.Weekly)
+	for _, slot in ChallengeConfig.Daily.Slots do
+		for _, t in slot do
+			table.insert(templates, t)
+		end
+	end
+	for _, t in templates do
+		local key = t.line or ("Challenge_" .. t.id)
+		if keys[key] ~= t.text then
+			challengesOk = false
+			print("  challenge line missing or different: " .. key)
+		end
+	end
+	check("translations: every challenge has its line", challengesOk)
 	for _, board in Leaderboards.Boards do
 		table.insert(plain, board.title)
 		if board.tag then

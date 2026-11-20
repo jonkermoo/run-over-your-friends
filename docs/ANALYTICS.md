@@ -39,6 +39,8 @@ Item names in the purchase events: `Product:<key>` (Robux products in `Config/Pr
 | `LoadTime` | seconds | seconds bucket (`0-5`, `5-10`, `10-20`, `20-40`, `40+`) | `Ready` / `Timeout` | Load time per device: from client start to spawn-ready (the loading cover's ready check). `Timeout`: the cover gave up waiting. |
 | `FirstVehicleBought` | total minutes played | vehicle id | total minutes bucket (`0-10`, `10-30`, `30-60`, `60-120`, `120-240`, `240+`) | The money curve: how long until players afford their first car beyond the starter, and which car it is. Logged on the first car bought with game money; cars from the Roadster pass or the Starter Pack don't count as bought. Minutes count all sessions (saved as `playSeconds` in the profile from this release on). |
 | `GoalClaimed` | 1 | goal kind (`Hits`, `Earn`, `Drive`, ...) | `Hourly` / `Daily` | Which goals players finish. |
+| `ChallengeDone` | 1 | challenge id (`Config/Challenges`: `CarHits`, `Spin`, `WeekHits`, ...) | `Daily` / `Weekly` | Which daily and weekly challenges players finish, and how many come back for them. |
+| `ChestOpened` | cash it paid | `Daily` / `Weekly` | `Paint:<id>` (a chest-only paint, `Config/Paints`) or `Cash` | What challenge chests give out. |
 | `EventSeen` | 1 | event key (`Config/Events`) | | Players in the server when a live event started. |
 | `EventJoined` | 1 | event key | | Players who took part (a hit, smash or stunt while it was live), once per event run. With `EventSeen`: the join rate per event. |
 
@@ -46,16 +48,23 @@ Older custom events (kept): `VehicleSpawned` (field 01: vehicle id), `Demolished
 
 ## Onboarding funnel (`LogOnboardingFunnelStepEvent`)
 
-Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Took a ramp, 6 Smashed a
-building, 7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done.
-Steps 5, 6, 7 and 9 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it
+Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Smashed a building, 6 Claimed a
+goal, 7 First vehicle bought, 8 Joined an event, 9 Tutorial done.
+
+Renumbered on 2026-11-20 when the tutorial's ramp step was removed. Data from before that release used: 5 Took
+a ramp, 6 Smashed a building, 7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done.
+Compare across the change by step name, not number. The same release made the goal step a short goal of its
+own (a few hits, then a CLAIM pop-up that claims itself after a few seconds) instead of opening the GOALS sheet.
+
+Steps 5, 6 and 8 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it
 was done before the step came up); a step the player skips is not logged. Answers: where new players drop out
 of the first session.
 
 ## Economy events (`LogEconomyEvent`)
 
 Currency `Money`. Sources: play earnings (batched per minute, `Gameplay`), goal and tutorial rewards, packs
-(`IAP`, sku = product key), the Roadster pass, group, invite and server-goal rewards. Sinks: vehicles (sku =
+(`IAP`, sku = product key), the Roadster pass, group, invite and server-goal rewards, challenge chests (`TimedReward`, sku `DailyChest` /
+`WeeklyChest`). Sinks: vehicles (sku =
 vehicle id) and paints. Answers: where money comes from and goes to (Creator Hub's Economy page).
 
 ## Reading it in Creator Hub

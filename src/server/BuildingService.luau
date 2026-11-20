@@ -32,7 +32,16 @@ local CFG = World.Debris
 local COLLAPSE = Smash.Collapse
 local CRUMBLE = Smash.Crumble
 
-type Chunk = { cf: CFrame, transparency: number, glass: boolean, group: string? }
+-- `ghost` / `unhit`: built not to collide (window trim, a tree crown over a road) / not to be hit by a query (that
+-- crown); a part stood back up keeps how it was built
+type Chunk = {
+	cf: CFrame,
+	transparency: number,
+	glass: boolean,
+	group: string?,
+	ghost: boolean?,
+	unhit: boolean?,
+}
 local chunks: { [BasePart]: Chunk } = {}
 -- whole buildings that can come down: their Fixed floors and roofs, every part, and which are down right now
 local structure: { [BasePart]: Chunk } = {}
@@ -57,6 +66,8 @@ function BuildingService.register(folder: Folder)
 				cf = p.CFrame,
 				transparency = p.Transparency,
 				glass = p:GetAttribute("Glass") == true,
+				ghost = not p.CanCollide or nil,
+				unhit = not p.CanQuery or nil,
 			}
 			if p:GetAttribute("Fixed") then
 				structure[p] = chunk
@@ -94,6 +105,8 @@ function BuildingService.registerProps(folder: Folder)
 				transparency = p.Transparency,
 				glass = false,
 				group = p.CollisionGroup,
+				ghost = not p.CanCollide or nil,
+				unhit = not p.CanQuery or nil,
 			}
 		end
 	end
@@ -141,8 +154,8 @@ local function restore(part: BasePart, always: boolean?)
 	part.CFrame = c.cf
 	part.CollisionGroup = c.group or "Default"
 	part.Transparency = c.transparency
-	part.CanCollide = true
-	part.CanQuery = true
+	part.CanCollide = not c.ghost
+	part.CanQuery = not c.unhit
 	part:SetAttribute("Broken", nil)
 end
 
@@ -364,6 +377,7 @@ local function loosen(
 end
 
 local breakListeners: { (Player, number, boolean) -> () } = {}
+local collapseListeners: { (Player) -> () } = {}
 -- is this part of a real building (a model in the Buildings folder at least Onboarding.SmashMinHeight tall,
 -- the ones the tutorial points at), not a fence, tree or shed? Cached per model.
 local tallModels: { [Model]: boolean } = {}
@@ -388,6 +402,11 @@ end
 -- called with the player, how many pieces they broke and whether any were a real building's
 function BuildingService.onBreak(listener: (Player, number, boolean) -> ())
 	table.insert(breakListeners, listener)
+end
+
+-- called with the player whose hit brought a whole building down
+function BuildingService.onCollapse(listener: (Player) -> ())
+	table.insert(collapseListeners, listener)
 end
 
 -- break everything within radius of pos; push is the hitter's velocity (studs/s); `way` keeps the hitter's path
@@ -535,6 +554,9 @@ local function collapse(pos: Vector3, velocity: Vector3, player: Player): boolea
 	end)
 	Analytics.custom(player, "Demolished")
 	MasteryService.add(player, "Collapse")
+	for _, listener in collapseListeners do
+		task.spawn(listener, player)
+	end
 	task.delay(COLLAPSE.HideSeconds, function()
 		for _, p in parts do
 			if p.Anchored and p:GetAttribute("Broken") then

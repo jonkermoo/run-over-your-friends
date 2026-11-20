@@ -6,7 +6,7 @@ StudsOrbit,{n} STUDS!! ORBIT!,,,¡{n} STUDS!! ¡A ÓRBITA!,{n} STUDS!! ÓRBITA!
 StudsHomeRun,{n} STUDS! HOME RUN!,,,¡{n} STUDS! ¡JONRÓN!,{n} STUDS! GOLAÇO!
 AirTime,AIR {t}s,,,AIRE {t}s,NO AR {t}s
 CheerPay,{cheer}  +${amount},,,{cheer}  +${amount},{cheer}  +${amount}
-FirstRampageSub,+${n} bonus. Now find a ramp and send it!,,,+${n} de bono. ¡Ahora busca una rampa y salta!,+${n} de bônus. Agora ache uma rampa e voa!
+FirstRampageSub,+${n} bonus. Now smash a building!,,,+${n} de bono. ¡Ahora rompe un edificio!,+${n} de bônus. Agora quebre um prédio!
 NewRideTouch,{car} is yours. Tap SPAWN to drive it!,,,¡{car} es tuyo! Toca USAR para manejarlo.,{car} é seu! Toque em USAR para dirigir.
 NewRideKeys,{car} is yours. Open the GARAGE to drive it!,,,¡{car} es tuyo! Abre el GARAJE para manejarlo.,{car} é seu! Abra a GARAGEM para dirigir.
 GiantToppledSub,{name} brought it down.,,,{name} lo derribó.,{name} derrubou ele.
@@ -55,7 +55,8 @@ PodiumPrize,{amount}  +{prize},,,{amount}  +{prize},{amount}  +{prize}
 EdgeDistance,{text} {m}M,,,{text} {m}M,{text} {m}M
 GuideHits,Run over {goal} people!   {n} / {goal},,,¡Atropella a {goal} personas!   {n} / {goal},Atropele {goal} pessoas!   {n} / {goal}
 GuideSmash,Smash a building!   {n} / {goal} pieces,,,¡Rompe un edificio!   {n} / {goal} pedazos,Quebre um prédio!   {n} / {goal} pedaços
-GuideGoal,Open GOALS and claim your first ${reward},,,Abre METAS y cobra tus primeros ${reward},Abra METAS e resgate seus primeiros ${reward}
+GuideFirstGoal,First goal: run over {goal} people   {n} / {goal},,,Primera meta: atropella a {goal} personas   {n} / {goal},Primeira meta: atropele {goal} pessoas   {n} / {goal}
+FirstGoalSub,You ran over {goal} people. More goals wait in GOALS!,,,Atropellaste a {goal} personas. ¡Hay más metas en METAS!,Você atropelou {goal} pessoas. Tem mais metas em METAS!
 GuideBuyNext,Buy your next ride: {car} for {price},,,Compra tu próximo auto: {car} por {price},Compre seu próximo carro: {car} por {price}
 GuideSaveUp,Save up for the {car}:  {cash} / {price},,,Ahorra para el {car}:  {cash} / {price},Junte grana para o {car}:  {cash} / {price}
 GuideEventLive,"{event} is LIVE! Hit, smash or jump to join",,,"¡{event} está EN VIVO! Golpea, rompe o salta para participar","{event} está AO VIVO! Bata, quebre ou salte para participar"
@@ -67,6 +68,11 @@ UnstuckWait,Unstuck ({n}),,,Desatascar ({n}),Desatolar ({n})
 GiantHitLeft,{n} hit left,,,falta {n} golpe,falta {n} batida
 GiantHitsLeft,{n} hits left,,,faltan {n} golpes,faltam {n} batidas
 BoardResets,resets in {time},,,se reinicia en {time},reinicia em {time}
+BoardYou,YOU,,,TÚ,VOCÊ
+BoardNoScore,Play to get on this board!,,,¡Juega para entrar en esta tabla!,Jogue para entrar neste placar!
+BoardTop,You're number 1!,,,¡Eres el número 1!,Você é o número 1!
+BoardPass,{gap} more to pass #{place},,,{gap} más para pasar al #{place},mais {gap} para passar o #{place}
+BoardClimb,Keep going to climb the board!,,,¡Sigue así para subir en la tabla!,Continue para subir no placar!
 LoadingPct,LOADING THE CITY... {pct}%,,,CARGANDO LA CIUDAD... {pct}%,CARREGANDO A CIDADE... {pct}%
 Quest_Hits,Run over {n} people,,,Atropella a {n} personas,Atropele {n} pessoas
 Quest_Earn,Earn ${n},,,Gana ${n},Ganhe ${n}
@@ -115,3 +121,22 @@ MasteryGain,+{n} MASTERY,,,+{n} MAESTRÍA,+{n} MAESTRIA
 MasteryLevel,{car} MASTERY {n},,,{car} MAESTRÍA {n},{car} MAESTRIA {n}
 MasteryOpensBoth,UNLOCKED: {up} + {decal} DECAL,,,DESBLOQUEADO: {up} + CALCOMANÍA {decal},LIBERADO: {up} + ADESIVO {decal}
 MasteryOpensDecal,UNLOCKED: {decal} DECAL,,,DESBLOQUEADO: CALCOMANÍA {decal},LIBERADO: ADESIVO {decal}
+Challenge_CarHits,Flatten {n} people in the {car},,,Aplasta a {n} personas en el {car},Esmague {n} pessoas no {car}
+Challenge_CarBreaks,Smash {n} building pieces in the {car},,,Rompe {n} pedazos de edificios en el {car},Quebre {n} pedaços de prédios no {car}
+Challenge_CarJumps,Land {n} jumps in the {car},,,Aterriza {n} saltos en el {car},Acerte {n} saltos no {car}
+Challenge_Spin,Land a 360,,,Aterriza un 360,Acerte um 360
+Challenge_ParkJumps,Land {n} jumps in the stunt park,,,Aterriza {n} saltos en el parque de acrobacias,Acerte {n} saltos no parque de manobras
+Challenge_BigAir,Stay in the air {n} seconds in one jump,,,Quédate {n} segundos en el aire en un salto,Fique {n} segundos no ar em um salto
+Challenge_Collapse,Bring down {n} whole buildings,,,Derriba {n} edificios enteros,Derrube {n} prédios inteiros
+Challenge_Event,Join a live event,,,Únete a un evento en vivo,Entre em um evento ao vivo
+Challenge_WeekHits,Flatten {n} people,,,Aplasta a {n} personas,Esmague {n} pessoas
+Challenge_WeekSpins,Land {n} 360s,,,Aterriza {n} 360s,Acerte {n} 360s
+Challenge_WeekEvents,Join {n} live events,,,Únete a {n} eventos en vivo,Entre em {n} eventos ao vivo
+ChallengeDoneDaily,DAILY CHALLENGE DONE!  +1 DAILY CHEST,,,¡DESAFÍO DIARIO HECHO!  +1 COFRE DIARIO,DESAFIO DIÁRIO FEITO!  +1 BAÚ DIÁRIO
+ChallengeDoneWeekly,WEEKLY CHALLENGE DONE!  +1 WEEKLY CHEST,,,¡DESAFÍO SEMANAL HECHO!  +1 COFRE SEMANAL,DESAFIO SEMANAL FEITO!  +1 BAÚ SEMANAL
+ChestDailyHolds,"Cash, or a chest-only paint ({pct}% chance)",,,"Dinero, o una pintura exclusiva de cofre ({pct}% de probabilidad)","Grana, ou uma pintura exclusiva de baú ({pct}% de chance)"
+ChestWeeklyHolds,A chest-only paint and {n},,,Una pintura exclusiva de cofre y {n},Uma pintura exclusiva de baú e {n}
+ChestPaintAndCash,New paint and {n}! Put it on any car in the GARAGE,,,¡Pintura nueva y {n}! Úsala en cualquier auto en el GARAJE,Pintura nova e {n}! Use em qualquer carro na GARAGEM
+ChestsWaiting,Chests to open in GOALS: {n},,,Cofres por abrir en METAS: {n},Baús para abrir em METAS: {n}
+ChallengesNew,{n} new challenges today. Each one you finish gives a chest!,,,{n} desafíos nuevos hoy. ¡Cada uno que completes da un cofre!,{n} desafios novos hoje. Cada um que você completar dá um baú!
+PaintChest,{paint}  FROM CHALLENGE CHESTS,,,{paint}  DE COFRES DE DESAFÍOS,{paint}  DE BAÚS DE DESAFIOS

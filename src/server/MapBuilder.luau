@@ -34,6 +34,7 @@ local RoadKit = require(script.Parent.RoadKit)
 local SkylineKit = require(script.Parent.SkylineKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
+local YardKit = require(script.Parent.YardKit)
 local Pace = require(script.Parent.Pace)
 local Terra = require(script.Parent.Terra)
 
@@ -230,7 +231,7 @@ local function dressSpawnPlaza(
 	local half = inner / 2
 	local band = rgb(SP.Band)
 	local yBand = 0.1 + World.Look.PaintLift / 2
-	-- the grass island in the middle with a terracotta kerb (the Hall of Fame tower stands on it), and a
+	-- the grass island in the middle with a terracotta kerb (the champions' podium stands on it), and a
 	-- border inside the plaza's edge
 	local function slab(radius: number, top: number, colour: Color3, material: Enum.Material)
 		local p = part(
@@ -364,86 +365,63 @@ local function dressSpawnPlaza(
 	end
 end
 
--- the Hall of Fame tower on the spawn plaza's island (World.SpawnPlaza.Tower): a black block on a concrete
--- step with an all-time board face on each side (parts named Board_<key>; the client draws them), yellow
--- bands, and the gold trophy (cup, handles, star) standing on its roof
-local function hallOfFame(boards: Instance, static: Instance, cx: number, cz: number, key: string)
+-- the champions' podium on the spawn plaza's island (World.SpawnPlaza.Podium): a round concrete turntable and,
+-- on it, a stage the client turns (model ChampionStage, kept loaded): three steps in a row (parts named
+-- Step_<key>; the client puts the plates and the avatars on them). Nothing else stands on the stage, so no
+-- angle shows anything passing through an avatar. The steps turn on screen only: an invisible wall collides.
+local function champions(static: Instance, cx: number, cz: number)
 	local SP = World.SpawnPlaza
-	local T = SP.Tower
-	local w, h, base = T.Width, T.Height, SP.IslandTop
-	part(
-		boards,
-		Vector3.new(w + 4, 1, w + 4),
-		CFrame.new(cx, base + 0.5, cz),
+	local P = SP.Podium
+	local base = SP.IslandTop
+	local table_ = part(
+		static,
+		Vector3.new(P.Rise, P.Radius * 2, P.Radius * 2),
+		CFrame.new(cx, base + P.Rise / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
 		COLORS.concrete,
 		Enum.Material.Concrete
 	)
-	part(
-		boards,
-		Vector3.new(w, h - base - 1, w),
-		CFrame.new(cx, (h + base + 1) / 2, cz),
-		PAINT_BLACK
-	)
-	part(boards, Vector3.new(w + 1.6, 1.6, w + 1.6), CFrame.new(cx, h + 0.8, cz), PAINT_YELLOW)
-	local faceY = T.FaceBottom + T.FaceHeight / 2
-	for _, out in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
-		local at = Vector3.new(cx, faceY, cz) + out * (w / 2 + 0.3)
-		local frame = CFrame.lookAt(at, at + out)
-		local face = part(
-			boards,
-			Vector3.new(T.FaceWidth, T.FaceHeight, 0.6),
-			frame,
-			Color3.fromRGB(24, 24, 38)
-		)
-		face.Name = "Board_" .. key
-		for _, e in { -1, 1 } do
-			part(
-				boards,
-				Vector3.new(T.FaceWidth + 1, 1.2, 1),
-				frame * CFrame.new(0, e * (T.FaceHeight / 2 + 0.6), 0),
-				PAINT_YELLOW
-			)
-		end
-	end
-	-- the trophy, built from its foot at `top` and scaled by TrophyScale
-	local trophy = Instance.new("Model")
-	trophy.Name = "Trophy"
-	trophy.Parent = static
-	local gold = rgb(SP.Gold)
-	local s, top = T.TrophyScale, h + 1.6
-	local function piece(size: Vector3, x: number, y: number, shape: Enum.PartType?): Part
+	table_.Shape = Enum.PartType.Cylinder
+	local stage = Instance.new("Model")
+	stage.Name = "ChampionStage"
+	stage.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client turns it
+	stage.Parent = static
+	local floor = base + P.Rise
+	for i, key in P.Keys do
+		local h = P.Heights[i]
+		local x = (2 - i) * P.StepWidth -- step 1 on the left seen from the front (-Z)
 		local p = part(
-			trophy,
-			size * s,
-			CFrame.new(cx + x * s, top + y * s, cz),
-			gold,
-			Enum.Material.Foil
+			stage,
+			Vector3.new(P.StepWidth, h, P.StepDepth),
+			CFrame.new(cx + x, floor + h / 2, cz),
+			rgb(P.Colours[i])
 		)
+		p.Name = "Step_" .. key
 		p.CanCollide = false
-		if shape then
-			p.Shape = shape
-		end
-		return p
+		-- a white cap on top, a little bigger than the step every way (sides LipOut out, top LipRaise up) so no
+		-- face of it lies in a face of the step: shared faces flicker
+		local lipH = 0.4 + P.LipRaise
+		part(
+			stage,
+			Vector3.new(P.StepWidth + P.LipOut * 2, lipH, P.StepDepth + P.LipOut * 2),
+			CFrame.new(cx + x, floor + h + P.LipRaise - lipH / 2, cz),
+			COLORS.concrete
+		).CanCollide =
+			false
 	end
-	local function cyl(height: number, dia: number, y: number): Part
-		local p = piece(Vector3.new(height, dia, dia), 0, y + height / 2, Enum.PartType.Cylinder)
-		p.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
-		return p
-	end
-	piece(Vector3.new(7.4, 0.6, 7.4), 0, 0.3)
-	cyl(1.2, 5, 0.6)
-	cyl(4, 2, 1.8)
-	piece(Vector3.one * 9, 0, 8.8, Enum.PartType.Ball)
-	cyl(5, 9, 8.8)
-	cyl(0.8, 9.8, 13.6)
-	for _, e in { -1, 1 } do
-		piece(Vector3.new(1, 6, 1), e * 6.6, 10.6)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 13.2)
-		piece(Vector3.new(2.6, 1, 1), e * 5.4, 8)
-	end
-	local star = piece(Vector3.one * 2.6, 0, 15.6, Enum.PartType.Ball)
-	star.Color = PAINT_YELLOW
-	star.Material = Enum.Material.Neon
+	-- the steps turn on screen only, so an invisible round wall over the circle they sweep (up past the avatars'
+	-- heads) is what people and cars bump into
+	local wall = part(
+		static,
+		Vector3.new(P.WallHeight, P.WallRadius * 2, P.WallRadius * 2),
+		CFrame.new(cx, floor + P.WallHeight / 2, cz) * CFrame.Angles(0, 0, math.pi / 2),
+		COLORS.concrete,
+		nil,
+		1
+	)
+	wall.Shape = Enum.PartType.Cylinder
+	wall.Name = "PodiumWall"
+	wall.CanQuery = false -- the camera sees through it
+	wall.CastShadow = false
 end
 
 -- a ramp you drive up while heading along `dir` (a flat unit vector); its foot sits at `foot`
@@ -622,6 +600,60 @@ local function clearGrassUnder(size: Vector3, cf: CFrame, lo: Vector3, hi: Vecto
 	end
 end
 
+-- a city home's small front garden (YardKit.front, compact): a picket fence or hedge along the sidewalk with
+-- a gap at the door and wherever the house reaches out low toward it (a porch, a stoop), small bushes
+local function frontGarden(
+	props: Instance,
+	buildings: Instance,
+	home: Places.Place,
+	c: Vector3,
+	face: Vector3,
+	t: Houses.HouseType
+)
+	local G = Houses.Garden
+	local right = Vector3.new(-face.Z, 0, face.X)
+	local door = (home.door - c):Dot(right)
+	local gaps = { { door - G.DoorGap, door + G.DoorGap } }
+	local model = buildings:FindFirstChild(home.name)
+	if model then
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") then
+				local cf, size = p.CFrame, p.Size
+				local function reach(dir: Vector3): number
+					return math.abs(cf.RightVector:Dot(dir)) * size.X / 2
+						+ math.abs(cf.UpVector:Dot(dir)) * size.Y / 2
+						+ math.abs(cf.LookVector:Dot(dir)) * size.Z / 2
+				end
+				local rel = p.Position - c
+				if
+					rel:Dot(face) + reach(face) > t.depth / 2 + G.Proud
+					and p.Position.Y - reach(Vector3.yAxis) < G.Low
+				then
+					local x, half = rel:Dot(right), reach(right)
+					table.insert(gaps, { x - half, x + half })
+				end
+			end
+		end
+	end
+	YardKit.front(props, {
+		c = c,
+		face = face,
+		width = t.width,
+		depth = t.depth,
+		lawn = Houses.Yard,
+		door = door,
+		drive = 0,
+		driveWidth = 0,
+		car = false,
+		gaps = gaps,
+		wallGaps = {},
+		clear = function(_: Vector3): boolean
+			return true
+		end,
+		compact = true,
+	})
+end
+
 -- `fresh` (the bake) draws all the terrain even when the place already holds it (Terra)
 function MapBuilder.build(fresh: boolean?): Result
 	Terra.begin(fresh)
@@ -773,8 +805,8 @@ function MapBuilder.build(fresh: boolean?): Result
 				workspace:SetAttribute("SafeZoneHalf", B / 2 + HitConfig.SafeZoneMargin)
 				paintPlaza(static, cx, cz, inner)
 				dressSpawnPlaza(static, props, cx, cz, inner)
-				-- leaderboard stands on the north sidewalk, facing the plaza, and the Hall of Fame tower on the
-				-- island (the client draws the boards)
+				-- leaderboard stands on the north sidewalk, facing the plaza (parts named Stand_<n>; the client
+				-- draws the boards, Config/Leaderboards), and the champions' podium on the island
 				local boards = Instance.new("Model")
 				boards.Name = "Boards"
 				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
@@ -790,43 +822,39 @@ function MapBuilder.build(fresh: boolean?): Result
 						PAINT_BLACK
 					)
 				end
-				local k = 0
-				for _, board in Leaderboards.Boards do
-					if board.allTime then
-						hallOfFame(boards, static, cx, cz, board.key)
-						continue
-					end
-					k += 1
-					local bx = cx + (k - 2) * 62
+				champions(static, cx, cz)
+				local STW, SH = Leaderboards.StandWidth, Leaderboards.StandHeight
+				for k = 1, Leaderboards.Stands do
+					local bx = cx + (k - (Leaderboards.Stands + 1) / 2) * Leaderboards.StandStep
 					local bz = cz - B / 2 + 6
 					local face = part(
 						boards,
-						Vector3.new(52, 46, 1.2),
+						Vector3.new(STW, SH, 1.2),
 						CFrame.lookAt(Vector3.new(bx, 30, bz), Vector3.new(bx, 30, bz + 10)),
 						Color3.fromRGB(24, 24, 38)
 					)
-					face.Name = "Board_" .. board.key
+					face.Name = "Stand_" .. k
 					-- a frame (yellow top and bottom, black sides) and two lamps leaning over the top
 					local frame =
 						CFrame.lookAt(Vector3.new(bx, 30, bz - 0.4), Vector3.new(bx, 30, bz + 10))
 					for _, e in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(55, 1.6, 1.6),
-							frame * CFrame.new(0, e * 23.8, 0),
+							Vector3.new(STW + 3, 1.6, 1.6),
+							frame * CFrame.new(0, e * (SH / 2 + 0.8), 0),
 							PAINT_YELLOW
 						)
 						part(
 							boards,
-							Vector3.new(1.6, 46, 1.6),
-							frame * CFrame.new(e * 26.8, 0, 0),
+							Vector3.new(1.6, SH, 1.6),
+							frame * CFrame.new(e * (STW / 2 + 0.8), 0, 0),
 							PAINT_BLACK
 						)
 						local lamp = part(
 							boards,
 							Vector3.new(3, 1.4, 2.4),
 							frame
-								* CFrame.new(e * 14, 25.6, -2.6)
+								* CFrame.new(e * STW * 0.27, SH / 2 + 2.6, -2.6)
 								* CFrame.Angles(math.rad(-35), 0, 0),
 							PAINT_BLACK
 						)
@@ -841,8 +869,8 @@ function MapBuilder.build(fresh: boolean?): Result
 					for _, side in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(2, 8, 2),
-							CFrame.new(bx + side * 20, 3, bz - 0.5),
+							Vector3.new(2, 7.4, 2), -- ends inside the frame's bottom bar: equal tops flicker
+							CFrame.new(bx + side * (STW / 2 - 2), 2.7, bz - 0.5),
 							COLORS.concrete
 						)
 					end
@@ -921,6 +949,13 @@ function MapBuilder.build(fresh: boolean?): Result
 				end
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
+				-- a street front: awnings either side of the door, planters, a bench (YardKit)
+				YardKit.officeFront(
+					props,
+					door,
+					out,
+					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
+				)
 				-- its own crown, taken in turn so neighbours differ (TowerKit)
 				TowerKit.crown(
 					model,
@@ -1155,6 +1190,14 @@ function MapBuilder.build(fresh: boolean?): Result
 								"Home" .. count
 							)
 							addPlace(home, i, j)
+							frontGarden(
+								props,
+								buildings,
+								home,
+								centre + Vector3.new(x, 0, z),
+								out,
+								t
+							)
 							-- detached homes get a back garden: a tree, a fence, maybe a pool (SuburbKit)
 							if t.perLot == 1 then
 								SuburbKit.garden(
@@ -1170,13 +1213,21 @@ function MapBuilder.build(fresh: boolean?): Result
 						end
 					end
 				end
+				-- the lawn in the middle: hedges, flower beds, sometimes a playground (YardKit)
+				local taken = YardKit.blockMiddle(props, centre, inner)
 				for _ = 1, Parks.HomeTrees do
 					local at = Vector3.new(
 						random:NextNumber(-inner / 2.4, inner / 2.4),
 						0,
 						random:NextNumber(-20, 20)
 					)
-					Greenery.tree(props, centre + at, random)
+					-- a tree that would stand in a hedge, a bed or the playground isn't planted (its draws
+					-- are still taken, so nothing after it moves)
+					if YardKit.inside(taken, centre + at, Parks.TreeClear) then
+						Greenery.skipTree(random)
+					else
+						Greenery.tree(props, centre + at, random)
+					end
 				end
 			elseif kind == "restaurant" then
 				-- the burger place, facing the middle of town, with a car park behind

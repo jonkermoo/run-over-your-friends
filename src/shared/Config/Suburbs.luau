@@ -68,6 +68,9 @@ return table.freeze({
 	Driveway = 11,
 	Path = 3,
 	Garden = 24, -- back garden depth (the fence)
+	GarageWing = 16, -- type C's garage wing (HouseKit), kept clear of front planting
+	MailboxGap = 0.8, -- a front border leaves this much either side of the mailbox post (plus Yards Front Gap)
+	BorderClear = 0.6, -- a front lawn's border keeps this far off the sidewalk's outer edge
 	FenceHeight = 4.5,
 	Fence = { 196, 160, 116 } :: RGB,
 	Picket = { 245, 245, 240 } :: RGB,
@@ -85,8 +88,11 @@ return table.freeze({
 		pool = 0.22,
 	}),
 	-- trees scattered on the open grass between the back gardens
-	Spinney = table.freeze({ n = 70, tries = 30, clear = 26, trees = { 2, 4 } }),
+	Spinney = table.freeze({ n = 70, tries = 30, clear = 26, trees = { 2, 4 }, ParkPad = 6 }),
 	LampEvery = 150,
+	-- trees on the verge along the side of each street without power poles, a little smaller than lawn trees;
+	-- their crowns hang over the road and sidewalk, so they don't collide (the trunk does)
+	StreetTrees = table.freeze({ Every = 40, Step = 4, Scale = 0.8, Clear = 7, Seed = 3390 }), -- Step: slid on past a driveway
 	Sign = table.freeze({ 46, 9 }), -- the name board at the entrance, wide and tall
 	SignColour = { 46, 92, 60 } :: RGB,
 	SignStone = { 168, 160, 148 } :: RGB, -- its wall and pillars

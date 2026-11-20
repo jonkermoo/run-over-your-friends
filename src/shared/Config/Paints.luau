@@ -12,6 +12,7 @@ export type Paint = {
 	rgb: { number }?, -- nil for Factory (each vehicle's own colour)
 	vip: boolean?, -- only with the VIP pass (price is 0)
 	material: string?, -- an Enum.Material name for the painted panels; nil = the model's own
+	chest: boolean?, -- never sold: only from a challenge chest (Config/Challenges; price is 0)
 }
 
 local Paints = {}
@@ -46,6 +47,61 @@ local list: { Paint } = {
 		rgb = { 255, 190, 30 },
 		material = "Foil",
 	},
+	-- chest-only paints, from challenge chests
+	{
+		id = "NeonPink",
+		name = "Neon Pink",
+		order = 19,
+		price = 0,
+		chest = true,
+		rgb = { 255, 60, 170 },
+		material = "Neon",
+	},
+	{
+		id = "NeonCyan",
+		name = "Neon Cyan",
+		order = 20,
+		price = 0,
+		chest = true,
+		rgb = { 40, 225, 255 },
+		material = "Neon",
+	},
+	{
+		id = "NeonLime",
+		name = "Neon Lime",
+		order = 21,
+		price = 0,
+		chest = true,
+		rgb = { 170, 255, 40 },
+		material = "Neon",
+	},
+	{
+		id = "Chrome",
+		name = "Chrome",
+		order = 22,
+		price = 0,
+		chest = true,
+		rgb = { 205, 210, 218 },
+		material = "Foil",
+	},
+	{
+		id = "Lava",
+		name = "Lava",
+		order = 23,
+		price = 0,
+		chest = true,
+		rgb = { 255, 96, 24 },
+		material = "CrackedLava",
+	},
+	{
+		id = "Ice",
+		name = "Ice",
+		order = 24,
+		price = 0,
+		chest = true,
+		rgb = { 170, 220, 255 },
+		material = "Ice",
+	},
 }
 for _, p in list do
 	table.freeze(p)
@@ -57,6 +113,15 @@ for _, p in list do
 	byId[p.id] = p
 end
 Paints.ById = table.freeze(byId)
+
+-- the chest-only paint ids, in order
+local chestIds = {}
+for _, p in list do
+	if p.chest then
+		table.insert(chestIds, p.id)
+	end
+end
+Paints.ChestIds = table.freeze(chestIds)
 
 -- each vehicle's own paint colour: the palette cell its Paint faces use (PAINT in export_vehicles.py)
 Paints.Factory = table.freeze({

@@ -11,7 +11,7 @@ local Paints = {}
 
 function Paints.isOpen(bought: { [string]: boolean }, id: string): boolean
 	local p = Config.ById[id]
-	return p ~= nil and ((p.price == 0 and not p.vip) or bought[id] == true)
+	return p ~= nil and ((p.price == 0 and not p.vip and not p.chest) or bought[id] == true)
 end
 
 -- the bought set with the VIP colours added while the player has the VIP pass
@@ -46,6 +46,8 @@ function Paints.buyProblem(money: number, bought: { [string]: boolean }, id: any
 		return "owned"
 	elseif p.vip then
 		return "vip"
+	elseif p.chest then
+		return "chest"
 	elseif money < p.price then
 		return "money"
 	end
@@ -81,14 +83,14 @@ function Paints.material(paintId: string?): string?
 	return p and p.material
 end
 
--- a saved profile's paint, keeping only known colours (paid ones still bought, VIP ones kept: the pass is checked
+-- a saved profile's paint, keeping only known colours (paid and chest ones still bought, VIP ones kept: the pass is checked
 -- after load, and Paints.shown hides them without it) on known vehicles; Factory is the default, so it isn't stored
 function Paints.clean(chosen: any, bought: any): ({ [string]: string }, { [string]: boolean })
 	local outBought: { [string]: boolean } = {}
 	if typeof(bought) == "table" then
 		for id, yes in bought do
 			local p = if typeof(id) == "string" then Config.ById[id] else nil
-			if yes == true and p and p.price > 0 then
+			if yes == true and p and (p.price > 0 or p.chest) then
 				outBought[id] = true
 			end
 		end

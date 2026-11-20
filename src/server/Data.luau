@@ -38,6 +38,7 @@ export type Profile = {
 	mastery: { [string]: number }, -- vehicle id -> mastery points (Config/Upgrades)
 	upgrades: { [string]: { [string]: boolean } }, -- vehicle id -> bought upgrade ("1"-"3") -> switched on
 	decal: { [string]: string }, -- vehicle id -> decal id on it; missing = none
+	challenges: { [string]: any }, -- daily/weekly challenge progress and unopened chests, checked by ChallengeService
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -87,6 +88,7 @@ local function default(): Profile
 		mastery = {},
 		upgrades = {},
 		decal = {},
+		challenges = {},
 	}
 end
 
@@ -294,6 +296,9 @@ local function load(player: Player)
 					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)
 				if typeof(decoded.quests) == "table" then
 					profile.quests = decoded.quests
+				end
+				if typeof(decoded.challenges) == "table" then
+					profile.challenges = decoded.challenges
 				end
 				if typeof(decoded.stats) == "table" then
 					profile.stats = decoded.stats
