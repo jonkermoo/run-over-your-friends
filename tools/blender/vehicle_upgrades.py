@@ -54,11 +54,14 @@ class Kit:
 
         lo = [v(p, a0) for p in pts]
         hi = [v(p, a1) for p in pts]
-        bm.faces.new(lo)
-        bm.faces.new(list(reversed(hi)))
         for i in range(len(pts)):
             j = (i + 1) % len(pts)
             bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+        # each cap filled as triangles on its own (so concave outlines like a curved splitter come out right,
+        # and thin pieces don't fill across from one cap to the other)
+        for ring in (lo, hi):
+            bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False,
+                                    edges=[bm.edges.get((ring[i], ring[(i + 1) % len(ring)])) for i in range(len(ring))])
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         return self._obj(bm, colour)
 
@@ -500,29 +503,55 @@ def semi_3(k):
 
 
 # ------------------------------------------------------------------------------------------------- Bulldozer
+# (the stock blade, stack and ripper come from export_vehicles.py; blade_face is shared with it)
 def dozer_1(k):
-    k.yz([(-13.3, 0.2), (-15.0, 0.2), (-15.6, 2.0), (-15.6, 7.2), (-14.7, 9.1), (-13.7, 8.7), (-14.2, 6.2),
-          (-14.2, 1.4)], -10.0, 10.0, "paint")
-    k.yz([(-15.0, 0.2), (-15.75, 0.25), (-15.7, 1.0), (-15.25, 1.0)], -10.0, 10.0, "char")
-    k.xy([(10.0, -15.6), (11.6, -17.2), (12.0, -16.8), (10.0, -14.2)], 0.2, 8.7, "paint", mirror=True)
-    k.bar((6.6, -14.1, 3.0), (6.6, -7.0, 4.6), 0.4, "char", mirror=True)
-    k.bar((3.0, -14.1, 6.5), (2.0, -8.2, 9.5), 0.3, "chrome", mirror=True)
+    # a U-blade: a taller, wider curved moldboard with wings swung forward at each end, teeth along the steel
+    # cutting edge, ribs behind, a spill guard on top and longer push arms
+    k.yz(blade_face(-13.6, 0.3, 9.2, 1.3, 0.6, 0.45), -9.6, 9.6, "paint")
+    k.xy([(9.5, -13.4), (12.1, -15.3), (12.4, -14.9), (9.5, -12.95)], 0.3, 8.4, "paint", mirror=True)
+    k.xy([(9.4, -13.75), (12.15, -15.75), (12.45, -15.3), (9.4, -13.35)], 0.0, 0.55, "mid", mirror=True)
+    k.box((0, -13.45, 0.3), (19.2, 0.55, 0.6), "mid")
+    for i in range(9):
+        x = -8.0 + i * 2.0
+        k.xy([(x - 0.45, -13.65), (x, -14.6), (x + 0.45, -13.65)], 0.05, 0.45, "mid")
+    for x in (-8.0, -5.3, -2.65, 0.0, 2.65, 5.3, 8.0):
+        k.box((x, -11.4, 4.6), (0.4, 0.9, 7.6), "char")
+    for i in range(11):
+        x = -8.0 + i * 1.6
+        k.bar((x, -13.9, 9.1), (x, -13.9, 11.0), 0.13, "char")
+    k.bar((-9.0, -13.9, 11.0), (9.0, -13.9, 11.0), 0.2, "char")
+    k.bar((-9.0, -13.9, 9.1), (-9.0, -13.9, 11.0), 0.2, "char")
+    k.bar((9.0, -13.9, 9.1), (9.0, -13.9, 11.0), 0.2, "char")
+    k.bar((7.8, -11.0, 2.5), (8.3, -12.3, 2.7), 0.45, "paint", mirror=True)
+    k.bar((5.0, -9.0, 8.0), (5.8, -12.3, 6.6), 0.36, "paint", mirror=True)
 
 
 def dozer_2(k):
-    k.cyl((-2.6, -3.5, 15.7), 0.7, 7.8, "Z", "char")
-    k.yz([(-4.2, 19.6), (-4.2, 19.8), (-2.6, 20.4), (-2.6, 20.2)], -3.3, -1.9, "black")
-    k.box((2.6, -3.0, 12.6), (1.7, 1.7, 1.6), "char", bevel=0.06)
-    k.cyl((2.6, -3.0, 14.1), 0.8, 1.4, "Z", "dark")
-    k.cyl((2.6, -3.0, 14.9), 0.95, 0.2, "Z", "black")
+    # turbo diesel: twin stacks with heat shields and flap caps, and a big precleaner bowl between them
+    for sx in (1, -1):
+        x = 2.4 * sx
+        k.cyl((x, -4.92, 14.6), 0.45, 6.4, "Z", "char")
+        k.cyl((x, -4.92, 14.0), 0.62, 2.8, "Z", "chrome", verts=14)
+        for z in (12.9, 14.0, 15.1):
+            k.cyl((x, -4.92, z), 0.66, 0.12, "Z", "char", verts=14)
+        k.yz([(-5.5, 17.75), (-4.42, 17.75), (-4.42, 17.95), (-5.35, 18.35)], x - 0.48, x + 0.48, "black")
+    k.cyl((0, -3.4, 12.6), 0.8, 1.4, "Z", "char", verts=16)
+    k.cyl((0, -3.4, 13.65), 0.95, 0.7, "Z", "mid", verts=16)
+    k.cyl((0, -3.4, 14.15), 0.95, 0.3, "Z", "black", r2=0.45, verts=16)
+    k.bar((0, -3.4, 12.4), (-1.6, -3.4, 12.0), 0.28, "char")
 
 
 def dozer_3(k):
-    k.bar((3.0, 12.0, 4.6), (3.0, 15.8, 4.6), 0.35, "char", mirror=True)
-    k.bar((3.0, 12.0, 7.4), (3.0, 15.8, 5.2), 0.3, "chrome", mirror=True)
-    k.box((0, 15.9, 4.9), (7.0, 1.0, 1.1), "paint", bevel=0.06)
-    k.yz([(15.4, 4.4), (16.4, 4.4), (16.8, 1.0), (16.2, -0.25), (15.5, 0.7)], -0.45, 0.45, "char")
-    k.yz([(16.2, -0.25), (16.8, 1.0), (17.0, 0.2)], -0.35, 0.35, "mid")
+    # a three-shank ripper on a wide beam: links back to the hull, two cylinders, curved shanks with steel tips
+    k.box((0, 12.7, 5.0), (8.4, 1.1, 2.8), "paint", bevel=0.1)
+    k.bar((2.4, 10.4, 6.8), (2.4, 12.2, 6.1), 0.32, "char", mirror=True)
+    k.bar((2.4, 10.4, 4.5), (2.4, 12.2, 4.2), 0.32, "char", mirror=True)
+    k.bar((1.2, 10.6, 7.9), (1.2, 12.3, 6.4), 0.4, "paint", mirror=True)
+    shank = [(12.6, 6.2), (14.2, 6.2), (14.2, 3.4), (13.4, 1.2), (12.1, 0.25), (11.7, 0.9), (12.6, 2.3), (12.9, 4.6)]
+    tip = [(12.1, 0.25), (11.0, 0.2), (10.9, 0.5), (11.7, 0.9)]
+    for x in (-3.0, 0.0, 3.0):
+        k.yz(shank, x - 0.42, x + 0.42, "char")
+        k.yz(tip, x - 0.46, x + 0.46, "mid")
 
 
 # ------------------------------------------------------------------------------------------------- Monster
@@ -572,23 +601,53 @@ def super_3(k):
 
 
 # ------------------------------------------------------------------------------------------------- Roadster
+# The Roadster is one smooth, rounded body (not the pack's flat panels), so its upgrades are thin swept pieces that
+# follow its lines: NOSE is its front edge (half width -> y) measured off the stock mesh near the ground.
+NOSE = [(0.0, -9.99), (0.5, -9.98), (1.0, -9.93), (1.5, -9.83), (2.0, -9.65), (2.5, -9.37), (3.0, -8.95), (3.5, -8.59),
+        (4.0, -8.06)]
+
+
+def nose_y(x):
+    x = min(abs(x), NOSE[-1][0])
+    for (x0, y0), (x1, y1) in zip(NOSE, NOSE[1:]):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return NOSE[-1][1]
+
+
 def road_1(k):
-    k.yz([(-8.5, 0.3), (-11.0, 0.3), (-11.0, 0.5), (-8.5, 0.7)], -3.8, 3.8, "black")
-    k.yz([(-9.5, 1.0), (-11.2, 0.6), (-10.4, 1.9), (-9.3, 2.4)], -2.6, 2.6, "paint")
+    # aero nose: a carbon splitter following the curve of the nose, end plates, two canards each side
+    xs = [i * 0.25 for i in range(-16, 17)]
+    k.xy([(x, nose_y(x) - 0.6) for x in xs] + [(x, nose_y(x) + 0.5) for x in reversed(xs)], 0.28, 0.42, "black")
+    k.yz([(-8.95, 0.28), (-7.95, 0.28), (-7.85, 0.85), (-8.5, 1.0)], 4.02, 4.14, "black", mirror=True)
+    k.xy([(3.3, -9.0), (4.15, -8.6), (4.2, -8.35), (3.6, -8.1)], 1.15, 1.24, "black", mirror=True)
+    k.xy([(3.5, -8.6), (4.2, -8.2), (4.22, -8.0), (3.75, -7.92)], 1.6, 1.69, "black", mirror=True)
 
 
 def road_2(k):
-    k.cyl((0, 10.6, 2.4), 1.1, 2.2, "Y", "char", r2=0.8, verts=16)
-    k.cyl((0, 11.85, 2.4), 1.3, 0.35, "Y", "chrome", verts=16)
-    k.cyl((0, 11.98, 2.4), 0.75, 0.1, "Y", "lamp", verts=16)
-    for a in range(6):
-        t = a * math.pi / 3
-        k.bar((0, 11.7, 2.4), (math.cos(t) * 1.1, 11.7, 2.4 + math.sin(t) * 1.1), 0.07, "dark")
+    # afterburner: a nozzle set into the rear between the diffuser fins, in a body-coloured shroud, petals round a
+    # glowing core
+    c = (0, 0, 1.9)
+    k.cyl((0, 9.7, c[2]), 0.95, 1.4, "Y", "paint", r2=0.84, verts=20)
+    k.cyl((0, 10.45, c[2]), 0.9, 0.12, "Y", "chrome", verts=20)
+    k.cyl((0, 10.78, c[2]), 0.82, 0.56, "Y", "char", r2=0.7, verts=20)
+    for a in range(8):
+        t = a * math.pi / 4
+        k.bar((math.cos(t) * 0.82, 10.52, c[2] + math.sin(t) * 0.82), (math.cos(t) * 0.7, 11.04, c[2] + math.sin(t) * 0.7),
+              0.045, "black")
+    # the open end: a dark lip, then the glow and its white-hot core just proud of it
+    k.cyl((0, 11.08, c[2]), 0.7, 0.04, "Y", "black", verts=20)
+    k.cyl((0, 11.11, c[2]), 0.56, 0.04, "Y", "orange", verts=20)
+    k.cyl((0, 11.14, c[2]), 0.28, 0.04, "Y", "pale", verts=16)
 
 
 def road_3(k):
-    k.xy([(3.6, -4.0), (5.9, -1.0), (6.1, 3.6), (3.6, 4.8)], 1.0, 1.3, "paint", mirror=True)
-    k.yz([(2.0, 1.3), (3.6, 1.3), (3.6, 2.6)], 5.95, 6.1, "black", mirror=True)
+    # flight fins: swept wings from the sills with dark flaps and upturned tips, and two small tail fins
+    k.xy([(3.6, -1.5), (4.6, -0.4), (5.5, 1.1), (6.2, 2.7), (6.4, 3.8), (6.1, 4.25), (3.6, 4.0)], 1.05, 1.22, "paint",
+         mirror=True)
+    k.xy([(3.6, 4.0), (6.1, 4.25), (6.0, 4.55), (3.6, 4.35)], 1.08, 1.19, "black", mirror=True)
+    k.yz([(2.4, 1.05), (4.4, 1.0), (4.7, 2.3), (3.9, 2.4)], 6.15, 6.32, "black", mirror=True)
+    k.yz([(6.6, 3.5), (9.3, 3.4), (9.6, 4.75), (9.0, 4.8)], 2.1, 2.25, "paint", mirror=True)
 
 
 # ------------------------------------------------------------------------------------------------- the list
@@ -627,18 +686,17 @@ UPGRADES = [
     ("Semi", 1, [(-W, W, -W, -10.9, -W, 2.0)], True, None, semi_1),
     ("Semi", 2, [(-5.6, 5.6, -11.0, -1.7, 14.3, W)], True, None, semi_2),
     ("SemiTrailer", 3, [], False, None, semi_3),
-    ("Bulldozer", 1, [(-W, W, -W, -12.5, -W, 7.4)], False, None, dozer_1),
-    ("Bulldozer", 2, [(-3.2, 3.2, -5.6, -2.0, 11.9, W)], False, None, dozer_2),
-    ("Bulldozer", 3, [(-W, W, 11.4, W, 3.5, 8.0)], True, None, dozer_3),
+    ("Bulldozer", 1, [(-W, W, -W, -11.4, -W, 7.4)], False, None, dozer_1),
+    ("Bulldozer", 2, [(-3.2, 3.2, -6.0, -2.0, 11.9, W)], False, None, dozer_2),
+    ("Bulldozer", 3, [(-3.2, 3.2, 11.4, W, -W, W), (-3.2, 3.2, 10.3, W, -W, 3.6)], False, None, dozer_3),
     ("Monster", 1, [(-4.2, 4.2, -2.6, 0.4, 12.2, W)], True, None, monster_1),
     ("Monster", 2, [(-W, W, -W, -11.6, 3.4, 6.6)], False, None, monster_2),
     ("Monster", 3, [], False, None, monster_3),
     ("Supercar", 1, [(-W, W, -W, -9.85, -W, 0.5)], False, None, super_1),
     ("Supercar", 2, [(-W, W, 9.3, W, 3.85, W)], False, None, super_2),
     ("Supercar", 3, [(-2.9, 2.9, 1.8, 7.6, 4.3, W)], True, None, super_3),
-    ("Roadster", 1, [(-W, W, -W, -8.6, -W, 2.3)], True,
-     lambda p: Vector((p.x, p.y - 0.55 * max(0.0, 1 - abs(p.x) / 3.8) * max(0.0, (-8.6 - p.y) / 1.4), p.z)), road_1),
-    ("Roadster", 2, [(-1.7, 1.7, 9.0, W, 1.4, 3.5)], True, None, road_2),
+    ("Roadster", 1, [], False, None, road_1),
+    ("Roadster", 2, [], False, None, road_2),
     ("Roadster", 3, [], False, None, road_3),
 ]
 
