@@ -181,8 +181,8 @@ function WildsKit.fill(ctx: CountryKit.Ctx, exclude: { Rules.Rect })
 	local P = F.Pines
 	for _, s in spots(P.n, P.radius) do
 		for _ = 1, count(random, P.trees) do
-			CountryKit.pine(
-				ctx.static,
+			CountryKit.pineProp(
+				ctx.props,
 				around(s, P.radius),
 				between(random, Country.Forest.PineHeight),
 				random

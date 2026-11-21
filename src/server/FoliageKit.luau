@@ -268,8 +268,9 @@ local function crops(parent: Instance, fields: { Field }): number
 	return placed
 end
 
--- palms along a beach (from CountryKit: its water's-edge x, middle z, length, and what to keep clear of)
-local function palms(parent: Instance, beach: Beach): number
+-- palms along a beach (from CountryKit: its water's-edge x, middle z, length, and what to keep clear of); each
+-- palm is a Prop in `props` that any vehicle knocks flying (its trunk is what the car meets, its leaves a ghost)
+local function palms(parent: Instance, props: Instance, beach: Beach): number
 	local P = Foliage.Palms
 	local B = Country.Beach
 	local random = Random.new(beach.seed)
@@ -292,10 +293,17 @@ local function palms(parent: Instance, beach: Beach): number
 			continue
 		end
 		local base = Vector3.new(x, y - P.sink, z)
-		Greenery.place(parent, "PalmTrunk", base, nil, h, turn, rgb(P.trunk)).Material =
-			Enum.Material.Wood
-		Greenery.place(parent, "PalmLeaves", base, nil, h, turn, leaves).Material =
-			Enum.Material.Grass
+		local palm = Instance.new("Model")
+		palm.Name = "Palm"
+		palm:SetAttribute("Prop", "Palm")
+		palm.Parent = props
+		local trunk = Greenery.place(palm, "PalmTrunk", base, nil, h, turn, rgb(P.trunk))
+		trunk.Material = Enum.Material.Wood
+		trunk.CanCollide = true
+		trunk.CanQuery = true
+		trunk.CanTouch = true
+		Greenery.place(palm, "PalmLeaves", base, nil, h, turn, leaves).Material = Enum.Material.Grass
+		palm.WorldPivot = CFrame.new(base) -- at its foot, where the car meets it (the server's reach check)
 		placed += 2
 		Pace.step()
 		for _ = 1, random:NextInteger(P.grass[1], P.grass[2]) do
@@ -316,6 +324,7 @@ end
 -- everything above, after the map and its terrain are in place; returns the number of pieces
 function FoliageKit.build(
 	static: Instance,
+	props: Instance,
 	level: { Ground.Rect },
 	seaEdge: number,
 	reach: number,
@@ -329,7 +338,7 @@ function FoliageKit.build(
 	n += woodEdges(folder, static, seaEdge)
 	n += crops(folder, fields)
 	for _, b in beaches do
-		n += palms(folder, b)
+		n += palms(folder, props, b)
 	end
 	folder.Parent = static
 	return n

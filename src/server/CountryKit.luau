@@ -300,6 +300,15 @@ local function pine(folder: Instance, at: Vector3, height: number, random: Rando
 end
 CountryKit.pine = pine
 
+-- a pine any vehicle knocks flying (a Prop in `props`); its pivot is at its foot, where the car meets it, so the
+-- server's reach check measures from there and not from halfway up the tree
+function CountryKit.pineProp(props: Instance, at: Vector3, height: number, random: Random): Model
+	local m = prop(props, "Pine")
+	pine(m, at, height, random).CanQuery = true -- the car finds props by querying for them
+	m.WorldPivot = CFrame.new(at)
+	return m
+end
+
 -- round the island's edge (Config/Land): two rows of hills, a belt of woods at their foot and pines on the
 -- slopes, wherever the edge is land; the sea runs on past the west coast with islands on the horizon
 local function edges(ctx: Ctx)
@@ -1236,7 +1245,7 @@ local function forest(ctx: Ctx)
 			end
 		end
 		if free then
-			pine(folder, at, between(random, F.PineHeight), random)
+			CountryKit.pineProp(ctx.props, at, between(random, F.PineHeight), random)
 			placed += 1
 		end
 	end

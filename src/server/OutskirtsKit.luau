@@ -1753,7 +1753,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		table.insert(places, place)
 	end
 	-- tufts, bushes, rocks, crop rows and palms on the finished ground (FoliageKit)
-	FoliageKit.build(static, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
+	FoliageKit.build(static, props, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
 	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
 end
 
