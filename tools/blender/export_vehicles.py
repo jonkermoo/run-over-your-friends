@@ -524,46 +524,126 @@ def strut(name, a, b, radius, rgb, verts=8):
     return o
 
 
+def prism(name, pts, a0, a1, rgb, plane="yz"):
+    """A flat shape (pts: (y, z) in the yz plane, or (x, y) in xy) pushed from a0 to a1 across it; the side
+    walls go in order round the outline and each cap is filled as triangles, so concave outlines come out right."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+
+    def v(p, a):
+        return bm.verts.new((a, p[0], p[1]) if plane == "yz" else (p[0], p[1], a))
+
+    lo = [v(p, a0) for p in pts]
+    hi = [v(p, a1) for p in pts]
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bm.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    for ring in (lo, hi):
+        bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False,
+                                edges=[bm.edges.get((ring[i], ring[(i + 1) % len(ring)])) for i in range(len(ring))])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    scene.collection.objects.link(o)
+    paint(o, rgb)
+    return o
+
+
+def blade_face(yf, zb, zt, depth, lean, thick, seg=10):
+    """A dozer blade's side outline (y, z): a moldboard curving back in the middle and rolling forward at the top
+    (the front face from the cutting edge up, then the back face down)."""
+    front, back = [], []
+    for i in range(seg + 1):
+        t = i / seg
+        y = yf + depth * math.sin(math.pi * t) - lean * t ** 3
+        z = zb + (zt - zb) * t
+        front.append((y, z))
+        back.append((y + thick, z))
+    return front + list(reversed(back))
+
+
 parts = []
 for s in (1, -1):
+    gx0, gx1 = sorted((s * (TX - (TW + 0.08) / 2), s * (TX + (TW + 0.08) / 2)))
     parts += [
         box("rollerFrame", (0.3, TY[1] - TY[0] - 0.2, 0.2), (s * TX, sum(TY) / 2, TZ - 0.02), DARK),
-        box("fender", (TW + 0.08, 1.7, 0.05), (s * TX, 0.3, 1.06), YEL, 0.01),
-        box("armPush", (0.09, 1.5, 0.11), (s * 1.0, -0.76, 0.36), YEL, 0.02),
+        # track guard: a shell over the whole track, sloping down over the idler and the sprocket
+        prism("guard", [(-1.12, 0.8), (-0.98, 1.06), (1.3, 1.06), (1.47, 0.86), (1.42, 0.83), (1.27, 1.01),
+                        (-0.95, 1.01), (-1.07, 0.77)], gx0, gx1, YEL),
+        box("guardEdge", (0.03, 2.22, 0.04), (s * 0.975, 0.16, 1.035), DARK),
+        box("frameSide", (0.03, TY[1] - TY[0] - 0.3, 0.12), (s * (TX + TW / 2 + 0.02), sum(TY) / 2, TZ - 0.02), DARK),
+        # push arms from the trunnions to the blade, a brace, and the lift cylinders from the hood
+        strut("armPush", (s * 0.99, -0.02, 0.36), (s * 0.97, -1.42, 0.3), 0.055, YEL),
+        strut("brace", (s * 0.97, -0.55, 0.36), (s * 0.62, -1.42, 0.62), 0.03, DARK),
         box("trunnion", (0.12, 0.16, 0.16), (s * 0.97, 0.0, 0.36), DARK, 0.02),
-        box("bladeSide", (0.06, 0.28, 0.72), (s * 1.0, -1.55, 0.42), YEL),
-        strut("liftCyl", (s * 0.42, -0.98, 1.05), (s * 0.55, -1.32, 0.72), 0.045, YEL),
-        strut("liftRod", (s * 0.55, -1.32, 0.72), (s * 0.6, -1.44, 0.6), 0.025, (0.85, 0.86, 0.88)),
+        strut("liftCyl", (s * 0.42, -0.98, 1.08), (s * 0.55, -1.3, 0.74), 0.05, YEL),
+        strut("liftRod", (s * 0.55, -1.3, 0.74), (s * 0.6, -1.42, 0.62), 0.028, (0.85, 0.86, 0.88)),
+        box("liftEye", (0.08, 0.1, 0.1), (s * 0.42, -0.98, 1.08), DARK, 0.02),
+        # hood: a lamp in a housing on each front corner, a hand rail on posts
+        box("headHouse", (0.13, 0.1, 0.09), (s * 0.34, -0.97, 1.41), DARK, 0.02),
+        box("headLamp", (0.09, 0.01, 0.06), (s * 0.34, -1.025, 1.41), (0.95, 0.95, 0.9)),
         box("handrail", (0.03, 0.9, 0.03), (s * 0.5, -0.45, 1.6), DARK),
+        strut("railPost", (s * 0.5, -0.85, 1.46), (s * 0.5, -0.85, 1.6), 0.015, DARK),
+        strut("railPost", (s * 0.5, -0.05, 1.46), (s * 0.5, -0.05, 1.6), 0.015, DARK),
+        # cab: posts, door frame, sills, work lamps in housings front and back, grab rails by the door
         box("light", (0.1, 0.06, 0.07), (s * 0.5, 0.22, 2.14), (0.95, 0.95, 0.9)),
         box("lightBack", (0.1, 0.06, 0.07), (s * 0.5, 1.18, 2.14), (0.95, 0.95, 0.9)),
+        box("lightHouse", (0.13, 0.05, 0.09), (s * 0.5, 0.26, 2.13), DARK),
+        box("lightHouse", (0.13, 0.05, 0.09), (s * 0.5, 1.14, 2.13), DARK),
         box("post", (0.07, 0.07, 0.98), (s * 0.56, 0.27, 1.58), YEL),
         box("post", (0.07, 0.07, 0.98), (s * 0.56, 1.13, 1.58), YEL),
         box("doorFrame", (0.04, 0.04, 0.9), (s * 0.57, 0.75, 1.58), YEL),
         box("cabLow", (0.04, 0.86, 0.2), (s * 0.565, 0.7, 1.19), YEL),
+        strut("grab", (s * 0.6, 0.33, 1.3), (s * 0.6, 0.33, 1.85), 0.014, DARK),
+        strut("grab", (s * 0.6, 1.07, 1.3), (s * 0.6, 1.07, 1.85), 0.014, DARK),
+        box("tailLamp", (0.1, 0.02, 0.06), (s * 0.43, 1.385, 0.95), (0.75, 0.05, 0.05)),
+        # blade: end plates on the moldboard's outline, a hardened bit at each corner
+        prism("bladeSide", blade_face(-1.625, 0.04, 0.82, 0.12, 0.065, 0.08), *sorted((1.0 * s, 1.03 * s)), YEL),
+        box("cornerBit", (0.2, 0.07, 0.12), (s * 0.9, -1.625, 0.07), STEEL, 0.01),
     ]
+    for i in range(5):
+        parts.append(box("louvre", (0.02, 0.07, 0.22), (s * 0.475, -0.85 + i * 0.16, 1.25), DARK))
+    for x in (0.3, 0.7):
+        parts.append(box("rib", (0.04, 0.08, 0.6), (s * x, -1.46, 0.43), DARK))
 parts += [
-    box("hull", (1.0, 2.25, 0.5), (0, 0.12, 0.78), YEL, 0.03),
+    prism("hull", [(-1.0, 0.6), (-1.05, 0.75), (-1.05, 1.05), (1.25, 1.05), (1.38, 0.9), (1.38, 0.62), (1.2, 0.5),
+                   (-0.85, 0.5)], -0.5, 0.5, YEL),
     box("belly", (0.9, 1.9, 0.12), (0, 0.15, 0.48), DARK),
     box("deck", (1.2, 1.0, 0.06), (0, 0.7, 1.06), DARK),
-    box("hood", (0.95, 1.12, 0.4), (0, -0.48, 1.25), YEL, 0.03),
-    box("grille", (0.8, 0.04, 0.32), (0, -1.05, 1.22), DARK),
-    box("vents", (0.96, 0.5, 0.04), (0, -0.4, 1.46), DARK),
+    prism("hood", [(-1.06, 1.05), (0.1, 1.05), (0.1, 1.46), (-0.9, 1.46), (-1.06, 1.34)], -0.47, 0.47, YEL),
+    box("vents", (0.7, 0.42, 0.02), (0, -0.4, 1.465), DARK),
+    # grille: a dark frame with steel bars inside a guard of steel tube
+    box("grille", (0.78, 0.03, 0.26), (0, -1.065, 1.18), DARK),
+    box("guardTop", (0.86, 0.05, 0.05), (0, -1.09, 1.33), STEEL),
+    box("guardLow", (0.86, 0.05, 0.05), (0, -1.09, 1.04), STEEL),
     strut("stack", (0.3, -0.62, 1.4), (0.3, -0.62, 1.95), 0.05, DARK),
-    box("rainCap", (0.13, 0.13, 0.03), (0.3, -0.62, 1.97), DARK),
+    box("rainCap", (0.13, 0.13, 0.02), (0.3, -0.62, 1.96), DARK),
+    cyl("precleaner", 0.07, 0.18, (-0.3, -0.55, 1.55), DARK, "Z", 12),
+    cyl("precleanerCap", 0.085, 0.03, (-0.3, -0.55, 1.655), STEEL, "Z", 12),
     box("cabLowF", (1.1, 0.04, 0.22), (0, 0.27, 1.2), YEL),
     box("cabLowB", (1.1, 0.04, 0.22), (0, 1.13, 1.2), YEL),
     box("roof", (1.26, 1.04, 0.09), (0, 0.7, 2.1), YEL, 0.02),
+    box("visor", (1.2, 0.1, 0.025), (0, 0.15, 2.07), YEL),
     box("roofRim", (1.18, 0.96, 0.04), (0, 0.7, 2.04), DARK),
-    box("blade", (2.0, 0.12, 0.62), (0, -1.53, 0.42), YEL, 0.02),
-    box("bladeTop", (2.0, 0.1, 0.14), (0, -1.6, 0.78), YEL, 0.02),
-    box("bladeEdge", (2.0, 0.16, 0.08), (0, -1.55, 0.04), STEEL),
-    box("bladeBack", (1.6, 0.08, 0.44), (0, -1.45, 0.42), DARK),
-    box("ripperFrame", (0.7, 0.4, 0.1), (0, 1.48, 0.62), DARK),
-    box("ripper", (0.1, 0.12, 0.62), (0, 1.62, 0.36), DARK),
-    box("ripperTip", (0.1, 0.14, 0.08), (0, 1.58, 0.07), STEEL),
-    strut("ripperCyl", (0, 1.35, 0.95), (0, 1.55, 0.67), 0.04, YEL),
+    # the blade: a curved moldboard with a steel cutting edge along the bottom
+    prism("blade", blade_face(-1.625, 0.04, 0.82, 0.12, 0.065, 0.05), -1.0, 1.0, YEL),
+    box("bladeEdge", (2.0, 0.06, 0.07), (0, -1.64, 0.035), STEEL),
+    box("bladeTopBar", (2.0, 0.05, 0.05), (0, -1.66, 0.79), DARK),
+    box("rib", (0.04, 0.08, 0.6), (0, -1.46, 0.43), DARK),
+    # ripper: two links each side from the hull back to a beam, one shank curving down and forward to a steel tip
+    strut("ripperLink", (0.3, 1.3, 0.85), (0.3, 1.485, 0.76), 0.035, DARK),
+    strut("ripperLink", (-0.3, 1.3, 0.85), (-0.3, 1.485, 0.76), 0.035, DARK),
+    strut("ripperLink", (0.3, 1.3, 0.56), (0.3, 1.485, 0.52), 0.035, DARK),
+    strut("ripperLink", (-0.3, 1.3, 0.56), (-0.3, 1.485, 0.52), 0.035, DARK),
+    box("ripperBeam", (0.72, 0.12, 0.34), (0, 1.525, 0.63), YEL, 0.02),
+    prism("ripper", [(1.52, 0.8), (1.68, 0.8), (1.66, 0.45), (1.58, 0.18), (1.46, 0.06), (1.43, 0.14), (1.52, 0.3),
+                     (1.54, 0.6)], -0.05, 0.05, DARK),
+    prism("ripperTip", [(1.46, 0.06), (1.36, 0.03), (1.34, 0.06), (1.43, 0.14)], -0.055, 0.055, STEEL),
+    strut("ripperCyl", (0, 1.3, 0.98), (0, 1.515, 0.8), 0.045, YEL),
 ]
+for x in (-0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3):
+    parts.append(box("grilleBar", (0.025, 0.03, 0.24), (x, -1.08, 1.18), STEEL))
 body = join(parts, "body")
 
 

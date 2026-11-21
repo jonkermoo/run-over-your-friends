@@ -108,18 +108,18 @@ car by that many studs.
 | **Semi Truck** | I Bull Bar | Front | big chrome bull bar round the grille | +20% WEIGHT, +1.5 REACH |
 | | II Big Stacks | Roof | tall chrome stacks, sun visor, roof air horns | +20% ACCEL, +10% SPEED |
 | | III Sweeper Trailer | Rear (trailer) | trailer side skirts with ram fins | trailer sweeps 3 studs wider each side |
-| **Bulldozer** | I Big Blade | Front | blade rebuilt wider and taller with side wings | +2.5 REACH, 4 studs wider, throws people 50% further |
-| | II Turbo Diesel | Roof | big exhaust stack and air intake on the hood | +30% SPEED, +25% ACCEL |
-| | III Ripper | Rear | rear ripper tooth on arms | +45% HANDLING (spins faster), hits count behind it too |
+| **Bulldozer** | I Big Blade | Front | a wider, taller curved U-blade: wings swung forward, teeth on the cutting edge, a spill guard on top | +2.5 REACH, 4 studs wider, throws people 50% further |
+| | II Turbo Diesel | Roof | twin stacks with heat shields and flap caps, a big precleaner bowl on the hood | +30% SPEED, +25% ACCEL |
+| | III Ripper | Rear | a three-shank ripper on a wide beam, curved shanks with steel tips | +45% HANDLING (spins faster), hits count behind it too |
 | **Monster Truck** | I Light Bar & Cage | Roof | roll cage over the bed, light bar on the roof | jumps pay 25% more |
 | | II Crusher Bumper | Front | toothed crusher bumper | +30% WEIGHT, +1 REACH |
 | | III Mega Tyres | Wheels | tyres 12% bigger, deeper treads, lift kit raised | +10% SPEED, bigger bounces |
 | **Supercar** | I Aero Nose | Front | deeper splitter with canards | +12% HANDLING |
 | | II Swan Wing | Rear | ducktail replaced by a tall swan-neck wing | +8% HANDLING, thruster lasts 25% longer |
 | | III Twin Turbo | Roof (engine deck) | louvred engine cover with twin intakes | +8% SPEED, thruster pushes 20% harder |
-| **Roadster** | I Aero Nose | Front | sharper nose with a splitter | +10% HANDLING |
-| | II Afterburner | Rear | bigger rear jet nozzle with a burner ring | rear jet pushes 20% harder and lasts 20% longer |
-| | III Flight Fins | Sides | fins along the sills | flies 20% faster and climbs 30% faster |
+| **Roadster** | I Aero Nose | Front | a carbon splitter following the curve of the nose, end plates and canards | +10% HANDLING |
+| | II Afterburner | Rear | a nozzle set into the rear in a body-coloured shroud, petals round a glowing core | rear jet pushes 20% harder and lasts 20% longer |
+| | III Flight Fins | Sides | swept wings off the sills with upturned tips, two small tail fins | flies 20% faster and climbs 30% faster |
 
 ## 4. Decals
 
