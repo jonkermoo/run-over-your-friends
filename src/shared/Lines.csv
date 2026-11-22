@@ -53,6 +53,8 @@ PodiumCame,YOU CAME {place}!  +{prize},,,¡QUEDASTE {place}!  +{prize},VOCÊ FIC
 PodiumYou,YOU: {place}  ({amount})  +{prize},,,TÚ: {place}  ({amount})  +{prize},VOCÊ: {place}  ({amount})  +{prize}
 PodiumPrize,{amount}  +{prize},,,{amount}  +{prize},{amount}  +{prize}
 EdgeDistance,{text} {m}M,,,{text} {m}M,{text} {m}M
+GuideStepTag,TUTORIAL {n}/{total},,,TUTORIAL {n}/{total},TUTORIAL {n}/{total}
+GuideStepBanner,STEP {n} OF {total},,,PASO {n} DE {total},PASSO {n} DE {total}
 GuideHits,Run over {goal} people!   {n} / {goal},,,¡Atropella a {goal} personas!   {n} / {goal},Atropele {goal} pessoas!   {n} / {goal}
 GuideSmash,Smash a building!   {n} / {goal} pieces,,,¡Rompe un edificio!   {n} / {goal} pedazos,Quebre um prédio!   {n} / {goal} pedaços
 GuideFirstGoal,First goal: run over {goal} people   {n} / {goal},,,Primera meta: atropella a {goal} personas   {n} / {goal},Primeira meta: atropele {goal} pessoas   {n} / {goal}

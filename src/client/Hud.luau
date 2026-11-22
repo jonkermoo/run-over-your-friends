@@ -608,6 +608,10 @@ goalsButton.Visible = false
 local inviteButton = tab("INVITE", 4)
 inviteButton.Name = "InviteButton"
 inviteButton.TextColor3 = C.pink
+-- gamepad: D-pad right puts the selection on the tabs (client/Pad)
+Pad.strip(tabRow, Enum.KeyCode.DPadRight, function()
+	return garageButton
+end)
 
 -- the open tab is painted yellow
 local function markTab(active: TextButton?)
@@ -2232,7 +2236,7 @@ RunService.RenderStepped:Connect(function()
 	local tipShown = guide ~= nil
 		and (guide:FindFirstChild("Tip") :: GuiObject?) ~= nil
 		and (guide:FindFirstChild("Tip") :: GuiObject).Visible
-	local keyboard = s.driving and not UserInputService.TouchEnabled
+	local keyboard = s.driving and not UserInputService.TouchEnabled and not Pad.console() -- keys, not pads
 	if s.driving and not wasDriving then
 		onDriveStart()
 	end
@@ -2339,11 +2343,13 @@ function Hud.start()
 	-- a new car of the day at UTC midnight
 	player:GetAttributeChangedSignal("CarOfDay"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("VehicleId"):Connect(refreshCards)
-	-- first visit: open the garage so the starter car is one click away
-	task.delay(2, function()
+	-- first visit: the server puts you in the starter car (server/Onboarding); if that hasn't happened by now,
+	-- open the garage so it's one click away
+	task.spawn(function()
 		while not player:GetAttribute("DataReady") do
 			task.wait(0.2)
 		end
+		task.wait(Onboarding.GarageFallback)
 		if not Drive.state.driving and player:GetAttribute("Tutorial") == 1 then
 			refreshCards()
 			open(garage)

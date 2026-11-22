@@ -12,6 +12,11 @@ return table.freeze({
 	StateCheckSeconds = 1,
 	-- a player flung by another player's car within this long counts as "just wrecked" when they leave
 	WreckedSeconds = 20,
+	-- out of the driver seat less than this long before leaving still counts as driving: leaving removes the
+	-- car (VehicleService) before the leave is logged, which stands the player up
+	SeatGraceSeconds = 2,
+	-- how long the server waits for a new character's Humanoid before it stops watching that character's seat
+	HumanoidWaitSeconds = 10,
 	-- the join is logged when the client says it's ready (with its device); no word by then, it's logged anyway
 	ReadyWaitSeconds = 120,
 	-- longest load time believed; anything longer is a bad report and dropped

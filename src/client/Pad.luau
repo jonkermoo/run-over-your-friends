@@ -164,6 +164,104 @@ function Pad.chip(parent: Instance, keys: { Enum.KeyCode }, word: string, color:
 	return f
 end
 
+-- a console player: the last input was a gamepad, or a gamepad is the only way in (no keyboard, no touch:
+-- before the first press GetLastInputType can still say None). Guide picks its hint wording by this.
+function Pad.console(): boolean
+	return Pad.usingGamepad()
+		or (
+			UserInputService.GamepadEnabled
+			and not UserInputService.KeyboardEnabled
+			and not UserInputService.TouchEnabled
+		)
+end
+
+-- a key that only acts when no button has the gamepad selection (with one selected, the D-pad moves it)
+local function shortcut(name: string, key: Enum.KeyCode, run: () -> boolean)
+	ContextActionService:BindAction(name, function(_, state)
+		if state ~= Enum.UserInputState.Begin or GuiService.SelectedObject ~= nil then
+			return Enum.ContextActionResult.Pass
+		end
+		return if run() then Enum.ContextActionResult.Sink else Enum.ContextActionResult.Pass
+	end, false, key)
+end
+
+-- the HUD's tab strip (GARAGE, STORE, GOALS, INVITE): `key` puts the gamepad selection on `first`, the D-pad
+-- or stick moves along the tabs, A opens one and B leaves the strip. A chip with the key's picture sits
+-- at the strip's start while a gamepad is connected.
+function Pad.strip(row: GuiObject, key: Enum.KeyCode, first: () -> GuiObject?)
+	row.SelectionGroup = true
+	row.SelectionBehaviorUp = Enum.SelectionBehavior.Stop
+	row.SelectionBehaviorDown = Enum.SelectionBehavior.Stop
+	row.SelectionBehaviorLeft = Enum.SelectionBehavior.Stop
+	row.SelectionBehaviorRight = Enum.SelectionBehavior.Stop
+	Pad.selectAll(row)
+	local chip = Pad.chip(row, { key }, "")
+	chip.Name = "PadMenuHint"
+	chip.LayoutOrder = 0
+	chip.Size = UDim2.fromOffset(0, 46)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.Parent = chip
+	shortcut("RoyfPadMenu", key, function()
+		local b = first()
+		if not (b and b.Visible) then
+			return false
+		end
+		GuiService.SelectedObject = b
+		return true
+	end)
+	-- B leaves the strip while one of its tabs is selected (B is boost in the car, so it's sunk then)
+	local bound = false
+	GuiService:GetPropertyChangedSignal("SelectedObject"):Connect(function()
+		local on = inside(GuiService.SelectedObject, row)
+		if on == bound then
+			return
+		end
+		bound = on
+		if on then
+			ContextActionService:BindActionAtPriority("RoyfPadMenuLeave", function(_, state)
+				if
+					state == Enum.UserInputState.Begin and inside(GuiService.SelectedObject, row)
+				then
+					GuiService.SelectedObject = nil
+				end
+				return Enum.ContextActionResult.Sink
+			end, false, PRIORITY, Enum.KeyCode.ButtonB)
+		else
+			ContextActionService:UnbindAction("RoyfPadMenuLeave")
+		end
+	end)
+end
+
+-- a button pressed with one gamepad key while it shows (the tutorial's SKIP), with the key's picture just
+-- left of it while a gamepad is connected
+function Pad.press(b: GuiButton, key: Enum.KeyCode, run: () -> ())
+	local icon = Instance.new("ImageLabel")
+	icon.Name = "PadKey"
+	icon.BackgroundTransparency = 1
+	icon.AnchorPoint = Vector2.new(1, 0.5)
+	icon.Position = UDim2.new(0, -4, 0.5, 0)
+	icon.Size = UDim2.fromOffset(22, 22)
+	icon.Image = UserInputService:GetImageForKeyCode(key)
+	icon.ZIndex = b.ZIndex
+	icon.Parent = b
+	Pad.hint(icon)
+	shortcut("RoyfPadPress" .. b.Name, key, function()
+		if not (b.Visible and b:FindFirstAncestorWhichIsA("LayerCollector")) then
+			return false
+		end
+		local shown: Instance? = b
+		while shown and shown:IsA("GuiObject") do
+			if not shown.Visible then
+				return false
+			end
+			shown = shown.Parent
+		end
+		run()
+		return true
+	end)
+end
+
 -- show a key hint (a "B close" chip) only while a gamepad is connected
 function Pad.hint(obj: GuiObject)
 	local function sync()

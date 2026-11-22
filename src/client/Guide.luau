@@ -23,6 +23,7 @@ local Rules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Drive = require(script.Parent.Drive)
+local Pad = require(script.Parent.Pad)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -287,7 +288,7 @@ cheer.SoundId = "rbxasset://sounds/electronicpingshort.wav"
 cheer.Volume = 0.8
 cheer.Parent = gui
 
-local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg)
+local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg, plain: boolean?)
 	cheer:Play()
 	local t = label(gui, "", Callouts.CheerSize, BOLD, GOLD)
 	say(t, title)
@@ -308,8 +309,8 @@ local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg
 	s.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop + math.floor(Callouts.CheerSize * 0.95))
 	Style.fitText(s, 16, 5)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	-- confetti from the top of the screen
-	for _ = 1, 70 do
+	-- confetti from the top of the screen (not for a plain banner, like a new tutorial step)
+	for _ = 1, if plain then 0 else 70 do
 		local c = Instance.new("Frame")
 		c.BorderSizePixel = 0
 		c.BackgroundColor3 = CONFETTI[math.random(1, #CONFETTI)]
@@ -593,7 +594,21 @@ local function vehicleTips(id: string)
 	tipsShown[id] = true
 	local touch = UserInputService.TouchEnabled
 	local text: string? = nil
-	if Vehicles.has(v, "Jet") then
+	if Pad.console() then
+		-- client/Drive's gamepad keys: B boost, X thruster, Y feature, LB/RB roll
+		if Vehicles.has(v, "Jet") then
+			text =
+				"Hold B to jet upward; let go and you drop. Pull the stick back to jet backwards, hold LB/RB to roll, hold X for the rear jet."
+		elseif Vehicles.has(v, "Thruster") then
+			text = "Press X for a thruster burst."
+		elseif Vehicles.has(v, "Taxi") then
+			text = "Press Y to yell TAXI! Someone will come running..."
+		elseif Vehicles.has(v, "Jingle") then
+			text = "Press Y to turn the jingle on or off. While it plays, everyone wants ice cream."
+		elseif Vehicles.has(v, "Cannon") then
+			text = "Hold Y to blast people off their feet. It sprays where the camera looks."
+		end
+	elseif Vehicles.has(v, "Jet") then
 		text = if touch
 			then "Hold FLY to jet upward; let go and you drop. Steer as normal; hold ROLL L/R to roll, hold BOOST for the rear jet."
 			else "Hold SHIFT to jet upward; let go and you drop. A/D steer, S jets backwards, hold Q/E to roll, hold R for the rear jet."
@@ -638,6 +653,24 @@ local function update()
 	end
 	if stepValue ~= lastStep then
 		lastStep = stepValue
+		-- you're in the tutorial: the card's tag counts the steps, and each step opens with a banner
+		local n, total = Rules.stepNumber(stepValue, Onboarding)
+		say(
+			tag,
+			if n
+				then Loc.msg("GuideStepTag", { n = tostring(n), total = tostring(total) })
+				else "TUTORIAL"
+		)
+		local title = Onboarding.StepTitles[stepValue]
+		if n and title then
+			task.delay(
+				Style.stage(Callouts.CheerHold),
+				showCelebrate,
+				Loc.msg("GuideStepBanner", { n = tostring(n), total = tostring(total) }),
+				title,
+				true
+			)
+		end
 		stepStarted = os.clock()
 		stepEntered = stepStarted
 	end
@@ -684,7 +717,12 @@ local function update()
 			pressTarget = garageButton
 		end
 		if stuck then
-			say(hintText, "Tap GARAGE at the top left, then SPAWN")
+			say(
+				hintText,
+				if Pad.console()
+					then "Press D-pad right, pick GARAGE with A, then SPAWN"
+					else "Tap GARAGE at the top left, then SPAWN"
+			)
 			hintText.Visible = true
 		end
 	elseif stepValue == Steps.Hits then
@@ -698,11 +736,13 @@ local function update()
 			glowGarage = true
 			say(hintText, "Spawn your car from the GARAGE")
 			hintText.Visible = stuck
-		elseif stuck then
+		elseif stuck or count == 0 then
+			-- you start in the car: how to drive shows from the start until the first hit
 			say(
 				hintText,
-				if touch
-					then "Use the thumbstick to drive at the arrow"
+				if Pad.console()
+					then "Hold RT to drive, steer with the left stick. Aim for the arrow!"
+					elseif touch then "Use the thumbstick to drive at the arrow"
 					else "Hold W to drive, A/D to steer. Aim for the arrow!"
 			)
 			hintText.Visible = true
@@ -906,11 +946,13 @@ function Guide.start()
 		claimBox.Visible = false
 		Net.waitFor("TutorialClaim"):FireServer()
 	end)
-	Style.onTap(skip, function()
+	local function skipStep()
 		skip.Visible = false
 		stepEntered = os.clock()
 		Net.waitFor("TutorialSkip"):FireServer(player:GetAttribute("Tutorial"))
-	end)
+	end
+	Style.onTap(skip, skipStep)
+	Pad.press(skip, Enum.KeyCode.DPadDown, skipStep) -- gamepad: D-pad down while SKIP shows
 	RunService.RenderStepped:Connect(update)
 end
 

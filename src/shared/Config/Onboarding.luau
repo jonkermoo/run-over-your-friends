@@ -28,6 +28,22 @@ return table.freeze({
 		[3] = Steps.Done,
 		[4] = Steps.Smash,
 	}),
+	-- the card's "TUTORIAL 1/5" tag and the "STEP 1 OF 5" banner count from this step; steps before it (the
+	-- spawn, done for you) share number 1
+	CountFrom = Steps.Hits,
+	-- the banner's line under "STEP n OF m" when a step starts (no entry: no banner)
+	StepTitles = table.freeze({
+		[Steps.Hits] = "HIT PEOPLE WITH YOUR CAR",
+		[Steps.Smash] = "SMASH A BUILDING",
+		[Steps.Goal] = "FINISH YOUR FIRST GOAL",
+		[Steps.Buy] = "BUY A NEW RIDE",
+		[Steps.Event] = "JOIN AN EVENT",
+	}),
+	-- first step: the server puts a new player in the starter car on its own (ad players decide in seconds)
+	AutoSpawnDelay = 1, -- seconds after the character and data are ready, so the character has landed
+	AutoSpawnTries = 5, -- a spawn can fail (character not ready, blocked spot): tries this many times
+	AutoSpawnRetry = 2, -- seconds between tries
+	GarageFallback = 12, -- seconds after the data loads: still not in a car, the client opens the garage
 	HitsGoal = 3,
 	HitsReward = 250,
 	SmashGoal = 5, -- building pieces

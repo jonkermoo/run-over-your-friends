@@ -9,6 +9,7 @@ export type Config = {
 	Retired: { [number]: number },
 	SmashGoal: number,
 	EventWait: number,
+	CountFrom: number,
 }
 
 -- what the player has done this session
@@ -41,6 +42,18 @@ function Rules.landing(step: number, facts: Facts, config: Config): (number, { n
 		step = Rules.after(step, config)
 	end
 	return step, passed
+end
+
+-- the step's number as the player sees it, and how many there are (steps before CountFrom share number 1);
+-- nil for a step not in Order (done, unknown)
+function Rules.stepNumber(step: number, config: Config): (number?, number)
+	local from = table.find(config.Order, config.CountFrom) or 1
+	local total = #config.Order - from + 1
+	local i = table.find(config.Order, step)
+	if not i then
+		return nil, total
+	end
+	return math.max(1, i - from + 1), total
 end
 
 function Rules.canSkip(step: number, config: Config): boolean
