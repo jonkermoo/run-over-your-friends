@@ -51,6 +51,14 @@ return function(check: (string, boolean) -> ())
 		act(true, false, false, Cfg.WreckedSeconds + 1) == "Driving"
 	)
 
+	check("driving: in the driver seat", Rules.wasDriving(true, nil, Cfg))
+	check("driving: never sat", not Rules.wasDriving(false, nil, Cfg))
+	check("driving: stood up by leaving (car removed)", Rules.wasDriving(false, 0, Cfg))
+	check(
+		"driving: got out a while ago",
+		not Rules.wasDriving(false, Cfg.SeatGraceSeconds + 1, Cfg)
+	)
+
 	check("players 1", Rules.countBucket(1, Cfg.PlayerBuckets) == "1")
 	check("players 2", Rules.countBucket(2, Cfg.PlayerBuckets) == "2")
 	check("players 3", Rules.countBucket(3, Cfg.PlayerBuckets) == "3-4")
