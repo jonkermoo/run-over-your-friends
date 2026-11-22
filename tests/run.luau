@@ -2997,6 +2997,38 @@ do
 		"drive hud: the jingle row says what G does next",
 		Rules.rows({ feature = "JINGLE", jingleOn = true })[6].label == "Jingle off"
 	)
+	local function padList(rows: { Rules.PadRow }): string
+		local list = {}
+		for _, r in rows do
+			table.insert(list, table.concat(r.keys, "+"))
+		end
+		return table.concat(list, ",")
+	end
+	local view = require("../src/shared/Config/Cockpit").pads[1]
+	check(
+		"drive hud: a pad lists the car's buttons and the menu",
+		padList(Rules.padRows({ view = view }))
+			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,DPadRight`
+	)
+	check(
+		"drive hud: the pad's unstuck row counts down",
+		Rules.padRows({ view = view, unstuckWait = 3 })[6].wait == 3
+	)
+	check(
+		"drive hud: a jet car's pad rows match Drive's bindings",
+		padList(Rules.padRows({ view = view, jet = true, thruster = true }))
+			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,ButtonB,ButtonL1+ButtonR1,ButtonL2,ButtonX,DPadRight`
+	)
+	check(
+		"drive hud: the pad's feature row is Y, the water aims with the camera",
+		Rules.padRows({ view = view, feature = "WATER" })[7].label == "Water (aim with camera)"
+			and Rules.padRows({ view = view, feature = "TAXI!" })[7].keys[1] == "ButtonY"
+	)
+	check(
+		"drive hud: D-pad down skips only while the tutorial runs",
+		Rules.padRows({ view = view, tutorial = true })[8].keys[1] == "DPadDown"
+			and #Rules.padRows({ view = view }) == 7
+	)
 	check(
 		"drive hud: the card is open on the first drives",
 		Rules.startsOpen(cfg.OpenDrives, false, cfg)
