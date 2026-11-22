@@ -302,7 +302,8 @@ local function palms(parent: Instance, props: Instance, beach: Beach): number
 		trunk.CanCollide = true
 		trunk.CanQuery = true
 		trunk.CanTouch = true
-		Greenery.place(palm, "PalmLeaves", base, nil, h, turn, leaves).Material = Enum.Material.Grass
+		Greenery.place(palm, "PalmLeaves", base, nil, h, turn, leaves).Material =
+			Enum.Material.Grass
 		palm.WorldPivot = CFrame.new(base) -- at its foot, where the car meets it (the server's reach check)
 		placed += 2
 		Pace.step()
