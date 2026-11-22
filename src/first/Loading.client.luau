@@ -1,10 +1,12 @@
 --!strict
 -- The loading cover. Runs from ReplicatedFirst before anything else, so it replaces Roblox's own loading
--- screen at once: a full screen in the "Road Paint" look (client/Style: asphalt, road yellow, hot pink,
--- Luckiest Guy) with the title, a little car driving along a progress road towards a blocky friend, and a
--- rotating tip. It covers the HUD and the bare terrain while the map streams in around the spawn plaza,
--- and goes when the character stands on a real floor (or after Config/Loading Timeout, whatever happens).
--- client/Style can't be required here (it isn't replicated yet), so the few colours it needs are copied.
+-- screen at once. It is drawn like real roadside signs on cracked asphalt: a yellow warning diamond (a car
+-- creeping up on a friend) with a FRIENDS AHEAD plaque on a punched steel post, the game's name, a green
+-- guide sign whose exit tab shows the percent and whose lines carry the status and a rotating tip, and a road
+-- along the bottom where a line-painting cart lays fresh double yellow over the faded old line as loading
+-- goes on. It covers the HUD and the bare terrain while the map streams in around the spawn plaza, and goes
+-- when the character stands on a real floor (or after Config/Loading Timeout, whatever happens first).
+-- client/Style can't be required here (it isn't replicated yet), so its colours and fonts are copied.
 
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
@@ -18,26 +20,66 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local INK = Color3.fromRGB(16, 16, 18)
-local ASPHALT = Color3.fromRGB(23, 23, 26)
-local ROAD = Color3.fromRGB(46, 46, 52)
+local ASPHALT = Color3.fromRGB(30, 30, 33)
+local PATCH = Color3.fromRGB(25, 25, 27)
+local CRACK = Color3.fromRGB(20, 20, 22)
+local ROAD = Color3.fromRGB(42, 42, 46)
+local EDGE_LINE = Color3.fromRGB(217, 217, 220)
+local SIGN_YELLOW = Color3.fromRGB(246, 196, 0)
+local TITLE_WHITE = Color3.fromRGB(244, 244, 246)
+local GUIDE_GREEN = Color3.fromRGB(0, 105, 62)
 local WHITE = Color3.fromRGB(255, 255, 255)
-local DIM = Color3.fromRGB(188, 188, 196)
-local YELLOW = Color3.fromRGB(255, 208, 0)
-local PINK = Color3.fromRGB(255, 46, 154)
-local RED = Color3.fromRGB(255, 46, 46)
-local BLUE = Color3.fromRGB(31, 107, 255)
-local GLASS = Color3.fromRGB(150, 220, 255)
-local SKIN = Color3.fromRGB(245, 205, 48)
-local LEGS = Color3.fromRGB(75, 151, 75)
+local TIP_WHITE = Color3.fromRGB(233, 243, 238)
+local STEEL = Color3.fromRGB(154, 156, 163)
+local STEEL_LIT = Color3.fromRGB(201, 203, 209)
+local STEEL_DARK = Color3.fromRGB(110, 112, 120)
+local BOLT = Color3.fromRGB(184, 186, 192)
+local BOLT_EDGE = Color3.fromRGB(85, 87, 94)
+local TANK = Color3.fromRGB(207, 209, 214)
+local CONE = Color3.fromRGB(255, 106, 0)
 local DISPLAY = Font.new("rbxasset://fonts/families/LuckiestGuy.json")
-local HEAVY = Font.new(
-	"rbxasset://fonts/families/Montserrat.json",
-	Enum.FontWeight.Heavy,
-	Enum.FontStyle.Italic
-)
+local OSWALD = "rbxasset://fonts/families/Oswald.json"
+local SIGN_BOLD = Font.new(OSWALD, Enum.FontWeight.SemiBold)
+local SIGN_MEDIUM = Font.new(OSWALD, Enum.FontWeight.Medium)
+local SIGN_TEXT = Font.new(OSWALD, Enum.FontWeight.Regular)
 
--- the scene is laid out on a 960 x 600 board, scaled to fit the screen
-local BOARD_W, BOARD_H = 960, 600
+-- The scene is laid out on a 960-wide board scaled to fit the screen: 540 tall on PCs and tablets, 444 on
+-- wide landscape phones, where the sign shrinks and the rest moves up. Road heights are board pixels.
+type Layout = {
+	height: number,
+	signBase: Vector2, -- where the sign post meets the ground
+	signScale: number,
+	title: Vector2,
+	titleSizes: { number },
+	guide: Vector2,
+	guideWidth: number,
+	guideHeight: number,
+	road: number,
+}
+local WIDE: Layout = {
+	height = 540,
+	signBase = Vector2.new(235, 510),
+	signScale = 1,
+	title = Vector2.new(440, 40),
+	titleSizes = { 74, 62 },
+	guide = Vector2.new(440, 214),
+	guideWidth = 470,
+	guideHeight = 168,
+	road = 96,
+}
+local PHONE: Layout = {
+	height = 444,
+	signBase = Vector2.new(205, 390),
+	signScale = 0.76,
+	title = Vector2.new(410, 22),
+	titleSizes = { 66, 56 },
+	guide = Vector2.new(410, 150),
+	guideWidth = 510,
+	guideHeight = 150,
+	road = 80,
+}
+local PHONE_ASPECT = 1.9 -- screens at least this much wider than tall use the phone layout
+local BOARD_W = 960
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Loading"
@@ -46,15 +88,41 @@ gui.ResetOnSpawn = false
 gui.DisplayOrder = 10000
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local function box(parent: Instance, color: Color3, size: UDim2, pos: UDim2, z: number?): Frame
+local function box(
+	parent: Instance,
+	color: Color3,
+	w: number,
+	h: number,
+	x: number,
+	y: number
+): Frame
 	local f = Instance.new("Frame")
 	f.BackgroundColor3 = color
 	f.BorderSizePixel = 0
-	f.Size = size
-	f.Position = pos
-	f.ZIndex = z or 1
+	f.Size = UDim2.fromOffset(w, h)
+	f.Position = UDim2.fromOffset(x, y)
 	f.Parent = parent
 	return f
+end
+
+local function holder(parent: Instance, w: number, h: number): Frame
+	local f = box(parent, INK, w, h, 0, 0)
+	f.BackgroundTransparency = 1
+	return f
+end
+
+local function round(obj: GuiObject, radius: number)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = if radius < 1 then UDim.new(radius, 0) else UDim.new(0, radius)
+	c.Parent = obj
+end
+
+local function stroke(obj: GuiObject, color: Color3, thickness: number)
+	local s = Instance.new("UIStroke")
+	s.Color = color
+	s.Thickness = thickness
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.Parent = obj
 end
 
 local function text(parent: Instance, s: string, font: Font, size: number, color: Color3): TextLabel
@@ -64,149 +132,262 @@ local function text(parent: Instance, s: string, font: Font, size: number, color
 	l.Text = s
 	l.TextSize = size
 	l.TextColor3 = color
+	l.TextXAlignment = Enum.TextXAlignment.Left
 	l.Parent = parent
 	return l
 end
 
-local function stroke(obj: Instance, thickness: number)
-	local s = Instance.new("UIStroke")
-	s.Color = INK
-	s.Thickness = thickness
-	s.LineJoinMode = Enum.LineJoinMode.Miter
-	s.Parent = obj
-end
-
-local cover = box(gui, ASPHALT, UDim2.fromScale(1, 1), UDim2.new(), 1)
+local cover = box(gui, ASPHALT, 0, 0, 0, 0)
+cover.Size = UDim2.fromScale(1, 1)
 cover.Active = true -- swallow taps while it's up
 
--- a yellow road-paint band along the top and bottom edges, with dashes, so the screen reads as a road sign
-for _, top in { true, false } do
-	local band =
-		box(cover, YELLOW, UDim2.new(1, 0, 0, 14), UDim2.fromScale(0, if top then 0 else 1), 2)
-	band.AnchorPoint = Vector2.new(0, if top then 0 else 1)
+-- worn asphalt: a couple of tar patches and sealed cracks
+for _, p in { { 0.58, 0.06, 0.14, 0.09 }, { 0.04, 0.70, 0.09, 0.06 } } do
+	local patch = box(cover, PATCH, 0, 0, 0, 0)
+	patch.Size = UDim2.fromScale(p[3], p[4])
+	patch.Position = UDim2.fromScale(p[1], p[2])
+end
+for _, c in { { 0.13, 0.13, 0.22, 8 }, { 0.46, 0.47, 0.12, -14 }, { 0.86, 0.11, 0.16, 21 } } do
+	local crack = box(cover, CRACK, 0, 3, 0, 0)
+	crack.AnchorPoint = Vector2.new(0.5, 0.5)
+	crack.Size = UDim2.new(c[3], 0, 0, 3)
+	crack.Position = UDim2.fromScale(c[1], c[2])
+	crack.Rotation = c[4]
 end
 
-local board = box(cover, ASPHALT, UDim2.fromOffset(BOARD_W, BOARD_H), UDim2.fromScale(0.5, 0.5), 2)
+local board = holder(cover, BOARD_W, WIDE.height)
 board.AnchorPoint = Vector2.new(0.5, 0.5)
-board.BackgroundTransparency = 1
-local fit = Instance.new("UIScale")
-fit.Parent = board
+board.Position = UDim2.fromScale(0.5, 0.5)
+local boardFit = Instance.new("UIScale")
+boardFit.Parent = board
+
+---------------------------------------------------------------- the warning sign
+
+-- The sign is drawn in the top half of a holder twice its height, so the holder's centre (where Roblox turns
+-- it) is the foot of the post: knocking the sign crooked turns it about its base.
+local SIGN_W, SIGN_H = 330, 480
+local sign = holder(board, SIGN_W, SIGN_H * 2)
+sign.AnchorPoint = Vector2.new(0.5, 0.5)
+sign.Rotation = -2
+local signFit = Instance.new("UIScale")
+signFit.Parent = sign
+
+-- the punched steel post: lit and shaded edges, a hole every 22 px
+local post = box(sign, STEEL, 24, 220, 153, 260)
+box(post, STEEL_LIT, 4, 220, 0, 0)
+box(post, STEEL_DARK, 4, 220, 20, 0)
+for i = 0, 9 do
+	local hole = box(post, ROAD, 7, 7, 8.5, 6 + i * 22)
+	round(hole, 0.5)
+end
+
+-- the diamond: reflective yellow, rounded corners, a thin black edge and the black border line inset
+local shade = box(sign, INK, 234, 234, 53, 47)
+shade.Rotation = 45
+shade.BackgroundTransparency = 0.65
+round(shade, 16)
+local diamond = box(sign, SIGN_YELLOW, 234, 234, 48, 48)
+diamond.Rotation = 45
+round(diamond, 16)
+stroke(diamond, INK, 2)
+local inset = holder(diamond, 208, 208)
+inset.Position = UDim2.fromOffset(13, 13)
+round(inset, 8)
+stroke(inset, INK, 6)
+for _, y in { 30, 286 } do
+	local bolt = box(sign, BOLT, 14, 14, 158, y)
+	round(bolt, 0.5)
+	stroke(bolt, BOLT_EDGE, 2)
+end
+
+-- the symbol: a car on the left, a blocky friend with their arms up on the right
+local PICTO = Vector2.new(68, 208) -- the symbol's bottom-left corner on the sign
+local car = holder(sign, 96, 52)
+car.AnchorPoint = Vector2.new(0, 1)
+local carBody = box(car, INK, 96, 22, 0, 19)
+round(carBody, 6)
+local carCab = box(car, INK, 52, 20, 20, 2)
+round(carCab, 10)
+carCab.ZIndex = 0 -- under the body, which hides its lower corners
+for _, x in { 12, 64 } do
+	local wheel = box(car, INK, 22, 22, x, 30)
+	round(wheel, 0.5)
+	stroke(wheel, SIGN_YELLOW, 3) -- the gap between tyre and body
+end
+local function carAt(p: number): UDim2
+	return UDim2.fromOffset(PICTO.X + p * 44, PICTO.Y)
+end
+car.Position = carAt(0)
+
+local FRIEND_AT = Vector2.new(PICTO.X + 152, PICTO.Y - 80)
+local friend = holder(sign, 40, 80)
+friend.Position = UDim2.fromOffset(FRIEND_AT.X, FRIEND_AT.Y)
+box(friend, INK, 18, 18, 11, 0)
+box(friend, INK, 22, 28, 9, 21)
+box(friend, INK, 7, 24, -2, 8).Rotation = -28
+box(friend, INK, 7, 24, 35, 8).Rotation = 28
+box(friend, INK, 9, 30, 10, 50)
+box(friend, INK, 9, 30, 21, 50)
+
+-- the plaque under the diamond
+local plaque = box(sign, SIGN_YELLOW, 220, 62, 55, 346)
+round(plaque, 8)
+stroke(plaque, INK, 2)
+local plaqueLine = holder(plaque, 202, 44)
+plaqueLine.Position = UDim2.fromOffset(9, 9)
+round(plaqueLine, 4)
+stroke(plaqueLine, INK, 4)
+local plaqueText = text(plaque, "FRIENDS AHEAD", SIGN_BOLD, 29, INK)
+plaqueText.Size = UDim2.fromScale(1, 1)
+plaqueText.TextXAlignment = Enum.TextXAlignment.Center
+
+---------------------------------------------------------------- title and guide sign
+
+local titleLines = {
+	text(board, "RUN OVER", DISPLAY, 74, SIGN_YELLOW),
+	text(board, "YOUR FRIENDS!", DISPLAY, 62, TITLE_WHITE),
+}
+
+local guide = holder(board, WIDE.guideWidth, 42 + WIDE.guideHeight)
+-- the exit tab on top carries the percent; its lower edge hides behind the sign
+local tab = box(guide, GUIDE_GREEN, 126, 58, 0, 0)
+round(tab, 10)
+local tabLine = holder(tab, 112, 58)
+tabLine.Position = UDim2.fromOffset(7, 7)
+round(tabLine, 6)
+stroke(tabLine, WHITE, 3)
+local pctLabel = text(tab, "0%", SIGN_MEDIUM, 30, WHITE)
+pctLabel.AutoLocalize = false
+pctLabel.Size = UDim2.fromOffset(126, 42)
+pctLabel.Position = UDim2.fromOffset(0, 2)
+pctLabel.TextXAlignment = Enum.TextXAlignment.Center
+local green = box(guide, GUIDE_GREEN, WIDE.guideWidth, WIDE.guideHeight, 0, 42)
+round(green, 12)
+local greenLine = holder(green, 0, 0)
+greenLine.Position = UDim2.fromOffset(9, 9)
+greenLine.Size = UDim2.new(1, -18, 1, -18)
+round(greenLine, 7)
+stroke(greenLine, WHITE, 4)
+-- an "ahead" arrow: a shaft and a solid head built from two turned bars
+local arrow = holder(green, 40, 62)
+arrow.AnchorPoint = Vector2.new(0, 0.5)
+box(arrow, WHITE, 12, 46, 14, 16)
+box(arrow, WHITE, 30, 12, -3, 12).Rotation = -45
+box(arrow, WHITE, 30, 12, 13, 12).Rotation = 45
+local status = text(green, "LOADING THE CITY", SIGN_BOLD, 40, WHITE)
+local tip = text(green, "", SIGN_TEXT, 23, TIP_WHITE)
+tip.TextWrapped = true
+tip.TextYAlignment = Enum.TextYAlignment.Top
+
+---------------------------------------------------------------- the road
+
+-- Full width along the bottom of the screen, in board pixels: its own UIScale matches the board's.
+local road = box(cover, ROAD, 0, WIDE.road, 0, 0)
+road.AnchorPoint = Vector2.new(0, 1)
+road.Position = UDim2.fromScale(0, 1)
+local roadFit = Instance.new("UIScale")
+roadFit.Parent = road
+local edgeLine = box(road, EDGE_LINE, 0, 5, 0, 12)
+edgeLine.Size = UDim2.new(1, 0, 0, 5)
+local function doubleYellow(parent: Instance, transparency: number): { Frame }
+	local out = {}
+	for _, dy in { 0, 9 } do
+		local strip = box(parent, SIGN_YELLOW, 0, 5, 0, dy)
+		strip.Size = UDim2.new(1, 0, 0, 5)
+		strip.BackgroundTransparency = transparency
+		table.insert(out, strip)
+	end
+	return out
+end
+local oldLine = holder(road, 0, 14)
+oldLine.Size = UDim2.new(1, 0, 0, 14)
+doubleYellow(oldLine, 0.82)
+local freshLine = holder(road, 0, 14)
+doubleYellow(freshLine, 0)
+
+-- the striping cart, and two cones behind it
+local cart = box(road, SIGN_YELLOW, 52, 30, 0, 0)
+round(cart, 4)
+box(cart, TANK, 18, 16, 6, -14).ZIndex = 0
+for _, x in { 4, 36 } do
+	local w = box(cart, INK, 12, 12, x, 24)
+	round(w, 0.5)
+end
+local cones: { Frame } = {}
+for _ = 1, 2 do
+	local cone = holder(road, 22, 30)
+	box(cone, CONE, 9, 10, 6.5, 0)
+	box(cone, WHITE, 13, 5, 4.5, 10)
+	box(cone, CONE, 16, 11, 3, 15)
+	box(cone, CONE, 22, 4, 0, 26)
+	table.insert(cones, cone)
+end
+
+local layout: Layout = WIDE
+local progressShown = 0
+local function placeRoad(p: number)
+	local lineY = if layout == PHONE then 40 else 48
+	freshLine.Size = UDim2.new(p, 0, 0, 14)
+	freshLine.Position = UDim2.fromOffset(0, lineY)
+	oldLine.Position = UDim2.fromOffset(0, lineY)
+	cart.Position = UDim2.new(p, -26, 0, lineY - 18)
+	for i, cone in cones do
+		cone.Position = UDim2.new(p, -80 - (i - 1) * 70, 0, lineY - 24)
+	end
+end
+
+local function applyLayout(l: Layout)
+	layout = l
+	board.Size = UDim2.fromOffset(BOARD_W, l.height)
+	sign.Position = UDim2.fromOffset(l.signBase.X, l.signBase.Y)
+	signFit.Scale = l.signScale
+	local y = l.title.Y
+	for i, line in titleLines do
+		local size = l.titleSizes[i]
+		line.TextSize = size
+		line.Size = UDim2.fromOffset(BOARD_W - l.title.X - 20, size)
+		line.Position = UDim2.fromOffset(l.title.X, y)
+		y += size
+	end
+	guide.Position = UDim2.fromOffset(l.guide.X, l.guide.Y)
+	guide.Size = UDim2.fromOffset(l.guideWidth, 42 + l.guideHeight)
+	tab.Position = UDim2.fromOffset(l.guideWidth - 22 - 126, 0)
+	green.Size = UDim2.fromOffset(l.guideWidth, l.guideHeight)
+	arrow.Position = UDim2.fromOffset(28, l.guideHeight / 2)
+	status.Position = UDim2.fromOffset(88, 20)
+	status.Size = UDim2.fromOffset(l.guideWidth - 116, 44)
+	tip.Position = UDim2.fromOffset(88, 72)
+	tip.Size = UDim2.fromOffset(l.guideWidth - 116, l.guideHeight - 86)
+	edgeLine.Position = UDim2.fromOffset(0, if l == PHONE then 9 else 12)
+	placeRoad(progressShown)
+end
 
 local function refit()
 	local cam = workspace.CurrentCamera
-	if cam then
-		local v = cam.ViewportSize
-		fit.Scale = math.clamp(math.min(v.X / (BOARD_W + 40), v.Y / (BOARD_H + 40)), 0.3, 1.6)
+	if not cam then
+		return
 	end
+	local v = cam.ViewportSize
+	if v.X <= 0 or v.Y <= 0 then
+		return
+	end
+	local l = if v.X / v.Y >= PHONE_ASPECT then PHONE else WIDE
+	if l ~= layout or board.Size.Y.Offset ~= l.height then
+		applyLayout(l)
+	end
+	local s = math.clamp(math.min(v.X / BOARD_W, v.Y / l.height), 0.3, 2)
+	boardFit.Scale = s
+	roadFit.Scale = s
+	road.Size = UDim2.fromOffset(v.X / s, l.road)
 end
+applyLayout(WIDE)
 refit()
 local cam = workspace.CurrentCamera
 local camWatch = cam and cam:GetPropertyChangedSignal("ViewportSize"):Connect(refit)
 
--- title: two lines, yellow then pink, tilted a touch, each with a hard ink shadow
-local title = Instance.new("Frame")
-title.BackgroundTransparency = 1
-title.Size = UDim2.fromOffset(BOARD_W, 230)
-title.Position = UDim2.fromOffset(0, 20)
-title.Rotation = -3
-title.ZIndex = 3
-title.Parent = board
-local function titleLine(s: string, y: number, size: number, color: Color3)
-	for _, shadow in { true, false } do
-		local l = text(title, s, DISPLAY, size, if shadow then INK else color)
-		l.Size = UDim2.new(1, 0, 0, size)
-		l.Position = UDim2.fromOffset(if shadow then 7 else 0, y + (if shadow then 7 else 0))
-		l.ZIndex = if shadow then 3 else 4
-		if not shadow then
-			stroke(l, 4)
-		end
-	end
-end
-titleLine("RUN OVER", 10, 96, YELLOW)
-titleLine("YOUR FRIENDS!", 108, 104, PINK)
-
--- the progress road: dark asphalt, yellow dashes down the middle, a pink skid trail behind the car
-local ROAD_X, ROAD_Y, ROAD_W, ROAD_H = 40, 400, BOARD_W - 80, 64
-local road = box(board, ROAD, UDim2.fromOffset(ROAD_W, ROAD_H), UDim2.fromOffset(ROAD_X, ROAD_Y), 3)
-stroke(road, 4)
-for i = 0, 16 do
-	box(road, YELLOW, UDim2.fromOffset(28, 6), UDim2.fromOffset(16 + i * 50, ROAD_H / 2 - 3), 4)
-end
-local trail = box(road, PINK, UDim2.fromOffset(0, 10), UDim2.fromOffset(0, ROAD_H - 10), 5)
-
--- the friend waiting at the end of the road: a blocky avatar, yellow head, blue shirt, green legs
-local FRIEND_X = ROAD_X + ROAD_W - 70
-local friend = Instance.new("Frame")
-friend.BackgroundTransparency = 1
-friend.Size = UDim2.fromOffset(44, 96)
-friend.AnchorPoint = Vector2.new(0.5, 1)
-friend.Position = UDim2.fromOffset(FRIEND_X, ROAD_Y + 26)
-friend.ZIndex = 6
-friend.Parent = board
-stroke(box(friend, SKIN, UDim2.fromOffset(26, 26), UDim2.fromOffset(9, 0), 7), 3)
-stroke(box(friend, BLUE, UDim2.fromOffset(32, 34), UDim2.fromOffset(6, 28), 7), 3)
-stroke(box(friend, SKIN, UDim2.fromOffset(9, 30), UDim2.fromOffset(-5, 28), 6), 3)
-stroke(box(friend, SKIN, UDim2.fromOffset(9, 30), UDim2.fromOffset(40, 28), 6), 3)
-stroke(box(friend, LEGS, UDim2.fromOffset(14, 34), UDim2.fromOffset(7, 62), 6), 3)
-stroke(box(friend, LEGS, UDim2.fromOffset(14, 34), UDim2.fromOffset(23, 62), 6), 3)
-local face = text(friend, ":O", DISPLAY, 16, INK)
-face.Size = UDim2.fromOffset(26, 26)
-face.Position = UDim2.fromOffset(9, 2)
-face.Rotation = 90
-face.ZIndex = 8
-
--- the car: a red cartoon hatchback, wheels and all; it drives along the road as loading goes on
-local CAR_W, CAR_H = 150, 84
-local car = Instance.new("Frame")
-car.BackgroundTransparency = 1
-car.Size = UDim2.fromOffset(CAR_W, CAR_H)
-car.AnchorPoint = Vector2.new(0, 1)
-car.ZIndex = 8
-car.Parent = board
-stroke(box(car, RED, UDim2.fromOffset(CAR_W, 40), UDim2.fromOffset(0, 26), 9), 4)
-stroke(box(car, RED, UDim2.fromOffset(84, 32), UDim2.fromOffset(24, 0), 9), 4)
-box(car, GLASS, UDim2.fromOffset(34, 22), UDim2.fromOffset(32, 6), 10)
-box(car, GLASS, UDim2.fromOffset(30, 22), UDim2.fromOffset(72, 6), 10)
-box(car, YELLOW, UDim2.fromOffset(14, 10), UDim2.fromOffset(CAR_W - 16, 34), 10) -- headlight
-local wheels: { Frame } = {}
-for _, x in { 20, CAR_W - 52 } do
-	local w = box(car, INK, UDim2.fromOffset(34, 34), UDim2.fromOffset(x, CAR_H - 34), 11)
-	local round = Instance.new("UICorner")
-	round.CornerRadius = UDim.new(0.5, 0)
-	round.Parent = w
-	local hub = box(w, DIM, UDim2.fromOffset(12, 12), UDim2.fromOffset(11, 11), 12)
-	hub.Rotation = 45
-	table.insert(wheels, w)
-end
-local CAR_START = ROAD_X + 8
-local CAR_END = FRIEND_X - 22 - CAR_W -- the bumper just touching the friend
-local function carAt(p: number): UDim2
-	return UDim2.fromOffset(CAR_START + (CAR_END - CAR_START) * p, ROAD_Y + 22)
-end
-car.Position = carAt(0)
-
-local bonk = text(board, "BONK!", DISPLAY, 70, YELLOW)
-bonk.Size = UDim2.fromOffset(260, 80)
-bonk.AnchorPoint = Vector2.new(0.5, 0.5)
-bonk.Position = UDim2.fromOffset(FRIEND_X - 40, ROAD_Y - 120)
-bonk.Rotation = 10
-bonk.ZIndex = 12
-bonk.Visible = false
-stroke(bonk, 5)
-
-local status = text(board, "LOADING THE CITY...", DISPLAY, 34, WHITE)
-status.Size = UDim2.fromOffset(BOARD_W, 40)
-status.Position = UDim2.fromOffset(0, 286)
-status.ZIndex = 4
-stroke(status, 3)
-
-local tip = text(board, "", HEAVY, 26, DIM)
-tip.Size = UDim2.fromOffset(BOARD_W - 80, 40)
-tip.Position = UDim2.fromOffset(40, 500)
-tip.TextWrapped = true
-tip.ZIndex = 4
-
 gui.Parent = playerGui
+
+---------------------------------------------------------------- loading
 
 -- Everything after this needs the game's settings, which arrive with the first replication.
 if not game:IsLoaded() then
@@ -222,55 +403,35 @@ if not (configModule and configModule:IsA("ModuleScript")) then
 	return
 end
 local Config = require(configModule) :: any
--- the translated progress line (src/shared/Loc); plain English if it is missing
-local locModule = sharedFolder:FindFirstChild("Loc")
-local Loc = if locModule and locModule:IsA("ModuleScript") then require(locModule) :: any else nil
 
 local done = false
 local progress = 0
+local paint = Instance.new("NumberValue") -- the painted share of the road, eased by tweens
+paint.Changed:Connect(function(p: number)
+	progressShown = p
+	placeRoad(p)
+end)
 local function reach(step: string)
 	local p = Config.Steps[step]
 	if done or not p or p <= progress then
 		return
 	end
 	progress = p
-	TweenService:Create(
-		car,
-		TweenInfo.new(Config.CarDrive, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Position = carAt(p) }
-	):Play()
-	TweenService:Create(
-		trail,
-		TweenInfo.new(Config.CarDrive, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{ Size = UDim2.fromOffset(carAt(p).X.Offset - ROAD_X + 20, 10) }
-	):Play()
-	local pct = math.floor(p * 100 + 0.5)
-	status.AutoLocalize = Loc == nil
-	status.Text = if Loc
-		then Loc.text("LoadingPct", { pct = pct })
-		else string.format("LOADING THE CITY... %d%%", pct)
+	local ease = TweenInfo.new(Config.Advance, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(car, ease, { Position = carAt(p) }):Play()
+	TweenService:Create(paint, ease, { Value = p }):Play()
+	pctLabel.Text = string.format("%d%%", math.floor(p * 100 + 0.5))
 end
 reach("start")
 reach("game")
 
--- the tips rotate, starting from a random one; the wheels spin and the car bobs while it waits
+-- the tips rotate, starting from a random one
 task.spawn(function()
 	local i = math.random(1, #Config.Tips)
 	while not done do
 		tip.Text = Config.Tips[i]
 		i = i % #Config.Tips + 1
 		task.wait(Config.TipEvery)
-	end
-end)
-task.spawn(function()
-	local t = 0
-	while not done do
-		t += task.wait()
-		for _, w in wheels do
-			w.Rotation = (t * 360) % 360
-		end
-		car.Rotation = math.sin(t * 14) * 1.5
-		friend.Rotation = math.sin(t * 5) * 4
 	end
 end)
 
@@ -316,40 +477,33 @@ if left > 0 then
 	task.wait(left)
 end
 
--- the finish: the car hits the friend, the friend flies off with a BONK!, then the cover fades
+-- the finish: the car taps the friend off the sign, the sign is knocked crooked on its post, LET'S GO!
 done = true
 progress = 1
-status.AutoLocalize = true
+pctLabel.Text = "100%"
 status.Text = "LET'S GO!"
+local F = Config.Finish
+TweenService:Create(paint, TweenInfo.new(F.hit), { Value = 1 }):Play()
+TweenService:Create(car, TweenInfo.new(F.hit, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+	Position = UDim2.fromOffset(PICTO.X + 58, PICTO.Y),
+}):Play()
+task.wait(F.hit)
+local fly = TweenInfo.new(F.fly, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+TweenService:Create(friend, fly, {
+	Position = UDim2.fromOffset(FRIEND_AT.X + 120, FRIEND_AT.Y - 90),
+	Rotation = 100,
+}):Play()
+for _, part in friend:GetChildren() do
+	if part:IsA("Frame") then
+		TweenService:Create(part, fly, { BackgroundTransparency = 1 }):Play()
+	end
+end
 TweenService
-	:Create(car, TweenInfo.new(Config.Finish.hit, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Position = carAt(1),
-		Rotation = 0,
+	:Create(sign, TweenInfo.new(F.knock, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Rotation = F.knockAngle,
 	})
 	:Play()
-TweenService:Create(
-	trail,
-	TweenInfo.new(Config.Finish.hit),
-	{ Size = UDim2.fromOffset(carAt(1).X.Offset - ROAD_X + 20, 10) }
-):Play()
-task.wait(Config.Finish.hit)
-bonk.Visible = true
-TweenService
-	:Create(
-		friend,
-		TweenInfo.new(Config.Finish.fly, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-		{
-			Position = UDim2.fromOffset(FRIEND_X + 140, ROAD_Y - 260),
-			Rotation = 400,
-		}
-	)
-	:Play()
-TweenService:Create(
-	bonk,
-	TweenInfo.new(Config.Finish.pop, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-	{ TextSize = 96 }
-):Play()
-task.wait(Config.Finish.hold)
+task.wait(F.hold)
 
 -- fade every piece out together
 local fade = TweenInfo.new(Config.Fade, Enum.EasingStyle.Quad, Enum.EasingDirection.In)

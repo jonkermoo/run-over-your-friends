@@ -1,6 +1,6 @@
 --!strict
--- The loading cover (ReplicatedFirst/Loading): a full screen in the "Road Paint" look that hides the bare
--- terrain and the HUD while the map streams in around the spawn plaza, then fades away.
+-- The loading cover (ReplicatedFirst/Loading): roadside signs on asphalt that hide the bare terrain and the HUD
+-- while the map streams in around the spawn plaza, then fade away.
 -- Seconds unless noted.
 
 return table.freeze({
@@ -10,15 +10,16 @@ return table.freeze({
 	StreamTimeout = 10, -- the longest one RequestStreamAroundAsync call may take before we stop waiting on it
 	GroundDepth = 40, -- studs below the character to look for a streamed-in floor part (not terrain)
 	TipEvery = 3, -- a new tip line this often
-	CarDrive = 0.35, -- the little car's ease along the progress road as each step finishes
-	-- the finish: the car hits the friend, who flies off with a BONK!, then the fade starts
+	Advance = 0.35, -- the ease of the fresh paint line and the car on the sign as each step finishes
+	-- the finish: the car taps the friend off the sign, the sign is knocked crooked, then the fade starts
 	Finish = table.freeze({
-		hit = 0.2, -- the last dash to the friend
-		fly = 0.7, -- the friend flying off
-		pop = 0.3, -- the BONK! growing
-		hold = 0.35, -- before the fade
+		hit = 0.2, -- the car's last push into the friend
+		fly = 0.45, -- the friend tumbling off the sign
+		knock = 0.35, -- the sign swinging crooked on its post
+		knockAngle = 11, -- degrees it ends up leaning
+		hold = 0.6, -- from the hit to the start of the fade
 	}),
-	-- how far along the progress road each step puts the car (0..1)
+	-- how much of the road each step has painted (0..1)
 	Steps = table.freeze({
 		start = 0.08,
 		game = 0.3, -- the game's own scripts and settings arrived
