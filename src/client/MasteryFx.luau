@@ -58,6 +58,8 @@ gain.Position = UDim2.new(0.5, 0, 1, -130)
 gain.Size = UDim2.fromOffset(200, 22)
 gain.Visible = false
 Style.outline(gain, 2)
+-- the outline fades with the text, or a bare ink border is left hanging after the number goes
+local gainStroke = gain:FindFirstChildOfClass("UIStroke") :: UIStroke
 
 local shownUntil = 0
 
@@ -72,15 +74,12 @@ local function show(vehicleId: string, points: number, total: number)
 	plate.Visible = true
 	gain.Visible = true
 	gain.TextTransparency = 0
+	gainStroke.Transparency = 0
 	shownUntil = os.clock() + Config.PopupSeconds
 	local mine = shownUntil
-	TweenService:Create(
-		gain,
-		TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.6),
-		{
-			TextTransparency = 1,
-		}
-	):Play()
+	local fade = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.6)
+	TweenService:Create(gain, fade, { TextTransparency = 1 }):Play()
+	TweenService:Create(gainStroke, fade, { Transparency = 1 }):Play()
 	task.delay(Config.PopupSeconds, function()
 		if shownUntil == mine then
 			plate.Visible = false
