@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
+local BoardHidden = require(ReplicatedStorage.Shared.Config.BoardHidden)
 local Config = require(ReplicatedStorage.Shared.Config.Leaderboards)
 local Lb = require(ReplicatedStorage.Shared.Rules.Leaderboards)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -21,6 +22,12 @@ local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local ChampionService = require(script.Parent.ChampionService)
 local Data = require(script.Parent.Data)
 local NpcService = require(script.Parent.NpcService)
+
+-- everyone kept off the boards and the podium: both hidden lists
+local HIDDEN: { [number]: boolean } = table.clone(Config.Hidden)
+for id, yes in BoardHidden do
+	HIDDEN[id] = yes
+end
 
 local LeaderboardService = {}
 
@@ -153,7 +160,7 @@ local function readTop(ds: OrderedDataStore?, count: number): { Lb.Entry }
 			end
 		end
 	end
-	entries = Lb.visible(entries, Config.Hidden)
+	entries = Lb.visible(entries, HIDDEN)
 	-- names only for the rows a board shows (the rest only count for ranks): a web call each, cached
 	for i = 1, math.min(#entries, Config.Top) do
 		if entries[i].name == "" then
@@ -190,7 +197,7 @@ local function merged(): { [string]: { Lb.Entry } }
 		end
 		for _, p in Players:GetPlayers() do
 			local s = statsOf(p)
-			if s and not Config.Hidden[p.UserId] then
+			if s and not HIDDEN[p.UserId] then
 				local v = math.floor(Lb.value(s, board.key))
 				local e = byId[p.UserId]
 				if not e or v > e.value then
