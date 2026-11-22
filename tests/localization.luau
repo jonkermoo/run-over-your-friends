@@ -203,6 +203,12 @@ return function(check: (string, boolean) -> ())
 		for _, row in DriveHud.rows(car) do
 			table.insert(plain, row.label)
 		end
+		local padCar = table.clone(car) :: DriveHud.PadCar
+		padCar.view = "ButtonR3"
+		padCar.tutorial = true
+		for _, row in DriveHud.padRows(padCar) do
+			table.insert(plain, row.label)
+		end
 	end
 	-- goal lines: Loc.goal reads Quest_<kind> / ServerGoal_<kind>, which must be the template's English
 	local goalsOk = true

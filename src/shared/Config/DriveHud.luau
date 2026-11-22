@@ -1,6 +1,6 @@
 --!strict
 -- The driving HUD (src/client/Hud, Rules/DriveHud): the speedometer, the controls card in the bottom right
--- (keyboard players), the hint chip over the speedometer, and the phone driving buttons. GUI pixels at
+-- (keyboard players; console players see button pictures), the hint chip over the speedometer, and the phone driving buttons. GUI pixels at
 -- desktop size (Style.fit scales them).
 
 return table.freeze({
@@ -15,4 +15,10 @@ return table.freeze({
 	RowGap = 6,
 	CardPad = 12,
 	TitleHeight = 24,
+
+	-- console: the same card with the gamepad's button pictures (src/client/PadControls)
+	PadIcon = 26, -- one button picture
+	PadIconGap = 2, -- between two pictures in a row (RT LT, LB RB)
+	PadRowHeight = 28,
+	PadHintIcon = 28, -- the D-pad-left picture on the stuck hint
 })

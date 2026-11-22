@@ -522,7 +522,8 @@ local function onDriveStart()
 		else DriveHudRules.startsOpen(drives, returning == true, DriveHudConfig)
 end
 
--- over the speedometer: the one hint you need right now (stuck: press T), a T cap and yellow words
+-- over the speedometer: the one hint you need right now (stuck: press T), a T cap and yellow words (a D-pad
+-- picture on console, PadControls)
 local hint = Style.panel(gui)
 hint.Name = "DriveHint"
 hint.AnchorPoint = Vector2.new(0.5, 1)
@@ -547,6 +548,16 @@ hintText:GetPropertyChangedSignal("TextBounds"):Connect(function()
 	hint.Size = UDim2.fromOffset(44 + hintText.TextBounds.X / Style.scale() + 14, 38)
 end)
 local hintBox = hint
+-- console players get the same card with gamepad button pictures, and a D-pad picture on this hint
+do
+	require(script.Parent.PadControls).start(gui, {
+		open = function()
+			return controlsOpen
+		end,
+		hint = hint,
+		hintCap = hintCap,
+	})
+end
 
 ---------------------------------------------------------------- side buttons and panels
 
@@ -2221,8 +2232,6 @@ end, function() end)
 ---------------------------------------------------------------- per frame
 
 local wasDriving = false
-local FEATURE_NAMES = { Taxi = "TAXI!", Jingle = "JINGLE", Cannon = "WATER" }
-
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
 	-- the GOALS tab is painted while the goals sheet is open
@@ -2259,7 +2268,7 @@ RunService.RenderStepped:Connect(function()
 	local hasThruster = stats ~= nil and Vehicles.has(stats, "Thruster")
 	local feature: string? = nil
 	if stats then
-		for f, text in FEATURE_NAMES do
+		for f, text in DriveHudRules.Features do
 			if Vehicles.has(stats, f :: any) then
 				feature = text
 			end
@@ -2290,7 +2299,7 @@ RunService.RenderStepped:Connect(function()
 	if feature == "JINGLE" then
 		feature = if jingleOn then "JINGLE OFF" else "JINGLE ON"
 	end
-	hintBox.Visible = keyboard and not tipShown and s.stuck and wait == 0
+	hintBox.Visible = (keyboard or Pad.console()) and not tipShown and s.stuck and wait == 0
 	unstuckB.Text = if wait > 0 then tostring(wait) else "STUCK?"
 	boostB.Visible = hasJet
 	featureB.Visible = feature ~= nil
