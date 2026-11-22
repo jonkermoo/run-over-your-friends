@@ -5,15 +5,16 @@
 -- them: cars drive on the invisible road parts (city, ring) and on the terrain (suburbs) under them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local RoadMeshes = require(ReplicatedStorage.Shared.Config.RoadMeshes)
 
 local RoadKit = {}
 
 function RoadKit.build(static: Instance): number
-	local templates = ReplicatedStorage:FindFirstChild("RoadModels")
+	local templates = ServerStorage:FindFirstChild("RoadModels")
 	if not templates then
-		warn("[RoadKit] ReplicatedStorage.RoadModels is missing: no road meshes")
+		warn("[RoadKit] ServerStorage.RoadModels is missing: no road meshes")
 		return 0
 	end
 	-- one persistent model: every player always has all the road meshes (200 parts), so a far road never

@@ -3,13 +3,14 @@
 -- Props folder and any vehicle knocks it flying (BuildingService stands it back up later).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local P = require(ReplicatedStorage.Shared.Config.Parks)
 local Foliage = require(ReplicatedStorage.Shared.Config.Foliage)
 
 -- one-piece meshes (assets/Scenery.rbxm, tools/blender/export_scenery.py): a tree's crown and a bed's flowers
 -- are one part each instead of four and fourteen
-local MESHES = ReplicatedStorage:WaitForChild("SceneryModels")
+local MESHES = ServerStorage:WaitForChild("SceneryModels")
 
 local Greenery = {}
 

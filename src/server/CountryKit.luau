@@ -6,6 +6,7 @@
 -- buildings folder, knockable things are props.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Country)
 local Outskirts = require(ReplicatedStorage.Shared.Config.Outskirts)
@@ -38,7 +39,7 @@ export type Ctx = {
 
 local SEA_DEPTH = Outskirts.Port.SeaDepth -- the sea past the edge is as deep as the port's
 local MOUND_STEP = Cfg.Edge.MoundStep
-local BELT_SIZE = (ReplicatedStorage:WaitForChild("SceneryModels"):WaitForChild("Belt") :: MeshPart).Size
+local BELT_SIZE = (ServerStorage:WaitForChild("SceneryModels"):WaitForChild("Belt") :: MeshPart).Size
 local BELT_HEIGHT = BELT_SIZE.Y
 CountryKit.beltLength = BELT_SIZE.X -- the woods mesh's long side, at full size
 

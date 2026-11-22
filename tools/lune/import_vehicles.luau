@@ -17,6 +17,7 @@ local Instance = roblox.Instance
 local CFrame = roblox.CFrame
 local Vector3 = roblox.Vector3
 
+local BOX = "CSGPHS\0\0\0\0BLOCK" -- what Studio saves as a Box mesh's collision data
 local raw, out = process.args[1], process.args[2]
 local factor = 1 / assert(tonumber(process.args[3]), "importer scale")
 local texture =
@@ -80,6 +81,12 @@ for id, parts in groups do
 		p.CanQuery = false
 		p.Massless = true
 		p.Name = string.sub(p.Name, #id + 2)
+		if p.Name ~= "Body" then
+			-- only the Body ever collides (parked and traffic cars; a driven car rides on its Chassis box), so the
+			-- rest carry no collision mesh, which every player would otherwise download with each car
+			p.CollisionFidelity = roblox.Enum.CollisionFidelity.Box
+			p.PhysicalConfigData = BOX
+		end
 		-- some source bodies have open or flipped panels (the Roadster's door seams), and glass is one sheet
 		-- seen from inside and out: draw both sides
 		if

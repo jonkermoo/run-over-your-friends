@@ -8,6 +8,7 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
+local BOX = "CSGPHS\0\0\0\0BLOCK" -- what Studio saves as a Box mesh's collision data
 local raw, out = process.args[1], process.args[2]
 local images = { Asphalt = process.args[3], Concrete = process.args[4], Trim = process.args[5] }
 local folder = roblox.Instance.new("Folder")
@@ -24,6 +25,10 @@ for _, root in roblox.deserializeModel(fs.readFile(raw)) do
 			p.CanQuery = false
 			p.CanTouch = false
 			p.CastShadow = false
+			-- no collision mesh: they never collide and rays pass through them, and every player downloads every
+			-- road (one persistent model) as they join. A Box stores just Studio's marker.
+			p.CollisionFidelity = roblox.Enum.CollisionFidelity.Box
+			p.PhysicalConfigData = BOX
 			p.Material = roblox.Enum.Material.SmoothPlastic
 			p.Color = roblox.Color3.new(1, 1, 1)
 			p.RenderFidelity = roblox.Enum.RenderFidelity.Precise

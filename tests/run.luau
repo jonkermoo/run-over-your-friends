@@ -2842,6 +2842,37 @@ do
 	check("traffic spacing and lane width fit the scaled everyday cars", fits)
 end
 
+do
+	-- the join download (phones load ~3x slower than PC): mesh collision data is most of a mesh's bytes, so the
+	-- roads and the car parts that never collide (all but the Body) are Boxes, and the templates only the
+	-- server clones stay out of ReplicatedStorage
+	local fs = require("@lune/fs")
+	local roblox = require("@lune/roblox")
+	local serde = require("@lune/serde")
+	local heavy = {}
+	for _, job in { { "assets/Roads.rbxm", "" }, { "assets/Vehicles.rbxm", "Body" } } do
+		for _, root in roblox.deserializeModel(fs.readFile(job[1])) do
+			for _, p in root:GetDescendants() do
+				if p:IsA("MeshPart") and p.Name ~= job[2] and #p.PhysicalConfigData > 64 then
+					table.insert(heavy, p.Name)
+				end
+			end
+		end
+	end
+	if #heavy > 0 then
+		print(`  with collision meshes: {table.concat(heavy, ", ", 1, math.min(#heavy, 8))}`)
+	end
+	check("roads and never-colliding car parts carry no collision mesh", #heavy == 0)
+	local tree = serde.decode("json", fs.readFile("default.project.json")).tree
+	check(
+		"server-only mesh templates aren't sent to players",
+		tree.ReplicatedStorage.RoadModels == nil
+			and tree.ReplicatedStorage.SceneryModels == nil
+			and tree.ServerStorage.RoadModels ~= nil
+			and tree.ServerStorage.SceneryModels ~= nil
+	)
+end
+
 local function checkRookiePay()
 	local untilVehicle = Vehicles.ById[Economy.RookieUntil]
 	check("rookie pay ends at a real vehicle", untilVehicle ~= nil and untilVehicle.price > 0)

@@ -5,6 +5,7 @@
 -- Positions are in the building's own frame: x to the right, y up, z toward the street; `m` = -1 mirrors x.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local B = require(ReplicatedStorage.Shared.Config.Buildings)
 local H = require(ReplicatedStorage.Shared.Config.Houses)
@@ -96,7 +97,7 @@ local put = Kit.put
 -- a window's trim as one mesh (WindowTrim, PaneTrim in assets/Scenery.rbxm, built for a house storey and wall):
 -- `size` its box, centred at building-frame (x, y, z), its front facing out of the wall (`s` 1 front, -1
 -- back); it counts for the two parts it replaces
-local TRIMS = ReplicatedStorage:WaitForChild("SceneryModels")
+local TRIMS = ServerStorage:WaitForChild("SceneryModels")
 function Kit.trimMesh(
 	ctx: Ctx,
 	name: string,
