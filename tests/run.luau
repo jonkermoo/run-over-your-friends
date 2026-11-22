@@ -2550,6 +2550,28 @@ do
 		local Rules = require("../src/shared/Rules/Onboarding")
 		local S = Config.Steps
 		local none = { pieces = 0, ownsExtra = false }
+		local spawnN, total = Rules.stepNumber(S.Spawn, Config)
+		local hitsN = Rules.stepNumber(S.Hits, Config)
+		local eventN = Rules.stepNumber(S.Event, Config)
+		check(
+			"tutorial: steps count from the first one you play (the spawn shares 1), the last is the total",
+			spawnN == 1
+				and hitsN == 1
+				and eventN == total
+				and total == #Config.Order - 1
+				and Rules.stepNumber(S.Done, Config) == nil
+		)
+		local titled = true
+		for _, s in Config.Order do
+			local n = Rules.stepNumber(s, Config)
+			if n and n > 1 and not Config.StepTitles[s] then
+				titled = false
+			end
+		end
+		check(
+			"tutorial: every numbered step after the first has a banner title",
+			titled and Config.StepTitles[S.Hits] ~= nil
+		)
 		check(
 			"tutorial: the retired steps and unknown saves count as done, live steps stay",
 			Rules.migrate(3, Config) == S.Done

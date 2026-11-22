@@ -288,7 +288,7 @@ cheer.SoundId = "rbxasset://sounds/electronicpingshort.wav"
 cheer.Volume = 0.8
 cheer.Parent = gui
 
-local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg)
+local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg, plain: boolean?)
 	cheer:Play()
 	local t = label(gui, "", Callouts.CheerSize, BOLD, GOLD)
 	say(t, title)
@@ -309,8 +309,8 @@ local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg
 	s.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop + math.floor(Callouts.CheerSize * 0.95))
 	Style.fitText(s, 16, 5)
 	TweenService:Create(scale, TweenInfo.new(0.45, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	-- confetti from the top of the screen
-	for _ = 1, 70 do
+	-- confetti from the top of the screen (not for a plain banner, like a new tutorial step)
+	for _ = 1, if plain then 0 else 70 do
 		local c = Instance.new("Frame")
 		c.BorderSizePixel = 0
 		c.BackgroundColor3 = CONFETTI[math.random(1, #CONFETTI)]
@@ -653,6 +653,24 @@ local function update()
 	end
 	if stepValue ~= lastStep then
 		lastStep = stepValue
+		-- you're in the tutorial: the card's tag counts the steps, and each step opens with a banner
+		local n, total = Rules.stepNumber(stepValue, Onboarding)
+		say(
+			tag,
+			if n
+				then Loc.msg("GuideStepTag", { n = tostring(n), total = tostring(total) })
+				else "TUTORIAL"
+		)
+		local title = Onboarding.StepTitles[stepValue]
+		if n and title then
+			task.delay(
+				Style.stage(Callouts.CheerHold),
+				showCelebrate,
+				Loc.msg("GuideStepBanner", { n = tostring(n), total = tostring(total) }),
+				title,
+				true
+			)
+		end
 		stepStarted = os.clock()
 		stepEntered = stepStarted
 	end
