@@ -1,6 +1,7 @@
 --!strict
--- First session: spawn a car, run over three people (bonus and confetti), smash a building, finish a short first
--- goal (a few more hits, then a big CLAIM pop-up that claims itself if left alone), buy a car, join an event. The
+-- First session: start in the starter car (the server spawns it; the garage if that fails), run over three
+-- people (bonus and confetti), smash a building, finish a short first goal (a few more hits, then a big CLAIM
+-- pop-up that claims itself if left alone), buy a car, join an event. The
 -- step is saved in the profile and shown as the player attribute "Tutorial"; "TutorialCount" counts toward the
 -- step (hits, building pieces) and "TutorialClaim" is set while the first goal waits to be claimed. The client
 -- draws the job card, markers, hints and the CLAIM pop-up. Things done before their step comes up
@@ -156,7 +157,35 @@ function OnboardingService.purchased(player: Player, _vehicle: Vehicles.Vehicle)
 	end
 end
 
+-- a new player (still on the spawn step) starts in the starter car instead of having to find the garage
+local function autoSpawn(player: Player)
+	while player.Parent and not player:GetAttribute("DataReady") do
+		task.wait(0.2)
+	end
+	for _ = 1, Onboarding.AutoSpawnTries do
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 and character:FindFirstChild("HumanoidRootPart") then
+			task.wait(Onboarding.AutoSpawnDelay)
+		else
+			task.wait(Onboarding.AutoSpawnRetry)
+		end
+		if not player.Parent or step(player) ~= Steps.Spawn or VehicleService.of(player) then
+			return
+		end
+		if humanoid and VehicleService.spawn(player, Vehicles.Starter) then
+			return
+		end
+	end
+end
+
 function OnboardingService.start()
+	Players.PlayerAdded:Connect(function(player)
+		autoSpawn(player)
+	end)
+	for _, player in Players:GetPlayers() do
+		task.spawn(autoSpawn, player)
+	end
 	VehicleService.onSpawn(function(player)
 		if step(player) == Steps.Spawn then
 			sessionOf(player).count = 0

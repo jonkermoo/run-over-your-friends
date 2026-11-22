@@ -28,6 +28,11 @@ return table.freeze({
 		[3] = Steps.Done,
 		[4] = Steps.Smash,
 	}),
+	-- first step: the server puts a new player in the starter car on its own (ad players decide in seconds)
+	AutoSpawnDelay = 1, -- seconds after the character and data are ready, so the character has landed
+	AutoSpawnTries = 5, -- a spawn can fail (character not ready, blocked spot): tries this many times
+	AutoSpawnRetry = 2, -- seconds between tries
+	GarageFallback = 12, -- seconds after the data loads: still not in a car, the client opens the garage
 	HitsGoal = 3,
 	HitsReward = 250,
 	SmashGoal = 5, -- building pieces
