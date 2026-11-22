@@ -80,6 +80,8 @@ local PHONE: Layout = {
 }
 local PHONE_ASPECT = 1.9 -- screens at least this much wider than tall use the phone layout
 local BOARD_W = 960
+local MIN_TEXT = 14 -- the smallest the guide sign's lines shrink to
+local MARGIN = Vector2.new(60, 20) -- board pixels kept clear around the board (phone notches, rounded corners)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "Loading"
@@ -204,10 +206,10 @@ end
 local PICTO = Vector2.new(68, 208) -- the symbol's bottom-left corner on the sign
 local car = holder(sign, 96, 52)
 car.AnchorPoint = Vector2.new(0, 1)
-local carBody = box(car, INK, 96, 22, 0, 19)
+local carBody = box(car, INK, 96, 20, 0, 21)
 round(carBody, 6)
-local carCab = box(car, INK, 52, 20, 20, 2)
-round(carCab, 10)
+local carCab = box(car, INK, 50, 20, 22, 6)
+round(carCab, 7)
 carCab.ZIndex = 0 -- under the body, which hides its lower corners
 for _, x in { 12, 64 } do
 	local wheel = box(car, INK, 22, 22, x, 30)
@@ -268,16 +270,35 @@ greenLine.Position = UDim2.fromOffset(9, 9)
 greenLine.Size = UDim2.new(1, -18, 1, -18)
 round(greenLine, 7)
 stroke(greenLine, WHITE, 4)
--- an "ahead" arrow: a shaft and a solid head built from two turned bars
+-- an "ahead" arrow: the head is a turned square whose lower half is hidden under a green mask (one solid
+-- triangle, no seam), then the shaft drawn over the mask
 local arrow = holder(green, 40, 62)
 arrow.AnchorPoint = Vector2.new(0, 0.5)
-box(arrow, WHITE, 12, 46, 14, 16)
-box(arrow, WHITE, 30, 12, -3, 12).Rotation = -45
-box(arrow, WHITE, 30, 12, 13, 12).Rotation = 45
+local head = box(arrow, WHITE, 28.3, 28.3, 5.85, 5.85)
+head.Rotation = 45
+box(arrow, GUIDE_GREEN, 48, 44, -4, 20)
+box(arrow, WHITE, 12, 44, 14, 18)
+-- Both shrink a step at a time while the shown (translated) text doesn't fit its box. TextScaled can't be
+-- used: under the board's UIScale it picks sizes far too small.
+local function shrinkToFit(l: TextLabel, max: number)
+	local function fit()
+		l.TextSize = max
+		task.defer(function()
+			while not l.TextFits and l.TextSize > MIN_TEXT do
+				l.TextSize -= 1
+				task.wait()
+			end
+		end)
+	end
+	l:GetPropertyChangedSignal("Text"):Connect(fit)
+	l:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
+end
 local status = text(green, "LOADING THE CITY", SIGN_BOLD, 40, WHITE)
+shrinkToFit(status, 40)
 local tip = text(green, "", SIGN_TEXT, 23, TIP_WHITE)
 tip.TextWrapped = true
 tip.TextYAlignment = Enum.TextYAlignment.Top
+shrinkToFit(tip, 23)
 
 ---------------------------------------------------------------- the road
 
@@ -375,15 +396,24 @@ local function refit()
 	if l ~= layout or board.Size.Y.Offset ~= l.height then
 		applyLayout(l)
 	end
-	local s = math.clamp(math.min(v.X / BOARD_W, v.Y / l.height), 0.3, 2)
+	local s = math.clamp(math.min(v.X / (BOARD_W + MARGIN.X), v.Y / (l.height + MARGIN.Y)), 0.3, 2)
 	boardFit.Scale = s
 	roadFit.Scale = s
 	road.Size = UDim2.fromOffset(v.X / s, l.road)
 end
+-- the camera this script first sees is replaced once the game loads, so follow whichever one is current
+local camWatch: RBXScriptConnection? = nil
+local function watchCamera()
+	if camWatch then
+		camWatch:Disconnect()
+	end
+	local cam = workspace.CurrentCamera
+	camWatch = cam and cam:GetPropertyChangedSignal("ViewportSize"):Connect(refit)
+	refit()
+end
 applyLayout(WIDE)
-refit()
-local cam = workspace.CurrentCamera
-local camWatch = cam and cam:GetPropertyChangedSignal("ViewportSize"):Connect(refit)
+local camSwap = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(watchCamera)
+watchCamera()
 
 gui.Parent = playerGui
 
@@ -517,6 +547,7 @@ for _, d in gui:GetDescendants() do
 	end
 end
 task.wait(Config.Fade)
+camSwap:Disconnect()
 if camWatch then
 	camWatch:Disconnect()
 end
