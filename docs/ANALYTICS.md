@@ -48,12 +48,14 @@ Older custom events (kept): `VehicleSpawned` (field 01: vehicle id), `Demolished
 
 ## Onboarding funnel (`LogOnboardingFunnelStepEvent`)
 
-Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Smashed a building, 6 Claimed a
-goal, 7 First vehicle bought, 8 Joined an event, 9 Tutorial done.
+Steps in order: 1 Joined, 2 Spawned a car, 3 First hit, 4 First rampage, 5 Took a ramp, 6 Smashed a building,
+7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done. Step numbers never change: the
+dashboard names each number from the events it has seen, so a renumbering mixes the steps up.
 
-Renumbered on 2026-11-20 when the tutorial's ramp step was removed. Data from before that release used: 5 Took
-a ramp, 6 Smashed a building, 7 Claimed a goal, 8 First vehicle bought, 9 Joined an event, 10 Tutorial done.
-Compare across the change by step name, not number. The same release made the goal step a short goal of its
+The tutorial's ramp step was removed on 2026-11-20; since then step 5 is logged together with step 4, so the
+funnel stays continuous and step 5's completion means nothing. The release of 2026-11-20 renumbered the steps
+(5 Smashed a building ... 9 Tutorial done) until the old numbers came back on 2026-11-21, so the dashboard's
+funnel for players who joined in between is mixed up. The same release made the goal step a short goal of its
 own (a few hits, then a CLAIM pop-up that claims itself after a few seconds) instead of opening the GOALS sheet.
 
 Steps 5, 6 and 8 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it

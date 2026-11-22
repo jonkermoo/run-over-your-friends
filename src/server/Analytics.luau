@@ -27,23 +27,27 @@ local F1 = Enum.AnalyticsCustomFieldKeys.CustomField01.Name
 local F2 = Enum.AnalyticsCustomFieldKeys.CustomField02.Name
 local F3 = Enum.AnalyticsCustomFieldKeys.CustomField03.Name
 
--- the first-session funnel, in order (renumbered 2026-11-20 when the ramp step left: docs/ANALYTICS.md)
+-- the first-session funnel, in order. Step numbers never change once live: Roblox names each number by the
+-- events it has seen, so renumbering mixes steps up on the dashboard. Step 5 ("Took a ramp") left the
+-- tutorial on 2026-11-20; it is now logged together with step 4 so the funnel stays continuous (docs/ANALYTICS.md)
 Analytics.Steps = table.freeze({
 	Joined = 1,
 	SpawnedCar = 2,
 	FirstHit = 3,
 	FirstRampage = 4,
-	SmashedBuilding = 5,
-	ClaimedGoal = 6,
-	FirstPurchase = 7,
-	JoinedEvent = 8,
-	TutorialDone = 9,
+	TookRamp = 5, -- retired: logged with FirstRampage
+	SmashedBuilding = 6,
+	ClaimedGoal = 7,
+	FirstPurchase = 8,
+	JoinedEvent = 9,
+	TutorialDone = 10,
 })
 local STEP_NAMES = {
 	"Joined",
 	"Spawned a car",
 	"First hit",
 	"First rampage",
+	"Took a ramp",
 	"Smashed a building",
 	"Claimed a goal",
 	"First vehicle bought",
@@ -138,6 +142,9 @@ function Analytics.step(player: Player, step: number)
 	safe(function()
 		AnalyticsService:LogOnboardingFunnelStepEvent(player, step, STEP_NAMES[step])
 	end)
+	if step == Analytics.Steps.FirstRampage then
+		Analytics.step(player, Analytics.Steps.TookRamp) -- the retired ramp step, so step 6 follows on
+	end
 end
 
 -- money earned by running people over (batched)
