@@ -329,6 +329,10 @@ local function worldText(at: Vector3, text: string, color: Color3)
 		:Play()
 	task.delay(1.1, function()
 		TweenService:Create(l, TweenInfo.new(0.5), { TextTransparency = 1 }):Play()
+		local s = l:FindFirstChildOfClass("UIStroke")
+		if s then
+			TweenService:Create(s, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		end
 	end)
 	task.delay(1.7, function()
 		bb:Destroy()
