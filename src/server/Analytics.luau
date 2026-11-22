@@ -71,6 +71,8 @@ type Session = {
 	viewed: { [string]: boolean },
 	eventRun: number, -- the live event run this player last took part in
 	bucket: Rules.Bucket,
+	inSeat: boolean, -- sitting in a car's driver seat (kept up while they play: at leave the car is already gone)
+	seatLeftAt: number?, -- os.clock when they last got out of a driver seat
 }
 local sessions: { [Player]: Session } = {}
 local eventRun = 0
@@ -101,6 +103,7 @@ local function session(player: Player): Session
 			viewed = {},
 			eventRun = 0,
 			bucket = { tokens = Cfg.TrackBurst, at = os.clock() },
+			inSeat = false,
 		}
 		sessions[player] = s
 	end
@@ -235,11 +238,37 @@ local function logJoin(player: Player)
 	)
 end
 
+-- keep the session's driver-seat flag up while the player plays
+local function watchSeat(player: Player, character: Model)
+	local humanoid = character:WaitForChild("Humanoid", Cfg.HumanoidWaitSeconds)
+	if not (humanoid and humanoid:IsA("Humanoid")) then
+		return
+	end
+	local function set(seat: Instance?)
+		local s = sessions[player]
+		-- an old character's late signals must not undo the new one's seat
+		if not s or player.Character ~= character then
+			return
+		end
+		local now = seat ~= nil and seat.Name == "DriverSeat"
+		if s.inSeat and not now then
+			s.seatLeftAt = os.clock()
+		end
+		s.inSeat = now
+	end
+	set(humanoid.SeatPart)
+	humanoid.Seated:Connect(function(active, seat)
+		set(if active then seat else nil)
+	end)
+	humanoid.Destroying:Connect(function()
+		set(nil)
+	end)
+end
+
 local function driving(player: Player): boolean
-	local character = player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	return seat ~= nil and seat.Name == "DriverSeat"
+	local s = session(player)
+	local ago = if s.seatLeftAt then os.clock() - s.seatLeftAt else nil
+	return Rules.wasDriving(s.inSeat, ago, Cfg)
 end
 
 -- the server's player count (the leaver included), how long they played and what they were doing
@@ -412,6 +441,17 @@ end
 function Analytics.start()
 	local function onPlayer(player: Player)
 		session(player)
+		local function onCharacter(character: Model)
+			task.spawn(function()
+				safe(function()
+					watchSeat(player, character)
+				end)
+			end)
+		end
+		player.CharacterAdded:Connect(onCharacter)
+		if player.Character then
+			onCharacter(player.Character)
+		end
 		Analytics.step(player, Analytics.Steps.Joined)
 		-- no Ready from the client in time: log the join anyway
 		task.delay(Cfg.ReadyWaitSeconds, function()

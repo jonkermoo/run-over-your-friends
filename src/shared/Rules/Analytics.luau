@@ -7,6 +7,7 @@ local Analytics = {}
 export type Cfg = {
 	PhoneShortSide: number,
 	WreckedSeconds: number,
+	SeatGraceSeconds: number,
 	TrackBurst: number,
 	TrackPerSecond: number,
 }
@@ -61,6 +62,15 @@ function Analytics.activity(info: ActivityInfo, cfg: Cfg): string
 		return "Driving"
 	end
 	return "OnFoot"
+end
+
+-- was the player driving when they left? In the driver seat now, or got out only just before (seatLeftAgo:
+-- seconds since they last left the driver seat, nil = not this session)
+function Analytics.wasDriving(inSeat: boolean, seatLeftAgo: number?, cfg: Cfg): boolean
+	if inSeat then
+		return true
+	end
+	return seatLeftAgo ~= nil and seatLeftAgo >= 0 and seatLeftAgo <= cfg.SeatGraceSeconds
 end
 
 -- a whole count in buckets with these tops: tops { 1, 2, 4, 8 } gives "1", "2", "3-4", "5-8", "9+"
