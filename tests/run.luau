@@ -1236,16 +1236,32 @@ check("shop names fit their hanging signs", shopNamesOk)
 local looksOk = true
 for key in Streets.Districts do
 	local look = BuildingConfig.Office.Looks[key]
-	looksOk = looksOk and look ~= nil and rgbOk({ look.trim, look.stone, look.roof })
-	if look then
-		-- a trim colour equal to a wall colour would pick up the district's wall material
-		for _, c in Streets.Districts[key].walls do
-			looksOk = looksOk
-				and not (c[1] == look.trim[1] and c[2] == look.trim[2] and c[3] == look.trim[3])
+	looksOk = looksOk and look ~= nil and rgbOk({ look.stone, look.roof })
+end
+check("every district has office lobby stone and roof colours", looksOk)
+do
+	local facadesOk = true
+	local trims = { BuildingConfig.Office.Hero.Trim }
+	for _, f in BuildingConfig.Office.Frames do
+		table.insert(trims, f.trim)
+	end
+	for _, c in BuildingConfig.Office.Shopfront.Colours do
+		table.insert(trims, c)
+	end
+	for key in Streets.Districts do
+		local mix = BuildingConfig.Facades[key]
+		facadesOk = facadesOk and mix ~= nil and #mix >= 3 and rgbOk(mix)
+		for _, c in mix or {} do
+			for _, t in trims do
+				facadesOk = facadesOk and not (c[1] == t[1] and c[2] == t[2] and c[3] == t[3])
+			end
 		end
 	end
+	check(
+		"every district has a facade mix, and no frame or shopfront colour is one of them",
+		facadesOk
+	)
 end
-check("every district has office trim, lobby stone and roof colours", looksOk)
 local landmarkOk = true
 for _, colours in { BuildingConfig.Restaurant.Colours, BuildingConfig.Warehouse.Colours } do
 	landmarkOk = landmarkOk

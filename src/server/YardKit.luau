@@ -509,25 +509,12 @@ function YardKit.pocketPark(
 	end
 end
 
--- an office tower's street front: `door` on the ground at the front's middle, `out` toward the street,
+-- an office tower's street front (planters, a bench): `door` on the ground at the front's middle, `out` toward the street,
 -- `width` the front's length
 function YardKit.officeFront(folder: Instance, door: Vector3, out: Vector3, width: number)
 	local O = Cfg.Office
 	local own = Random.new(O.Seed + math.floor(door.X) * 13 + math.floor(door.Z))
 	local across = Vector3.new(-out.Z, 0, out.X)
-	local colour = pick(own, O.Awnings)
-	for _, sx in { -1, 1 } do
-		local m = prop(folder, "Awning")
-		local at = door + across * sx * width / 2 * O.AwningAt + out * (O.Awning[2] / 2)
-		local cf = CFrame.lookAt(at, at + out) * CFrame.Angles(-O.AwningTilt, 0, 0)
-		part(
-			m,
-			Vector3.new(O.Awning[1], O.Awning[3], O.Awning[2]),
-			cf + Vector3.new(0, O.AwningHeight, 0),
-			colour,
-			Enum.Material.Fabric
-		)
-	end
 	for _, sx in { -1, 1 } do
 		local m = prop(folder, "Planter")
 		local at = door + across * sx * (width / 2 - O.PlanterInset) + out * O.Out

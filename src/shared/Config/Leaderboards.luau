@@ -72,11 +72,27 @@ return table.freeze({
 			stand = 4,
 		}),
 	}),
-	-- the stands under the gantry (MapBuilder), centred on the plaza, studs
+	-- the stands under the gantry (MapBuilder), centred on the plaza, studs. A board is laid out 728 px wide, so
+	-- keep StandHeight / StandWidth near 1.06 (the rows need about 750 px of height)
 	Stands = 4,
-	StandWidth = 43,
-	StandHeight = 46,
-	StandStep = 47, -- centre to centre
+	StandWidth = 32,
+	StandHeight = 34,
+	StandStep = 36, -- centre to centre
+	StandLift = 6, -- the board's foot above the sidewalk
+	-- the frame round each board, the gantry over them all; colours are { r, g, b }
+	Frame = { 226, 170, 70 }, -- warm gold bars top and bottom
+	FrameSides = { 236, 226, 206 }, -- cream
+	Glow = { 255, 204, 130 }, -- a lit strip under each top bar
+	GantryOver = 4, -- the beam this far above the boards' tops
+	FrameTop = 1.6, -- the top frame bar's height over the board, under the beam's gap
+	GlowStrip = { 2, 0.5, 0.6 }, -- wider than the board by, tall, deep
+	GlowAt = { 0.1, 1.2 }, -- below the board's top edge, out in front of it
+	GantryReach = 6, -- and this far past the outer boards
+	Gantry = { 236, 226, 206 }, -- the beam
+	GantryPosts = { 186, 92, 66 }, -- terracotta, as the plaza's border
+	-- the boards' own colours behind the rows (Boards.luau): a warm dark instead of asphalt black
+	Panel = { 58, 38, 48 },
+	Card = { 82, 56, 66 },
 	FlipSeconds = 15,
 	Top = 10, -- rows on a board
 	ReadTop = 100, -- entries read per board (one request either way); your own rank is shown up to here

@@ -147,19 +147,9 @@ return table.freeze({
 		Seed = 6610,
 	}),
 
-	-- office towers' street fronts (MapBuilder after TownKit.office): two awnings either side of the door,
-	-- `AwningAt` of the front's half-width out; planters at the front's ends; a bench by the door
+	-- office towers' street fronts (MapBuilder after TownKit.office): planters at the front's ends, a bench by
+	-- the door (the awnings are the tower's own shopfronts, Config/Buildings Office.Shopfront)
 	Office = table.freeze({
-		AwningAt = 0.55,
-		Awning = table.freeze({ 16, 5, 0.5 }), -- long, deep, thick
-		AwningHeight = 10,
-		AwningTilt = 0.25, -- radians down toward the street
-		Awnings = table.freeze({
-			{ 236, 84, 96 },
-			{ 60, 140, 220 },
-			{ 90, 170, 110 },
-			{ 250, 180, 60 },
-		}),
 		Planter = table.freeze({ 6, 2.2, 3 }), -- long, tall, deep
 		PlanterColour = { 120, 116, 110 } :: RGB,
 		PlanterInset = 5, -- in from the front's ends
