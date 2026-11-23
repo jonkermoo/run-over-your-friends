@@ -5,20 +5,26 @@
 -- styled by district. Paint is flat and never collides. Furniture goes in the Props folder: each piece is a
 -- Model that any vehicle knocks flying (BuildingService puts it back later).
 
+local CollectionService = game:GetService("CollectionService")
+local GeometryService = game:GetService("GeometryService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
+local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
 local Places = require(script.Parent.Places)
+local G = require(ReplicatedStorage.Shared.Config.StreetGreen)
+local Green = require(ReplicatedStorage.Shared.Rules.StreetGreen)
 local Greenery = require(script.Parent.Greenery)
-local Foliage = require(ReplicatedStorage.Shared.Config.Foliage)
 
 local StreetKit = {}
 
 local DARK = Color3.fromRGB(34, 36, 40)
 local METAL = Color3.fromRGB(70, 74, 80)
 local Y0 = 0.08
+local SIG = S.Signal
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -89,28 +95,95 @@ local function lamp(folder: Instance, foot: Vector3, out: Vector3, color: Color3
 	)
 end
 
--- a traffic light on a corner: one lamp facing each road; the client cycles them
+-- the traffic light's head facing one road: a yellow housing with a dark visor over each lamp slot, its middle at
+-- `cf` (LookVector toward the road)
+local function signalHead(parent: Instance, cf: CFrame)
+	local hs, v = SIG.Housing, SIG.Visor
+	block(parent, Vector3.new(hs[1], hs[2], hs[3]), cf, rgb(SIG.HousingColour))
+	for i = -1, 1 do
+		local y = i * SIG.LampSpacing + SIG.LampDiameter / 2 + v[2] / 2
+		block(
+			parent,
+			Vector3.new(v[1], v[2], v[3]),
+			cf * CFrame.new(0, y, -(hs[3] / 2 + v[3] / 2)),
+			rgb(SIG.VisorColour)
+		)
+	end
+end
+
+-- the head joined into one part, made once and copied to every corner; false when the
+-- engine can't join it, and each head is then built from its four parts
+local headUnion: BasePart | false | nil = nil
+local function headCopy(): BasePart?
+	if headUnion == nil then
+		local holder = Instance.new("Model")
+		signalHead(holder, CFrame.identity)
+		local parts = holder:GetChildren() :: { any }
+		local ok, joined = pcall(function()
+			return GeometryService:UnionAsync(parts[1], { parts[2], parts[3], parts[4] }, {
+				CollisionFidelity = Enum.CollisionFidelity.Box,
+				RenderFidelity = Enum.RenderFidelity.Automatic,
+				SplitApart = false,
+			})
+		end)
+		local union = ok and joined and joined[1]
+		if union and union:IsA("BasePart") then
+			union.UsePartColor = false -- keep the housing yellow and the visors dark
+			union.Anchored = true
+			union.Name = "SignalHead"
+			headUnion = union
+		else
+			warn("StreetKit: couldn't join the traffic light head, building it from parts", joined)
+			headUnion = false
+		end
+		holder:Destroy()
+	end
+	return if headUnion then headUnion:Clone() else nil
+end
+
+-- a traffic light on a corner: a grey pole and a head facing each road (toX and toZ point at the crossing), set side
+-- by side round the pole; each lamp is tagged Signal = "EW" / "NS" and Lamp = its colour, and the client lights
+-- the one for the current colour
 local function signal(folder: Instance, foot: Vector3, toX: Vector3, toZ: Vector3)
 	local m = prop(folder, "Signal")
+	local pw, hs = SIG.PoleWidth, SIG.Housing
 	block(
 		m,
-		Vector3.new(0.6, 12, 0.6),
-		CFrame.new(foot + Vector3.new(0, 6, 0)),
-		METAL,
+		Vector3.new(pw, SIG.PoleHeight, pw),
+		CFrame.new(foot + Vector3.new(0, SIG.PoleHeight / 2, 0)),
+		rgb(SIG.PoleColour),
 		Enum.Material.Metal
 	)
-	block(m, Vector3.new(1.6, 3.6, 1.6), CFrame.new(foot + Vector3.new(0, 13.2, 0)), DARK)
-	for _, f in { { toX, "EW" }, { toZ, "NS" } } do
-		local dir = f[1] :: Vector3
-		local at = foot + dir * 0.85 + Vector3.new(0, 13.2, 0)
-		local l = block(
-			m,
-			Vector3.new(1, 1, 0.2),
-			CFrame.lookAt(at, at + dir),
-			Color3.fromRGB(60, 200, 90),
-			Enum.Material.Neon
-		)
-		l:SetAttribute("Signal", f[2])
+	for _, f in { { toX, toZ, "EW" }, { toZ, toX, "NS" } } do
+		local dir, other = f[1] :: Vector3, f[2] :: Vector3
+		-- its back against the pole, shifted away from the other head so the two don't meet
+		local at = foot
+			+ dir * (pw / 2 + hs[3] / 2)
+			- other * (hs[1] / 2 - pw / 2)
+			+ Vector3.new(0, SIG.HousingHeight, 0)
+		local cf = CFrame.lookAt(at, at + dir)
+		local head = headCopy()
+		if head then
+			head.CFrame = cf * head.CFrame
+			head.Parent = m
+		else
+			signalHead(m, cf)
+		end
+		for i, colour in { "green", "amber", "red" } do
+			local disc = cylinder(
+				m,
+				SIG.LampDepth,
+				SIG.LampDiameter,
+				Vector3.zero,
+				rgb((SIG.Dim :: any)[colour])
+			)
+			-- the disc's axis (X) points at the road, half of it standing out of the housing's face
+			disc.CFrame = cf
+				* CFrame.new(0, (i - 2) * SIG.LampSpacing, -hs[3] / 2)
+				* CFrame.Angles(0, math.pi / 2, 0)
+			disc:SetAttribute("Signal", f[3])
+			disc:SetAttribute("Lamp", colour)
+		end
 	end
 end
 
@@ -172,13 +245,26 @@ local function planter(folder: Instance, at: Vector3, out: Vector3)
 		Color3.fromRGB(150, 140, 128),
 		Enum.Material.Concrete
 	)
+	-- soil and a row of blooms (Config/StreetGreen PlanterBlooms), the colour picked by its spot
+	local B = G.PlanterBlooms
 	block(
 		m,
-		Vector3.new(4.4, 1.4, 1.8),
-		cf + Vector3.new(0, 2.1, 0),
-		Color3.fromRGB(80, 150, 70),
-		Enum.Material.Grass
+		Vector3.new(B.Size[1], B.SoilThick, 1.8),
+		cf + Vector3.new(0, B.SoilTop - B.SoilThick / 2, 0),
+		rgb(B.Soil),
+		Enum.Material.Ground
 	)
+	local blooms = Greenery.mesh(
+		m,
+		"Blooms",
+		1,
+		cf + Vector3.new(0, B.SoilTop + B.Size[2] / 2 - B.Sink, 0),
+		rgb(G.Flowers[Green.spot(at.X, at.Z) % #G.Flowers + 1])
+	)
+	blooms.Size = Vector3.new(B.Size[1], B.Size[2], B.Size[3])
+	blooms.Material = Enum.Material.SmoothPlastic
+	blooms.CanCollide = false
+	blooms.CanQuery = false
 end
 
 -- a sandwich board outside a shop or cafe
@@ -193,39 +279,53 @@ local function aBoard(folder: Instance, at: Vector3, out: Vector3, color: Color3
 	w.Parent = m
 end
 
-local function tree(folder: Instance, at: Vector3)
+-- a street tree (Config/StreetGreen Trees): a trunk and a big low-poly crown, its shape and turn picked by
+-- its spot and its tint by its block side (`accent`, else a green by spot), so no random draws and nothing else
+-- moves; the crown reaches over the road, so it never collides (the trunk does)
+local function tree(folder: Instance, at: Vector3, accent: number?)
+	local T = G.Trees
 	local m = prop(folder, "Tree")
+	local shape = T.Shapes[Green.shape(at.X, at.Z, #T.Shapes)]
 	block(
 		m,
-		Vector3.new(3.2, 1.2, 3.2),
-		CFrame.new(at + Vector3.new(0, 0.6, 0)),
-		Color3.fromRGB(120, 112, 104),
-		Enum.Material.Concrete
-	)
-	block(
-		m,
-		Vector3.new(0.9, 9, 0.9),
-		CFrame.new(at + Vector3.new(0, 5, 0)),
-		Color3.fromRGB(110, 78, 52),
+		Vector3.new(T.TrunkWidth, shape.trunk, T.TrunkWidth),
+		CFrame.new(at + Vector3.new(0, shape.trunk / 2, 0)),
+		rgb(T.Trunk),
 		Enum.Material.Wood
 	)
-	-- a chunky low-poly crown like the countryside's trees (Config/Streets TreeCrown), its shape, turn and
-	-- green picked by its spot (no random draws, so nothing else moves)
-	local T = S.TreeCrown
-	local spot = math.floor(at.X) * 7 + math.floor(at.Z) * 13
+	local colour = if accent
+		then rgb(T.Accents[accent])
+		else rgb(T.Greens[Green.green(at.X, at.Z, #T.Greens)])
 	local crown = Greenery.place(
 		m,
-		Foliage.Crowns[spot % #Foliage.Crowns + 1],
-		at + Vector3.new(0, T.Base, 0),
-		T.Width,
+		shape.mesh,
+		at,
+		shape.width,
 		nil,
-		(spot % 360) * math.pi / 180,
-		rgb(T.Greens[spot % #T.Greens + 1])
+		(Green.spot(at.X, at.Z) % 360) * math.pi / 180,
+		colour
 	)
+	crown.Size = Vector3.new(crown.Size.X, crown.Size.Y * shape.stretch, crown.Size.Z)
+	local foot = shape.foot or (shape.trunk - crown.Size.Y * shape.sink)
+	crown.Position = at + Vector3.new(0, foot + crown.Size.Y / 2, 0)
 	crown.Material = Enum.Material.Grass
-	crown.CanCollide = true
-	crown.CanQuery = true
-	crown.CanTouch = true
+end
+
+-- a flat grass strip along a block side's kerb, under its trees (Config/StreetGreen Verge); never collides
+local function verge(static: Instance, edge: Vector3, out: Vector3, blockSize: number)
+	local V = G.Verge
+	local along = Vector3.new(-out.Z, 0, out.X)
+	local mid = edge - out * V.Inset + Vector3.new(0, V.Top / 2, 0)
+	local p = block(
+		static,
+		Vector3.new(V.Length * blockSize, V.Top, V.Width),
+		CFrame.fromMatrix(mid, along, Vector3.yAxis),
+		rgb(V.Colour),
+		Enum.Material.Grass
+	)
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
 end
 
 local function shelter(folder: Instance, at: Vector3, out: Vector3, accent: Color3)
@@ -326,9 +426,20 @@ function StreetKit.build(
 					out,
 					rgb(d.accent):Lerp(Color3.new(1, 1, 1), 0.5)
 				)
+				-- street trees (Config/StreetGreen Trees) in a grass verge; the spawn plaza keeps its own paving and
+				-- only the outer pair, clear of its exits
 				if random:NextNumber() < d.trees then
-					for _, t in { -0.32, 0.32 } do
-						tree(props, edge - out * (S.KerbInset + 1) + along * (t * B))
+					local accent = Green.accent(i, j, sideIndex, G.Trees.AccentEvery)
+					local downtown = CityPlan.distance(i, j, N, M) < G.Trees.DowntownReach
+					local spots = if kind == "spawn"
+						then G.Trees.SpawnAt
+						elseif downtown then G.Trees.At
+						else G.Trees.OuterAt
+					for _, t in spots do
+						tree(props, edge - out * G.Trees.Inset + along * (t * B), accent)
+					end
+					if kind ~= "spawn" then
+						verge(static, edge, out, B)
 					end
 				end
 				if sideIndex == hydrantSide then
@@ -375,6 +486,9 @@ function StreetKit.build(
 				)
 				water.Material = Enum.Material.Glass
 				water.Transparency = 0.15
+				-- a jet of spray from the column's top, made on each screen (client/Ambient)
+				water:SetAttribute("SprayLift", Ambient.FountainLift)
+				CollectionService:AddTag(water, Ambient.Tags.Spray)
 				cylinder(static, F.column, 4, centre + Vector3.new(0, F.column / 2, 0), stone)
 				cylinder(static, 1, 12, centre + Vector3.new(0, F.column, 0), stone)
 				for k = 0, S.PlazaPlanters - 1 do

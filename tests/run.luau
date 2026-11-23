@@ -990,6 +990,28 @@ check(
 	Streets.PlazaFountain.size / 2 + 4 < (World.Map.BlockSize - World.Map.SidewalkWidth * 2) * 0.22
 )
 check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
+do
+	local SIG = Streets.Signal
+	local hs = SIG.Housing
+	check(
+		"signal: the three lamps fit in the housing",
+		SIG.LampSpacing >= SIG.LampDiameter + SIG.Visor[2]
+			and SIG.LampSpacing + SIG.LampDiameter / 2 + SIG.Visor[2] <= hs[2] / 2
+			and SIG.LampDiameter < hs[1]
+	)
+	check(
+		"signal: the housing reaches above the pole top",
+		SIG.HousingHeight - hs[2] / 2 < SIG.PoleHeight
+			and SIG.HousingHeight + hs[2] / 2 > SIG.PoleHeight
+	)
+	for _, colour in { "red", "amber", "green" } do
+		local lit, dim = (SIG.Lit :: any)[colour], (SIG.Dim :: any)[colour]
+		check(
+			`signal: {colour} has a lit and a dim colour, the dim one darker`,
+			lit ~= nil and dim ~= nil and dim[1] + dim[2] + dim[3] < lit[1] + lit[2] + lit[3]
+		)
+	end
+end
 
 -- house kit
 check(
@@ -3787,7 +3809,235 @@ checkDayNight(); -- glass tints (a function, so its locals stay off the main chu
 	check("glass: tints keep hue, cap colour, clamp lightness", okTint)
 	check("glass: see-through stays partial", G.MinTransparency >= 0 and G.MinTransparency < 0.5)
 	check("look: sun latitude in range", LookCfg.Look.Latitude >= 0 and LookCfg.Look.Latitude <= 80)
+end)(); -- street life (a function, so its locals stay off the main chunk's register limit)
+(function()
+	local SL = require("../src/shared/Rules/StreetLife")
+	local C = require("../src/shared/Config/StreetLife")
+	local Traffic = require("../src/shared/Config/Traffic")
+	local WM = World.Map
+	local slPlan = CityPlan.plan(WM.BlocksX, WM.BlocksZ, WM.Seed)
+	local kerbSides = SL.sides(slPlan, WM.BlocksX, WM.BlocksZ, C.Kerb.Kinds)
+	local okSides = #kerbSides > 0
+	for _, s in kerbSides do
+		local d = SL.SIDES[s.side]
+		local ni, nj = s.i + d[1], s.j + d[2]
+		local n = slPlan[ni] and slPlan[ni][nj]
+		okSides = okSides and C.Kerb.Kinds[slPlan[s.i][s.j]] == true and n ~= "spawn"
+	end
+	check("street life: kerb parking on its kinds only, never round spawn", okSides)
+	local works = SL.sides(slPlan, WM.BlocksX, WM.BlocksZ, C.Works.Kinds)
+	check("street life: enough quiet sides for the roadworks", #works >= C.Works.Count)
+	local toRoad = WM.BlockSize / 2 + WM.RoadWidth / 2
+	local half = 5 -- a parked car's half width, with room
+	check(
+		"street life: kerb cars clear of the traffic lane and off the sidewalk",
+		toRoad - C.Kerb.Out - half > Traffic.Lane + half and C.Kerb.Out - half >= WM.BlockSize / 2
+	)
+	local farSlot = 0
+	for _, t in C.Kerb.Slots do
+		farSlot = math.max(farSlot, math.abs(t))
+	end
+	local wcfg = C.Works
+	check(
+		"street life: roadworks clear of the crossings",
+		wcfg.Spread + wcfg.Patch[2] / 2 + wcfg.Cones * wcfg.ConeGap < WM.BlockSize / 2 - 10
+	)
+	check(
+		"street life: kerb cars clear of the crossings",
+		farSlot + C.Kerb.Jitter + 13 < WM.BlockSize / 2 - 20
+	)
+	check(
+		"street life: a box hits a rect it overlaps, not one beside it",
+		SL.hits({ { 0, 0, 10, 10 } }, 5, 5, 15, 15)
+			and not SL.hits({ { 0, 0, 10, 10 } }, 10, 0, 20, 10)
+	)
+	local lotInner = WM.BlockSize - WM.SidewalkWidth * 2
+	local L = C.Lot
+	local area = C.Site.Area
+	local keepOut = table.clone(L.KeepOut)
+	table.insert(keepOut, { area[1] - 4, area[2] - 4, area[3] + 4, area[4] + 4 })
+	local bays = SL.lotBays(lotInner, L.Bay, L.Edge, L.Corner, keepOut)
+	local okBays = #bays >= 12
+	for _, bay in bays do
+		local hx = if bay.dx ~= 0 then L.Bay[2] / 2 else L.Bay[1] / 2
+		local hz = if bay.dx ~= 0 then L.Bay[1] / 2 else L.Bay[2] / 2
+		okBays = okBays
+			and not SL.hits(keepOut, bay.x - hx, bay.z - hz, bay.x + hx, bay.z + hz)
+			and math.abs(bay.x) + hx <= lotInner / 2
+			and math.abs(bay.z) + hz <= lotInner / 2
+			and math.abs(bay.dx) + math.abs(bay.dz) == 1
+	end
+	check("street life: car park bays inside the lot, clear of the ramps and the site", okBays)
+	local boards = SL.hoarding(area, C.Site.Hoarding, C.Site.Gate)
+	local okBoards, gateOpen = #boards > 8, true
+	for _, bay in boards do
+		okBoards = okBoards and bay.len <= C.Site.Hoarding * 1.5
+		if
+			not bay.alongX
+			and bay.x == area[3]
+			and math.abs(bay.z - (area[2] + area[4]) / 2) < C.Site.Gate / 2
+		then
+			gateOpen = false
+		end
+	end
+	check("street life: the site is boarded round, its gate left open", okBoards and gateOpen)
+	local slPitch = WM.BlockSize + WM.RoadWidth
+	local x0 = -(WM.BlocksX * slPitch + WM.RoadWidth) / 2
+	local z0 = -(WM.BlocksZ * slPitch + WM.RoadWidth) / 2
+	local si = (C.Site.Block[1] - x0 - WM.RoadWidth - WM.BlockSize / 2) / slPitch
+	local sj = (C.Site.Block[2] - z0 - WM.RoadWidth - WM.BlockSize / 2) / slPitch
+	check(
+		"street life: the building site stands on a car park",
+		si == math.floor(si) and sj == math.floor(sj) and slPlan[si][sj] == "parking"
+	)
+end)();
+-- the cars' finish (a function, so its locals stay off the main chunk's register limit)
+(function()
+	local SR = require("../src/shared/Rules/Sheen")
+	local C = require("../src/shared/Config/Look").Cars
+	check(
+		"sheen: paint and zone paint pieces are painted panels",
+		SR.isPaint("Paint") and SR.isPaint("Z1_Paint") and SR.isPaint("U2_Paint")
+	)
+	check(
+		"sheen: body, glass and wheels are not painted panels",
+		not SR.isPaint("Body")
+			and not SR.isPaint("Glass")
+			and not SR.isPaint("Wheel_FL1")
+			and not SR.isPaint("Painted")
+	)
+	local pm, pr = SR.finish("Z3_Paint", C)
+	local gm, gr = SR.finish("Glass", C)
+	local bm, br = SR.finish("Body", C)
+	check("sheen: paint gets the paint finish", pm == C.PaintMaterial and pr == C.PaintReflectance)
+	check("sheen: glass gets the glass finish", gm == C.GlassMaterial and gr == C.GlassReflectance)
+	check("sheen: the body keeps its own", bm == nil and br == nil)
+	check(
+		"sheen: light, not washed out",
+		C.PaintReflectance > 0
+			and C.PaintReflectance <= 0.1
+			and C.GlassReflectance > 0
+			and C.GlassReflectance <= 0.25
+	)
+	check(
+		"sheen: special paints keep their own finish",
+		SR.paintReflectance(C.PaintMaterial, C) == C.PaintReflectance
+			and SR.paintReflectance("Neon", C) == 0
+			and SR.paintReflectance("Foil", C) == 0
+	)
+	local roblox = require("@lune/roblox")
+	local okEnum = pcall(function()
+		return (roblox.Enum.Material :: any)[C.PaintMaterial],
+			(roblox.Enum.Material :: any)[C.GlassMaterial]
+	end)
+	check("sheen: the finishes are real materials", okEnum)
+	-- every template has painted panels for the sheen to land on
+	local fs = require("@lune/fs")
+	local okPaint = true
+	for _, root in roblox.deserializeModel(fs.readFile("assets/Vehicles.rbxm")) do
+		for _, m in root:GetChildren() do
+			if m:IsA("Model") and m.Name ~= "SemiTrailer" and m:FindFirstChild("Paint") == nil then
+				print("   no Paint part on " .. m.Name)
+				okPaint = false
+			end
+		end
+	end
+	check("sheen: every vehicle has a Paint part", okPaint)
 end)()
+
+-- street greenery (Config/StreetGreen, Rules/StreetGreen) and the ambient motion's numbers (Config/Ambient)
+local function checkStreetGreen()
+	local G = require("../src/shared/Config/StreetGreen")
+	local SG = require("../src/shared/Rules/StreetGreen")
+	local Amb = require("../src/shared/Config/Ambient")
+	local MW = World.Map
+	local T = G.Trees
+	-- every tree spot stays on the sidewalk, clear of the lamp in the side's middle and of the hydrant
+	local okSpots = T.Inset > Streets.KerbInset and T.Inset + T.TrunkWidth / 2 < MW.SidewalkWidth
+	for _, list in { T.At, T.OuterAt, T.SpawnAt } do
+		for _, t in list do
+			local along = math.abs(t) * MW.BlockSize
+			okSpots = okSpots and along > 4 and math.abs(along - 0.2 * MW.BlockSize) > 4
+		end
+	end
+	okSpots = okSpots and #T.OuterAt < #T.At and T.DowntownReach > 0
+	check("street trees: on the sidewalk, clear of lamps and hydrants", okSpots)
+	local okShapes = #T.Shapes >= 3
+	for _, sh in T.Shapes do
+		okShapes = okShapes
+			and sh.width > 0
+			and sh.stretch > 0
+			and sh.trunk > 4
+			and sh.sink >= 0
+			and sh.sink < 1
+	end
+	check("street trees: three or more crown shapes", okShapes)
+	-- picks: in range, neighbours along a row differ, accents are rare
+	local pickOk, differ = true, false
+	for x = -600, 600, 37 do
+		local s = SG.shape(x, 141.5, #T.Shapes)
+		local g = SG.green(x, 141.5, #T.Greens)
+		pickOk = pickOk and s >= 1 and s <= #T.Shapes and g >= 1 and g <= #T.Greens
+		if SG.shape(x, 141.5, #T.Shapes) ~= SG.shape(x + 35, 141.5, #T.Shapes) then
+			differ = true
+		end
+	end
+	check("street trees: shape and green picks in range and varied", pickOk and differ)
+	local accents, sides = 0, 0
+	for i = 0, MW.BlocksX - 1 do
+		for j = 0, MW.BlocksZ - 1 do
+			for side = 1, 4 do
+				sides += 1
+				local acc = SG.accent(i, j, side, T.AccentEvery)
+				if acc then
+					accents += 1
+					pickOk = pickOk and acc >= 1 and acc <= #T.Accents
+				end
+			end
+		end
+	end
+	check(
+		"street trees: accent avenues are a few sides",
+		pickOk and accents > 0 and accents < sides / 4
+	)
+	local V = G.Verge
+	check(
+		"verge: inside the sidewalk and shorter than the block",
+		V.Inset + V.Width / 2 < MW.SidewalkWidth
+			and V.Inset - V.Width / 2 > 0
+			and V.Length < 1
+			and V.Top < 0.5
+	)
+	-- the beds beside a tower: none when the flank is narrow, two inside the flanks otherwise, never past the
+	-- tower's back (the car park) or the front sidewalk
+	local F = G.Forecourt
+	local paved = MW.BlockSize - MW.SidewalkWidth * 2
+	check("forecourt: no beds on a narrow flank", #SG.flankRuns(paved, paved - 4, 80, 6, F) == 0)
+	local runs = SG.flankRuns(paved, paved * 0.5, 80, 6, F)
+	local okRuns = #runs == 2
+	for _, r in runs do
+		okRuns = okRuns
+			and math.abs(r.x) + F.Depth / 2 <= paved / 2
+			and math.abs(r.x) - F.Depth / 2 >= paved * 0.25 + F.Clear - 0.01
+			and r.y0 >= paved / 2 - 6 - 80 - 0.01
+			and r.y1 <= paved / 2
+			and r.y1 - r.y0 >= F.MinRun
+	end
+	check("forecourt: two beds inside the flanks, clear of the car park", okRuns)
+	check("forecourt: a short run gets none", #SG.flankRuns(paved, paved * 0.5, 10, 6, F) == 0)
+	check(
+		"ambient: ranges, rates and the pool are sane",
+		Amb.RangePhone <= Amb.Range
+			and Amb.PhoneRate > 0
+			and Amb.PhoneRate <= 1
+			and Amb.Birds * #Amb.Flocks <= 40
+			and Amb.Spray.Rate <= 60
+			and Amb.Steam.Rate <= 20
+			and Amb.VentEvery >= 1
+			and Amb.CheckEvery > 0
+	)
+end
+checkStreetGreen()
 
 -- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
 local function checkBakedTerrain()

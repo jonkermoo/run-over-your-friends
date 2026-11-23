@@ -76,16 +76,27 @@ local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
 local DayNightService = require(script.DayNightService)
 local LookService = require(script.LookService)
+local StreetLife = require(script.StreetLife)
 
 -- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
 local Players = game:GetService("Players")
 Players.CharacterAutoLoads = false
+-- the cars' finish, before the map's parked cars copy the templates (a failure only costs the sheen)
+local shone, shineError = pcall(LookService.cars, ReplicatedStorage:WaitForChild("VehicleModels"))
+if not shone then
+	warn("car finish not applied: " .. tostring(shineError))
+end
 local built, world = pcall(MapBuilder.build)
 Players.CharacterAutoLoads = true -- even if the build failed, so players still spawn and the error shows
 if not built then
 	error(world)
 end
 LookService.apply(world.buildings)
+-- parked cars, plaza life, a building site, roadworks (props, registered below); a failure here only loses them
+local streetOk, streetErr = pcall(StreetLife.build, world)
+if not streetOk then
+	warn("street life failed: " .. tostring(streetErr))
+end
 for _, p in Players:GetPlayers() do
 	if not p.Character then
 		task.spawn(p.LoadCharacter, p)

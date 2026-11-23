@@ -1,5 +1,6 @@
 --!strict
 -- Client entry.
+local Ambient = require(script.Ambient)
 local Boards = require(script.Boards)
 local ChampionsClient = require(script.Champions)
 local CamLock = require(script.CamLock)
@@ -57,6 +58,7 @@ NameTags.start()
 VipTags.start()
 GiantFinder.start()
 Streets.start()
+Ambient.start()
 Skyline.start()
 Traffic.start()
 Interiors.start()
