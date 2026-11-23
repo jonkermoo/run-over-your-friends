@@ -10,6 +10,8 @@ local Foliage = require(ReplicatedStorage.Shared.Config.Foliage)
 local Parks = require(ReplicatedStorage.Shared.Config.Parks)
 local Suburbs = require(ReplicatedStorage.Shared.Config.Suburbs)
 local World = require(ReplicatedStorage.Shared.Config.World)
+local StreetGreen = require(ReplicatedStorage.Shared.Config.StreetGreen)
+local Green = require(ReplicatedStorage.Shared.Rules.StreetGreen)
 local Greenery = require(script.Parent.Greenery)
 local LotKit = require(script.Parent.LotKit)
 local StreetKit = require(script.Parent.StreetKit)
@@ -538,6 +540,70 @@ function YardKit.officeFront(folder: Instance, door: Vector3, out: Vector3, widt
 		bush.Material = Enum.Material.Grass
 	end
 	StreetKit.bench(folder, door + across * O.BenchAt + out * O.Out, out)
+end
+
+-- beds on the bare paving either side of an office tower (Config/StreetGreen Forecourt, Rules/StreetGreen
+-- flankRuns): a flat lawn strip along the sidewalk, a low hedge on the tower's side, flowers on the street's.
+-- `centre` is the block's middle on the ground, `out` toward the tower's front, `inner` the paved middle,
+-- `across` and `deep` the tower's size, `setback` its front's distance in from the front sidewalk
+function YardKit.officeFlanks(
+	folder: Instance,
+	static: Instance,
+	centre: Vector3,
+	out: Vector3,
+	inner: number,
+	across: number,
+	deep: number,
+	setback: number
+)
+	local F = StreetGreen.Forecourt
+	local side = Vector3.new(-out.Z, 0, out.X)
+	for _, run in Green.flankRuns(inner, across, deep, setback, F) do
+		local inward = if run.x > 0 then -side else side
+		local a = centre + side * run.x + out * run.y0
+		local b = centre + side * run.x + out * run.y1
+		local len = run.y1 - run.y0
+		local lawn = part(
+			static,
+			Vector3.new(len, F.Top, F.Depth),
+			CFrame.fromMatrix((a + b) / 2 + Vector3.new(0, F.Top / 2, 0), out, Vector3.yAxis),
+			rgb(StreetGreen.Verge.Colour),
+			Enum.Material.Grass
+		)
+		lawn.CanCollide = false
+		lawn.CanQuery = false
+		lawn.CanTouch = false
+		local m = prop(folder, "Hedge")
+		local back = inward * (F.Depth / 2 - F.Hedge.depth / 2)
+		strip(
+			m,
+			"BushA",
+			a + back + Vector3.new(0, F.Top, 0),
+			b + back + Vector3.new(0, F.Top, 0),
+			F.Hedge.height,
+			F.Hedge.depth,
+			rgb(F.HedgeColour)
+		).Material =
+			Enum.Material.Grass
+		local front = -inward * (F.Depth / 2 - F.BloomSize[3] / 2 - F.BloomEdge)
+		for k = 1, F.Blooms do
+			local at = a:Lerp(b, (k - 0.5) / F.Blooms) + front
+			local bed = prop(folder, "FlowerBed")
+			local blooms = Greenery.mesh(
+				bed,
+				"Blooms",
+				1,
+				CFrame.fromMatrix(
+					at + Vector3.new(0, F.Top + F.BloomSize[2] / 2, 0),
+					out,
+					Vector3.yAxis
+				),
+				rgb(StreetGreen.Flowers[Green.spot(at.X, at.Z) % #StreetGreen.Flowers + 1])
+			)
+			blooms.Size = Vector3.new(F.BloomSize[1], F.BloomSize[2], F.BloomSize[3])
+			blooms.Material = Enum.Material.SmoothPlastic
+		end
+	end
 end
 
 -- a slide: a ladder post, a platform and the chute sloping down along `along`

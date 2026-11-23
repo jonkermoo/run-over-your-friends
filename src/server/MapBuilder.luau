@@ -4,8 +4,10 @@
 -- warehouse, shops, parks, plazas) with destructible chunked buildings and places for the crowd,
 -- parking lots with kickers; the ground, the highway ring and the zones beyond it come from OutskirtsKit.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
 local BuildingConfig = require(ReplicatedStorage.Shared.Config.Buildings)
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
@@ -353,14 +355,19 @@ local function dressSpawnPlaza(
 				Enum.Material.Fabric
 			)
 			b.CanCollide = false
-			part(
+			local tail = part(
 				static,
 				Vector3.new(0.3, 2.4, 4),
 				b.CFrame * CFrame.new(0, -7.2, 0),
 				PAINT_BLACK,
 				Enum.Material.Fabric
-			).CanCollide =
-				false
+			)
+			tail.CanCollide = false
+			-- both sway about the pole on each screen (client/Ambient)
+			for _, piece in { b, tail } do
+				piece:SetAttribute("Hinge", at)
+				CollectionService:AddTag(piece, Ambient.Tags.Flag)
+			end
 		end
 	end
 end
@@ -492,6 +499,10 @@ local function park(
 		disc(static, 0.3, PK.Pond, centre, 0.9, Color3.fromRGB(60, 160, 200), Enum.Material.Glass)
 	water.Transparency = 0.15
 	water.Reflectance = 0.1
+	-- a low jet of spray in its middle, made on each screen (client/Ambient)
+	water:SetAttribute("SprayLift", Ambient.PondLift)
+	water:SetAttribute("Pond", true)
+	CollectionService:AddTag(water, Ambient.Tags.Spray)
 	-- along each arm, from the pond out to the sidewalk
 	local lampColour = accent:Lerp(Color3.new(1, 1, 1), 0.5)
 	for _, dir in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
@@ -980,6 +991,17 @@ function MapBuilder.build(fresh: boolean?): Result
 					out,
 					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
 				)
+				-- lawn, hedge and flower beds on the bare paving either side of it (Config/StreetGreen Forecourt)
+				YardKit.officeFlanks(
+					props,
+					static,
+					centre,
+					out,
+					inner,
+					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d))),
+					deep,
+					BuildingConfig.Office.Setback
+				)
 				-- its own crown, taken in turn so neighbours differ (TowerKit)
 				TowerKit.crown(
 					model,
@@ -1002,6 +1024,26 @@ function MapBuilder.build(fresh: boolean?): Result
 					colours :: any,
 					offices
 				)
+				-- a vent box on some roofs' back corner, steaming on each screen (client/Ambient)
+				if offices % Ambient.VentEvery == 0 then
+					local VS = Ambient.VentSize
+					local side = Vector3.new(-out.Z, 0, out.X)
+					local acrossW = math.abs(side:Dot(Vector3.new(w, 0, d)))
+					local vent = part(
+						model,
+						Vector3.new(VS[1], VS[2], VS[3]),
+						CFrame.new(
+							tower
+								- out * (deep / 2 - Ambient.VentInset)
+								+ side * (acrossW / 2 - Ambient.VentInset)
+								+ Vector3.new(0, floors * M.FloorHeight + VS[2] / 2, 0)
+						),
+						rgb(Ambient.VentColour),
+						Enum.Material.Metal
+					)
+					vent:SetAttribute("Fixed", true)
+					CollectionService:AddTag(vent, Ambient.Tags.Steam)
+				end
 				-- the company name and a parody billboard stand on the roof, behind the parapet
 				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
 				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
