@@ -12,7 +12,7 @@ export type District = {
 	sidewalkMaterial: string,
 	accent: RGB, -- awnings, lamp heads, billboards
 	signals: boolean, -- traffic lights at its crossings
-	trees: number, -- chance of planter trees along a block side
+	trees: number, -- chance of street trees along a block side (Config/StreetGreen)
 }
 
 return table.freeze({
@@ -84,14 +84,6 @@ return table.freeze({
 		"MEGACORP IS HIRING",
 	}),
 
-	-- the street trees' crowns (StreetKit, one of the low-poly crown meshes): this wide, their foot this far up
-	-- the trunk, in one of these greens
-	TreeCrown = table.freeze({
-		Width = 8, -- (as wide and as high over the road as the round crowns they replaced)
-		Base = 7,
-		Greens = table.freeze({ { 76, 146, 70 }, { 88, 156, 72 }, { 66, 132, 64 } }),
-	}),
-
 	Districts = table.freeze({
 		neon = table.freeze({
 			name = "Neon Core",
@@ -107,7 +99,7 @@ return table.freeze({
 			sidewalkMaterial = "Concrete",
 			accent = { 120, 220, 255 },
 			signals = true,
-			trees = 0.65,
+			trees = 1,
 		}) :: District,
 		old = table.freeze({
 			name = "Old Town",
@@ -123,7 +115,7 @@ return table.freeze({
 			sidewalkMaterial = "Pavement", -- paving slabs (was cobblestone: too loud)
 			accent = { 232, 172, 60 },
 			signals = true,
-			trees = 0.5,
+			trees = 1,
 		}) :: District,
 		maple = table.freeze({
 			name = "Maple Hills",
@@ -159,7 +151,7 @@ return table.freeze({
 			sidewalkMaterial = "WoodPlanks",
 			accent = { 60, 160, 200 },
 			signals = true,
-			trees = 0.7,
+			trees = 1,
 		}) :: District,
 		stadium = table.freeze({
 			name = "Stadium Row",
@@ -169,7 +161,7 @@ return table.freeze({
 			sidewalkMaterial = "Concrete",
 			accent = { 220, 140, 40 },
 			signals = true,
-			trees = 0.4,
+			trees = 1,
 		}) :: District,
 	}),
 })

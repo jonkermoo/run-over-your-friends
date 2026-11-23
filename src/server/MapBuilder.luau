@@ -4,8 +4,10 @@
 -- warehouse, shops, parks, plazas) with destructible chunked buildings and places for the crowd,
 -- parking lots with kickers; the ground, the highway ring and the zones beyond it come from OutskirtsKit.
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
 local BuildingConfig = require(ReplicatedStorage.Shared.Config.Buildings)
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
@@ -353,14 +355,19 @@ local function dressSpawnPlaza(
 				Enum.Material.Fabric
 			)
 			b.CanCollide = false
-			part(
+			local tail = part(
 				static,
 				Vector3.new(0.3, 2.4, 4),
 				b.CFrame * CFrame.new(0, -7.2, 0),
 				PAINT_BLACK,
 				Enum.Material.Fabric
-			).CanCollide =
-				false
+			)
+			tail.CanCollide = false
+			-- both sway about the pole on each screen (client/Ambient)
+			for _, piece in { b, tail } do
+				piece:SetAttribute("Hinge", at)
+				CollectionService:AddTag(piece, Ambient.Tags.Flag)
+			end
 		end
 	end
 end
@@ -492,6 +499,10 @@ local function park(
 		disc(static, 0.3, PK.Pond, centre, 0.9, Color3.fromRGB(60, 160, 200), Enum.Material.Glass)
 	water.Transparency = 0.15
 	water.Reflectance = 0.1
+	-- a low jet of spray in its middle, made on each screen (client/Ambient)
+	water:SetAttribute("SprayLift", Ambient.PondLift)
+	water:SetAttribute("Pond", true)
+	CollectionService:AddTag(water, Ambient.Tags.Spray)
 	-- along each arm, from the pond out to the sidewalk
 	local lampColour = accent:Lerp(Color3.new(1, 1, 1), 0.5)
 	for _, dir in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
@@ -753,8 +764,9 @@ function MapBuilder.build(fresh: boolean?): Result
 			local centre = Vector3.new(cx, 0, cz)
 			local district = Districts.of(i, j, M.BlocksX, M.BlocksZ)
 			local style = (Streets.Districts :: any)[district] :: Streets.District
+			local walls = (BuildingConfig.Facades :: any)[district] or style.walls
 			local function wallColour(): Color3
-				local c = style.walls[random:NextInteger(1, #style.walls)]
+				local c = walls[random:NextInteger(1, #walls)]
 				return Color3.fromRGB(c[1], c[2], c[3])
 			end
 			local firstBuilding = #buildings:GetChildren() + 1
@@ -811,44 +823,48 @@ function MapBuilder.build(fresh: boolean?): Result
 				boards.Name = "Boards"
 				boards.ModelStreamingMode = Enum.ModelStreamingMode.Persistent -- the client builds the boards on it
 				boards.Parent = static
-				-- a sign gantry over them: a road-yellow beam on two black posts
+				-- the boards in a row, each in a frame (gold bars, cream sides, a lit strip under the top bar)
+				-- with two lamps leaning over it, under a cream gantry on terracotta posts
+				local L = Leaderboards
+				local STW, SH = L.StandWidth, L.StandHeight
+				local by = L.StandLift + SH / 2
+				local span = (L.Stands - 1) * L.StandStep + STW + L.GantryReach * 2
 				local gz = cz - B / 2 + 5
-				part(boards, Vector3.new(196, 3, 2.4), CFrame.new(cx, 55, gz), PAINT_YELLOW)
+				local beamY = L.StandLift + SH + L.FrameTop + L.GantryOver
+				part(boards, Vector3.new(span, 3, 2.4), CFrame.new(cx, beamY, gz), rgb(L.Gantry))
 				for _, side in { -1, 1 } do
 					part(
 						boards,
-						Vector3.new(3, 56, 3),
-						CFrame.new(cx + side * 96, 27, gz),
-						PAINT_BLACK
+						Vector3.new(L.GantryPost, beamY + 1, L.GantryPost),
+						CFrame.new(cx + side * (span / 2 - L.PostInset), (beamY + 1) / 2, gz),
+						rgb(L.GantryPosts)
 					)
 				end
 				champions(static, cx, cz)
-				local STW, SH = Leaderboards.StandWidth, Leaderboards.StandHeight
-				for k = 1, Leaderboards.Stands do
-					local bx = cx + (k - (Leaderboards.Stands + 1) / 2) * Leaderboards.StandStep
+				for k = 1, L.Stands do
+					local bx = cx + (k - (L.Stands + 1) / 2) * L.StandStep
 					local bz = cz - B / 2 + 6
 					local face = part(
 						boards,
 						Vector3.new(STW, SH, 1.2),
-						CFrame.lookAt(Vector3.new(bx, 30, bz), Vector3.new(bx, 30, bz + 10)),
-						Color3.fromRGB(24, 24, 38)
+						CFrame.lookAt(Vector3.new(bx, by, bz), Vector3.new(bx, by, bz + 10)),
+						rgb(L.Panel)
 					)
 					face.Name = "Stand_" .. k
-					-- a frame (yellow top and bottom, black sides) and two lamps leaning over the top
 					local frame =
-						CFrame.lookAt(Vector3.new(bx, 30, bz - 0.4), Vector3.new(bx, 30, bz + 10))
+						CFrame.lookAt(Vector3.new(bx, by, bz - 0.4), Vector3.new(bx, by, bz + 10))
 					for _, e in { -1, 1 } do
 						part(
 							boards,
 							Vector3.new(STW + 3, 1.6, 1.6),
 							frame * CFrame.new(0, e * (SH / 2 + 0.8), 0),
-							PAINT_YELLOW
+							rgb(L.Frame)
 						)
 						part(
 							boards,
 							Vector3.new(1.6, SH, 1.6),
 							frame * CFrame.new(e * (STW / 2 + 0.8), 0, 0),
-							PAINT_BLACK
+							rgb(L.FrameSides)
 						)
 						local lamp = part(
 							boards,
@@ -866,11 +882,23 @@ function MapBuilder.build(fresh: boolean?): Result
 						light.Color = Color3.fromRGB(255, 244, 220)
 						light.Parent = lamp
 					end
+					part(
+						boards,
+						Vector3.new(STW + L.GlowStrip[1], L.GlowStrip[2], L.GlowStrip[3]),
+						frame * CFrame.new(0, SH / 2 - L.GlowAt[1], -L.GlowAt[2]),
+						rgb(L.Glow),
+						Enum.Material.Neon
+					)
 					for _, side in { -1, 1 } do
 						part(
 							boards,
-							Vector3.new(2, 7.4, 2), -- ends inside the frame's bottom bar: equal tops flicker
-							CFrame.new(bx + side * (STW / 2 - 2), 2.7, bz - 0.5),
+							-- ends inside the frame's bottom bar: equal tops flicker
+							Vector3.new(2, L.StandLift + 0.4, 2),
+							CFrame.new(
+								bx + side * (STW / 2 - 2),
+								(L.StandLift + 0.4) / 2 - 1,
+								bz - 0.5
+							),
 							COLORS.concrete
 						)
 					end
@@ -934,13 +962,20 @@ function MapBuilder.build(fresh: boolean?): Result
 				end
 				local wall = wallColour()
 				local look = (BuildingConfig.Office.Looks :: any)[district] :: BuildingConfig.OfficeLook
+				-- its own frame and spandrels, and two shopfront colours, each taken in turn
+				local frame = OF.Frames[(offices * OF.FrameStride) % #OF.Frames + 1]
+				local SFC = OF.Shopfront.Colours
 				local colours = {
-					wall = wall,
-					trim = rgb(look.trim),
+					wall = if hero or OF.FacadeSpandrels then wall else rgb(frame.spandrel),
+					trim = rgb(frame.trim),
 					accent = rgb(style.accent),
 					roof = rgb(look.roof),
 					stone = rgb(look.stone),
 					glass = rgb(OF.Tints[(offices * 5) % #OF.Tints + 1]),
+					shops = {
+						rgb(SFC[(offices * 2) % #SFC + 1]),
+						rgb(SFC[(offices * 2 + 1) % #SFC + 1]),
+					},
 				}
 				if hero then
 					colours.glass = rgb(OF.Hero.Glass)
@@ -949,12 +984,23 @@ function MapBuilder.build(fresh: boolean?): Result
 				end
 				local model, door =
 					TownKit.office(buildings, tower, w, d, floors, colours, "Office" .. count, out)
-				-- a street front: awnings either side of the door, planters, a bench (YardKit)
+				-- a street front: planters and a bench (YardKit)
 				YardKit.officeFront(
 					props,
 					door,
 					out,
 					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d)))
+				)
+				-- lawn, hedge and flower beds on the bare paving either side of it (Config/StreetGreen Forecourt)
+				YardKit.officeFlanks(
+					props,
+					static,
+					centre,
+					out,
+					inner,
+					math.abs(Vector3.new(-out.Z, 0, out.X):Dot(Vector3.new(w, 0, d))),
+					deep,
+					BuildingConfig.Office.Setback
 				)
 				-- its own crown, taken in turn so neighbours differ (TowerKit)
 				TowerKit.crown(
@@ -968,6 +1014,36 @@ function MapBuilder.build(fresh: boolean?): Result
 					colours :: any,
 					lotRandom
 				)
+				TowerKit.clutter(
+					model,
+					tower,
+					w,
+					d,
+					out,
+					floors * M.FloorHeight,
+					colours :: any,
+					offices
+				)
+				-- a vent box on some roofs' back corner, steaming on each screen (client/Ambient)
+				if offices % Ambient.VentEvery == 0 then
+					local VS = Ambient.VentSize
+					local side = Vector3.new(-out.Z, 0, out.X)
+					local acrossW = math.abs(side:Dot(Vector3.new(w, 0, d)))
+					local vent = part(
+						model,
+						Vector3.new(VS[1], VS[2], VS[3]),
+						CFrame.new(
+							tower
+								- out * (deep / 2 - Ambient.VentInset)
+								+ side * (acrossW / 2 - Ambient.VentInset)
+								+ Vector3.new(0, floors * M.FloorHeight + VS[2] / 2, 0)
+						),
+						rgb(Ambient.VentColour),
+						Enum.Material.Metal
+					)
+					vent:SetAttribute("Fixed", true)
+					CollectionService:AddTag(vent, Ambient.Tags.Steam)
+				end
 				-- the company name and a parody billboard stand on the roof, behind the parapet
 				local top = floors * M.FloorHeight + BuildingConfig.Office.Parapet + 1
 				local name = Crowd.OfficeNames[(offices - 1) % #Crowd.OfficeNames + 1]
@@ -1309,7 +1385,7 @@ function MapBuilder.build(fresh: boolean?): Result
 			for n = firstBuilding, #children do
 				for _, p in children[n]:GetDescendants() do
 					if p:IsA("BasePart") and p.Material == Enum.Material.SmoothPlastic then
-						for _, c in style.walls do
+						for _, c in walls do
 							if p.Color == Color3.fromRGB(c[1], c[2], c[3]) then
 								p.Material = wallMaterial
 								break
