@@ -23,6 +23,9 @@ return function(check: (string, boolean) -> ())
 			check(`car detail: {kind} colour is 0-255`, ok)
 		end
 	end
+	for _, kind in Config.Parked do
+		check(`car detail: parked {kind} is a detail kind`, table.find(kinds, kind) ~= nil)
+	end
 	-- lit lenses glow: the tail red stays deep so bloom doesn't turn it pink
 	local tail = Config.Look.Tail.rgb :: { number }
 	check("car detail: tail red is deep", tail[1] <= 180 and tail[2] <= 40 and tail[3] <= 40)

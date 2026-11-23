@@ -5,6 +5,8 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CarDetail = require(ReplicatedStorage.Shared.Config.CarDetail)
+local CarDetailRules = require(ReplicatedStorage.Shared.Rules.CarDetail)
 local Cfg = require(ReplicatedStorage.Shared.Config.Lots)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
@@ -47,10 +49,10 @@ local function prop(folder: Instance, kind: string): Model
 	return m
 end
 
--- a parked car: a vehicle model cut down to its body, paint, glass, lamps, trim, plates and wheels, welded to its body so a knock
--- sends it flying in one piece; `cf` is where its bottom centre stands, facing along its look vector
-local KEEP =
-	{ Body = true, Paint = true, Glass = true, Lamp = true, Tail = true, Trim = true, Plate = true }
+-- a parked car: a vehicle model cut down to its body, paint, glass, lamp lenses and wheels (Config/CarDetail Parked:
+-- the map is near its part budget), welded to its body so a knock sends it flying in one piece; `cf` is where its
+-- bottom centre stands, facing along its look vector
+local KEEP = { Body = true, Paint = true, Glass = true }
 local MODELS = ReplicatedStorage:WaitForChild("VehicleModels")
 
 function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random): Model?
@@ -63,15 +65,17 @@ function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random
 	model.WorldPivot = CFrame.identity
 	model:ScaleTo(Game.VehicleScale)
 	for _, d in model:GetDescendants() do
-		-- keep the body, paint, glass, finishing detail and wheels; drop the rest (interior, needles, the drivable model's
-		-- attachments, welds and sounds)
-		local keep = if d:IsA("BasePart")
+		-- keep the body, paint, glass, the parked finishing detail and wheels; drop the rest (interior, needles, the
+		-- drivable model's attachments, welds and sounds)
+		local detail = CarDetailRules.kind(d.Name, CarDetail.Kinds)
+		local keep = if not d:IsA("BasePart")
+			then d:IsA("Model")
+			elseif detail then table.find(CarDetail.Parked, detail) ~= nil
 			-- stock look: the body's zones cut out for mastery upgrades (Z<n>) stay, the rebuilt ones (U<n>) go
-			then KEEP[d.Name] or string.sub(d.Name, 1, 6) == "Wheel_" or string.match(
+			else KEEP[d.Name] or string.sub(d.Name, 1, 6) == "Wheel_" or string.match(
 				d.Name,
 				"^Z%d"
 			) ~= nil
-			else d:IsA("Model")
 		if not keep then
 			d:Destroy()
 		end

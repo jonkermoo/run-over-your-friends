@@ -8,6 +8,10 @@ local CarDetail = {}
 
 CarDetail.Kinds = table.freeze({ "Lamp", "Tail", "Trim", "Plate" })
 
+-- what the map's parked cars keep: the lit lenses only (trim and plates would put the map over its part budget,
+-- Config/Buildings PartBudget; each kept kind is about 1 part per parked car)
+CarDetail.Parked = table.freeze({ "Lamp", "Tail" })
+
 CarDetail.Look = table.freeze({
 	Lamp = table.freeze({ rgb = { 255, 238, 204 }, material = "Neon" }), -- warm white, lit
 	Tail = table.freeze({ rgb = { 150, 16, 20 }, material = "Neon" }), -- deep red: brighter reds bloom pink
