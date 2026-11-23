@@ -43,6 +43,32 @@ return table.freeze({
 	PlazaFountain = table.freeze({ size = 30, rim = 2.5, column = 9 }),
 	SignalSeconds = 9, -- traffic lights: green this long each way
 	AmberSeconds = 2,
+	-- the traffic light's look (StreetKit.signal; Streets on the client lights one lamp per housing): a grey pole
+	-- with a yellow housing facing each road, three round lamps in it (red top, amber middle, green bottom), a
+	-- dark visor over each; the lit lamp glows in its full colour, the other two show their dim colour
+	Signal = table.freeze({
+		PoleHeight = 12,
+		PoleWidth = 0.6,
+		Housing = table.freeze({ 1.5, 4.2, 0.8 }), -- across, high, deep
+		HousingHeight = 12.4, -- the housing's middle above the ground
+		LampDiameter = 1,
+		LampDepth = 0.2, -- how thick the lamp disc is (it stands half out of the housing's face)
+		LampSpacing = 1.3, -- between lamp middles, up the housing
+		Visor = table.freeze({ 1.2, 0.12, 0.5 }), -- across, thick, out from the housing's face
+		PoleColour = table.freeze({ 140, 144, 150 }),
+		HousingColour = table.freeze({ 246, 198, 46 }),
+		VisorColour = table.freeze({ 38, 40, 44 }),
+		Lit = table.freeze({
+			red = table.freeze({ 255, 60, 48 }),
+			amber = table.freeze({ 255, 178, 36 }),
+			green = table.freeze({ 70, 230, 110 }),
+		}),
+		Dim = table.freeze({
+			red = table.freeze({ 104, 42, 40 }),
+			amber = table.freeze({ 112, 86, 40 }),
+			green = table.freeze({ 40, 86, 54 }),
+		}),
+	}),
 	PropRebuildSeconds = 45, -- knocked props stand back up after this
 	-- text resolution of signs and billboards (Places.sign); they're big, so a low one keeps them inside the
 	-- engine's SurfaceGui texture budget (over it, far boards can draw as blank white)
