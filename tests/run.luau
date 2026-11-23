@@ -3788,6 +3788,97 @@ checkDayNight(); -- glass tints (a function, so its locals stay off the main chu
 	check("look: sun latitude in range", LookCfg.Look.Latitude >= 0 and LookCfg.Look.Latitude <= 80)
 end)()
 
+-- street greenery (Config/StreetGreen, Rules/StreetGreen) and the ambient motion's numbers (Config/Ambient)
+local function checkStreetGreen()
+	local G = require("../src/shared/Config/StreetGreen")
+	local SG = require("../src/shared/Rules/StreetGreen")
+	local Amb = require("../src/shared/Config/Ambient")
+	local MW = World.Map
+	local T = G.Trees
+	-- every tree spot stays on the sidewalk, clear of the lamp in the side's middle and of the hydrant
+	local okSpots = T.Inset > Streets.KerbInset and T.Inset + T.TrunkWidth / 2 < MW.SidewalkWidth
+	for _, t in T.At do
+		local along = math.abs(t) * MW.BlockSize
+		okSpots = okSpots and along > 4 and math.abs(along - 0.2 * MW.BlockSize) > 4
+	end
+	check("street trees: on the sidewalk, clear of lamps and hydrants", okSpots)
+	local okShapes = #T.Shapes >= 3
+	for _, sh in T.Shapes do
+		okShapes = okShapes
+			and sh.width > 0
+			and sh.stretch > 0
+			and sh.trunk > 4
+			and sh.sink >= 0
+			and sh.sink < 1
+	end
+	check("street trees: three or more crown shapes", okShapes)
+	-- picks: in range, neighbours along a row differ, accents are rare
+	local pickOk, differ = true, false
+	for x = -600, 600, 37 do
+		local s = SG.shape(x, 141.5, #T.Shapes)
+		local g = SG.green(x, 141.5, #T.Greens)
+		pickOk = pickOk and s >= 1 and s <= #T.Shapes and g >= 1 and g <= #T.Greens
+		if SG.shape(x, 141.5, #T.Shapes) ~= SG.shape(x + 35, 141.5, #T.Shapes) then
+			differ = true
+		end
+	end
+	check("street trees: shape and green picks in range and varied", pickOk and differ)
+	local accents, sides = 0, 0
+	for i = 0, MW.BlocksX - 1 do
+		for j = 0, MW.BlocksZ - 1 do
+			for side = 1, 4 do
+				sides += 1
+				local acc = SG.accent(i, j, side, T.AccentEvery)
+				if acc then
+					accents += 1
+					pickOk = pickOk and acc >= 1 and acc <= #T.Accents
+				end
+			end
+		end
+	end
+	check(
+		"street trees: accent avenues are a few sides",
+		pickOk and accents > 0 and accents < sides / 4
+	)
+	local V = G.Verge
+	check(
+		"verge: inside the sidewalk and shorter than the block",
+		V.Inset + V.Width / 2 < MW.SidewalkWidth
+			and V.Inset - V.Width / 2 > 0
+			and V.Length < 1
+			and V.Top < 0.5
+	)
+	-- the beds beside a tower: none when the flank is narrow, two inside the flanks otherwise, never past the
+	-- tower's back (the car park) or the front sidewalk
+	local F = G.Forecourt
+	local paved = MW.BlockSize - MW.SidewalkWidth * 2
+	check("forecourt: no beds on a narrow flank", #SG.flankRuns(paved, paved - 4, 80, 6, F) == 0)
+	local runs = SG.flankRuns(paved, paved * 0.5, 80, 6, F)
+	local okRuns = #runs == 2
+	for _, r in runs do
+		okRuns = okRuns
+			and math.abs(r.x) + F.Depth / 2 <= paved / 2
+			and math.abs(r.x) - F.Depth / 2 >= paved * 0.25 + F.Clear - 0.01
+			and r.y0 >= paved / 2 - 6 - 80 - 0.01
+			and r.y1 <= paved / 2
+			and r.y1 - r.y0 >= F.MinRun
+	end
+	check("forecourt: two beds inside the flanks, clear of the car park", okRuns)
+	check("forecourt: a short run gets none", #SG.flankRuns(paved, paved * 0.5, 10, 6, F) == 0)
+	check(
+		"ambient: ranges, rates and the pool are sane",
+		Amb.RangePhone <= Amb.Range
+			and Amb.PhoneRate > 0
+			and Amb.PhoneRate <= 1
+			and Amb.Birds * #Amb.Flocks <= 40
+			and Amb.Spray.Rate <= 60
+			and Amb.Steam.Rate <= 20
+			and Amb.VentEvery >= 1
+			and Amb.CheckEvery > 0
+	)
+end
+checkStreetGreen()
+
 -- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
 local function checkBakedTerrain()
 	local fs = require("@lune/fs")
