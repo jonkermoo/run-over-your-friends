@@ -75,6 +75,7 @@ local RateLimit = require(script.RateLimit)
 local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
 local DayNightService = require(script.DayNightService)
+local LookService = require(script.LookService)
 
 -- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
 local Players = game:GetService("Players")
@@ -84,6 +85,7 @@ Players.CharacterAutoLoads = true -- even if the build failed, so players still 
 if not built then
 	error(world)
 end
+LookService.apply(world.buildings)
 for _, p in Players:GetPlayers() do
 	if not p.Character then
 		task.spawn(p.LoadCharacter, p)

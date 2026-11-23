@@ -3,11 +3,11 @@
 -- people, cars and roads read as well as by day; the sky turns navy with stars and a big moon, windows and lamps
 -- glow. The server only fixes when the cycle started (Lighting attributes); each client works out the same time
 -- from the shared server clock and sets its own Lighting. Seconds, studs, colours { r, g, b }.
-local World = if typeof(script) == "Instance"
-	then require(script.Parent.World)
-	else require("./World")
+local LookConfig = if typeof(script) == "Instance"
+	then require(script.Parent.Look)
+	else require("./Look")
 
-local L = World.Look
+local L = LookConfig.Look
 
 export type Look = {
 	Brightness: number,
@@ -30,7 +30,7 @@ export type Look = {
 	Glow: number, -- 0..1: how many of the lit windows are on, and the headlights
 }
 
--- the day is the approved "golden afternoon" look (Config/World Look), unchanged
+-- the day is the approved "golden afternoon" look (Config/Look)
 local Day: Look = table.freeze({
 	Brightness = L.Brightness,
 	Exposure = L.Exposure,
@@ -53,8 +53,8 @@ local Day: Look = table.freeze({
 })
 
 return table.freeze({
-	Cycle = 1200, -- one full day: 13 min day, 1.5 sunset, ~4 night, 1.5 sunrise
-	StartAt = 120, -- a new server opens here: early morning with the whole day ahead
+	Cycle = 1200, -- one full day: 13 min day (under 3 of them morning), 1.5 sunset, ~4 night, 1.5 sunrise
+	StartAt = 300, -- a new server opens here: early afternoon, the low golden sun with the whole day ahead
 	MoonSize = 14, -- Sky.MoonAngularSize, degrees: big and cartoony
 	Looks = table.freeze({
 		Day = Day,
@@ -149,6 +149,8 @@ return table.freeze({
 	Stops = table.freeze({
 		table.freeze({ at = 0, clock = 6.8, look = "Dawn" }),
 		table.freeze({ at = 90, clock = 8.5, look = "Day" }),
+		-- the morning goes by quickly so most of the day is afternoon light, the sun low and in the west
+		table.freeze({ at = 260, clock = 13.2, look = "Day" }),
 		table.freeze({ at = 690, clock = 16.4, look = "Day" }),
 		table.freeze({ at = 780, clock = 17.4, look = "Golden" }),
 		table.freeze({ at = 870, clock = 18.5, look = "Dusk" }),

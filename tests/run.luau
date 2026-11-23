@@ -3759,7 +3759,34 @@ local function checkDayNight()
 	check("day/night: night lights every lit pane", C.Looks.Night.Glow >= C.Windows.LastAt)
 	check("day/night: headlights on by night", C.Looks.Night.Glow >= C.Headlights.From)
 end
-checkDayNight()
+checkDayNight(); -- glass tints (a function, so its locals stay off the main chunk's register limit)
+(function()
+	local GR = require("../src/shared/Rules/Glass")
+	local LookCfg = require("../src/shared/Config/Look")
+	local G = LookCfg.Glass
+	local okPick, seen = true, {}
+	for i = 1, 200 do
+		local k = GR.pick("Office" .. i, #G.Tints)
+		okPick = okPick and k >= 1 and k <= #G.Tints and k == GR.pick("Office" .. i, #G.Tints)
+		seen[k] = true
+	end
+	local used = 0
+	for _ in seen do
+		used += 1
+	end
+	check("glass: a steady tint per building, all tints used", okPick and used == #G.Tints)
+	local okTint = true
+	for _, t in G.Tints do
+		okTint = okTint and t[1] >= 0 and t[1] <= 1 and t[2] >= 0 and t[2] <= 1
+		local h, s, v = GR.tint(0.9, 0.95, t, G)
+		okTint = okTint and h == t[1] and s <= t[2] and v <= G.ValueMax and v >= G.ValueMin
+		local _, s2, v2 = GR.tint(0.05, 0.1, t, G)
+		okTint = okTint and s2 == 0.05 and v2 == G.ValueMin
+	end
+	check("glass: tints keep hue, cap colour, clamp lightness", okTint)
+	check("glass: see-through stays partial", G.MinTransparency >= 0 and G.MinTransparency < 0.5)
+	check("look: sun latitude in range", LookCfg.Look.Latitude >= 0 and LookCfg.Look.Latitude <= 80)
+end)()
 
 -- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
 local function checkBakedTerrain()

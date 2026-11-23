@@ -2,50 +2,9 @@
 -- Map layout, NPCs and destruction budgets. Studs and seconds.
 
 return table.freeze({
-	-- the world's look, "golden afternoon": a lower, warm late-afternoon sun for long readable shadows, cool
-	-- blue shade so lit sides pop, a painted cartoon sky with real clouds, a light blue haze that keeps the
-	-- distance clear, a punchier grade and a touch of sun rays. Colours are { r, g, b }.
-	-- (Was: no sky, no clouds, shadows off and a milky haze (Haze 1), Exposure +0.15 blew white concrete out.)
+	-- the world's look (light, sky, haze, grade, glass) lives in Config/Look, outside the map build, so a look
+	-- change never needs a terrain bake. Only what the map's build reads stays here.
 	Look = table.freeze({
-		ClockTime = 16.4,
-		Brightness = 3,
-		Exposure = 0,
-		Shadows = true, -- Lighting.GlobalShadows; phones on low quality skip shadows themselves
-		Ambient = table.freeze({ 125, 125, 140 }), -- indoor / no-sky fill
-		OutdoorAmbient = table.freeze({ 120, 130, 160 }), -- shade colour outdoors: cool, so sunlit sides stand out
-		SunTint = table.freeze({ 255, 226, 190 }), -- the sun's colour on lit faces (Lighting.ColorShift_Top)
-		ShadowSoftness = 0.25,
-		DiffuseScale = 1, -- sky light on surfaces
-		SpecularScale = 1, -- sky reflections on smooth parts (glass, paint)
-		AirDensity = 0.18, -- a light haze gives the bigger map depth and softens where far ground stops loading
-		AirOffset = 0.1,
-		AirHaze = 0.4,
-		AirGlare = 0.2,
-		AirColor = table.freeze({ 225, 232, 240 }), -- the horizon: close to the sky's pale band
-		AirDecay = table.freeze({ 110, 165, 225 }), -- blue distance away from the sun
-		-- the painted sky (tools/sky/make_sky.py): image ids per face, and a big cartoon sun
-		Sky = table.freeze({
-			Ft = 124408530416332,
-			Bk = 121619511943463,
-			Lf = 105868860160466,
-			Rt = 79382770347599,
-			Up = 137876384618520,
-			Dn = 84132017227560,
-		}),
-		SunSize = 16, -- Sky.SunAngularSize, degrees
-		-- volumetric clouds (workspace.Terrain.Clouds); off on low quality
-		CloudCover = 0.4,
-		CloudDensity = 0.45,
-		CloudColor = table.freeze({ 255, 255, 255 }),
-		Saturation = 0.25,
-		Contrast = 0.12,
-		GradeBrightness = 0.01,
-		Tint = table.freeze({ 255, 249, 240 }),
-		BloomIntensity = 0.35,
-		BloomSize = 24,
-		BloomThreshold = 1.6,
-		SunRays = 0.06, -- intensity of the rays round the sun
-		SunRaysSpread = 0.6,
 		PaintLift = 0.03, -- plaza paint sits this far above the paving
 	}),
 	-- subtle built-in materials on the buildings' plain plastic (the "quiet" look): light walls get soft
