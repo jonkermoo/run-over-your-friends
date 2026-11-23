@@ -1,8 +1,8 @@
 --!strict
--- The world's look: light, sky, haze, grade, bloom and the buildings' window glass. Set by the server once
--- the map stands (server/LookService); in play each client's DayNight then eases the light through the day
--- (Config/DayNight, whose day look is this one). Kept out of the map build, so a look change never needs a
--- terrain bake. Colours are { r, g, b }.
+-- The world's look: light, sky, haze, grade, bloom, the buildings' window glass and the cars' finish. Set by
+-- the server once the map stands (the cars' finish before it, server/LookService); in play each client's
+-- DayNight then eases the light through the day (Config/DayNight, whose day look is this one). Kept out of the
+-- map build, so a look change never needs a terrain bake. Colours are { r, g, b }.
 
 return table.freeze({
 	-- "golden afternoon" (user's pick, 2026-11-22): a low warm sun kept off noon (high latitude) for long
@@ -67,5 +67,16 @@ return table.freeze({
 		ValueMax = 0.9,
 		ValueGain = 1.02,
 		MinTransparency = 0.15, -- solid panes become a little see-through, so rooms behind show
+	}),
+	-- the cars' finish (user's pick, 2026-11-22, the light version): painted panels (Paint and *_Paint) a smooth
+	-- paint with a faint sheen, the windows real glass with a soft reflection. Set on the vehicle templates
+	-- (server/LookService), so player cars, traffic, parked cars and garage pictures all get it. The body keeps
+	-- its own material: a stronger sheen washed the paint colours out. A paint with its own material (Neon, Foil,
+	-- Ice...) keeps its old look: the sheen only goes on the stock paint material (Rules/Sheen).
+	Cars = table.freeze({
+		PaintMaterial = "SmoothPlastic", -- an Enum.Material name
+		PaintReflectance = 0.03,
+		GlassMaterial = "Glass",
+		GlassReflectance = 0.1, -- the glass keeps its own see-through value
 	}),
 })
