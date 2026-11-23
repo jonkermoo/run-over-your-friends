@@ -10,6 +10,7 @@ local GeometryService = game:GetService("GeometryService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
+local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
@@ -429,7 +430,11 @@ function StreetKit.build(
 				-- only the outer pair, clear of its exits
 				if random:NextNumber() < d.trees then
 					local accent = Green.accent(i, j, sideIndex, G.Trees.AccentEvery)
-					local spots = if kind == "spawn" then G.Trees.SpawnAt else G.Trees.At
+					local downtown = CityPlan.distance(i, j, N, M) < G.Trees.DowntownReach
+					local spots = if kind == "spawn"
+						then G.Trees.SpawnAt
+						elseif downtown then G.Trees.At
+						else G.Trees.OuterAt
 					for _, t in spots do
 						tree(props, edge - out * G.Trees.Inset + along * (t * B), accent)
 					end

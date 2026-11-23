@@ -18,7 +18,9 @@ return table.freeze({
 	-- the trees along each block side: at these shares of the block from the side's middle, this far in from
 	-- the kerb; only in districts whose Config/Streets `trees` chance is drawn
 	Trees = table.freeze({
-		At = table.freeze({ -0.32, -0.16, 0.16, 0.32 }),
+		At = table.freeze({ -0.32, -0.16, 0.16, 0.32 }), -- downtown (Rules/CityPlan distance under DowntownReach)
+		OuterAt = table.freeze({ -0.32, 0.32 }), -- the rest of the city (keeps the map inside its part budget)
+		DowntownReach = 2.5,
 		SpawnAt = table.freeze({ -0.32, 0.32 }), -- the spawn plaza's sides: clear of its exits
 		Inset = 2.5,
 		TrunkWidth = 1.3,

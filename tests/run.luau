@@ -3872,10 +3872,13 @@ local function checkStreetGreen()
 	local T = G.Trees
 	-- every tree spot stays on the sidewalk, clear of the lamp in the side's middle and of the hydrant
 	local okSpots = T.Inset > Streets.KerbInset and T.Inset + T.TrunkWidth / 2 < MW.SidewalkWidth
-	for _, t in T.At do
-		local along = math.abs(t) * MW.BlockSize
-		okSpots = okSpots and along > 4 and math.abs(along - 0.2 * MW.BlockSize) > 4
+	for _, list in { T.At, T.OuterAt, T.SpawnAt } do
+		for _, t in list do
+			local along = math.abs(t) * MW.BlockSize
+			okSpots = okSpots and along > 4 and math.abs(along - 0.2 * MW.BlockSize) > 4
+		end
 	end
+	okSpots = okSpots and #T.OuterAt < #T.At and T.DowntownReach > 0
 	check("street trees: on the sidewalk, clear of lamps and hydrants", okSpots)
 	local okShapes = #T.Shapes >= 3
 	for _, sh in T.Shapes do
