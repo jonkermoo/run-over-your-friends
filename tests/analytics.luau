@@ -2,6 +2,7 @@
 -- Analytics checks (Config/Analytics, Rules/Analytics), called from tests/run.
 
 local Cfg = require("../src/shared/Config/Analytics")
+local Onboarding = require("../src/shared/Config/Onboarding")
 local Rules = require("../src/shared/Rules/Analytics")
 
 return function(check: (string, boolean) -> ())
@@ -68,8 +69,32 @@ return function(check: (string, boolean) -> ())
 	check("minutes 2", Rules.rangeBucket(2, Cfg.MinuteBuckets) == "2-5")
 	check("minutes 90", Rules.rangeBucket(90, Cfg.MinuteBuckets) == "60+")
 	check("load 12 s", Rules.rangeBucket(12, Cfg.LoadBuckets) == "10-20")
+	check("skip after 12 s", Rules.rangeBucket(12, Cfg.SkipBuckets) == "10-20")
+	check("skip after 25 s", Rules.rangeBucket(25, Cfg.SkipBuckets) == "20-40")
+	check("skip after 45 s", Rules.rangeBucket(45, Cfg.SkipBuckets) == "40-60")
+	check("skip after 300 s", Rules.rangeBucket(300, Cfg.SkipBuckets) == "60+")
+	check(
+		"skip buckets start where SKIP shows",
+		Rules.rangeBucket(Onboarding.SkipAfter, Cfg.SkipBuckets) == "10-20"
+	)
+	local S = Onboarding.Steps
+	check("step name: Hits", Rules.stepName(S.Hits, S) == "Hits")
+	check("step name: Smash", Rules.stepName(S.Smash, S) == "Smash")
+	check("step name: Goal", Rules.stepName(S.Goal, S) == "Goal")
+	check("step name: Buy", Rules.stepName(S.Buy, S) == "Buy")
+	check("step name: Event", Rules.stepName(S.Event, S) == "Event")
+	check("step name: unknown number", Rules.stepName(1234, S) == "Unknown")
+	check("event timeout is its own name", Rules.stepName(S.Event, S) ~= Cfg.EventTimeout)
 	-- each bucket list gives few values (Roblox caps distinct field values)
-	for _, tops in { Cfg.PlayerBuckets, Cfg.MinuteBuckets, Cfg.LoadBuckets, Cfg.PlayMinuteBuckets } do
+	for _, tops in
+		{
+			Cfg.PlayerBuckets,
+			Cfg.MinuteBuckets,
+			Cfg.LoadBuckets,
+			Cfg.PlayMinuteBuckets,
+			Cfg.SkipBuckets,
+		}
+	do
 		local seen = {}
 		for x = 0, 1000 do
 			seen[Rules.rangeBucket(x / 2, tops)] = true

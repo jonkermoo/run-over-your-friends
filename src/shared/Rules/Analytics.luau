@@ -97,6 +97,16 @@ function Analytics.rangeBucket(x: number, tops: { number }): string
 	return `{low}+`
 end
 
+-- a tutorial step's name from its number in Config/Onboarding Steps ("Smash", "Goal", ...); "Unknown" if none
+function Analytics.stepName(step: number, steps: { [string]: number }): string
+	for name, n in steps do
+		if n == step then
+			return name
+		end
+	end
+	return "Unknown"
+end
+
 -- is v one of the fixed values?
 function Analytics.oneOf(list: { string }, v: any): boolean
 	if typeof(v) ~= "string" then

@@ -38,6 +38,7 @@ Item names in the purchase events: `Product:<key>` (Robux products in `Config/Pr
 | `LeftWhile` | session minutes | `Driving` / `Menu` / `Idle` / `Wrecked` / `OnFoot` | minutes bucket | What players were doing when they quit. `Wrecked`: another player's car flung them in the last `WreckedSeconds`; `Menu`: a menu or card was open; `Idle`: no input for `IdleSeconds`; `Driving`: in their car's driver seat (tracked while they play, and still counted if they were stood up within `SeatGraceSeconds`, since leaving removes the car before the leave is logged). |
 | `LoadTime` | seconds | seconds bucket (`0-5`, `5-10`, `10-20`, `20-40`, `40+`) | `Ready` / `Timeout` | Load time per device: from client start to spawn-ready (the loading cover's ready check). `Timeout`: the cover gave up waiting. |
 | `FirstVehicleBought` | total minutes played | vehicle id | total minutes bucket (`0-10`, `10-30`, `30-60`, `60-120`, `120-240`, `240+`) | The money curve: how long until players afford their first car beyond the starter, and which car it is. Logged on the first car bought with game money; cars from the Roadster pass or the Starter Pack don't count as bought. Minutes count all sessions (saved as `playSeconds` in the profile from this release on). |
+| `TutorialSkipped` | 1 | step skipped (`Smash`, `Goal`, `Buy`, `Event`; the hits step has no SKIP; `EventTimeout` when the event step ended itself after `EventWait`) | seconds on the step (`10-20`, `20-40`, `40-60`, `60+`; `0-10` only if the server's step clock started late) | Tells skipping from quitting: every tutorial step left without finishing it (SKIP press, shown after `SkipAfter` = 10 s, or the event step's timeout). Skipped steps are not funnel steps. |
 | `GoalClaimed` | 1 | goal kind (`Hits`, `Earn`, `Drive`, ...) | `Hourly` / `Daily` | Which goals players finish. |
 | `ChallengeDone` | 1 | challenge id (`Config/Challenges`: `CarHits`, `Spin`, `WeekHits`, ...) | `Daily` / `Weekly` | Which daily and weekly challenges players finish, and how many come back for them. |
 | `ChestOpened` | cash it paid | `Daily` / `Weekly` | `Paint:<id>` (a chest-only paint, `Config/Paints`) or `Cash` | What challenge chests give out. |
@@ -77,3 +78,5 @@ vehicle id) and paints. Answers: where money comes from and goes to (Creator Hub
 - Empty-server churn: `PlayerLeft` broken down by field 01 (players) and field 02 (minutes).
 - Quit points: `LeftWhile` by field 01.
 - Phone load time: `LoadTime` by field 03 = `Phone`, field 01 buckets.
+- Tutorial skips: skips per step = `TutorialSkipped` by field 01, compared with the funnel's drop at that step
+  (a big drop with few skips means players quit there; with many skips they move on without finishing).

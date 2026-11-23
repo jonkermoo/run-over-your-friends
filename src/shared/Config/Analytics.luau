@@ -29,6 +29,11 @@ return table.freeze({
 	MinuteBuckets = table.freeze({ 2, 5, 15, 30, 60 }), -- minutes: 0-2, 2-5, 5-15, 15-30, 30-60, 60+
 	LoadBuckets = table.freeze({ 5, 10, 20, 40 }), -- seconds: 0-5, 5-10, 10-20, 20-40, 40+
 	PlayMinuteBuckets = table.freeze({ 10, 30, 60, 120, 240 }), -- total minutes played: 0-10 ... 240+
+	-- seconds on a tutorial step before it was skipped: 10-20, 20-40, 40-60, 60+ (SKIP shows after
+	-- Config/Onboarding SkipAfter = 10 s; 0-10 only if the server's step clock started late)
+	SkipBuckets = table.freeze({ 10, 20, 40, 60 }),
+	-- TutorialSkipped field 01 when the event step ended itself (Config/Onboarding EventWait)
+	EventTimeout = "EventTimeout",
 
 	-- the fixed values the client may send (Rules/Analytics checks them; anything else is ignored)
 	Devices = table.freeze({ "Phone", "Tablet", "PC", "Console", "Unknown" }),

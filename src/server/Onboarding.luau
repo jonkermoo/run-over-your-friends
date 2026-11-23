@@ -14,6 +14,8 @@ local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Rules = require(ReplicatedStorage.Shared.Rules.Onboarding)
+local AnalyticsRules = require(ReplicatedStorage.Shared.Rules.Analytics)
+local AnalyticsCfg = require(ReplicatedStorage.Shared.Config.Analytics)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
@@ -24,6 +26,10 @@ local StuntService = require(script.Parent.StuntService)
 local VehicleService = require(script.Parent.VehicleService)
 
 local Steps = Onboarding.Steps
+local SKIP_NAMES: { [number]: string } = {}
+for _, n in Onboarding.Order do
+	SKIP_NAMES[n] = AnalyticsRules.stepName(n, Steps)
+end
 local FUNNEL = {
 	[Steps.Smash] = Analytics.Steps.SmashedBuilding,
 	[Steps.Goal] = Analytics.Steps.ClaimedGoal,
@@ -253,6 +259,11 @@ function OnboardingService.start()
 			and from == step(player)
 			and Rules.canSkip(from, Onboarding)
 		then
+			Analytics.tutorialSkipped(
+				player,
+				SKIP_NAMES[from] or "Unknown",
+				os.clock() - sessionOf(player).enteredAt
+			)
 			moveOn(player, from)
 		end
 	end)
@@ -273,6 +284,11 @@ function OnboardingService.start()
 						Onboarding
 					)
 				then
+					Analytics.tutorialSkipped(
+						player,
+						AnalyticsCfg.EventTimeout,
+						os.clock() - sessionOf(player).enteredAt
+					)
 					moveOn(player, Steps.Event)
 				end
 			end

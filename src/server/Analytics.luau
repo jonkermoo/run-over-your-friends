@@ -380,6 +380,14 @@ function Analytics.chest(player: Player, set: string, cash: number, paint: strin
 	end)
 end
 
+-- a tutorial step left without finishing it: field 01 the step's name (Config/Onboarding Steps) or
+-- "EventTimeout" when the event step ended itself, field 02 the seconds spent on it, bucketed
+function Analytics.tutorialSkipped(player: Player, stepName: string, seconds: number)
+	safe(function()
+		log(player, "TutorialSkipped", 1, stepName, Rules.rangeBucket(seconds, Cfg.SkipBuckets))
+	end)
+end
+
 -- a hit, smash or stunt while an event is live counts as joining it, once per event run
 function Analytics.tookPart(player: Player)
 	safe(function()
