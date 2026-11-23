@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Upgrades)
 local Loc = require(ReplicatedStorage.Shared.Loc)
+local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Rules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
@@ -117,7 +118,9 @@ local function setDecal(player: Player, vehicleId: any, decalId: any)
 end
 
 -- Studio only: ServerStorage.MasteryTest (a BindableFunction) for play tests and hand tests:
--- ("points", player, vehicleId, n) adds mastery, ("money", player, n) adds cash, ("own", player, vehicleId) gives a car
+-- ("points", player, vehicleId, n) adds mastery, ("money", player, n) adds cash, ("own", player, vehicleId) gives a car,
+-- ("tutorialDone", player) ends the tutorial, ("trialReset", player) makes the Roadster free trial available again,
+-- ("unown", player, vehicleId) takes a car away (and the Roadster pass, for this session) to test as a new player
 local function studioHook()
 	if not RunService:IsStudio() then
 		return
@@ -135,6 +138,15 @@ local function studioHook()
 			profile.money += tonumber(a) or 0
 		elseif what == "own" and Vehicles.ById[a] then
 			profile.owned[a] = true
+		elseif what == "tutorialDone" then
+			profile.tutorial = Onboarding.Steps.Done
+		elseif what == "trialReset" then
+			profile.trialAt = 0
+		elseif what == "unown" and Vehicles.ById[a] and a ~= Vehicles.Starter then
+			profile.owned[a] = nil
+			if a == "Roadster" then
+				player:SetAttribute("PassRoadster", false)
+			end
 		else
 			return false
 		end

@@ -413,7 +413,8 @@ function Analytics.carOwned(
 end
 
 -- after any money or garage change: cash reached 25/50/75/100% of the cheapest car not owned yet, each step
--- once per car (kept in progress: vehicle id -> highest step logged); value the total minutes played
+-- once per car (kept in progress: vehicle id -> highest step logged); value the total minutes played. Waits for the
+-- client's Ready (its device), so a join logs nothing until cash next changes
 function Analytics.progress(
 	player: Player,
 	owned: { [string]: boolean },
@@ -422,6 +423,10 @@ function Analytics.progress(
 	playSeconds: number
 )
 	safe(function()
+		local s = sessions[player]
+		if not (s and s.ready) then
+			return -- the device isn't known yet; the next money change catches up
+		end
 		local car = Rules.nextCar(Vehicles.List, owned)
 		if not car then
 			return

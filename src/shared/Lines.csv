@@ -143,6 +143,5 @@ ChallengesNew,{n} new challenges today. Each one you finish gives a chest!,,,{n}
 PaintChest,{paint}  FROM CHALLENGE CHESTS,,,{paint}  DE COFRES DE DESAFÍOS,{paint}  DE BAÚS DE DESAFIOS
 TrialResume,TRIAL {time},,,PRUEBA {time},TESTE {time}
 TrialIn,TRIAL IN {time},,,PRUEBA EN {time},TESTE EM {time}
-TrialChip,ROADSTER TRIAL {time},,,PRUEBA ROADSTER {time},TESTE ROADSTER {time}
 TrialBar,{cash} / {price},,,{cash} / {price},{cash} / {price}
 TrialWarn,{n} SECONDS LEFT IN THE ROADSTER!,,,¡QUEDAN {n} SEGUNDOS EN EL ROADSTER!,FALTAM {n} SEGUNDOS NO ROADSTER!

@@ -182,7 +182,7 @@ end
 function TrialService.start()
 	Net.remote("RoadsterTrial").OnServerEvent:Connect(function(player, action)
 		if
-			typeof(action) ~= "string"
+			(action ~= "Start" and action ~= "Offered")
 			or not RateLimit.allow(player, "trial" .. action, Cfg.RemoteCooldown)
 		then
 			return
