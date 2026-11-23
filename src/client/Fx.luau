@@ -171,7 +171,14 @@ local function sprite(id: number): string
 end
 
 -- a cartoon puff of smoke that pops out then fades, and broken chunks thrown out of it that fall
-local function burst(at: Vector3, color: Color3, count: number, speed: number, size: number)
+local function burst(
+	at: Vector3,
+	color: Color3,
+	count: number,
+	speed: number,
+	size: number,
+	noChunks: boolean?
+)
 	local a = Instance.new("Attachment")
 	a.WorldPosition = at
 	a.Parent = workspace.Terrain
@@ -195,7 +202,7 @@ local function burst(at: Vector3, color: Color3, count: number, speed: number, s
 	p.Rate = 0
 	p.Parent = a
 	p:Emit(count)
-	local chunks = math.floor(count * Particles.ChunkShare)
+	local chunks = if noChunks then 0 else math.floor(count * Particles.ChunkShare)
 	if chunks > 0 then
 		local c = Instance.new("ParticleEmitter")
 		c.Texture = sprite(Particles.Chunk)
@@ -352,12 +359,14 @@ local function onFx(kind: string, at: Vector3, a: number, b: number, userId: num
 		if math.random() < 0.55 then
 			play("Squeal", at)
 		end
+		local puff = Particles.HitPuff
 		burst(
 			at,
-			Color3.fromRGB(220, 210, 190),
+			Color3.fromRGB(puff[1], puff[2], puff[3]),
 			10 + math.floor(strength * 20),
 			20 + 40 * strength,
-			1.2
+			1.2,
+			not Particles.HitChunks
 		)
 		stars(at + Vector3.new(0, 2, 0))
 		-- the one hit screams; a few people round them scream as they run (the server sends them running)

@@ -8,4 +8,8 @@ return table.freeze({
 	Chunk = 90654646129975, -- a broken brick chunk thrown out of a hit burst
 	ChunkShare = 0.35, -- chunks per burst particle
 	ChunkGravity = 70,
+	-- a person hit: a soft cool-white puff and no chunks, so nothing flying off a person can read as blood
+	-- or gore (buildings keep their dust colour and chunks)
+	HitPuff = table.freeze({ 235, 242, 255 }),
+	HitChunks = false,
 })
