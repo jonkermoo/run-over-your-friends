@@ -50,6 +50,8 @@ local HEIGHTS = { 76, 64, 64 } -- the top 3; the rest are SLIM
 local SLIM = 44
 local YOU_H = 54
 local SHOWN = 9 -- rows above your own
+local PANEL = Color3.fromRGB(Config.Panel[1], Config.Panel[2], Config.Panel[3])
+local CARD = Color3.fromRGB(Config.Card[1], Config.Card[2], Config.Card[3])
 local METAL = {
 	Color3.fromRGB(255, 196, 48),
 	Color3.fromRGB(218, 224, 236),
@@ -183,7 +185,7 @@ end
 local function makeRow(list: Frame, y: number, h: number, place: number?): Row
 	local metal = if place then METAL[place] else nil
 	local row = Instance.new("Frame")
-	row.BackgroundColor3 = metal or C.card
+	row.BackgroundColor3 = metal or CARD
 	row.BorderSizePixel = 0
 	row.Position = UDim2.fromOffset(0, y)
 	row.Size = UDim2.new(1, 0, 0, h)
@@ -268,7 +270,7 @@ local function build(part: BasePart, board: Config.Board): View
 	local bg = Instance.new("Frame")
 	bg.Position = UDim2.fromOffset(6, 6)
 	bg.Size = UDim2.new(1, -12, 1, -12)
-	bg.BackgroundColor3 = C.panel
+	bg.BackgroundColor3 = PANEL
 	bg.BorderSizePixel = 0
 	bg.Parent = edge
 	-- a checkered finish-line strip across the top

@@ -1259,16 +1259,59 @@ check("shop names fit their hanging signs", shopNamesOk)
 local looksOk = true
 for key in Streets.Districts do
 	local look = BuildingConfig.Office.Looks[key]
-	looksOk = looksOk and look ~= nil and rgbOk({ look.trim, look.stone, look.roof })
-	if look then
-		-- a trim colour equal to a wall colour would pick up the district's wall material
-		for _, c in Streets.Districts[key].walls do
-			looksOk = looksOk
-				and not (c[1] == look.trim[1] and c[2] == look.trim[2] and c[3] == look.trim[3])
+	looksOk = looksOk and look ~= nil and rgbOk({ look.stone, look.roof })
+end
+check("every district has office lobby stone and roof colours", looksOk)
+do
+	local facadesOk = true
+	local trims = { BuildingConfig.Office.Hero.Trim }
+	for _, f in BuildingConfig.Office.Frames do
+		table.insert(trims, f.trim)
+	end
+	for _, c in BuildingConfig.Office.Shopfront.Colours do
+		table.insert(trims, c)
+	end
+	for key in Streets.Districts do
+		local mix = BuildingConfig.Facades[key]
+		facadesOk = facadesOk and mix ~= nil and #mix >= 3 and rgbOk(mix)
+		for _, c in mix or {} do
+			for _, t in trims do
+				facadesOk = facadesOk and not (c[1] == t[1] and c[2] == t[2] and c[3] == t[3])
+			end
 		end
 	end
+	check(
+		"every district has a facade mix, and no frame or shopfront colour is one of them",
+		facadesOk
+	)
 end
-check("every district has office trim, lobby stone and roof colours", looksOk)
+do
+	local O = BuildingConfig.Office
+	local R = O.Roof
+	-- neighbours can come Slot * (1 - jitter spread) apart; the widest unit (turned either way) must fit
+	local gap = R.Slot * (1 - (R.Jitter[2] - R.Jitter[1]))
+	local widest = math.max(R.Ac[1], R.Ac[3], R.Hut[1], R.Hut[3], R.Vent[1])
+	check(
+		"roof clutter: chances add to 1 or less and neighbouring units never touch",
+		R.Chance.ac + R.Chance.vent + R.Chance.hut <= 1
+			and R.Jitter[1] >= 0
+			and R.Jitter[2] <= 1
+			and gap > widest
+			and R.MinZone > 0
+	)
+	check(
+		"shopfront awnings stay inside the tower's setback",
+		O.Shopfront.AwningDepth < O.Setback
+			and O.Shopfront.Fascia > 0
+			and O.Shopfront.LobbyFascia > 0
+	)
+	check(
+		"leaderboards: tall enough for their rows, gantry posts under the beam",
+		LbConfig.StandHeight / LbConfig.StandWidth * 728 >= 750
+			and LbConfig.PostInset > LbConfig.GantryPost / 2
+			and LbConfig.StandStep > LbConfig.StandWidth
+	)
+end
 local landmarkOk = true
 for _, colours in { BuildingConfig.Restaurant.Colours, BuildingConfig.Warehouse.Colours } do
 	landmarkOk = landmarkOk

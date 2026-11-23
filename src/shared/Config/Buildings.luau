@@ -1,10 +1,10 @@
 --!strict
 -- The town buildings in the house-kit style: office towers, shop rows, the burger place and the parcel
 -- warehouse. Studs; colours are { r, g, b }; materials are Enum.Material names (Lune checks them).
--- Office and shop walls keep their district's colours and material (Config/Streets).
+-- Office and shop walls take their district's warm facade mix (Facades below) and its material (Config/Streets).
 
 export type RGB = { number }
-export type OfficeLook = { trim: RGB, stone: RGB, roof: RGB }
+export type OfficeLook = { stone: RGB, roof: RGB }
 export type Colours = { wall: RGB, trim: RGB, accent: RGB, roof: RGB, material: string }
 
 return table.freeze({
@@ -14,6 +14,58 @@ return table.freeze({
 	-- the whole map, measured in Studio (about 87,000 with the suburbs); with streaming on, each player only
 	-- loads what is near them, so this caps the server's map, not a phone's
 	PartBudget = 100000,
+
+	-- each building's wall colour, drawn per building from its district's mix (shops, the hero tower and, with
+	-- Office.FacadeSpandrels, every tower's spandrels): warm so the city doesn't read white, grey and blue from
+	-- the air; the district's wall material (Config/Streets) goes on these colours
+	Facades = table.freeze({
+		-- downtown: cream and mint listed twice (twice as likely), so the two reds come up a quarter of the time
+		neon = {
+			{ 232, 216, 190 },
+			{ 232, 216, 190 },
+			{ 168, 212, 190 },
+			{ 168, 212, 190 },
+			{ 240, 220, 168 },
+			{ 198, 112, 82 },
+			{ 226, 132, 108 },
+			{ 96, 104, 140 },
+		},
+		old = {
+			{ 170, 82, 60 },
+			{ 196, 112, 80 },
+			{ 230, 210, 176 },
+			{ 222, 126, 100 },
+			{ 210, 158, 92 },
+		},
+		maple = {
+			{ 242, 230, 206 },
+			{ 188, 222, 198 },
+			{ 240, 178, 158 },
+			{ 244, 222, 164 },
+			{ 246, 206, 182 },
+		},
+		dock = {
+			{ 150, 74, 58 },
+			{ 196, 150, 72 },
+			{ 72, 122, 118 },
+			{ 154, 142, 128 },
+			{ 214, 204, 184 },
+		},
+		canal = {
+			{ 150, 70, 52 },
+			{ 196, 112, 80 },
+			{ 232, 214, 182 },
+			{ 160, 202, 182 },
+			{ 224, 130, 106 },
+		},
+		stadium = {
+			{ 234, 222, 198 },
+			{ 226, 132, 108 },
+			{ 220, 140, 40 },
+			{ 196, 112, 80 },
+			{ 40, 50, 76 },
+		},
+	}) :: { [string]: { RGB } },
 
 	Office = table.freeze({
 		PanelWidth = 16, -- wider than other buildings: big windows, fewer parts
@@ -69,35 +121,80 @@ return table.freeze({
 			pad = { 58, 60, 66 },
 			grass = { 92, 150, 70 },
 		}),
-		-- trim, lobby stone and roof per district; the accent is the district's accent
+		-- every tower's own frame (pilasters, sill bands, cornices: `trim`) and the panels under its windows
+		-- (`spandrel`, used only with FacadeSpandrels off), taken in turn (every FrameStride-th) so neighbours
+		-- differ; the hero keeps Hero.Trim
+		Frames = table.freeze({
+			table.freeze({ trim = { 62, 66, 76 }, spandrel = { 128, 134, 144 } }), -- charcoal
+			table.freeze({ trim = { 238, 230, 214 }, spandrel = { 190, 112, 82 } }), -- cream on terracotta
+			table.freeze({ trim = { 148, 110, 74 }, spandrel = { 214, 192, 156 } }), -- bronze on sand
+			table.freeze({ trim = { 118, 148, 128 }, spandrel = { 222, 224, 212 } }), -- sage
+			table.freeze({ trim = { 74, 92, 128 }, spandrel = { 214, 218, 226 } }), -- slate blue
+			table.freeze({ trim = { 246, 246, 244 }, spandrel = { 160, 86, 68 } }), -- white on brick
+			table.freeze({ trim = { 212, 186, 140 }, spandrel = { 120, 104, 92 } }), -- sand on umber
+		}) :: { { trim: RGB, spandrel: RGB } },
+		FrameStride = 3,
+		-- true: a tower's spandrels take its facade colour (Facades) and only the frame comes from Frames
+		FacadeSpandrels = true,
+		-- the ground floor of the three street faces (not the back, on the car park): shop windows, each bay
+		-- with a coloured fascia and a sloping awning (no collisions); a tower takes two neighbouring colours
+		Shopfront = table.freeze({
+			Colours = table.freeze({
+				{ 214, 84, 72 }, -- tomato
+				{ 236, 170, 60 }, -- mustard
+				{ 46, 134, 128 }, -- teal
+				{ 64, 112, 72 }, -- forest
+				{ 60, 84, 140 }, -- navy
+				{ 150, 52, 72 }, -- berry
+			}) :: { RGB },
+			Fascia = 3, -- the coloured band over the window
+			LobbyFascia = 3, -- the stone band over a front lobby window when a tower has no shopfront colours
+			AwningDepth = 4.5,
+			AwningThick = 0.4,
+			AwningTilt = 0.3, -- radians down toward the street
+			AwningInset = 1, -- each awning stops this short of its bay's edges
+		}),
+		-- a little clutter on the front half of the roof (TowerKit.clutter), on a grid of Slot-stud squares:
+		-- air-con units (a box with a fan on top), vent pipes, the odd stair hut
+		Roof = table.freeze({
+			Slot = 12,
+			Margin = 6, -- clear of the parapet
+			Chance = { ac = 0.25, vent = 0.15, hut = 0.04 }, -- per slot, else empty
+			Near = 2, -- the zone starts this far in front of the roof's middle (the billboard posts stand 10 back)
+			MinZone = 6, -- no clutter on a roof whose zone is shallower than this
+			Jitter = { 0.4, 0.6 }, -- where in its slot a unit stands (share of Slot), each way; neighbours never touch
+			Ac = { 7, 4, 5 }, -- wide, tall, deep
+			Fan = { 3, 0.5 }, -- across, tall
+			Vent = { 1.2, 4 }, -- across, tall
+			Hut = { 9, 7, 8 },
+			AcColour = { 206, 208, 210 } :: RGB,
+			FanColour = { 70, 74, 80 } :: RGB,
+			VentColour = { 150, 154, 160 } :: RGB,
+			Seed = 5170,
+		}),
+		-- lobby stone and roof per district (the trim is the tower's frame); the accent is the district's accent
 		Looks = table.freeze({
 			neon = table.freeze({
-				trim = { 230, 226, 214 },
 				stone = { 205, 200, 190 },
 				roof = { 36, 40, 56 },
 			}),
 			old = table.freeze({
-				trim = { 239, 230, 214 },
 				stone = { 216, 205, 184 },
 				roof = { 60, 63, 69 },
 			}),
 			maple = table.freeze({
-				trim = { 255, 255, 255 },
 				stone = { 200, 192, 176 },
 				roof = { 90, 100, 112 },
 			}),
 			dock = table.freeze({
-				trim = { 236, 236, 232 },
 				stone = { 176, 172, 164 },
 				roof = { 50, 56, 64 },
 			}),
 			canal = table.freeze({
-				trim = { 236, 228, 212 },
 				stone = { 196, 184, 166 },
 				roof = { 52, 58, 66 },
 			}),
 			stadium = table.freeze({
-				trim = { 250, 250, 250 },
 				stone = { 190, 190, 196 },
 				roof = { 44, 50, 70 },
 			}),

@@ -255,4 +255,82 @@ function TowerKit.crown(
 	end
 end
 
+-- a little clutter on the front half of the roof, between the name sign and the billboard (Config/Buildings
+-- Office.Roof): that part of the roof is cut into squares, each holding an air-con unit, a vent pipe, a stair
+-- hut or nothing. Same arguments as crown; `index` is the tower's number, so every tower differs but the town
+-- is the same on every server
+function TowerKit.clutter(
+	model: Model,
+	centre: Vector3,
+	w: number,
+	d: number,
+	out: Vector3,
+	top: number,
+	c: Colours,
+	index: number
+)
+	local R = B.Office.Roof
+	local random = Random.new(R.Seed + index)
+	local across = Vector3.new(-out.Z, 0, out.X)
+	local W = math.abs(across:Dot(Vector3.new(w, 0, d)))
+	local D = math.abs(out:Dot(Vector3.new(w, 0, d)))
+	-- the front zone: from just in front of the billboard (its posts stand 10 back) to the front margin
+	local near, far = R.Near, D / 2 - R.Margin
+	if far - near < R.MinZone then
+		return
+	end
+	local n = math.floor((W - R.Margin * 2) / R.Slot)
+	local function part(size: Vector3, cf: CFrame, colour: Color3, material: Enum.Material?): Part
+		local p = Instance.new("Part")
+		p.Anchored = true
+		p.Size = size
+		p.CFrame = cf
+		p.Color = colour
+		p.Material = material or Enum.Material.SmoothPlastic
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.BottomSurface = Enum.SurfaceType.Smooth
+		p:SetAttribute("Pieces", 0) -- roof kit: knocked off with the tower, pays nothing
+		p.Parent = model
+		return p
+	end
+	local base = Vector3.new(centre.X, top, centre.Z)
+	local rows = math.floor((far - near) / R.Slot)
+	for k = 0, n * rows - 1 do
+		local roll = random:NextNumber()
+		local x = -W / 2 + R.Margin + (k % n + random:NextNumber(R.Jitter[1], R.Jitter[2])) * R.Slot
+		local z = near + (k // n + random:NextNumber(R.Jitter[1], R.Jitter[2])) * R.Slot
+		local at = base + across * x + out * z
+		local frame = CFrame.lookAt(at, at + out)
+			* CFrame.Angles(0, random:NextInteger(0, 1) * math.pi / 2, 0)
+		local ch = R.Chance
+		if roll < ch.ac then
+			local s = R.Ac
+			part(
+				Vector3.new(s[1], s[2], s[3]),
+				frame * CFrame.new(0, s[2] / 2, 0),
+				rgb(R.AcColour),
+				Enum.Material.Metal
+			)
+			local fan = part(
+				Vector3.new(R.Fan[2], R.Fan[1], R.Fan[1]),
+				frame * CFrame.new(0, s[2] + R.Fan[2] / 2, 0) * CFrame.Angles(0, 0, math.pi / 2),
+				rgb(R.FanColour),
+				Enum.Material.Metal
+			)
+			fan.Shape = Enum.PartType.Cylinder
+		elseif roll < ch.ac + ch.vent then
+			local v = part(
+				Vector3.new(R.Vent[2], R.Vent[1], R.Vent[1]),
+				frame * CFrame.new(0, R.Vent[2] / 2, 0) * CFrame.Angles(0, 0, math.pi / 2),
+				rgb(R.VentColour),
+				Enum.Material.Metal
+			)
+			v.Shape = Enum.PartType.Cylinder
+		elseif roll < ch.ac + ch.vent + ch.hut then
+			local h = R.Hut
+			part(Vector3.new(h[1], h[2], h[3]), frame * CFrame.new(0, h[2] / 2, 0), c.wall)
+		end
+	end
+end
+
 return TowerKit
