@@ -13,6 +13,7 @@ local PassMoney = require(ReplicatedStorage.Shared.Rules.PassMoney)
 local Analytics = require(script.Parent.Analytics)
 local Data = require(script.Parent.Data)
 local RateLimit = require(script.Parent.RateLimit)
+local TrialService = require(script.Parent.TrialService)
 
 local Passes = {}
 
@@ -40,7 +41,12 @@ local function grant(player: Player, name: string, bought: boolean?)
 	if name == "Roadster" then
 		local profile = Data.get(player)
 		if profile then
+			local isNew = not profile.owned.Roadster
 			profile.owned.Roadster = true
+			if isNew then
+				Analytics.carOwned(player, "Roadster", profile.owned, Data.playSeconds(player))
+				TrialService.bought(player)
+			end
 			if not profile.roadsterPassPaid then
 				profile.roadsterPassPaid = true
 				profile.money += Economy.RoadsterPassMoney

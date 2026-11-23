@@ -39,6 +39,9 @@ export type Profile = {
 	upgrades: { [string]: { [string]: boolean } }, -- vehicle id -> bought upgrade ("1"-"3") -> switched on
 	decal: { [string]: string }, -- vehicle id -> decal id on it; missing = none
 	challenges: { [string]: any }, -- daily/weekly challenge progress and unopened chests, checked by ChallengeService
+	trialAt: number, -- os.time the last Roadster free trial started; 0 = never (Config/Trial)
+	trialConverted: boolean, -- the car or its pass was bought after that trial (logged once, analytics)
+	progress: { [string]: number }, -- vehicle id -> highest NextCarProgress milestone logged (analytics)
 }
 
 local ROOKIE_PRICE = Vehicles.ById[Economy.RookieUntil].price
@@ -89,7 +92,17 @@ local function default(): Profile
 		upgrades = {},
 		decal = {},
 		challenges = {},
+		trialAt = 0,
+		trialConverted = false,
+		progress = {},
 	}
+end
+
+local publishListeners: { (Player, Profile) -> () } = {}
+
+-- called after every money or garage change (analytics: progress toward the next car)
+function Data.onPublish(listener: (Player, Profile) -> ())
+	table.insert(publishListeners, listener)
 end
 
 local function publish(player: Player, profile: Profile)
@@ -137,6 +150,10 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute("Mastery", HttpService:JSONEncode(profile.mastery))
 	player:SetAttribute("Upgrades", HttpService:JSONEncode(profile.upgrades))
 	player:SetAttribute("Decals", HttpService:JSONEncode(profile.decal))
+	player:SetAttribute("TrialAt", profile.trialAt)
+	for _, listener in publishListeners do
+		task.spawn(listener, player, profile)
+	end
 end
 
 function Data.get(player: Player): Profile?
@@ -284,6 +301,15 @@ local function load(player: Player)
 				profile.musicOff = decoded.musicOff == true
 				profile.starterDealEnds = tonumber(decoded.starterDealEnds) or 0
 				profile.playSeconds = math.max(0, tonumber(decoded.playSeconds) or 0)
+				profile.trialAt = math.max(0, tonumber(decoded.trialAt) or 0)
+				profile.trialConverted = decoded.trialConverted == true
+				if typeof(decoded.progress) == "table" then
+					for id, pct in decoded.progress do
+						if Vehicles.ById[id] and tonumber(pct) then
+							profile.progress[id] = tonumber(pct) :: number
+						end
+					end
+				end
 				if typeof(decoded.invited) == "table" then
 					for id, yes in decoded.invited do
 						if yes == true and tonumber(id) then

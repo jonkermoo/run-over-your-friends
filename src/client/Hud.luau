@@ -1058,6 +1058,7 @@ for _, stats in Vehicles.List do
 	action.AnchorPoint = Vector2.new(1, 1)
 	action.Position = UDim2.fromScale(1, 1)
 	action.Size = UDim2.new(0.5, -12, 0, 60)
+	require(script.Parent.Trial).button(stats.id, action) -- the Roadster's FREE TRIAL beside it
 	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
 		refreshCards()
 	end, paintSpot)

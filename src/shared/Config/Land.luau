@@ -45,7 +45,8 @@ return table.freeze({
 		table.freeze({ k = 95, amp = 9, phase = 2.2 }),
 	}) :: { Wave },
 	BeachTaper = 300, -- the beaches narrow to nothing over this far at their ends
-	WaterWave = 0.15,
+	WaterWave = 0.35, -- terrain water: gentle waves (was 0.15, near flat)...
+	WaterWaveSpeed = 12, -- ...rolling a little faster than the default 10
 	WaterClear = 0.3, -- terrain water transparency
 	SuburbSeed = 20261111, -- the suburbs' own random stream (Config/Suburbs)
 })

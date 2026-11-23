@@ -26,6 +26,12 @@ local owned: { [Player]: Model } = {}
 local cooldownUntil: { [Player]: number } = {}
 local spawnPoints: { Vector3 } = {}
 local spawnListeners: { (Player, string) -> () } = {}
+local trialCar: { [Player]: string } = {} -- a car the player may drive without owning it (server/TrialService)
+
+-- let the player spawn this car without owning it (a free trial), or nil to stop
+function VehicleService.setTrial(player: Player, id: string?)
+	trialCar[player] = id
+end
 
 -- the vehicle's collider nearest a point: the chassis, or its trailer's (for hit range checks)
 function VehicleService.bodyNear(vehicle: Model, pos: Vector3): BasePart?
@@ -163,8 +169,17 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	-- a trial car (not owned) comes stock: factory paint, no upgrades, no decal, and is marked Trial
+	local trial = profile ~= nil and not profile.owned[id] and trialCar[player] == id
 	if
-		not (stats and profile and profile.owned[id] and humanoid and root and humanoid.Health > 0)
+		not (
+			stats
+			and profile
+			and (profile.owned[id] or trial)
+			and humanoid
+			and root
+			and humanoid.Health > 0
+		)
 	then
 		return false
 	end
@@ -178,13 +193,20 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	end
 	VehicleService.despawn(player)
 
-	local model = VehicleBuilder.build(id, UpgradeRules.onList(profile.upgrades[id]))
+	local model =
+		VehicleBuilder.build(id, if trial then {} else UpgradeRules.onList(profile.upgrades[id]))
 	-- the driver's own car never streams out under them; everyone else gets it whole (like Atomic)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.PersistentPerPlayer
 	model:AddPersistentPlayer(player)
-	local paint = PaintRules.shown(profile.paint[id], player:GetAttribute("PassVIP") == true)
+	local paint = PaintRules.shown(
+		if trial then nil else profile.paint[id],
+		player:GetAttribute("PassVIP") == true and not trial
+	)
 	VehicleBuilder.paint(model, PaintRules.colour(id, paint), PaintRules.material(paint))
-	VehicleBuilder.decal(model, profile.decal[id])
+	VehicleBuilder.decal(model, if trial then nil else profile.decal[id])
+	if trial then
+		model:SetAttribute("Trial", true)
+	end
 	local _, size = model:GetBoundingBox()
 	local ignore = { character, folder }
 	local look = root.CFrame.LookVector * Vector3.new(1, 0, 1)
@@ -422,6 +444,7 @@ function VehicleService.start()
 	Players.PlayerRemoving:Connect(function(player)
 		VehicleService.despawn(player)
 		cooldownUntil[player] = nil
+		trialCar[player] = nil
 	end)
 	local function onCharacter(character: Model)
 		-- vehicles pass through players

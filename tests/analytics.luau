@@ -148,4 +148,48 @@ return function(check: (string, boolean) -> ())
 		end)()
 	)
 	check("analytics: idle is longer than a state check", Cfg.IdleSeconds > Cfg.StateCheckSeconds)
+
+	-- car progression
+	check("cars: count", Rules.carCount({ Hatchback = true, Scooter = true, Sedan = false }) == 2)
+	check("cars: count none", Rules.carCount({}) == 0)
+	check("cars: bucket 1", Rules.countBucket(1, Cfg.CarBuckets) == "1")
+	check("cars: bucket 4-5", Rules.countBucket(4, Cfg.CarBuckets) == "4-5")
+	check("cars: bucket 9+", Rules.countBucket(13, Cfg.CarBuckets) == "9+")
+	local list = {
+		{ id = "Hatchback", price = 0 },
+		{ id = "Scooter", price = 200 },
+		{ id = "Cart", price = 400 },
+		{ id = "Roadster", price = 1000000 },
+	}
+	local nxt = Rules.nextCar(list, { Hatchback = true })
+	check("next car: cheapest unowned", nxt ~= nil and nxt.id == "Scooter")
+	nxt = Rules.nextCar(list, { Hatchback = true, Scooter = true, Cart = true })
+	check("next car: the Roadster last", nxt ~= nil and nxt.id == "Roadster")
+	check(
+		"next car: a free car is never next",
+		Rules.nextCar(list, { Scooter = true, Cart = true, Roadster = true }) == nil
+	)
+	check(
+		"next car: all owned",
+		Rules.nextCar(list, { Hatchback = true, Scooter = true, Cart = true, Roadster = true })
+			== nil
+	)
+	local steps = Cfg.ProgressSteps
+	local m = Rules.newMilestones(100, 400, 0, steps)
+	check("milestones: 25% reached", #m == 1 and m[1] == 25)
+	m = Rules.newMilestones(320, 400, 25, steps)
+	check("milestones: 50 and 75 at once", #m == 2 and m[1] == 50 and m[2] == 75)
+	m = Rules.newMilestones(320, 400, 75, steps)
+	check("milestones: none twice", #m == 0)
+	m = Rules.newMilestones(500, 400, 75, steps)
+	check("milestones: 100% and over", #m == 1 and m[1] == 100)
+	check("milestones: zero price", #Rules.newMilestones(10, 0, 0, steps) == 0)
+	check("milestones: no cash", #Rules.newMilestones(0, 400, 0, steps) == 0)
+	check("milestones: NaN cash", #Rules.newMilestones(0 / 0, 400, 0, steps) == 0)
+	check("trial: stages are fixed values", Rules.oneOf(Cfg.TrialStages, "Converted"))
+	check(
+		"trial: end reasons",
+		Rules.oneOf(Cfg.TrialEnds, "Time") and Rules.oneOf(Cfg.TrialEnds, "Left")
+	)
+	check("trial: end card is an offer", Rules.oneOf(Cfg.Offers, "Trial"))
 end

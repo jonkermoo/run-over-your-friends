@@ -295,6 +295,14 @@ local function logLeave(player: Player)
 		span
 	)
 	log(player, "LeftWhile", rounded, activity, span)
+	-- how far along the cars they were, so retention can be read against progress
+	local owned = 0
+	for _, id in string.split((player:GetAttribute("Owned") or "") :: string, ",") do
+		if Vehicles.ById[id] then
+			owned += 1
+		end
+	end
+	log(player, "LeftOwning", rounded, Rules.countBucket(owned, Cfg.CarBuckets), span)
 end
 
 ---------------- the purchase funnel: store opened -> item viewed -> prompt shown -> bought / cancelled
@@ -385,6 +393,63 @@ end
 function Analytics.tutorialSkipped(player: Player, stepName: string, seconds: number)
 	safe(function()
 		log(player, "TutorialSkipped", 1, stepName, Rules.rangeBucket(seconds, Cfg.SkipBuckets))
+	end)
+end
+
+---------------- car progression and the Roadster free trial
+
+-- a car came to the player (bought with cash, from a pass or a pack): field 01 the car, field 02 how many cars
+-- they own now (the starter included), value their total minutes played
+function Analytics.carOwned(
+	player: Player,
+	vehicleId: string,
+	owned: { [string]: boolean },
+	playSeconds: number
+)
+	safe(function()
+		local count = tostring(Rules.carCount(owned))
+		log(player, "CarOwned", math.floor(playSeconds / 60 + 0.5), vehicleId, count)
+	end)
+end
+
+-- after any money or garage change: cash reached 25/50/75/100% of the cheapest car not owned yet, each step
+-- once per car (kept in progress: vehicle id -> highest step logged); value the total minutes played. Waits for the
+-- client's Ready (its device), so a join logs nothing until cash next changes
+function Analytics.progress(
+	player: Player,
+	owned: { [string]: boolean },
+	cash: number,
+	progress: { [string]: number },
+	playSeconds: number
+)
+	safe(function()
+		local s = sessions[player]
+		if not (s and s.ready) then
+			return -- the device isn't known yet; the next money change catches up
+		end
+		local car = Rules.nextCar(Vehicles.List, owned)
+		if not car then
+			return
+		end
+		local steps = Rules.newMilestones(cash, car.price, progress[car.id] or 0, Cfg.ProgressSteps)
+		for _, step in steps do
+			progress[car.id] = step
+			log(
+				player,
+				"NextCarProgress",
+				math.floor(playSeconds / 60 + 0.5),
+				car.id,
+				tostring(step)
+			)
+		end
+	end)
+end
+
+-- the Roadster free trial: stage Offered | Started | Ended | Converted (Config/Analytics TrialStages); ended:
+-- why (Time | Left | Bought)
+function Analytics.trial(player: Player, stage: string, ended: string?)
+	safe(function()
+		log(player, "RoadsterTrial", 1, stage, ended)
 	end)
 end
 
@@ -479,8 +544,11 @@ function Analytics.start()
 		safe(function()
 			logLeave(p)
 		end)
-		reached[p] = nil
-		sessions[p] = nil
+		-- a moment later, so other leave handlers (a trial ending) still log with the player's device
+		task.defer(function()
+			reached[p] = nil
+			sessions[p] = nil
+		end)
 	end)
 	Net.remote("Track").OnServerEvent:Connect(function(player, kind, a, b, c)
 		safe(function()

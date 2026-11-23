@@ -45,7 +45,13 @@ export type Ctx = {
 	blocksX: number,
 	blocksZ: number,
 }
-export type Result = { walkPoints: { Vector3 }, places: { Places.Place }, spawnPoints: { Vector3 } }
+export type Result = {
+	walkPoints: { Vector3 },
+	places: { Places.Place },
+	spawnPoints: { Vector3 },
+	seaEdge: number, -- the straight west coast's x (the port's quay)
+	lamp: Vector3?, -- the lighthouse lamp's middle
+}
 
 local C = Cfg.Colours
 local function rgb(c: { number }): Color3
@@ -274,6 +280,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	GroundKit.tint() -- the farm's soil and crops
 	terrain.WaterColor = rgb(C.water)
 	terrain.WaterWaveSize = LandCfg.WaterWave
+	terrain.WaterWaveSpeed = LandCfg.WaterWaveSpeed
 	terrain.WaterTransparency = LandCfg.WaterClear
 
 	local R = ctx.road
@@ -1079,6 +1086,90 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			)
 			crane.Parent = buildings
 		end
+		-- tall ship-to-shore cranes along the quay (static scenery, the port's skyline from afar): four legs with
+		-- portal beams, a boom reaching out over the water and back over the yard, an A-frame with two stays, a cab
+		local ST = P.Sts
+		-- always on every client (like the far stand-ins), so they stand on the skyline from the city too
+		local cranes = Instance.new("Model")
+		cranes.Name = "PortCranes"
+		cranes.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+		for k, oz in ST.At do
+			local colour = rgb(ST.Colours[(k - 1) % #ST.Colours + 1])
+			local lx, cz, H = qx + ST.Inland, pt.z + oz, ST.Height
+			local hs, hd = ST.Span / 2, ST.Depth / 2
+			for _, dx in { -hs, hs } do
+				for _, dz in { -hd, hd } do
+					part(
+						cranes,
+						Vector3.new(ST.Leg, H, ST.Leg),
+						CFrame.new(lx + dx, H / 2, cz + dz),
+						colour
+					)
+				end
+				part(
+					cranes,
+					Vector3.new(ST.Leg + 1, 5, ST.Depth + ST.Leg),
+					CFrame.new(lx + dx, H - ST.Tie, cz),
+					colour
+				).CanCollide =
+					false
+			end
+			for _, dz in { -hd, hd } do
+				part(
+					cranes,
+					Vector3.new(ST.Span + ST.Leg, 6, ST.Leg + 1),
+					CFrame.new(lx, H, cz + dz),
+					colour
+				)
+			end
+			local back = ST.Boom - ST.Reach
+			local boomY = H + 6
+			part(
+				cranes,
+				Vector3.new(ST.Boom, 5, 8),
+				CFrame.new(lx + (back - ST.Reach) / 2, boomY, cz),
+				colour
+			).CanCollide =
+				false
+			local apex = Vector3.new(lx + hs, boomY + ST.Frame, cz)
+			part(
+				cranes,
+				Vector3.new(4, ST.Frame, 4),
+				CFrame.new(apex - Vector3.new(0, ST.Frame / 2, 0)),
+				colour
+			).CanCollide =
+				false
+			beam(cranes, apex, Vector3.new(lx - ST.Reach * 0.6, boomY + 2, cz), 2, colour).CanCollide =
+				false
+			beam(cranes, apex, Vector3.new(lx + back, boomY + 2, cz), 2, colour).CanCollide = false
+			part(cranes, Vector3.new(10, 8, 10), CFrame.new(lx - hs, boomY - 8, cz), COLORS.white).CanCollide =
+				false
+		end
+		cranes.Parent = static
+		-- stacks of mixed heights along the yard's north and south edges (static, so the smashable stacks and
+		-- their pay stay as they were): the yard's skyline is uneven instead of one flat grid
+		local ES = P.EdgeStacks
+		local edgeRandom = Random.new(ES.Seed)
+		local ek = Cfg.Container
+		local size = Vector3.new(ek.Size[1], ek.Size[2], ek.Size[3])
+		for _, side in { -1, 1 } do
+			local z = pt.z + side * (pt.d / 2 - ES.Inset)
+			local x = pt.x - pt.w / 2 + ES.From
+			while x + size.Z <= pt.x + pt.w / 2 - ES.To do
+				for h = 0, edgeRandom:NextInteger(ES.Heights[1], ES.Heights[2]) - 1 do
+					-- turned to lie along x, doors at either end
+					local turn = if edgeRandom:NextNumber() < 0.5 then math.pi / 2 else -math.pi / 2
+					container(
+						static,
+						size,
+						CFrame.new(x + size.Z / 2, size.Y / 2 + h * (size.Y + 0.2), z)
+							* CFrame.Angles(0, turn, 0),
+						containerColour(edgeRandom)
+					)
+				end
+				x += size.Z + ES.Gap
+			end
+		end
 		-- a cargo ship moored off the quay (you can jump onto its deck): a two-tone hull with a pointed bow, a
 		-- deck stacked with containers, a bridge tower with windows and wings at the stern, a funnel, rails and
 		-- lifeboats. The bow points along -z.
@@ -1754,7 +1845,13 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	end
 	-- tufts, bushes, rocks, crop rows and palms on the finished ground (FoliageKit)
 	FoliageKit.build(static, props, level, seaEdge, reach, CountryKit.fields, CountryKit.beaches)
-	return { walkPoints = walkPoints, places = places, spawnPoints = suburbs.spawnPoints }
+	return {
+		walkPoints = walkPoints,
+		places = places,
+		spawnPoints = suburbs.spawnPoints,
+		seaEdge = seaEdge,
+		lamp = CountryKit.lamp,
+	}
 end
 
 return OutskirtsKit
