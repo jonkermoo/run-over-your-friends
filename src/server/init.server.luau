@@ -76,6 +76,7 @@ local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
 local DayNightService = require(script.DayNightService)
 local LookService = require(script.LookService)
+local StreetLife = require(script.StreetLife)
 
 -- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
 local Players = game:GetService("Players")
@@ -86,6 +87,11 @@ if not built then
 	error(world)
 end
 LookService.apply(world.buildings)
+-- parked cars, plaza life, a building site, roadworks (props, registered below); a failure here only loses them
+local streetOk, streetErr = pcall(StreetLife.build, world)
+if not streetOk then
+	warn("street life failed: " .. tostring(streetErr))
+end
 for _, p in Players:GetPlayers() do
 	if not p.Character then
 		task.spawn(p.LoadCharacter, p)

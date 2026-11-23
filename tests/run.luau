@@ -3786,6 +3786,87 @@ checkDayNight(); -- glass tints (a function, so its locals stay off the main chu
 	check("glass: tints keep hue, cap colour, clamp lightness", okTint)
 	check("glass: see-through stays partial", G.MinTransparency >= 0 and G.MinTransparency < 0.5)
 	check("look: sun latitude in range", LookCfg.Look.Latitude >= 0 and LookCfg.Look.Latitude <= 80)
+end)(); -- street life (a function, so its locals stay off the main chunk's register limit)
+(function()
+	local SL = require("../src/shared/Rules/StreetLife")
+	local C = require("../src/shared/Config/StreetLife")
+	local Traffic = require("../src/shared/Config/Traffic")
+	local WM = World.Map
+	local slPlan = CityPlan.plan(WM.BlocksX, WM.BlocksZ, WM.Seed)
+	local kerbSides = SL.sides(slPlan, WM.BlocksX, WM.BlocksZ, C.Kerb.Kinds)
+	local okSides = #kerbSides > 0
+	for _, s in kerbSides do
+		local d = SL.SIDES[s.side]
+		local ni, nj = s.i + d[1], s.j + d[2]
+		local n = slPlan[ni] and slPlan[ni][nj]
+		okSides = okSides and C.Kerb.Kinds[slPlan[s.i][s.j]] == true and n ~= "spawn"
+	end
+	check("street life: kerb parking on its kinds only, never round spawn", okSides)
+	local works = SL.sides(slPlan, WM.BlocksX, WM.BlocksZ, C.Works.Kinds)
+	check("street life: enough quiet sides for the roadworks", #works >= C.Works.Count)
+	local toRoad = WM.BlockSize / 2 + WM.RoadWidth / 2
+	local half = 5 -- a parked car's half width, with room
+	check(
+		"street life: kerb cars clear of the traffic lane and off the sidewalk",
+		toRoad - C.Kerb.Out - half > Traffic.Lane + half and C.Kerb.Out - half >= WM.BlockSize / 2
+	)
+	local farSlot = 0
+	for _, t in C.Kerb.Slots do
+		farSlot = math.max(farSlot, math.abs(t))
+	end
+	local wcfg = C.Works
+	check(
+		"street life: roadworks clear of the crossings",
+		wcfg.Spread + wcfg.Patch[2] / 2 + wcfg.Cones * wcfg.ConeGap < WM.BlockSize / 2 - 10
+	)
+	check(
+		"street life: kerb cars clear of the crossings",
+		farSlot + C.Kerb.Jitter + 13 < WM.BlockSize / 2 - 20
+	)
+	check(
+		"street life: a box hits a rect it overlaps, not one beside it",
+		SL.hits({ { 0, 0, 10, 10 } }, 5, 5, 15, 15)
+			and not SL.hits({ { 0, 0, 10, 10 } }, 10, 0, 20, 10)
+	)
+	local lotInner = WM.BlockSize - WM.SidewalkWidth * 2
+	local L = C.Lot
+	local area = C.Site.Area
+	local keepOut = table.clone(L.KeepOut)
+	table.insert(keepOut, { area[1] - 4, area[2] - 4, area[3] + 4, area[4] + 4 })
+	local bays = SL.lotBays(lotInner, L.Bay, L.Edge, L.Corner, keepOut)
+	local okBays = #bays >= 12
+	for _, bay in bays do
+		local hx = if bay.dx ~= 0 then L.Bay[2] / 2 else L.Bay[1] / 2
+		local hz = if bay.dx ~= 0 then L.Bay[1] / 2 else L.Bay[2] / 2
+		okBays = okBays
+			and not SL.hits(keepOut, bay.x - hx, bay.z - hz, bay.x + hx, bay.z + hz)
+			and math.abs(bay.x) + hx <= lotInner / 2
+			and math.abs(bay.z) + hz <= lotInner / 2
+			and math.abs(bay.dx) + math.abs(bay.dz) == 1
+	end
+	check("street life: car park bays inside the lot, clear of the ramps and the site", okBays)
+	local boards = SL.hoarding(area, C.Site.Hoarding, C.Site.Gate)
+	local okBoards, gateOpen = #boards > 8, true
+	for _, bay in boards do
+		okBoards = okBoards and bay.len <= C.Site.Hoarding * 1.5
+		if
+			not bay.alongX
+			and bay.x == area[3]
+			and math.abs(bay.z - (area[2] + area[4]) / 2) < C.Site.Gate / 2
+		then
+			gateOpen = false
+		end
+	end
+	check("street life: the site is boarded round, its gate left open", okBoards and gateOpen)
+	local slPitch = WM.BlockSize + WM.RoadWidth
+	local x0 = -(WM.BlocksX * slPitch + WM.RoadWidth) / 2
+	local z0 = -(WM.BlocksZ * slPitch + WM.RoadWidth) / 2
+	local si = (C.Site.Block[1] - x0 - WM.RoadWidth - WM.BlockSize / 2) / slPitch
+	local sj = (C.Site.Block[2] - z0 - WM.RoadWidth - WM.BlockSize / 2) / slPitch
+	check(
+		"street life: the building site stands on a car park",
+		si == math.floor(si) and sj == math.floor(sj) and slPlan[si][sj] == "parking"
+	)
 end)()
 
 -- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
