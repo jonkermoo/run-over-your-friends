@@ -33,6 +33,7 @@ local Traffic = require(script.Traffic)
 local VipTags = require(script.VipTags)
 local Streak = require(script.Streak)
 local Track = require(script.Track)
+local Trial = require(script.Trial)
 local Stunts = require(script.Stunts)
 
 Hud.onGoals = Goals.toggle
@@ -72,3 +73,4 @@ task.spawn(HideUi.start)
 task.spawn(CamLock.start)
 task.spawn(NewRide.start)
 task.spawn(Podium.start)
+task.spawn(Trial.start)

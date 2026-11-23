@@ -138,6 +138,53 @@ function Analytics.firstBought(
 	return true
 end
 
+-- how many cars the player owns (the starter included)
+function Analytics.carCount(owned: { [string]: boolean }): number
+	local n = 0
+	for _, yes in owned do
+		if yes then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- the car progress is measured toward: the cheapest one not owned (price > 0, ties by list order); nil when
+-- every car is owned
+function Analytics.nextCar(
+	list: { { id: string, price: number } },
+	owned: { [string]: boolean }
+): { id: string, price: number }?
+	local best = nil
+	for _, v in list do
+		if not owned[v.id] and v.price > 0 and (best == nil or v.price < best.price) then
+			best = v
+		end
+	end
+	return best
+end
+
+-- the progress milestones (percent of the price, e.g. { 25, 50, 75, 100 }) that cash now reaches and that
+-- haven't been logged yet (logged: the highest already logged for this car, 0 = none), lowest first
+function Analytics.newMilestones(
+	cash: number,
+	price: number,
+	logged: number,
+	steps: { number }
+): { number }
+	local out = {}
+	if price <= 0 or cash ~= cash then
+		return out
+	end
+	local pct = cash / price * 100
+	for _, step in steps do
+		if step > logged and pct >= step then
+			table.insert(out, step)
+		end
+	end
+	return out
+end
+
 export type Bucket = { tokens: number, at: number }
 
 -- the Track rate limit: true (and one token used) when the message may go through

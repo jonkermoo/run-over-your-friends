@@ -1055,6 +1055,7 @@ for _, stats in Vehicles.List do
 	local action = Style.button(bottom, "SPAWN", "green", 28)
 	action.Name = "Action"
 	action:SetAttribute("VehicleId", stats.id) -- client/Guide finds the button by it
+	require(script.Parent.Trial).button(stats.id, action) -- the Roadster's FREE TRIAL beside it
 	action.AnchorPoint = Vector2.new(1, 1)
 	action.Position = UDim2.fromScale(1, 1)
 	action.Size = UDim2.new(0.5, -12, 0, 60)

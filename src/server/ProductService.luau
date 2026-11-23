@@ -56,7 +56,10 @@ local function grant(player: Player, product: Products.Product): boolean
 	local names = {}
 	for _, id in product.vehicles or {} do
 		if Vehicles.ById[id] then
-			profile.owned[id] = true
+			if not profile.owned[id] then
+				profile.owned[id] = true
+				Analytics.carOwned(player, id, profile.owned, Data.playSeconds(player))
+			end
 			table.insert(names, Vehicles.ById[id].name)
 		end
 	end

@@ -76,6 +76,8 @@ local TrafficService = require(script.TrafficService)
 local StuntService = require(script.StuntService)
 local DayNightService = require(script.DayNightService)
 local LookService = require(script.LookService)
+local TrialService = require(script.TrialService)
+local TrialConfig = require(ReplicatedStorage.Shared.Config.Trial)
 
 -- the map's terrain takes a few seconds to fill (it yields), so nobody spawns until it stands
 local Players = game:GetService("Players")
@@ -134,9 +136,19 @@ UpgradeService.start()
 ServerGoalService.start()
 StuntService.start()
 DayNightService.start()
+TrialService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)
+Data.onPublish(function(player, profile)
+	Analytics.progress(
+		player,
+		profile.owned,
+		profile.money,
+		profile.progress,
+		Data.playSeconds(player)
+	)
+end)
 VehicleService.onSpawn(function(player, id)
 	Analytics.step(player, Analytics.Steps.SpawnedCar)
 	Analytics.custom(
@@ -185,6 +197,10 @@ Net.remote("BuyVehicle").OnServerEvent:Connect(function(player, id)
 		Analytics.firstVehicle(player, stats.id, Data.playSeconds(player))
 	end
 	OnboardingService.purchased(player, stats)
+	Analytics.carOwned(player, stats.id, profile.owned, Data.playSeconds(player))
+	if stats.id == TrialConfig.Car then
+		TrialService.bought(player)
+	end
 end)
 
 -- group reward: once per account, for members of the game's group (checked fresh, so joining mid-session counts)

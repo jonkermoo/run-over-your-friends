@@ -34,12 +34,19 @@ return table.freeze({
 	SkipBuckets = table.freeze({ 10, 20, 40, 60 }),
 	-- TutorialSkipped field 01 when the event step ended itself (Config/Onboarding EventWait)
 	EventTimeout = "EventTimeout",
+	-- cars owned (the starter included) on LeftOwning: 1, 2, 3, 4-5, 6-8, 9+
+	CarBuckets = table.freeze({ 1, 2, 3, 5, 8 }),
+	-- NextCarProgress: percent of the cheapest unowned car's price the player's cash has reached
+	ProgressSteps = table.freeze({ 25, 50, 75, 100 }),
+	-- RoadsterTrial field 01 stages and field 02 end reasons
+	TrialStages = table.freeze({ "Offered", "Started", "Ended", "Converted" }),
+	TrialEnds = table.freeze({ "Time", "Left", "Bought" }),
 
 	-- the fixed values the client may send (Rules/Analytics checks them; anything else is ignored)
 	Devices = table.freeze({ "Phone", "Tablet", "PC", "Console", "Unknown" }),
 	Sheets = table.freeze({ "Store", "Garage" }),
 	StoreSections = table.freeze({ "DEALS", "MONEY", "PASSES", "FREE" }),
-	Offers = table.freeze({ "Starter", "Upsell" }),
+	Offers = table.freeze({ "Starter", "Upsell", "Trial" }), -- Trial: the end card's Roadster pass button
 	OfferStages = table.freeze({ "Shown", "Pressed" }),
 	States = table.freeze({ "Menu", "Idle", "Active" }),
 })

@@ -141,3 +141,8 @@ ChestPaintAndCash,New paint and {n}! Put it on any car in the GARAGE,,,¡Pintura
 ChestsWaiting,Chests to open in GOALS: {n},,,Cofres por abrir en METAS: {n},Baús para abrir em METAS: {n}
 ChallengesNew,{n} new challenges today. Each one you finish gives a chest!,,,{n} desafíos nuevos hoy. ¡Cada uno que completes da un cofre!,{n} desafios novos hoje. Cada um que você completar dá um baú!
 PaintChest,{paint}  FROM CHALLENGE CHESTS,,,{paint}  DE COFRES DE DESAFÍOS,{paint}  DE BAÚS DE DESAFIOS
+TrialResume,TRIAL {time},,,PRUEBA {time},TESTE {time}
+TrialIn,TRIAL IN {time},,,PRUEBA EN {time},TESTE EM {time}
+TrialChip,ROADSTER TRIAL {time},,,PRUEBA ROADSTER {time},TESTE ROADSTER {time}
+TrialBar,{cash} / {price},,,{cash} / {price},{cash} / {price}
+TrialWarn,{n} SECONDS LEFT IN THE ROADSTER!,,,¡QUEDAN {n} SEGUNDOS EN EL ROADSTER!,FALTAM {n} SEGUNDOS NO ROADSTER!
