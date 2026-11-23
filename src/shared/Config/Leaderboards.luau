@@ -90,6 +90,8 @@ return table.freeze({
 	GantryReach = 6, -- and this far past the outer boards
 	Gantry = { 236, 226, 206 }, -- the beam
 	GantryPosts = { 186, 92, 66 }, -- terracotta, as the plaza's border
+	GantryPost = 3, -- a post's width and depth
+	PostInset = 2, -- a post's middle this far in from the beam's end (over half a post, so the beam overhangs it)
 	-- the boards' own colours behind the rows (Boards.luau): a warm dark instead of asphalt black
 	Panel = { 58, 38, 48 },
 	Card = { 82, 56, 66 },

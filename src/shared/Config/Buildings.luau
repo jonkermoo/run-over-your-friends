@@ -157,12 +157,12 @@ return table.freeze({
 		-- a little clutter on the front half of the roof (TowerKit.clutter), on a grid of Slot-stud squares:
 		-- air-con units (a box with a fan on top), vent pipes, the odd stair hut
 		Roof = table.freeze({
-			Slot = 11,
+			Slot = 12,
 			Margin = 6, -- clear of the parapet
 			Chance = { ac = 0.25, vent = 0.15, hut = 0.04 }, -- per slot, else empty
 			Near = 2, -- the zone starts this far in front of the roof's middle (the billboard posts stand 10 back)
 			MinZone = 6, -- no clutter on a roof whose zone is shallower than this
-			Jitter = { 0.3, 0.7 }, -- where in its slot a unit stands (share of Slot), each way
+			Jitter = { 0.4, 0.6 }, -- where in its slot a unit stands (share of Slot), each way; neighbours never touch
 			Ac = { 7, 4, 5 }, -- wide, tall, deep
 			Fan = { 3, 0.5 }, -- across, tall
 			Vent = { 1.2, 4 }, -- across, tall

@@ -824,8 +824,8 @@ function MapBuilder.build(fresh: boolean?): Result
 				for _, side in { -1, 1 } do
 					part(
 						boards,
-						Vector3.new(3, beamY + 1, 3),
-						CFrame.new(cx + side * (span / 2 - 1.5), (beamY + 1) / 2, gz),
+						Vector3.new(L.GantryPost, beamY + 1, L.GantryPost),
+						CFrame.new(cx + side * (span / 2 - L.PostInset), (beamY + 1) / 2, gz),
 						rgb(L.GantryPosts)
 					)
 				end

@@ -1284,6 +1284,33 @@ do
 		facadesOk
 	)
 end
+do
+	local O = BuildingConfig.Office
+	local R = O.Roof
+	-- neighbours can come Slot * (1 - jitter spread) apart; the widest unit (turned either way) must fit
+	local gap = R.Slot * (1 - (R.Jitter[2] - R.Jitter[1]))
+	local widest = math.max(R.Ac[1], R.Ac[3], R.Hut[1], R.Hut[3], R.Vent[1])
+	check(
+		"roof clutter: chances add to 1 or less and neighbouring units never touch",
+		R.Chance.ac + R.Chance.vent + R.Chance.hut <= 1
+			and R.Jitter[1] >= 0
+			and R.Jitter[2] <= 1
+			and gap > widest
+			and R.MinZone > 0
+	)
+	check(
+		"shopfront awnings stay inside the tower's setback",
+		O.Shopfront.AwningDepth < O.Setback
+			and O.Shopfront.Fascia > 0
+			and O.Shopfront.LobbyFascia > 0
+	)
+	check(
+		"leaderboards: tall enough for their rows, gantry posts under the beam",
+		LbConfig.StandHeight / LbConfig.StandWidth * 728 >= 750
+			and LbConfig.PostInset > LbConfig.GantryPost / 2
+			and LbConfig.StandStep > LbConfig.StandWidth
+	)
+end
 local landmarkOk = true
 for _, colours in { BuildingConfig.Restaurant.Colours, BuildingConfig.Warehouse.Colours } do
 	landmarkOk = landmarkOk
