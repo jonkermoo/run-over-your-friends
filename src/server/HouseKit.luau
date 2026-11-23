@@ -38,6 +38,10 @@ local function interior(ctx: Ctx, cx: number, w: number, zFront: number, zBack: 
 	)
 end
 
+-- which way each type's main roof ridge runs in the house's frame (A and C gable to the street, B to the side;
+-- D is flat): the far stand-in (SkylineKit) puts its roof the same way
+local RIDGE: { [string]: string } = { A = "z", B = "x", C = "z" }
+
 local BUILD: { [string]: (Ctx) -> { door: number, front: number, back: number, living: Vector3 } } =
 	{}
 
@@ -259,6 +263,7 @@ function HouseKit.build(
 	local model = Instance.new("Model")
 	model.Name = name
 	model:SetAttribute("HouseType", kind)
+	model:SetAttribute("Ridge", RIDGE[kind])
 	-- each house's own touches come from its name (no random draws, so the town's layout doesn't shift):
 	-- a roof colour from the darker set, shutters, flower boxes, a door canopy, a porch (Config/Houses Variety)
 	local function hash(text: string): number
@@ -276,6 +281,7 @@ function HouseKit.build(
 	local roof = if roll("roof") < V.OwnRoof
 		then Kit.rgb(V.Roofs[hash(name .. "#colour") % #V.Roofs + 1])
 		else Kit.rgb(palette.roof)
+	model:SetAttribute("RoofColour", roof)
 	local ctx = Kit.context(model, c, out, mirror, {
 		wall = Kit.rgb(palette.wall),
 		trim = Kit.rgb(palette.trim),

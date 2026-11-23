@@ -38,6 +38,10 @@ return table.freeze({
 		}),
 		MinPart = 3,
 		Inset = 0.6,
+		-- a gabled house's stand-in is a wall box with a roof in the house's roof colour: one part turned 45
+		-- degrees about the ridge, its top half the gable, as wide as the house and as tall as the house's ridge;
+		-- the walls stay at least RoofMinWall tall (the ridge rises above the real one if it must)
+		RoofMinWall = 7,
 	}),
 	-- the spawn plaza (MapBuilder spawnPlaza, dressSpawnPlaza): a roundabout hub. A grass island in the middle
 	-- holds the champions' podium (Config/Champions: a slowly turning stage); the spawn
