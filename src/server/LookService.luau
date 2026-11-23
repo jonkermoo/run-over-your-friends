@@ -1,12 +1,14 @@
 --!strict
 -- The world's look (Config/Look), set once the map stands: Lighting, sky, haze, clouds, grade, bloom, sun
--- rays (the start-up values, also what Edit mode shows), and the buildings' window glass in soft tints.
+-- rays (the start-up values, also what Edit mode shows), and the buildings' window glass in soft tints. The cars'
+-- finish goes on the vehicle templates before anything copies them (LookService.cars).
 -- In play each client's DayNight then drives the clock, light, haze, grade and bloom through the day.
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Look)
 local GlassRules = require(ReplicatedStorage.Shared.Rules.Glass)
+local Sheen = require(ReplicatedStorage.Shared.Rules.Sheen)
 
 local LookService = {}
 
@@ -95,6 +97,21 @@ end
 function LookService.apply(buildings: Instance)
 	lighting()
 	glass(buildings)
+end
+
+-- the cars' finish (Config/Look Cars) on every vehicle template: painted panels and window glass. Run before
+-- anything copies a template (the map's parked cars, the first player's car); the templates replicate, so each
+-- client's traffic and garage pictures copy the finished parts too. Materials only: no parts or assets.
+function LookService.cars(models: Instance)
+	for _, part in models:GetDescendants() do
+		if part:IsA("BasePart") then
+			local material, reflectance = Sheen.finish(part.Name, Config.Cars)
+			if material and reflectance then
+				part.Material = (Enum.Material :: any)[material]
+				part.Reflectance = reflectance
+			end
+		end
+	end
 end
 
 return LookService

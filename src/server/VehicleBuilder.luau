@@ -14,6 +14,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
+local Look = require(ReplicatedStorage.Shared.Config.Look)
+local Sheen = require(ReplicatedStorage.Shared.Rules.Sheen)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.Upgrades)
 local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
@@ -289,6 +291,7 @@ function VehicleBuilder.paint(model: Model, rgb: { number }?, material: string?)
 		end)
 		if ok and m then
 			part.Material = m
+			part.Reflectance = Sheen.paintReflectance(m.Name, Look.Cars)
 		end
 	end
 end

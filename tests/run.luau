@@ -3786,6 +3786,59 @@ checkDayNight(); -- glass tints (a function, so its locals stay off the main chu
 	check("glass: tints keep hue, cap colour, clamp lightness", okTint)
 	check("glass: see-through stays partial", G.MinTransparency >= 0 and G.MinTransparency < 0.5)
 	check("look: sun latitude in range", LookCfg.Look.Latitude >= 0 and LookCfg.Look.Latitude <= 80)
+end)();
+-- the cars' finish (a function, so its locals stay off the main chunk's register limit)
+(function()
+	local SR = require("../src/shared/Rules/Sheen")
+	local C = require("../src/shared/Config/Look").Cars
+	check(
+		"sheen: paint and zone paint pieces are painted panels",
+		SR.isPaint("Paint") and SR.isPaint("Z1_Paint") and SR.isPaint("U2_Paint")
+	)
+	check(
+		"sheen: body, glass and wheels are not painted panels",
+		not SR.isPaint("Body")
+			and not SR.isPaint("Glass")
+			and not SR.isPaint("Wheel_FL1")
+			and not SR.isPaint("Painted")
+	)
+	local pm, pr = SR.finish("Z3_Paint", C)
+	local gm, gr = SR.finish("Glass", C)
+	local bm, br = SR.finish("Body", C)
+	check("sheen: paint gets the paint finish", pm == C.PaintMaterial and pr == C.PaintReflectance)
+	check("sheen: glass gets the glass finish", gm == C.GlassMaterial and gr == C.GlassReflectance)
+	check("sheen: the body keeps its own", bm == nil and br == nil)
+	check(
+		"sheen: light, not washed out",
+		C.PaintReflectance > 0
+			and C.PaintReflectance <= 0.1
+			and C.GlassReflectance > 0
+			and C.GlassReflectance <= 0.25
+	)
+	check(
+		"sheen: special paints keep their own finish",
+		SR.paintReflectance(C.PaintMaterial, C) == C.PaintReflectance
+			and SR.paintReflectance("Neon", C) == 0
+			and SR.paintReflectance("Foil", C) == 0
+	)
+	local roblox = require("@lune/roblox")
+	local okEnum = pcall(function()
+		return (roblox.Enum.Material :: any)[C.PaintMaterial],
+			(roblox.Enum.Material :: any)[C.GlassMaterial]
+	end)
+	check("sheen: the finishes are real materials", okEnum)
+	-- every template has painted panels for the sheen to land on
+	local fs = require("@lune/fs")
+	local okPaint = true
+	for _, root in roblox.deserializeModel(fs.readFile("assets/Vehicles.rbxm")) do
+		for _, m in root:GetChildren() do
+			if m:IsA("Model") and m.Name ~= "SemiTrailer" and m:FindFirstChild("Paint") == nil then
+				print("   no Paint part on " .. m.Name)
+				okPaint = false
+			end
+		end
+	end
+	check("sheen: every vehicle has a Paint part", okPaint)
 end)()
 
 -- the baked island terrain (server/Terra, tools/lune/bake_terrain): the place ships with it, labelled
