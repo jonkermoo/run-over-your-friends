@@ -20,6 +20,7 @@ local TownKit = {}
 local M = World.Map
 local O = B.Office
 local S = B.Shops
+local SF = O.Shopfront
 local BLACK = Color3.new(0, 0, 0)
 
 export type OfficeColours = {
@@ -29,6 +30,7 @@ export type OfficeColours = {
 	roof: Color3,
 	stone: Color3,
 	glass: Color3?, -- the tower's own tint (Config/Buildings Office.Tints); Office.Glass if missing
+	shops: { Color3 }?, -- its shopfronts' colours, in turn (Office.Shopfront); stone lobby walls if missing
 }
 
 local function part(
@@ -87,6 +89,8 @@ function TownKit.office(
 		local n = math.max(1, math.floor(length / O.PanelWidth + 0.5))
 		local pw = length / n
 		local isFront = outward:Dot(front) > 0.9
+		-- the front and both sides face streets and get shop windows; the back faces the car park
+		local shops = if outward:Dot(front) > -0.9 then c.shops else nil
 		local doorAt = n // 2
 		local mid0 = origin + along * (length / 2)
 		local faceCf = CFrame.lookAt(mid0, mid0 + outward)
@@ -161,8 +165,9 @@ function TownKit.office(
 						Enum.Material.Concrete
 					)
 					door = Vector3.new(mid.X, 0, mid.Z)
-				elseif f == 0 and isFront then
-					-- lobby window
+				elseif f == 0 and (isFront or shops) then
+					-- lobby or shop window under a stone (or the shop's coloured) fascia, a shop's awning
+					local fascia = if shops then SF.Fascia else SF.LobbyFascia
 					part(
 						model,
 						Vector3.new(pw, 1.5, T),
@@ -170,17 +175,45 @@ function TownKit.office(
 						c.stone,
 						stoneMat
 					)
-					glass(
-						Vector3.new(pw, FH - 4.5, T * 0.6),
-						cf + Vector3.new(0, 1.5 + (FH - 4.5) / 2, 0)
+					local window = glass(
+						Vector3.new(pw, FH - 1.5 - fascia, T * 0.6),
+						cf + Vector3.new(0, 1.5 + (FH - 1.5 - fascia) / 2, 0)
 					)
-					part(
-						model,
-						Vector3.new(pw, 3, T),
-						cf + Vector3.new(0, FH - 1.5, 0),
-						c.stone,
-						stoneMat
-					)
+					if shops then
+						local colour = shops[i % #shops + 1]
+						local shopBand = part(
+							model,
+							Vector3.new(pw, fascia, T),
+							cf + Vector3.new(0, FH - fascia / 2, 0),
+							colour
+						)
+						local depth = SF.AwningDepth
+						local awning = part(
+							model,
+							Vector3.new(pw - SF.AwningInset * 2, SF.AwningThick, depth),
+							cf
+								* CFrame.new(0, FH - fascia, -T / 2)
+								* CFrame.Angles(-SF.AwningTilt, 0, 0)
+								* CFrame.new(0, 0, -depth / 2),
+							colour,
+							Enum.Material.Fabric
+						)
+						awning.CanCollide = false
+						-- pay as before: a side bay was one stone panel, so only its sill pays; awnings never do
+						awning:SetAttribute("Pieces", 0)
+						if not isFront then
+							window:SetAttribute("Pieces", 0)
+							shopBand:SetAttribute("Pieces", 0)
+						end
+					else
+						part(
+							model,
+							Vector3.new(pw, fascia, T),
+							cf + Vector3.new(0, FH - fascia / 2, 0),
+							c.stone,
+							stoneMat
+						)
+					end
 				elseif f == 0 then
 					part(
 						model,
