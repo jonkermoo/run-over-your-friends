@@ -30,6 +30,7 @@ return table.freeze({
 
 	-- kerb parking: on block sides of these kinds, never on the spawn block's ring
 	Kerb = table.freeze({
+		On = false, -- off to keep within the map's part budget (about 950 parts with it on)
 		Kinds = table.freeze({ office = true, shops = true, restaurant = true, plaza = true }),
 		Out = 117, -- car centre from the block's middle (19-31 studs off the road's centre; traffic runs 11 off it)
 		Slots = table.freeze({ -50, -17, 17, 50 }), -- along the side; the ends stay clear of the crossings
@@ -105,7 +106,7 @@ return table.freeze({
 
 	-- roadworks in the kerb lane on the quieter streets: a dug patch, barriers round it, cones before it
 	Works = table.freeze({
-		Count = 20,
+		Count = 0, -- boxes; 0 keeps within the map's part budget (each box is about 11 parts)
 		Kinds = table.freeze({ homes = true, park = true, warehouse = true, parking = true }),
 		Spread = 40, -- a box's middle lands up to this far either way of the side's middle
 		Patch = table.freeze({ 7, 18 }), -- across, along

@@ -618,7 +618,9 @@ function StreetLife.build(map: { props: Folder, buildings: Folder, grid: Routes.
 			end
 		end
 	end
-	kerb(ctx, grid, plan)
+	if Cfg.Kerb.On then
+		kerb(ctx, grid, plan)
+	end
 	works(ctx, grid, plan)
 	return ctx.parts
 end
