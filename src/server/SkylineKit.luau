@@ -1,10 +1,10 @@
 --!strict
--- Far stand-ins for the buildings: one plain box per house, shop, office and farm building, in its wall colour,
--- in a Persistent model so it is always on every client. A building streams in and out whole (Atomic); the
--- client (Skyline.luau) hides a box while its real building is loaded, so from afar the town, the skyline and
--- the suburbs never vanish to bare road. Each building gets a `Sky` number attribute; its box is named the same.
--- (Model.LevelOfDetail can't be set by a game script, and the engine makes no stand-ins for models built at
--- run time.)
+-- Far stand-ins for the buildings: one plain box per house, shop, office and farm building, in its wall colour
+-- (a gabled house's box also gets its roof, in the roof's colour), in a Persistent model so it is always on
+-- every client. A building streams in and out whole (Atomic); the client (Skyline.luau) hides a box while its
+-- real building is loaded, so from afar the town, the skyline and the suburbs never vanish to bare road.
+-- Each building gets a `Sky` number attribute; its box is named the same. (Model.LevelOfDetail can't be set by
+-- a game script, and the engine makes no stand-ins for models built at run time.)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local World = require(ReplicatedStorage.Shared.Config.World)
@@ -63,6 +63,34 @@ local function standIn(model: Model): (CFrame?, Vector3?, Color3?)
 	return frame.Rotation + centre, size, colours[best :: string]
 end
 
+-- a gabled house's roof on its stand-in (World.Skyline RoofMinWall): the box is cut down to the walls and a box
+-- turned 45 degrees about the ridge sits on it, its lower half hidden in the walls (and the ground); a child of
+-- the stand-in, so it shows and hides with it
+local function roof(box: Part, ridge: string, colour: Color3)
+	local s = box.Size
+	local frame = box.CFrame
+	local across = if ridge == "x" then s.Z else s.X
+	local along = if ridge == "x" then s.X else s.Z
+	local bottom = -s.Y / 2
+	-- never above the box's own top, so the walls never poke past the real ones
+	local wallsTop =
+		math.min(math.max(s.Y / 2 - across / 2, bottom + World.Skyline.RoofMinWall), s.Y / 2)
+	box.Size = Vector3.new(s.X, wallsTop - bottom, s.Z)
+	box.CFrame = frame * CFrame.new(0, (bottom + wallsTop) / 2, 0)
+	local side = across / math.sqrt(2)
+	local top = box:Clone()
+	top.Name = "Roof"
+	top.Color = colour
+	if ridge == "x" then
+		top.Size = Vector3.new(along, side, side)
+		top.CFrame = frame * CFrame.new(0, wallsTop, 0) * CFrame.Angles(math.pi / 4, 0, 0)
+	else
+		top.Size = Vector3.new(side, side, along)
+		top.CFrame = frame * CFrame.new(0, wallsTop, 0) * CFrame.Angles(0, 0, math.pi / 4)
+	end
+	top.Parent = box
+end
+
 function SkylineKit.build(map: Instance, buildings: Instance): Model
 	local skyline = Instance.new("Model")
 	skyline.Name = "Skyline"
@@ -92,6 +120,11 @@ function SkylineKit.build(map: Instance, buildings: Instance): Model
 		-- a hair inside the real walls, so a box that is still showing never pokes through
 		box.Size = size - Vector3.one * World.Skyline.Inset
 		box.CFrame = cf
+		local ridge = m:GetAttribute("Ridge")
+		local roofColour = m:GetAttribute("RoofColour")
+		if (ridge == "x" or ridge == "z") and typeof(roofColour) == "Color3" then
+			roof(box, ridge, roofColour)
+		end
 		box.Parent = skyline
 	end
 	skyline.Parent = map

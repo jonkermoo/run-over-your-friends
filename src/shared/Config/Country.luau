@@ -1,6 +1,6 @@
 --!strict
--- The countryside that fills the map round the city and its four zones (CountryKit): hills, woods and islands
--- past the map's edge, a farm (north-east), a motocross track (south-east), beaches and a lighthouse on the
+-- The countryside that fills the map round the city and its four zones (CountryKit): mountain ranges, woods and
+-- islands past the map's edge, a farm (north-east), a motocross track (south-east), beaches and a lighthouse on the
 -- west coast, a pine forest round a lake (north-west), uses for the cells between the city and the ring, a
 -- sidewalk on the city's outer road, and fills for the bare parking lots and plazas. Hills and dirt are
 -- terrain (no parts); woods are one-piece meshes (assets/Scenery.rbxm). Studs; colours are { r, g, b }.
@@ -9,35 +9,66 @@
 export type RGB = { number }
 
 return table.freeze({
-	-- past the island's edge (Config/Land; outside the invisible walls, so nobody drives there): two rows of
-	-- terrain hills wherever the edge is land, a belt of woods at their foot, pines on the slopes; the sea runs
-	-- on past the west coast with a few islands. `out` distances are past the edge.
+	-- past the island's edge (Config/Land; outside the invisible walls, so nobody drives there): mountain ranges
+	-- wherever the edge is land, a belt of woods at their foot, pines in the forest band; the sea runs on past
+	-- the west coast with a few islands. `out` distances are past the edge.
 	Edge = table.freeze({
-		Spacing = 170, -- between hills along the edge
 		MoundStep = 4, -- tall hills are stacked terrain discs this thick...
 		BellMax = 45, -- ...lower ones are smooth bells written voxel by voxel (no terraces)
-		-- out: past the edge; heights are skewed toward the low end by `skew` (1 = even)
-		Near = table.freeze({
-			out = { 60, 220 },
-			radius = { 220, 340 },
-			height = { 35, 90 },
-			skew = 1,
-		}),
-		Far = table.freeze({
-			out = { 380, 700 },
-			radius = { 360, 600 },
-			height = { 160, 620 },
-			skew = 1.6,
-		}),
-		RadiusScale = { 0.8, 1.2 }, -- a hill's radius grows with its height, by this much from lowest to tallest
-		-- hills this tall are mountains: pointed, grass up to GrassTo of their height, rock above, and a snow cap
-		-- from SnowFrom on the ones at least SnowMin tall (Shape > 1 makes the slopes concave)
-		Peak = table.freeze({
-			From = 120,
-			Shape = 1.3,
-			GrassTo = 0.4,
-			SnowFrom = 0.78,
-			SnowMin = 340,
+		-- the ranges (Rules/Ranges, drawn as terrain in Tile-stud squares): `v` is studs past the edge. Front:
+		-- forested foothills rising from `from` to `rise`, gone over `fade`, `base` + up to `amp` tall, rolling
+		-- every `scale` studs. Back: rocky ridges (ridged noise every `scale`) rising over `rise`, gone over `fade`
+		-- (before the ground under them ends, Config/Land Overrun), `base` + up to `amp` tall, with big peaks and
+		-- low saddles every `bigScale` along the edge (`bigMin` = the saddles' share). They fade out from
+		-- CoastClear to CoastClear + CoastFade east of the west coast. Bands: grass up to `grass`, forest up to
+		-- `forest`, rock (two kinds in strata `strata` studs across) up to `rock`, snow above; band edges wander
+		-- by `jitter` studs every `jitterScale`.
+		Ranges = table.freeze({
+			Seed = 31,
+			Tile = 128,
+			-- a tile is drawn up to its tallest column, found on a grid of TopSamples x TopSamples steps, times
+			-- TopMargin[1] plus TopMargin[2] studs for peaks that fall between the samples
+			TopSamples = 8,
+			TopMargin = table.freeze({ 1.2, 16 }),
+			Front = table.freeze({
+				from = 40,
+				rise = 240,
+				fade = table.freeze({ 520, 720 }),
+				base = 70,
+				amp = 150,
+				scale = 380,
+			}),
+			Back = table.freeze({
+				rise = table.freeze({ 320, 720 }),
+				fade = table.freeze({ 1150, 1450 }),
+				base = 140,
+				amp = 620,
+				scale = 750,
+				bigScale = 1400,
+				bigMin = 0.45,
+			}),
+			CoastClear = 120,
+			CoastFade = 500,
+			Bands = table.freeze({
+				grass = 20,
+				forest = 200,
+				rock = 450,
+				jitter = 60,
+				jitterScale = 90,
+				strata = 140,
+				strataY = 40, -- the strata's layers are this many studs thick
+				grassJitter = 0.2, -- the grass line wanders by this share of `jitter`
+			}),
+			-- the terrain material each band is drawn in, and the colours of the two that are only used here
+			Materials = table.freeze({
+				grass = "Grass",
+				forest = "Mud",
+				rock = "Rock",
+				rock2 = "Basalt",
+				snow = "Snow",
+			}),
+			Forest = { 28, 62, 40 } :: RGB, -- Mud, as dark pine forest
+			Rock2 = { 92, 96, 116 } :: RGB, -- Basalt, a cool blue-grey beside the warm Rock
 		}),
 		BeltOut = 25, -- the woods' centre line, past the edge
 		BeltSpacing = 190, -- between belt meshes along the edge (each is about 210 long)
@@ -45,10 +76,11 @@ return table.freeze({
 		CoastClear = 120, -- no woods or pines this close to the west coast
 		PineOut = table.freeze({ 80, 700 }), -- pines spread this far past the edge
 		PineTries = 10, -- spots tried per pine before giving up
-		PineMinHeight = 6, -- pines only on slopes at least this high (not in the flat between hills)
+		PineMinHeight = 6, -- pines only on slopes at least this high (not in the flat between hills)...
+		PineMaxHeight = 160, -- ...and no higher than the forest band (Ranges Bands.forest, less a margin)
 		BeltSink = 4, -- woods sit this far into the slope
 		BeltColours = table.freeze({ { 58, 112, 60 }, { 66, 126, 64 }, { 52, 100, 56 } }) :: { RGB },
-		Pines = 300, -- on the hills, all round
+		Pines = 300, -- on the foothills, all round
 		PineHeight = table.freeze({ 30, 55 }),
 		PineColours = table.freeze({ { 46, 94, 60 }, { 54, 106, 64 }, { 40, 84, 54 } }) :: { RGB },
 		Islands = 7,

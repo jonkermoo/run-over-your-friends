@@ -33,6 +33,7 @@ local OutskirtsKit = require(script.Parent.OutskirtsKit)
 local Places = require(script.Parent.Places)
 local RampKit = require(script.Parent.RampKit)
 local RoadKit = require(script.Parent.RoadKit)
+local SeaKit = require(script.Parent.SeaKit)
 local SkylineKit = require(script.Parent.SkylineKit)
 local StreetKit = require(script.Parent.StreetKit)
 local TownKit = require(script.Parent.TownKit)
@@ -1570,6 +1571,8 @@ function MapBuilder.build(fresh: boolean?): Result
 
 	-- far stand-ins for the buildings (always loaded; the client hides each while its building is here)
 	SkylineKit.build(map, buildings)
+	-- boats, the lighthouse beam and the beaches' foam (Config/Sea)
+	SeaKit.build(map, static, outskirts.seaEdge, outskirts.lamp)
 	map.Parent = workspace
 	return {
 		buildings = buildings,

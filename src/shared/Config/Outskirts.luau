@@ -71,6 +71,33 @@ return table.freeze({
 		Cols = 4,
 		Cranes = 2,
 		Fenders = 20, -- tyres on the quay's face
+		-- tall ship-to-shore cranes along the quay (static scenery, clear of the two smashable gantries at z
+		-- -160 and 160): at these z offsets from the port's middle, colours taking turns. Legs `Leg` thick, `Span`
+		-- apart across the quay (centred `Inland` from its edge) and `Depth` along it, `Height` tall, a tie `Tie`
+		-- below the top; a boom `Boom` long, `Reach` of it out over the water; an A-frame `Frame` above the boom
+		Sts = table.freeze({
+			At = table.freeze({ -420, -20, 300, 450 }),
+			Colours = table.freeze({ { 200, 60, 50 }, { 235, 235, 230 } }),
+			Inland = 24,
+			Span = 40,
+			Depth = 30,
+			Leg = 3,
+			Height = 95,
+			Tie = 30,
+			Boom = 170,
+			Reach = 110,
+			Frame = 40,
+		}),
+		-- stacks along the yard's north and south edges, `Inset` in from them, from `From` past the quay to `To`
+		-- short of the land side, `Gap` apart, `Heights` containers tall (own random stream, `Seed`)
+		EdgeStacks = table.freeze({
+			Inset = 40,
+			From = 120,
+			To = 60,
+			Gap = 6,
+			Heights = table.freeze({ 1, 5 }),
+			Seed = 5150,
+		}),
 		Dock = { 150, 150, 146 }, -- the yard's concrete (darker than the plazas, so it doesn't blow out in the sun)
 		LaneColour = { 240, 196, 40 },
 		SeaDepth = 12, -- water surface sits 1 stud under the quay

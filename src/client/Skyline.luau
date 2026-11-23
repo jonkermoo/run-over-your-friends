@@ -14,7 +14,14 @@ function Skyline.start()
 		local function apply(id: string)
 			local b = boxes:FindFirstChild(id)
 			if b and b:IsA("BasePart") then
-				b.Transparency = if here[id] then 1 else 0
+				local t = if here[id] then 1 else 0
+				b.Transparency = t
+				-- a house's roof is a child of its box
+				for _, c in b:GetChildren() do
+					if c:IsA("BasePart") then
+						c.Transparency = t
+					end
+				end
 			end
 		end
 		local function set(model: Instance, loaded: boolean)
