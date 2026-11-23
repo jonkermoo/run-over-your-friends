@@ -11,6 +11,8 @@ local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
+local Look = require(ReplicatedStorage.Shared.Config.Look)
+local Sheen = require(ReplicatedStorage.Shared.Rules.Sheen)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
@@ -108,6 +110,7 @@ function PaintPicker.attach(
 			end)
 			if ok and m then
 				part.Material = m
+				part.Reflectance = Sheen.paintReflectance(m.Name, Look.Cars)
 			end
 		end
 	end

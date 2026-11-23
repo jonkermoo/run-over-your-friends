@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Sheen = require(ReplicatedStorage.Shared.Rules.Sheen)
 local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -35,7 +36,7 @@ end
 function VehicleParts.paintParts(model: Model): { BasePart }
 	local out = {}
 	for _, p in model:GetChildren() do
-		if p:IsA("BasePart") and (p.Name == "Paint" or string.sub(p.Name, -6) == "_Paint") then
+		if p:IsA("BasePart") and Sheen.isPaint(p.Name) then
 			table.insert(out, p)
 		end
 	end

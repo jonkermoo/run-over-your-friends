@@ -5,6 +5,7 @@
 -- styled by district. Paint is flat and never collides. Furniture goes in the Props folder: each piece is a
 -- Model that any vehicle knocks flying (BuildingService puts it back later).
 
+local GeometryService = game:GetService("GeometryService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
@@ -19,6 +20,7 @@ local StreetKit = {}
 local DARK = Color3.fromRGB(34, 36, 40)
 local METAL = Color3.fromRGB(70, 74, 80)
 local Y0 = 0.08
+local SIG = S.Signal
 
 local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
@@ -89,28 +91,95 @@ local function lamp(folder: Instance, foot: Vector3, out: Vector3, color: Color3
 	)
 end
 
--- a traffic light on a corner: one lamp facing each road; the client cycles them
+-- the traffic light's head facing one road: a yellow housing with a dark visor over each lamp slot, its middle at
+-- `cf` (LookVector toward the road)
+local function signalHead(parent: Instance, cf: CFrame)
+	local hs, v = SIG.Housing, SIG.Visor
+	block(parent, Vector3.new(hs[1], hs[2], hs[3]), cf, rgb(SIG.HousingColour))
+	for i = -1, 1 do
+		local y = i * SIG.LampSpacing + SIG.LampDiameter / 2 + v[2] / 2
+		block(
+			parent,
+			Vector3.new(v[1], v[2], v[3]),
+			cf * CFrame.new(0, y, -(hs[3] / 2 + v[3] / 2)),
+			rgb(SIG.VisorColour)
+		)
+	end
+end
+
+-- the head joined into one part, made once and copied to every corner; false when the
+-- engine can't join it, and each head is then built from its four parts
+local headUnion: BasePart | false | nil = nil
+local function headCopy(): BasePart?
+	if headUnion == nil then
+		local holder = Instance.new("Model")
+		signalHead(holder, CFrame.identity)
+		local parts = holder:GetChildren() :: { any }
+		local ok, joined = pcall(function()
+			return GeometryService:UnionAsync(parts[1], { parts[2], parts[3], parts[4] }, {
+				CollisionFidelity = Enum.CollisionFidelity.Box,
+				RenderFidelity = Enum.RenderFidelity.Automatic,
+				SplitApart = false,
+			})
+		end)
+		local union = ok and joined and joined[1]
+		if union and union:IsA("BasePart") then
+			union.UsePartColor = false -- keep the housing yellow and the visors dark
+			union.Anchored = true
+			union.Name = "SignalHead"
+			headUnion = union
+		else
+			warn("StreetKit: couldn't join the traffic light head, building it from parts", joined)
+			headUnion = false
+		end
+		holder:Destroy()
+	end
+	return if headUnion then headUnion:Clone() else nil
+end
+
+-- a traffic light on a corner: a grey pole and a head facing each road (toX and toZ point at the crossing), set side
+-- by side round the pole; each lamp is tagged Signal = "EW" / "NS" and Lamp = its colour, and the client lights
+-- the one for the current colour
 local function signal(folder: Instance, foot: Vector3, toX: Vector3, toZ: Vector3)
 	local m = prop(folder, "Signal")
+	local pw, hs = SIG.PoleWidth, SIG.Housing
 	block(
 		m,
-		Vector3.new(0.6, 12, 0.6),
-		CFrame.new(foot + Vector3.new(0, 6, 0)),
-		METAL,
+		Vector3.new(pw, SIG.PoleHeight, pw),
+		CFrame.new(foot + Vector3.new(0, SIG.PoleHeight / 2, 0)),
+		rgb(SIG.PoleColour),
 		Enum.Material.Metal
 	)
-	block(m, Vector3.new(1.6, 3.6, 1.6), CFrame.new(foot + Vector3.new(0, 13.2, 0)), DARK)
-	for _, f in { { toX, "EW" }, { toZ, "NS" } } do
-		local dir = f[1] :: Vector3
-		local at = foot + dir * 0.85 + Vector3.new(0, 13.2, 0)
-		local l = block(
-			m,
-			Vector3.new(1, 1, 0.2),
-			CFrame.lookAt(at, at + dir),
-			Color3.fromRGB(60, 200, 90),
-			Enum.Material.Neon
-		)
-		l:SetAttribute("Signal", f[2])
+	for _, f in { { toX, toZ, "EW" }, { toZ, toX, "NS" } } do
+		local dir, other = f[1] :: Vector3, f[2] :: Vector3
+		-- its back against the pole, shifted away from the other head so the two don't meet
+		local at = foot
+			+ dir * (pw / 2 + hs[3] / 2)
+			- other * (hs[1] / 2 - pw / 2)
+			+ Vector3.new(0, SIG.HousingHeight, 0)
+		local cf = CFrame.lookAt(at, at + dir)
+		local head = headCopy()
+		if head then
+			head.CFrame = cf * head.CFrame
+			head.Parent = m
+		else
+			signalHead(m, cf)
+		end
+		for i, colour in { "green", "amber", "red" } do
+			local disc = cylinder(
+				m,
+				SIG.LampDepth,
+				SIG.LampDiameter,
+				Vector3.zero,
+				rgb((SIG.Dim :: any)[colour])
+			)
+			-- the disc's axis (X) points at the road, half of it standing out of the housing's face
+			disc.CFrame = cf
+				* CFrame.new(0, (i - 2) * SIG.LampSpacing, -hs[3] / 2)
+				* CFrame.Angles(0, math.pi / 2, 0)
+			disc:SetAttribute("Signal", f[3])
+			disc:SetAttribute("Lamp", colour)
+		end
 	end
 end
 
