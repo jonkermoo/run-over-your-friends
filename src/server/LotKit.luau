@@ -47,9 +47,10 @@ local function prop(folder: Instance, kind: string): Model
 	return m
 end
 
--- a parked car: a vehicle model cut down to its body, paint, glass and wheels, welded to its body so a knock
+-- a parked car: a vehicle model cut down to its body, paint, glass, lamps, trim, plates and wheels, welded to its body so a knock
 -- sends it flying in one piece; `cf` is where its bottom centre stands, facing along its look vector
-local KEEP = { Body = true, Paint = true, Glass = true }
+local KEEP =
+	{ Body = true, Paint = true, Glass = true, Lamp = true, Tail = true, Trim = true, Plate = true }
 local MODELS = ReplicatedStorage:WaitForChild("VehicleModels")
 
 function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random): Model?
@@ -62,7 +63,7 @@ function LotKit.car(props: Instance, ids: { string }, cf: CFrame, random: Random
 	model.WorldPivot = CFrame.identity
 	model:ScaleTo(Game.VehicleScale)
 	for _, d in model:GetDescendants() do
-		-- keep the body, paint, glass and wheels; drop the rest (interior, needles, the drivable model's
+		-- keep the body, paint, glass, finishing detail and wheels; drop the rest (interior, needles, the drivable model's
 		-- attachments, welds and sounds)
 		local keep = if d:IsA("BasePart")
 			-- stock look: the body's zones cut out for mastery upgrades (Z<n>) stay, the rebuilt ones (U<n>) go

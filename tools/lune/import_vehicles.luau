@@ -6,11 +6,15 @@
 -- cabin parts that reach out (untilted handlebars, track plates) and upgrade pieces don't shift the seat spots in
 -- Config/Vehicles. The stock zones cut out for mastery upgrades (Z<n>, Z<n>_Paint) count as stock body; the
 -- rebuilt zones (U<n>, U<n>_Paint) and upgrade wheel sets (U<n>W_<Corner><n>) don't (tools/blender/vehicle_upgrades.py).
--- lune run tools/lune/import_vehicles <raw.rbxm> <out.rbxm> <studsInBlender> <paletteImageId>
+-- The finishing detail (Lamp, Tail, Trim, Plate, and Z<n>_<Kind> inside zones; tools/blender/vehicle_detail.py)
+-- takes its look from Config/CarDetail: lit lenses are untextured, plates wear the plate sheet.
+-- lune run tools/lune/import_vehicles <raw.rbxm> <out.rbxm> <studsInBlender> <paletteImageId> <plateImageId>
 -- <studsInBlender>: how big the importer made one Blender unit (measured: 47.344, from the export spacing).
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
+local CarDetail = require("../../src/shared/Config/CarDetail")
+local CarDetailRules = require("../../src/shared/Rules/CarDetail")
 local Paints = require("../../src/shared/Config/Paints")
 
 local Instance = roblox.Instance
@@ -22,6 +26,7 @@ local raw, out = process.args[1], process.args[2]
 local factor = 1 / assert(tonumber(process.args[3]), "importer scale")
 local texture =
 	roblox.Content.fromUri("rbxassetid://" .. assert(process.args[4], "palette image id"))
+local plates = roblox.Content.fromUri("rbxassetid://" .. assert(process.args[5], "plate image id"))
 
 local source = roblox.deserializeModel(fs.readFile(raw))[1]
 local groups: { [string]: { any } } = {}
@@ -68,10 +73,24 @@ for id, parts in groups do
 		p.Size = p.Size * factor
 		p.CFrame = CFrame.new(p.CFrame.Position * factor - origin)
 		local short = string.sub(p.Name, #id + 2)
+		local detail = CarDetailRules.kind(short, CarDetail.Kinds)
 		if short == "Paint" or string.sub(short, -6) == "_Paint" then
 			-- the painted panels take a plain colour the game sets (Config/Paints); this is the factory one
 			local rgb = assert(Paints.Factory[id], "no factory paint for " .. id)
 			p.Color = roblox.Color3.fromRGB(rgb[1], rgb[2], rgb[3])
+		elseif detail then
+			local look = CarDetail.Look[detail]
+			if look.rgb then
+				p.Color = roblox.Color3.fromRGB(look.rgb[1], look.rgb[2], look.rgb[3])
+			elseif detail == "Plate" then
+				p.TextureContent = plates
+			else
+				p.TextureContent = texture
+			end
+			if look.material then
+				p.Material = (roblox.Enum.Material :: any)[look.material]
+			end
+			p.CastShadow = false
 		else
 			p.TextureContent = texture
 		end

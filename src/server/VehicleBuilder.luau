@@ -1,6 +1,7 @@
 --!strict
 -- Builds a drivable rig from a vehicle model (Body + Wheel_<Corner><n> meshes, plus the cabin: Glass, Interior,
--- Mirror, Steer, NeedleSpeed/NeedleRev, bulldozer StickL/StickR, and tiny marker parts SteerPivot, StickLPivot,
+-- Mirror, Steer, NeedleSpeed/NeedleRev, bulldozer StickL/StickR, the finishing detail Lamp/Tail/Trim/Plate,
+-- and tiny marker parts SteerPivot, StickLPivot,
 -- StickRPivot, GripL, GripR that are read and removed; crawler vehicles add RollerL<n>/RollerR<n> and one
 -- TrackShoe copied round each loop; base centre at the origin, front facing -Z): an invisible box Chassis that collides and carries the Drive/Turn constraints,
 -- a Sprung part the body hangs from (the client animates its weld for suspension), wheel welds
@@ -12,6 +13,8 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CarDetail = require(ReplicatedStorage.Shared.Config.CarDetail)
+local CarDetailRules = require(ReplicatedStorage.Shared.Rules.CarDetail)
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
@@ -107,12 +110,17 @@ local function copyOf(template: Model, on: { number }): Model
 	return model
 end
 
--- the box round the model without its rebuilt zones (U<n> parts): the stock shape the physics is sized from
+-- the box round the model without its rebuilt zones (U<n> parts) and finishing detail: the stock shape the
+-- physics is sized from
 local function stockBox(model: Model): (CFrame, Vector3)
 	local lo = Vector3.one * math.huge
 	local hi = -lo
 	for _, p in model:GetChildren() do
-		if p:IsA("BasePart") and not string.match(p.Name, "^U%d") then
+		if
+			p:IsA("BasePart")
+			and not string.match(p.Name, "^U%d")
+			and not CarDetailRules.kind(p.Name, CarDetail.Kinds)
+		then
 			local half = p.Size / 2
 			lo = lo:Min(p.Position - half)
 			hi = hi:Max(p.Position + half)
@@ -126,6 +134,17 @@ local function weldZones(model: Model, carrier: BasePart)
 	for _, p in model:GetChildren() do
 		if p:IsA("BasePart") and string.match(p.Name, "^[ZU]%d") then
 			weld(p.Name .. "Weld", carrier, p)
+		end
+	end
+end
+
+-- weld the finishing detail outside the zones (lamps, tail lamps, trim, plates; Config/CarDetail) to what
+-- carries the body (zone pieces Z<n>_<Kind> go with weldZones)
+local function weldDetail(model: Model, carrier: BasePart)
+	for _, kind in CarDetail.Kinds do
+		local p = model:FindFirstChild(kind)
+		if p and p:IsA("BasePart") then
+			weld(kind .. "Weld", carrier, p)
 		end
 	end
 end
@@ -171,6 +190,7 @@ local function buildTrailer(model: Model, chassis: BasePart, spec: Vehicles.Trai
 	end
 	weld("BodyWeld", box, body)
 	weldZones(trailer, box)
+	weldDetail(trailer, box)
 	for _, w in wheels do
 		local wl = weld("Wheel_" .. string.sub(w.Name, 7), box, w)
 		wl:SetAttribute("Corner", string.sub(w.Name, 7, 8))
@@ -370,6 +390,7 @@ function VehicleBuilder.build(id: string, on: { number }?): Model
 	weld("Suspension", chassis, sprung):SetAttribute("Suspension", true)
 	weld("BodyWeld", sprung, body)
 	weldZones(model, sprung)
+	weldDetail(model, sprung)
 	-- the painted panels: their own untextured part, so the server can recolour them (Config/Paints)
 	local paint = model:FindFirstChild("Paint") :: BasePart?
 	if paint then

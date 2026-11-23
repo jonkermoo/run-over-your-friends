@@ -987,15 +987,15 @@ def tree_of(o):
 # what each cabin is made of: seat and insert colours, door cards, dash, the steering wheel, the cluster and the
 # centre stack, then extras that suit the vehicle
 CABIN = {
-    "Hatchback": dict(seat="dark", insert="green", door="dark", dash="char", trim="grey", wheel="round", cluster="twin",
+    "Hatchback": dict(seat="dark", insert="green", door="light", dash="char", lower="pale", carpet="dark", trim="grey", wheel="round", cluster="twin",
                       stack="radio", shift="manual", rear=True, extras=("bobble",)),
-    "Sedan": dict(seat="tan", insert="cream", door="tan", dash="char", trim="chrome", wheel="round", cluster="twin",
+    "Sedan": dict(seat="tan", insert="cream", door="cream", dash="char", lower="cream", carpet="brown", trim="chrome", wheel="round", cluster="twin",
                   stack="screen", shift="auto", rear=True, extras=()),
-    "Taxi": dict(seat="black", insert="dark", door="dark", dash="char", trim="yellow", wheel="round", cluster="twin",
+    "Taxi": dict(seat="grey", insert="light", door="light", dash="char", lower="mid", carpet="dark", trim="yellow", wheel="round", cluster="twin",
                  stack="radio", shift="auto", rear=True, extras=("meter", "freshener", "handset")),
     "Muscle": dict(seat="black", insert="red", door="black", dash="black", trim="chrome", wheel="wood", cluster="row3",
                    stack="radio", shift="pistol", rear=False, extras=("dice", "undergauges")),
-    "Supercar": dict(seat="black", insert="orange", door="black", dash="black", trim="orange", wheel="sport",
+    "Supercar": dict(seat="black", insert="orange", door="grey", dash="black", lower="grey", carpet="char", trim="orange", wheel="sport",
                      cluster="digital", stack="toggles", shift="paddles", rear=False, extras=("carbon",)),
     "Roadster": dict(seat="white", insert="pale", door="char", dash="black", trim="char", wheel="yoke",
                      cluster="small", stack="bigscreen", shift="none", rear=False, extras=()),
@@ -1122,6 +1122,7 @@ def car_cabin(vid, f, glass, sp):
     sx, sy, sz = f.seat
     ey = f.eye.y
     trim, dash, door = C[sp["trim"]], C[sp["dash"]], C[sp["door"]]
+    lower = C[sp.get("lower", sp["dash"])]  # the dash below its top, the centre stack and the console
     elbow = sy + 1.3
     xl = f.side(sx, elbow, sz, LEFT) + 0.12
     xr = f.side(-sx, elbow, sz, RIGHT) - 0.12
@@ -1156,7 +1157,7 @@ def car_cabin(vid, f, glass, sp):
     wide(ds, 0.9, depth, top - 0.45, zdash + depth / 2, dash, 0.12)
     wide((ds[0] + 0.05, ds[1] - 0.05), 0.12, depth * 0.6, top + 0.03, zdash + depth * 0.3, C["black"] if dash != C["black"] else C["char"])
     wide(ds, 0.12, 0.14, top - 0.1, zd + 0.02, trim, 0.03)
-    wide(span((zd - 0.15,), (top - 1.75, top - 0.85)), 1.0, 0.5, top - 1.3, zd - 0.15, dash, 0.15, rot(-18))
+    wide(span((zd - 0.15,), (top - 1.75, top - 0.85)), 1.0, 0.5, top - 1.3, zd - 0.15, lower, 0.15, rot(-18))
     wide(span((zfire,), (floor + 0.2, (floor + top) / 2, top - 0.1)), top - floor, 0.3, (top + floor) / 2, zfire, C["black"])
     # a brow over the cluster in front of the driver
     k.box((2.2, 0.14, 0.6), (sx, top + 0.04, zd + 0.1), dash, 0.06)
@@ -1210,7 +1211,7 @@ def car_cabin(vid, f, glass, sp):
 
     # centre stack: vents, radio or screen, climate knobs and a hazard button
     stack_z = zd - 0.1
-    k.box((1.4, top - floor - 0.2, 0.5), (0, (top + floor) / 2 - 0.15, stack_z - 0.1), dash, 0.08)
+    k.box((1.4, top - floor - 0.2, 0.5), (0, (top + floor) / 2 - 0.15, stack_z - 0.1), lower, 0.08)
     for vx in (-0.35, 0.35):
         k.box((0.55, 0.3, 0.06), (vx, top - 0.35, stack_z + 0.17), C["black"], 0.02)
         for i in range(3):
@@ -1251,7 +1252,7 @@ def car_cabin(vid, f, glass, sp):
 
     # console between the seats: shifter, cup holders, handbrake, armrest
     con_top = sy + 0.55
-    k.box((1.05, con_top - floor, sz + 1.0 - (zd - 0.2)), (0, (con_top + floor) / 2, (sz + 1.0 + zd - 0.2) / 2), dash, 0.08)
+    k.box((1.05, con_top - floor, sz + 1.0 - (zd - 0.2)), (0, (con_top + floor) / 2, (sz + 1.0 + zd - 0.2) / 2), lower, 0.08)
     k.box((1.1, 0.25, 1.2), (0, con_top + 0.12, sz + 0.5), C[sp["seat"]], 0.1)
     for cz in (sz - 1.15, sz - 0.75):
         k.cyl(0.16, 0.03, (-0.22, con_top + 0.01, cz), C["black"], rot(90), 10)
@@ -1356,7 +1357,7 @@ def car_cabin(vid, f, glass, sp):
     # as wide as the shell at floor level, which can be narrower than at the elbows
     fl = f.inner(sx, sz, LEFT, (floor + 0.3,)) + 0.1
     fr = f.inner(-sx, sz, RIGHT, (floor + 0.3,)) - 0.1
-    k.box((fr - fl, 0.1, zback - zfire), ((fl + fr) / 2, floor, (zback + zfire) / 2), C["black"], 0)
+    k.box((fr - fl, 0.1, zback - zfire), ((fl + fr) / 2, floor, (zback + zfire) / 2), C[sp.get("carpet", "black")], 0)
     for vx in (sx, -sx):
         k.box((1.5, 0.04, 1.9), (vx, floor + 0.07, zfire + 1.3), C["char"], 0.02)
     wall = (xl, xr)
@@ -1847,7 +1848,11 @@ for vid in vehicles:
         print(f"PAINT {vid} {len(shell.data.polygons)} faces {cols[0]}")
 
 # ---- mastery upgrades (rebuilt zones, new wheel sets) and the decal layout on every painted part
-exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "vehicle_upgrades.py"), encoding="utf-8").read())
+HERE = os.path.dirname(os.path.abspath(__file__))
+# ---- finishing detail (lamp lenses, trim, number plates), then the mastery upgrades
+exec(open(os.path.join(HERE, "vehicle_detail.py"), encoding="utf-8").read())
+exec(open(os.path.join(HERE, "vehicle_upgrades.py"), encoding="utf-8").read())
+detail_zones()
 
 # ---- export
 tri = 0

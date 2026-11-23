@@ -63,9 +63,10 @@ local maxShown = if UserInputService.TouchEnabled and not UserInputService.Keybo
 	then Cfg.ShownPhone
 	else Cfg.ShownMax
 
-local KEEP = { Body = true, Paint = true, Glass = true }
+local KEEP =
+	{ Body = true, Paint = true, Glass = true, Lamp = true, Tail = true, Trim = true, Plate = true }
 
--- a stripped copy of a vehicle model (body, paint, glass, wheels) welded to its body, anchored, no collisions
+-- a stripped copy of a vehicle model (body, paint, glass, lamps, trim, plates, wheels) welded to its body, anchored, no collisions
 local function build(kind: number): Copy?
 	local id = Cfg.Kinds[kind].id
 	local models = ReplicatedStorage:FindFirstChild("VehicleModels")
