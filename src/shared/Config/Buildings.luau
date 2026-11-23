@@ -11,9 +11,10 @@ return table.freeze({
 	-- trim bands are laid in pieces no longer than this, so a hit knocks out a piece, not a whole strip
 	BandPiece = 48,
 	SidePanel = 12, -- a house's side wall counts for one piece per this many studs of its length
-	-- the whole map, measured in Studio (about 87,000 with the suburbs); with streaming on, each player only
-	-- loads what is near them, so this caps the server's map, not a phone's
-	PartBudget = 100000,
+	-- the whole map, measured in Studio (about 100,650 in Play with the 2026-11 visual pass: street life,
+	-- greenery, towers, horizon, car detail); with streaming on, each player only loads what is near them, so
+	-- this caps the server's map, not a phone's. Raised from 100,000 by the user's call (2026-11-23)
+	PartBudget = 102000,
 
 	-- each building's wall colour, drawn per building from its district's mix (shops, the hero tower and, with
 	-- Office.FacadeSpandrels, every tower's spandrels): warm so the city doesn't read white, grey and blue from
