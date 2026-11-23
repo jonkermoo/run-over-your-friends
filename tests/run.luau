@@ -989,6 +989,28 @@ check(
 	Streets.PlazaFountain.size / 2 + 4 < (World.Map.BlockSize - World.Map.SidewalkWidth * 2) * 0.22
 )
 check("signals cycle", Streets.SignalSeconds > Streets.AmberSeconds and Streets.AmberSeconds > 0)
+do
+	local SIG = Streets.Signal
+	local hs = SIG.Housing
+	check(
+		"signal: the three lamps fit in the housing",
+		SIG.LampSpacing >= SIG.LampDiameter + SIG.Visor[2]
+			and SIG.LampSpacing + SIG.LampDiameter / 2 + SIG.Visor[2] <= hs[2] / 2
+			and SIG.LampDiameter < hs[1]
+	)
+	check(
+		"signal: the housing reaches above the pole top",
+		SIG.HousingHeight - hs[2] / 2 < SIG.PoleHeight
+			and SIG.HousingHeight + hs[2] / 2 > SIG.PoleHeight
+	)
+	for _, colour in { "red", "amber", "green" } do
+		local lit, dim = (SIG.Lit :: any)[colour], (SIG.Dim :: any)[colour]
+		check(
+			`signal: {colour} has a lit and a dim colour, the dim one darker`,
+			lit ~= nil and dim ~= nil and dim[1] + dim[2] + dim[3] < lit[1] + lit[2] + lit[3]
+		)
+	end
+end
 
 -- house kit
 check(
