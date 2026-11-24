@@ -532,21 +532,131 @@ require("./spread")(check)
 require("./horizon")(check)
 require("./citymap")(check)
 
--- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
-local function ph(t: number, offset: number?)
-	return EventRules.phase(t, 4, 90, 360, 120, 20, offset or 0)
+-- events: the next one and its wait (Rules/Events.pick)
+do
+	local list, tiers = EventConfig.List, EventConfig.Tiers
+	-- a small fixed random sequence (Lune has no Random)
+	local seed = 7
+	local function roll(): number
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		return seed / 2147483648
+	end
+	local ok, gapsOk, seen, last = true, true, {}, nil
+	local tierSeen = {}
+	local giantAfterShort = false
+	for _ = 1, 4000 do
+		local i, gap = EventRules.pick(list, tiers, last, roll(), roll(), roll())
+		local e = list[i]
+		ok = ok and i ~= last
+		if last and EventRules.isContest(list[last]) then
+			ok = ok and not EventRules.isContest(e)
+		end
+		local range = tiers[e.tier].gap
+		gapsOk = gapsOk and gap >= range[1] and gap <= range[2] and gap >= 60 and gap <= 300
+		giantAfterShort = giantAfterShort or (e.tier == #tiers and gap < tiers[#tiers].gap[1])
+		seen[e.key] = true
+		tierSeen[e.tier] = (tierSeen[e.tier] or 0) + 1
+		last = i
+	end
+	check("events: never the same twice or two contests in a row", ok)
+	check("events: every wait is 1-5 minutes and in its tier's range", gapsOk)
+	check("events: big events only after the longest waits", not giantAfterShort)
+	local all = true
+	for _, e in list do
+		all = all and seen[e.key] == true and tiers[e.tier] ~= nil
+	end
+	check("events: every event comes up", all)
+	check(
+		"events: quick ones come most, big ones least",
+		(tierSeen[1] or 0) > (tierSeen[3] or 0) and (tierSeen[3] or 0) > 400
+	)
+	local _, firstGap = EventRules.pick(list, tiers, nil, 0, 0, 0, EventConfig.FirstAfter)
+	check("events: a new server's first wait is FirstAfter", firstGap == EventConfig.FirstAfter)
+	check(
+		"events: the wait picks the tier",
+		EventRules.tierOf(70, tiers) == 1
+			and EventRules.tierOf(150, tiers) == 2
+			and EventRules.tierOf(250, tiers) == 3
+			and EventRules.tierOf(999, tiers) == 3
+	)
+	-- after a contest with the contest tier rolled, it falls back to a quick one
+	local contestAt = 0
+	for i, e in list do
+		if EventRules.isContest(e) then
+			contestAt = i
+		end
+	end
+	local nextI, nextGap = EventRules.pick(list, tiers, contestAt, 0.5, 0.5, 0.5)
+	check(
+		"events: no contest after a contest, falls to a lower tier",
+		not EventRules.isContest(list[nextI])
+			and list[nextI].tier == 1
+			and nextGap <= tiers[1].gap[2]
+	)
+	local tiersOk = true
+	for i, t in tiers do
+		tiersOk = tiersOk
+			and t.gap[1] < t.gap[2]
+			and t.duration > 0
+			and (i == 1 or tiers[i - 1].gap[2] == t.gap[1])
+			and t.gap[2] - t.gap[1] > EventConfig.WarnSeconds
+	end
+	check("events: tiers' waits join up end to end", tiersOk)
 end
-check("quiet at the start", ph(0).phase == "quiet" and ph(0).index == 1)
-check("warning before the first", ph(75).phase == "warn" and math.abs(ph(75).endsIn - 15) < 1e-9)
-check("first event live", ph(90).phase == "live" and ph(90).index == 1 and ph(209).phase == "live")
-check("quiet after it", ph(210).phase == "quiet" and ph(210).index == 2)
-check(
-	"second event warns then runs",
-	ph(560).phase == "warn" and ph(570).phase == "live" and ph(570).index == 2
-)
-check("events cycle through the list", ph(90 + 4 * 480).index == 1 and ph(90 + 3 * 480).index == 4)
-check("offset rotates the order", ph(90, 2).index == 3)
-check("no events, always quiet", EventRules.phase(100, 0, 90, 360, 120, 20, 0).phase == "quiet")
+
+-- event sizes and boss damage (Rules/Events)
+do
+	local MT, BT = EventConfig.MoneyTruck, EventConfig.BossTruck
+	check(
+		"events: truck hits grow with players, capped",
+		EventRules.needed(MT.Hits, MT.HitsPerPlayer, 1, MT.HitsMax) == MT.Hits
+			and EventRules.needed(MT.Hits, MT.HitsPerPlayer, 3, MT.HitsMax) == MT.Hits + 2 * MT.HitsPerPlayer
+			and EventRules.needed(MT.Hits, MT.HitsPerPlayer, 40, MT.HitsMax) == MT.HitsMax
+	)
+	local base = EventRules.damage(BT.DamageSpeed, BT.WeightRef, BT)
+	check("boss: a reference hit does Damage", base == BT.Damage)
+	check(
+		"boss: faster and heavier hits do more, within limits",
+		EventRules.damage(BT.DamageSpeed * 2, BT.WeightRef, BT) > base
+			and EventRules.damage(BT.DamageSpeed, BT.WeightRef * 4, BT) > base
+			and EventRules.damage(1, 100, BT) == BT.DamageMin
+			and EventRules.damage(500, 99999, BT) == BT.DamageMax
+	)
+	-- a solo player beats the boss in a sensible number of solid hits
+	local hits = BT.Hp / base
+	check("boss: about 8-20 solid hits alone", hits >= 8 and hits <= 20)
+end
+
+-- event vehicles' route (Rules/Route)
+do
+	local Route = require("../src/shared/Rules/Route")
+	-- east 300, then a right turn south 300 (z grows south)
+	local path = Route.build({ { 0, 0 }, { 300, 0 }, { 300, 300 } }, 11, 32)
+	local x0, z0, hx0, hz0 = Route.at(path, 0)
+	check("route: starts in the right-hand lane", near(x0, 0, 1e-6) and near(z0, 11, 1e-6))
+	check("route: faces along the road", near(hx0, 1, 1e-6) and near(hz0, 0, 1e-6))
+	local xe, ze, hxe, hze = Route.at(path, path.length)
+	check("route: ends in the lane of the last road", near(xe, 289, 1e-6) and near(ze, 300, 1e-6))
+	check("route: faces the last road at the end", near(hxe, 0, 1e-6) and near(hze, 1, 1e-6))
+	check(
+		"route: a rounded corner is shorter than the square one",
+		path.length < 578 and path.length > 540
+	)
+	-- smooth: no jumps along it
+	local smooth, px, pz = true, x0, z0
+	for s = 2, path.length, 2 do
+		local x, z = Route.at(path, s)
+		smooth = smooth and math.sqrt((x - px) ^ 2 + (z - pz) ^ 2) <= 2.2
+		px, pz = x, z
+	end
+	check("route: no jumps along it", smooth)
+	local back = Route.decode(Route.encode({ { 1.25, -3 }, { 400, 12.5 } }))
+	check(
+		"route: encode and decode",
+		#back == 2 and near(back[1][1], 1.25, 0.051) and back[2][2] == 12.5
+	)
+	check("route: past the end stays at the end", select(1, Route.at(path, path.length + 50)) == xe)
+end
 do
 	-- the event sign never touches the menu strip, at any screen width, while it shares the strip's row
 	local menu = { left = 14, top = 8, right = 14 + 560, bottom = 8 + 46 }
@@ -2237,22 +2347,39 @@ do
 				and Contest.amount(0.6, "studs") == "1 stud"
 		)
 		local ok, contests = true, 0
-		local stats = { Breaks = true, Launch = true, Hits = true, Stunt = true }
-		for i, e in EventConfig.List do
+		local stats = { Breaks = true, Launch = true, Hits = true, Stunt = true, Damage = true }
+		for _, e in EventConfig.List do
 			local c = e.contest
 			if c then
-				contests += 1
+				if EventRules.isContest(e) then
+					contests += 1
+				end
 				ok = ok
 					and stats[c.stat] == true
 					and (c.mode == "add" or c.mode == "max")
+					and (c.pay == nil or c.pay == "places" or c.pay == "share")
 					and #c.unit > 0
 			end
-			local isContest = c ~= nil
-			-- the list wraps round, so the last and the first are neighbours too
-			local nextOne = EventConfig.List[i % #EventConfig.List + 1]
-			ok = ok and not (isContest and nextOne.contest ~= nil)
 		end
-		check("four contest events, valid, never two in a row", ok and contests == 4)
+		check("four place contests, all contests valid", ok and contests == 4)
+		local split = Contest.shares(
+			Contest.standings({
+				[1] = { score = 300, at = 1 },
+				[2] = { score = 100, at = 2 },
+				[3] = { score = 1, at = 3 },
+			}),
+			20000,
+			500
+		)
+		check(
+			"boss pot: split by damage, a floor for small hitters",
+			split[1] == 14960 and split[2] == 4990 and split[3] == 500
+		)
+		check(
+			"boss pot: alone you take it all",
+			Contest.shares(Contest.standings({ [7] = { score = 5, at = 1 } }), 20000, 500)[7]
+				== 20000
+		)
 		local p = EventConfig.ContestPrizes
 		check(
 			"prizes fall by place and beat taking part",

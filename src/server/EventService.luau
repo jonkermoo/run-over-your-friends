@@ -1,6 +1,8 @@
 --!strict
--- Server events on a schedule (Config/Events, Rules/Events): low gravity, golden rush, a giant, a stampede,
--- and contests (Rules/Contest) that score smashing, flinging, hits or jumps and pay the top 3 and everyone who took part.
+-- Server events on a schedule (Config/Events, Rules/Events): after each one a wait of 1-5 minutes, and the
+-- longer the wait the bigger the next event (its tier). Low gravity, golden rush, a giant, a stampede, the
+-- Cash Drop, Money Truck and Boss Truck (server/EventProps), and contests (Rules/Contest) that score smashing,
+-- flinging, hits or jumps and pay the top 3 and everyone who took part (the Boss Truck splits a pot by damage).
 -- Clients read the workspace attributes EventPhase ("quiet" | "warn" | "live"), EventKey and EventEndsAt
 -- (server time) to draw the banner; Event holds the key only while one is live (NpcService reads it).
 
@@ -13,9 +15,12 @@ local Rules = require(ReplicatedStorage.Shared.Rules.Events)
 local Contest = require(ReplicatedStorage.Shared.Rules.Contest)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Analytics = require(script.Parent.Analytics)
 local BuildingService = require(script.Parent.BuildingService)
 local Data = require(script.Parent.Data)
+local EventProps = require(script.Parent.EventProps)
 local NpcService = require(script.Parent.NpcService)
+local Passes = require(script.Parent.Passes)
 local StuntService = require(script.Parent.StuntService)
 
 local EventService = {}
@@ -24,11 +29,14 @@ local baseGravity = workspace.Gravity
 local giantSpots: { Vector3 } = {}
 local giant: Model? = nil
 local random = Random.new()
-local t0 = os.clock() -- the schedule's start; hurry() moves it to bring the next event forward
-local phase = "quiet"
-local untilWarn = 0
-local offset = 0 -- which event in the list comes first
-local restart = false -- Studio: start the live event over (a fresh giant)
+-- the schedule (os.clock times): the next event and when it starts, or the live one and when it ends
+local nextIndex = 1
+local startAt = 0
+local liveIndex: number? = nil
+local liveEnds = 0
+local lastIndex: number? = nil
+local won = false -- the live event was won early (claimed, cracked, beaten)
+local forced: number? = nil -- Studio: start this event now
 
 -- the contest running now, if any
 type Running = { event: Config.Event, scores: Contest.Scores, names: { [number]: string } }
@@ -48,13 +56,13 @@ function EventService.leader(): number?
 	return if st[1] then st[1].id else nil
 end
 
--- where the live event is happening, if it has one spot (the giant, while it stands)
+-- where the live event is happening, if it has one spot (the giant while it stands, a truck, the crate)
 function EventService.spot(): Vector3?
 	local g = giant
 	if g and g.Parent and not g:GetAttribute("Down") then
 		return g:GetPivot().Position
 	end
-	return nil
+	return EventProps.spot()
 end
 
 local function nearPlayers(npc: Model): number
@@ -129,23 +137,46 @@ local function finishContest()
 		return
 	end
 	local st = Contest.standings(c.scores)
-	local won =
-		Contest.prizes(st, Config.ContestPrizes, Config.ContestTakePart, Config.ContestFullField)
+	local share = c.event.contest.pay == "share"
+	local prizes: { [number]: number }
+	if share then
+		-- the Boss Truck: its pot split by damage, in full if it was beaten; money passes count
+		local B = Config.BossTruck
+		local pot = B.Pot * Config.PayScale * (if EventProps.beaten() then 1 else B.FailShare)
+		prizes = Contest.shares(st, pot, B.MinShare * Config.PayScale)
+	else
+		prizes = Contest.prizes(
+			st,
+			Config.ContestPrizes,
+			Config.ContestTakePart,
+			Config.ContestFullField
+		)
+	end
 	local unit = c.event.contest.unit
 	for _, p in st do
 		local player = Players:GetPlayerByUserId(p.id)
-		local pay = won[p.id]
-		if player and pay then
-			Data.addMoney(player, pay)
-			local label = if p.place <= #Config.ContestPrizes
-				then Loc.msg(
-					"ContestPlace",
-					{ place = Loc.ordinal(p.place), event = Loc.src(c.event.title) }
-				)
-				else Loc.src("FOR TAKING PART")
-			Net.remote("Popup")
-				:FireClient(player, Loc.msg("ContestPay", { pay = pay, label = label }), "big")
+		local pay = prizes[p.id]
+		if not (player and pay) then
+			continue
 		end
+		if share then
+			pay = math.floor(pay * Passes.moneyMultiplier(player) + 0.5)
+			prizes[p.id] = pay
+		end
+		Data.addMoney(player, pay)
+		Analytics.eventPaid(player, c.event.key, if share then "Share" else "Prize", pay)
+		if share then
+			Net.remote("Popup"):FireClient(player, Loc.msg("BossPay", { pay = pay }), "big")
+			continue
+		end
+		local label = if p.place <= #Config.ContestPrizes
+			then Loc.msg(
+				"ContestPlace",
+				{ place = Loc.ordinal(p.place), event = Loc.src(c.event.title) }
+			)
+			else Loc.src("FOR TAKING PART")
+		Net.remote("Popup")
+			:FireClient(player, Loc.msg("ContestPay", { pay = pay, label = label }), "big")
 	end
 	if #st == 0 then
 		return
@@ -156,7 +187,7 @@ local function finishContest()
 		local p = st[i]
 		table.insert(
 			top,
-			{ id = p.id, name = c.names[p.id] or "?", score = p.score, prize = won[p.id] or 0 }
+			{ id = p.id, name = c.names[p.id] or "?", score = p.score, prize = prizes[p.id] or 0 }
 		)
 	end
 	local placeOf = {}
@@ -171,7 +202,7 @@ local function finishContest()
 			top = top,
 			place = if mine then mine.place else 0,
 			score = if mine then mine.score else 0,
-			prize = if mine then won[mine.id] or 0 else 0,
+			prize = if mine then prizes[mine.id] or 0 else 0,
 		})
 	end
 end
@@ -197,6 +228,19 @@ local function begin(key: string)
 			then giantSpots[random:NextInteger(1, #giantSpots)]
 			else Vector3.new(0, 0, 0)
 		giant = NpcService.spawnGiant(at)
+	elseif key == "CashDrop" or key == "MoneyTruck" or key == "BossTruck" then
+		EventProps.begin(key, {
+			score = function(player, amount)
+				score(player, "Damage", amount)
+			end,
+			won = function()
+				won = true
+				liveEnds = math.min(liveEnds, os.clock() + Config.EndLinger)
+			end,
+			paid = function(player, what, amount)
+				Analytics.eventPaid(player, key, what, amount)
+			end,
+		})
 	end
 end
 
@@ -214,21 +258,89 @@ local function finish(key: string)
 			giant:Destroy()
 		end
 		giant = nil
+	elseif key == "CashDrop" or key == "MoneyTruck" or key == "BossTruck" then
+		EventProps.finish()
 	end
 end
 
 -- start the next event's countdown now (a server goal reward); false when one is already on its way or live
 function EventService.hurry(): boolean
-	if phase ~= "quiet" then
+	local t = os.clock()
+	if liveIndex or startAt - t <= Config.WarnSeconds then
 		return false
 	end
-	t0 -= untilWarn
-	untilWarn = 0
+	startAt = t + Config.WarnSeconds
 	return true
+end
+
+-- the next event and its wait, after `last` (nil: a new server's first, FirstAfter from now)
+local function plan(last: number?)
+	local gap
+	nextIndex, gap = Rules.pick(
+		Config.List,
+		Config.Tiers,
+		last,
+		random:NextNumber(),
+		random:NextNumber(),
+		random:NextNumber(),
+		if last then nil else Config.FirstAfter
+	)
+	startAt = os.clock() + gap
+end
+
+local function goLive(i: number)
+	local event = Config.List[i]
+	liveIndex = i
+	won = false
+	liveEnds = os.clock() + Rules.duration(event, Config.Tiers)
+	workspace:SetAttribute("Event", event.key)
+	begin(event.key)
+end
+
+local function endLive()
+	local i = liveIndex
+	if not i then
+		return
+	end
+	local key = Config.List[i].key
+	local g = giant
+	local toppled = key == "Giant" and g ~= nil and g:GetAttribute("Down") == true
+	finish(key)
+	Analytics.eventEnded(key, if won or toppled then "Won" else "Time")
+	liveIndex = nil
+	lastIndex = i
+	workspace:SetAttribute("Event", nil)
+end
+
+local function tick()
+	local t = os.clock()
+	local f = forced
+	if f then
+		forced = nil
+		endLive()
+		nextIndex, startAt = f, t
+	end
+	if liveIndex and t >= liveEnds then
+		endLive()
+		plan(lastIndex)
+	elseif not liveIndex and t >= startAt then
+		goLive(nextIndex)
+	end
+	local live = liveIndex
+	local phase, endsIn = "live", liveEnds - t
+	if not live then
+		local untilStart = startAt - t
+		phase = if untilStart <= Config.WarnSeconds then "warn" else "quiet"
+		endsIn = if phase == "warn" then untilStart else untilStart - Config.WarnSeconds
+	end
+	workspace:SetAttribute("EventPhase", phase)
+	workspace:SetAttribute("EventKey", Config.List[live or nextIndex].key)
+	workspace:SetAttribute("EventEndsAt", workspace:GetServerTimeNow() + math.max(endsIn, 0))
 end
 
 function EventService.start()
 	Net.remote("Podium") -- made now, so screens can listen before the first contest ends
+	EventProps.start()
 	BuildingService.onBreak(function(player, count)
 		score(player, "Breaks", count)
 	end)
@@ -245,55 +357,27 @@ function EventService.start()
 			score(player, "Stunt", amount)
 		end
 	end)
-	t0 = os.clock()
-	offset = random:NextInteger(0, #Config.List - 1)
+	plan(nil)
 	if RunService:IsStudio() then
-		-- testing: put the schedule at the start of the named event
+		-- testing: start the named event now (ending the live one)
 		local attr = Config.StudioStartAttribute
 		workspace:GetAttributeChangedSignal(attr):Connect(function()
 			local key = workspace:GetAttribute(attr)
 			for i, e in Config.List do
 				if e.key == key then
-					offset = i - 1
-					t0 = os.clock() - Config.FirstAfter
-					restart = true
+					forced = i
 					workspace:SetAttribute(attr, nil) -- so the same key can start it again
 				end
 			end
 		end)
 	end
-	local live: string? = nil
 	task.spawn(function()
 		while true do
-			local ph = Rules.phase(
-				os.clock() - t0,
-				#Config.List,
-				Config.FirstAfter,
-				Config.GapSeconds,
-				Config.DurationSeconds,
-				Config.WarnSeconds,
-				offset
-			)
-			local event = Config.List[ph.index]
-			local key = if event then event.key else ""
-			local nowLive = if ph.phase == "live" then key else nil
-			if nowLive ~= live or restart then
-				restart = false
-				if live then
-					finish(live)
-				end
-				live = nowLive
-				workspace:SetAttribute("Event", live)
-				if live then
-					begin(live)
-				end
+			local ok, err = pcall(tick)
+			if not ok then
+				warn("[EventService]", err)
 			end
-			phase = ph.phase
-			untilWarn = if ph.phase == "quiet" then ph.endsIn else 0
-			workspace:SetAttribute("EventPhase", ph.phase)
-			workspace:SetAttribute("EventKey", key)
-			workspace:SetAttribute("EventEndsAt", workspace:GetServerTimeNow() + ph.endsIn)
-			task.wait(0.5)
+			task.wait(0.25)
 		end
 	end)
 end

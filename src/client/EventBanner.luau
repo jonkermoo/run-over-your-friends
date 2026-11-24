@@ -1,5 +1,5 @@
 --!strict
--- The event banner (top centre): next event countdown while quiet, a pulsing warning before one starts,
+-- The event banner (top centre): the next event's tier, name and countdown while quiet, a pulsing warning before one starts,
 -- and the live event with what it does and how long it has left. A big title flies in when it starts.
 -- During a contest event a slim line under the sign shows the leader and your own place (the Contest remote,
 -- once a second).
@@ -331,15 +331,20 @@ local function update()
 
 	local k = Style.scale()
 	if phase == "quiet" then
-		-- a slim asphalt sign: what's coming and when
+		-- a slim asphalt sign: what's coming (its tier and name) and when
+		local tier = Config.Tiers[event.tier]
+		local tierColor = Style.colors[tier.color] or C.gold
 		banner.Size = UDim2.fromOffset(Card.QuietWidth, Card.Height)
 		banner.BackgroundColor3 = C.panel
 		paintLines(C.yellow)
-		pill.Visible = false
+		pill.Visible = true
+		pill.Text = tier.name
+		pill.BackgroundColor3 = tierColor
+		pill.TextColor3 = inkOn(tierColor)
 		contest.Visible, contestYou.Visible = false, false
-		title.Text = "NEXT EVENT"
+		title.Text = event.title
 		title.TextColor3 = C.text
-		title.Position = UDim2.fromOffset(14, Card.Height / 2)
+		title.Position = UDim2.fromOffset(14 + pill.AbsoluteSize.X / k + 8, Card.Height / 2)
 		timer.Text = fmt(left + Config.WarnSeconds)
 		timer.TextColor3 = C.yellow
 		Style.setShadow(banner, C.ink)

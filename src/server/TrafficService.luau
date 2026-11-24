@@ -529,6 +529,11 @@ function TrafficService.start()
 	end)
 end
 
+-- the road network (nil before setup), for the event vehicles' routes (server/EventProps)
+function TrafficService.graph(): Roads.Graph?
+	return graph
+end
+
 -- numbers for a play test
 function TrafficService.stats(): { [string]: number }
 	local placed, moving, crashed = 0, 0, 0

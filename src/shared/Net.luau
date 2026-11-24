@@ -41,6 +41,7 @@ Net.Messages = table.freeze({
 	-- (action: "Offered" | "Start"): the garage showed the Roadster's FREE TRIAL button, or it was pressed
 	-- (starts a trial, or brings the trial car back while one runs); server/TrialService checks everything
 	RoadsterTrial = "RoadsterTrial",
+	HitEventProp = "HitEventProp", -- (velocity: Vector3): the driver's vehicle ran into the live event's truck (server/EventProps checks)
 	MapOpen = "MapOpen", -- (open: boolean): the city map opened or closed; the server sends MapDots only while it's open
 	-- server -> client
 	-- (spots: { number }, leader: number, eventX: number?, eventZ: number?): every player's spot packed by
@@ -117,6 +118,7 @@ export type MessageName =
 	| "ChestPrize"
 	| "RoadsterTrial"
 	| "TrialOver"
+	| "HitEventProp"
 	| "MapOpen"
 	| "MapDots"
 

@@ -1,7 +1,8 @@
 --!strict
 -- Finding the giant (Giant in Town) from anywhere on the map, on this screen only: a tall light column
 -- rises just over its head, and a red plate with GIANT and the distance pins to the screen edge pointing the
--- way. Once the giant is in view the plate floats over its head instead; up close it hides and the name
+-- way. The same marks the new events' targets (client/EventProps.target): the Money Truck, the Boss Truck and
+-- the Cash Drop's crate, each with its own word and colour. Once the giant is in view the plate floats over its head instead; up close it hides and the name
 -- tag (client/NameTags) takes over. Gone once the giant is toppled or walks off. Numbers: Config/Events
 -- GiantFinder.
 
@@ -15,6 +16,7 @@ local CrowdConfig = require(ReplicatedStorage.Shared.Config.Crowd)
 local Clear = require(ReplicatedStorage.Shared.Rules.Clear)
 local Joints = require(ReplicatedStorage.Shared.Joints)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
+local EventProps = require(script.Parent.EventProps)
 local Style = require(script.Parent.Style)
 
 local GiantFinder = {}
@@ -83,6 +85,19 @@ core.Parent = beam
 
 local giant: Model? = nil
 local scanAt = 0
+local look = { word = "GIANT", color = RED }
+
+-- the plate's word and the marks' colour
+local function setLook(word: string, color: Color3)
+	if look.word == word and look.color == color then
+		return
+	end
+	look.word, look.color = word, color
+	name.Text = word
+	plate.BackgroundColor3 = color
+	pointer.ImageColor3 = color
+	glow.BackgroundColor3 = color
+end
 
 -- what this module wants shown; Enabled is written only when that changes, so the UI OFF button
 -- (client/HideUi) can hold these off and bring them back as they should be
@@ -131,7 +146,15 @@ local function update()
 	local m = giant
 	local cam = workspace.CurrentCamera
 	local head = m and m:FindFirstChild("Head") :: BasePart?
-	if not m or not cam or not head or m:GetAttribute("Down") then
+	if m and head and not m:GetAttribute("Down") then
+		setLook("GIANT", RED)
+	else
+		-- no giant up: the live event's truck or crate, if it has one
+		local part, word, color = EventProps.target()
+		head = part
+		setLook(word, color)
+	end
+	if not cam or not head then
 		hide()
 		return
 	end
@@ -170,7 +193,12 @@ local function update()
 		and p.Y >= margin
 		and p.Y <= vp.Y - margin
 	then
-		-- in view: float over its head, pointing down at it
+		-- in view: a truck's own health bar names it, so its plate only points the way while it's off screen
+		if look.word ~= "GIANT" then
+			showGui(false)
+			return
+		end
+		-- the giant: float over its head, pointing down at it
 		at, dir = p - Vector2.new(0, G.AboveHead * s), Vector2.new(0, 1)
 	else
 		-- off screen: pin to the edge in its direction (behind the camera the projection is mirrored)

@@ -15,6 +15,15 @@ GiantHitPay,+${pay}  GIANT HIT!,,,+${pay}  ¡GOLPE AL GIGANTE!,+${pay}  BATIDA N
 StreakPay,DAY {n} STREAK  +${pay},,,RACHA DE {n} DÍAS  +${pay},SEQUÊNCIA DE {n} DIAS  +${pay}
 GroupPay,+${pay}  Thanks for joining!,,,+${pay}  ¡Gracias por unirte!,+${pay}  Valeu por entrar!
 ContestPay,+${pay}  {label},,,+${pay}  {label},+${pay}  {label}
+CashGrab,+${pay}  CASH!,,,+${pay}  ¡DINERO!,+${pay}  GRANA!
+TruckHit,TRUCK HIT!  {left} MORE TO CRACK IT,,,¡GOLPE AL CAMIÓN!  FALTAN {left},BATIDA NO CARRO-FORTE!  FALTAM {left}
+TruckJackpot,+${pay}  JACKPOT!,,,+${pay}  ¡PREMIO MAYOR!,+${pay}  BOLADA!
+TruckCracked,{name} cracked the money truck!,,,¡{name} abrió el camión del dinero!,{name} abriu o carro-forte!
+CrateWon,+${pay}  CASH DROP!,,,+${pay}  ¡CAÍDA DE DINERO!,+${pay}  CHUVA DE GRANA!
+CrateClaimed,{name} got the cash drop!,,,¡{name} se llevó la caja de dinero!,{name} pegou a caixa de grana!
+BossHit,-{dmg}  BOSS HIT!,,,-{dmg}  ¡GOLPE AL JEFE!,-{dmg}  BATIDA NO CHEFÃO!
+BossBeaten,{name} finished off the boss truck!,,,¡{name} acabó con el camión jefe!,{name} acabou com o caminhão chefão!
+BossPay,+${pay}  BOSS TRUCK PAYOUT,,,+${pay}  PREMIO DEL CAMIÓN JEFE,+${pay}  PRÊMIO DO CAMINHÃO CHEFÃO
 ContestPlace,{place} IN {event}!,,,¡{place} EN {event}!,{place} EM {event}!
 ServerGoalPay,SERVER GOAL!  +${pay},,,¡META DEL SERVIDOR!  +${pay},META DO SERVIDOR!  +${pay}
 SoClosePay,SO CLOSE!  +${pay},,,¡CASI!  +${pay},QUASE!  +${pay}

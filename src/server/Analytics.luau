@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Analytics)
+local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Offer = require(ReplicatedStorage.Shared.Rules.Offer)
 local Products = require(ReplicatedStorage.Shared.Config.Products)
@@ -487,6 +488,30 @@ function Analytics.tookPart(player: Player)
 	end)
 end
 
+-- a live event ended: logged once per run, on one player in the server. value = players who took part;
+-- outcome "Won" (claimed, cracked, beaten) or "Time" (ran out)
+function Analytics.eventEnded(key: string, outcome: string)
+	safe(function()
+		local joined, anyone = 0, nil
+		for p, s in sessions do
+			anyone = anyone or p
+			if s.eventRun == eventRun then
+				joined += 1
+			end
+		end
+		if anyone then
+			log(anyone, "EventEnded", joined, key, outcome)
+		end
+	end)
+end
+
+-- event money paid to a player (a prize, a share, a jackpot, cash grabbed): value = the amount
+function Analytics.eventPaid(player: Player, key: string, kind: string, amount: number)
+	safe(function()
+		log(player, "EventPaid", math.floor(amount + 0.5), key, kind)
+	end)
+end
+
 ---------------- client-only facts (Net "Track")
 
 local function onTrack(player: Player, kind: any, a: any, b: any, c: any)
@@ -583,8 +608,14 @@ function Analytics.start()
 			return
 		end
 		eventRun += 1
+		local tier = ""
+		for _, e in EventConfig.List do
+			if e.key == key then
+				tier = EventConfig.Tiers[e.tier].key
+			end
+		end
 		for _, p in Players:GetPlayers() do
-			log(p, "EventSeen", 1, key)
+			log(p, "EventSeen", 1, key, tier)
 		end
 	end)
 	task.spawn(function()

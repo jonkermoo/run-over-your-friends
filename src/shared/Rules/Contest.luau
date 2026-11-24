@@ -76,6 +76,21 @@ function Contest.prizes(
 	return out
 end
 
+-- a pot split by score (the Boss Truck's damage): each player's share of all the points, never under minPay.
+-- Rounds to $10.
+function Contest.shares(standings: { Place }, pot: number, minPay: number): { [number]: number }
+	local total = 0
+	for _, p in standings do
+		total += p.score
+	end
+	local out = {}
+	for _, p in standings do
+		local share = if total > 0 then pot * p.score / total else 0
+		out[p.id] = math.max(minPay, math.floor(share / 10 + 0.5) * 10)
+	end
+	return out
+end
+
 -- "1ST", "2ND", "3RD", "4TH", ... "11TH", "12TH", "13TH", "21ST"
 function Contest.ordinal(n: number): string
 	local tens = n % 100

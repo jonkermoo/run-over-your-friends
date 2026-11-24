@@ -1,45 +1,109 @@
 --!strict
--- Event schedule: given seconds since the server started, which phase it is (quiet, warning, running),
--- which event, and when that phase ends. Events take turns in order, starting at a seeded position.
--- Pure, so Lune tests it.
+-- Event schedule: after each event, how long until the next and which one. A longer wait brings a bigger event
+-- (Config/Events Tiers: quick ones after short gaps, contests in the middle, big ones after the longest). The
+-- same event never runs twice in a row, and neither do two place contests. Pure (the random rolls are passed
+-- in), so Lune tests it.
 
 local Events = {}
 
-export type Phase = { phase: "quiet" | "warn" | "live", index: number, endsIn: number }
+export type Tier = { key: string, weight: number, gap: { number }, duration: number }
+export type Item = { tier: number, duration: number?, contest: { pay: string? }? }
 
--- t: seconds since start; count: how many events; first: when the first one starts
-function Events.phase(
-	t: number,
-	count: number,
-	first: number,
-	gap: number,
-	duration: number,
-	warn: number,
-	offset: number
-): Phase
-	if count <= 0 then
-		return { phase = "quiet", index = 0, endsIn = math.huge }
+-- a contest paid by place (top 3): these never run back to back. Share contests (the Boss Truck) don't count.
+function Events.isContest(e: Item): boolean
+	return e.contest ~= nil and e.contest.pay ~= "share"
+end
+
+-- the tier a wait of `gap` seconds belongs to (the first before the shortest, the last past the longest)
+function Events.tierOf(gap: number, tiers: { Tier }): number
+	for i, t in tiers do
+		if gap < t.gap[2] then
+			return i
+		end
 	end
-	local cycle = gap + duration
-	-- start times: first, first + cycle, first + 2 * cycle, ...
-	local n = math.floor((t - first) / cycle)
-	local start = first + math.max(n, 0) * cycle
-	if t < first then
-		start = first
-		n = 0
+	return #tiers
+end
+
+-- how long an event runs: its own length, else its tier's
+function Events.duration(e: Item, tiers: { Tier }): number
+	return e.duration or tiers[e.tier].duration
+end
+
+-- the next event (an index into `list`) and the wait before it starts, in seconds. `last` is the event that
+-- just ran (nil at the start). rTier, rGap, rPick are random rolls 0-1: which tier (by weight), where in its
+-- gap range, which of its events. forceGap fixes the wait (a new server's first event) and so the tier. A
+-- tier with nothing allowed (a contest just ran and only contests are left) falls back to the tiers below,
+-- then above, with that tier's own gap.
+function Events.pick(
+	list: { Item },
+	tiers: { Tier },
+	last: number?,
+	rTier: number,
+	rGap: number,
+	rPick: number,
+	forceGap: number?
+): (number, number)
+	local want = 1
+	if forceGap then
+		want = Events.tierOf(forceGap, tiers)
+	else
+		local total = 0
+		for _, t in tiers do
+			total += t.weight
+		end
+		local at = rTier * total
+		want = #tiers
+		for i, t in tiers do
+			at -= t.weight
+			if at < 0 then
+				want = i
+				break
+			end
+		end
 	end
-	local index = (math.max(n, 0) + offset) % count + 1
-	if t >= start and t < start + duration then
-		return { phase = "live", index = index, endsIn = start + duration - t }
+	local lastWasContest = last ~= nil and list[last] ~= nil and Events.isContest(list[last])
+	local order = { want }
+	for t = want - 1, 1, -1 do
+		table.insert(order, t)
 	end
-	-- after this one ends, the next one starts a gap later
-	local nextStart = if t < start then start else start + cycle
-	local nextIndex = if t < start then index else (math.max(n, 0) + 1 + offset) % count + 1
-	local untilNext = nextStart - t
-	if untilNext <= warn then
-		return { phase = "warn", index = nextIndex, endsIn = untilNext }
+	for t = want + 1, #tiers do
+		table.insert(order, t)
 	end
-	return { phase = "quiet", index = nextIndex, endsIn = untilNext - warn }
+	for _, t in order do
+		local options = {}
+		for i, e in list do
+			if e.tier == t and i ~= last and not (lastWasContest and Events.isContest(e)) then
+				table.insert(options, i)
+			end
+		end
+		if #options > 0 then
+			local index = options[math.clamp(math.floor(rPick * #options) + 1, 1, #options)]
+			local range = tiers[t].gap
+			local gap = forceGap or (range[1] + (range[2] - range[1]) * rGap)
+			return index, gap
+		end
+	end
+	return 1, forceGap or tiers[1].gap[1]
+end
+
+-- how much a server of `players` needs (truck hits, boss health): base for one, plus `per` for each other one,
+-- up to `max`
+function Events.needed(base: number, per: number, players: number, max: number?): number
+	local n = base + per * math.max(players - 1, 0)
+	return if max then math.min(n, max) else n
+end
+
+export type DamageConfig = {
+	Damage: number,
+	DamageSpeed: number,
+	WeightRef: number,
+	DamageMin: number,
+	DamageMax: number,
+}
+-- one hit on the Boss Truck: in step with the closing speed (m/s) and the square root of the hitter's weight (kg)
+function Events.damage(closing: number, weightKg: number, c: DamageConfig): number
+	local d = c.Damage * (closing / c.DamageSpeed) * math.sqrt(math.max(weightKg, 1) / c.WeightRef)
+	return math.floor(math.clamp(d, c.DamageMin, c.DamageMax) + 0.5)
 end
 
 -- where the event sign goes, kept clear of the menu strip (the tab strip, top left). All in layout px from the
