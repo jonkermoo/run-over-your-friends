@@ -703,52 +703,84 @@ local function scroller(p: Frame, x: number, y: number): ScrollingFrame
 	return list
 end
 
--- the garage, a showroom: every vehicle in a list on the left (bay number, name, and its price or that you
--- own it) and the chosen one big on the right: its 3D picture, blurb, stats, what a hit pays, the paint
--- swatches (owned) or the price, and one SPAWN / BUY button. Each vehicle has its own detail panel, named
--- by its id with its button named Action (client/Guide points at them); only the chosen one shows.
-local LIST_W = LayoutConfig.GarageListWidth
-local DETAIL_BOTTOM = LayoutConfig.GarageDetailBottom
+-- the garage, two pages. The list: every vehicle in two columns (bay number, name, and its price or that you
+-- own it); tap one for its page: the 3D picture over its SPAWN / BUY button, and STATS / UPGRADES / PAINT /
+-- DECALS tabs beside it (client/UpgradePanel). BACK goes back to the list, < and > (LB / RB) step through the
+-- vehicles. Each vehicle has its own page frame under Details, named by its id with its button named Action
+-- (client/Guide points at them); only the chosen one shows.
 local garage = sheetFrame(C.pink)
 garage.Name = "Garage"
-local carList = Instance.new("Frame")
-carList.Name = "CarList"
-carList.BackgroundColor3 = C.ink
-carList.BorderSizePixel = 0
-carList.Size = UDim2.new(0, LIST_W, 1, 0)
-carList.Parent = garage
-local garageTitle = Style.label(carList, "GARAGE", 40, F.display, C.text)
-garageTitle.Position = UDim2.fromOffset(20, 16)
-garageTitle.Size = UDim2.new(1, -28, 0, 44)
+local listPage = Instance.new("Frame")
+listPage.Name = "List"
+listPage.BackgroundTransparency = 1
+listPage.Size = UDim2.fromScale(1, 1)
+listPage.Parent = garage
+local garageTitle = Style.label(listPage, "GARAGE", 46, F.display, C.text)
+garageTitle.Position = UDim2.fromOffset(24, 12)
+garageTitle.Size = UDim2.new(1, -200, 0, 50)
 garageTitle.TextXAlignment = Enum.TextXAlignment.Left
 local rows = Instance.new("ScrollingFrame")
 rows.Name = "Rows"
-rows.Position = UDim2.fromOffset(0, 80)
-rows.Size = UDim2.new(1, -4, 1, -88)
+rows.Position = UDim2.fromOffset(24, LayoutConfig.GarageHeader + 16)
+rows.Size = UDim2.new(1, -36, 1, -(LayoutConfig.GarageHeader + 28))
 rows.BackgroundTransparency = 1
 rows.BorderSizePixel = 0
 rows.ScrollBarThickness = 6
 rows.ScrollBarImageColor3 = C.yellow
 rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
 rows.CanvasSize = UDim2.new()
-rows.Parent = carList
-local rowsLayout = Instance.new("UIListLayout")
-rowsLayout.Padding = UDim.new(0, 4)
-rowsLayout.SortOrder = Enum.SortOrder.LayoutOrder
-rowsLayout.Parent = rows
+rows.Parent = listPage
+local rowsGrid = Instance.new("UIGridLayout")
+rowsGrid.CellPadding = UDim2.fromOffset(18, 8)
+rowsGrid.CellSize = UDim2.new(1 / LayoutConfig.GarageColumns, -18, 0, LayoutConfig.GarageRowHeight)
+rowsGrid.SortOrder = Enum.SortOrder.LayoutOrder
+rowsGrid.Parent = rows
 local details = Instance.new("Frame")
 details.Name = "Details"
 details.BackgroundTransparency = 1
-details.Position = UDim2.fromOffset(LIST_W, 0)
-details.Size = UDim2.new(1, -LIST_W, 1, 0)
+details.Size = UDim2.fromScale(1, 1)
+details.Visible = false
 details.Parent = garage
+-- the car page's header buttons and the page switch (one table: this file is at Luau's 200 top-level locals)
+local garageNav = {} :: {
+	back: TextButton,
+	prev: TextButton,
+	next: TextButton,
+	show: (car: boolean) -> (),
+	step: (dir: number) -> (),
+}
+do
+	local size = LayoutConfig.GarageHeaderButton
+	local function headButton(text: string, name: string, right: number): TextButton
+		local b = Style.button(details, text, "dark", 30)
+		b.Name = name
+		b.Size = UDim2.fromOffset(size, size)
+		b.AnchorPoint = Vector2.new(1, 0)
+		b.Position = UDim2.new(1, -right, 0, 4)
+		b.ZIndex = 3
+		return b
+	end
+	garageNav.back = headButton("< BACK", "Back", 0)
+	garageNav.back.TextSize = 26
+	garageNav.back.AnchorPoint = Vector2.new(0, 0)
+	garageNav.back.Position = UDim2.fromOffset(14, 4)
+	garageNav.back.Size = UDim2.fromOffset(130, size)
+	garageNav.next = headButton(">", "Next", 14 + size + 14)
+	garageNav.prev = headButton("<", "Prev", 14 + 2 * (size + 12) + 2)
+	-- on a gamepad: LB / RB step through the cars (B goes back to the list, client/Pad)
+	local carsChip = Pad.chip(details, { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1 }, "cars")
+	carsChip.AnchorPoint = Vector2.new(1, 0.5)
+	carsChip.Position = UDim2.new(1, -(3 * size + 64), 0, 34)
+end
 local garageLine = Style.dashes(garage, C.yellow, false, 4)
-garageLine.Position = UDim2.fromOffset(0, 66)
-local garageClose = closeButton(garage, 12)
+garageLine.Position = UDim2.fromOffset(0, LayoutConfig.GarageHeader)
+local garageClose = closeButton(garage, 4)
+garageClose.Size =
+	UDim2.fromOffset(LayoutConfig.GarageHeaderButton, LayoutConfig.GarageHeaderButton)
 garageClose.ZIndex = 3
-local garageHint = Pad.chip(garage, { Enum.KeyCode.ButtonB }, "close")
+local garageHint = Pad.chip(listPage, { Enum.KeyCode.ButtonB }, "close")
 garageHint.AnchorPoint = Vector2.new(1, 0.5)
-garageHint.Position = UDim2.new(1, -72, 0, 34)
+garageHint.Position = UDim2.new(1, -(14 + LayoutConfig.GarageHeaderButton + 14), 0, 34)
 
 type Card = {
 	stats: Vehicles.Vehicle,
@@ -794,16 +826,16 @@ local refreshCards: () -> ()
 
 -- a stat: its name and a dashed paint bar
 local function statBar(parent: Instance, y: number, name: string, value: number, color: Color3)
-	local l = Style.label(parent, name, 14, F.heavy, C.dim)
+	local l = Style.label(parent, name, 18, F.heavy, C.dim)
 	l.Position = UDim2.fromOffset(0, y)
-	l.Size = UDim2.fromOffset(96, 18)
+	l.Size = UDim2.fromOffset(130, 22)
 	l.TextXAlignment = Enum.TextXAlignment.Left
 	local back, fill = Style.bar(parent, color)
 	back.Name = name -- client/UpgradePanel adds the upgrades' share to it
 	back.BackgroundColor3 = C.card
 	back.BackgroundTransparency = 0
-	back.Position = UDim2.fromOffset(100, y + 3)
-	back.Size = UDim2.new(1, -100, 0, 12)
+	back.Position = UDim2.fromOffset(136, y + 4)
+	back.Size = UDim2.new(1, -136, 0, 15)
 	fill.Size = UDim2.fromScale(math.clamp(value, 0.05, 1), 1)
 	Style.laneGaps(back, C.panel)
 end
@@ -890,82 +922,116 @@ local function choose(id: string)
 	require(script.Parent.Track).viewed("Garage", id)
 end
 
+-- the list or the chosen vehicle's page
+function garageNav.show(car: boolean)
+	listPage.Visible = not car
+	details.Visible = car
+end
+
+-- the vehicle before (-1) or after (+1) the one shown, round the list
+function garageNav.step(dir: number)
+	local at = 1
+	for i, v in Vehicles.List do
+		if v.id == chosenId then
+			at = i
+		end
+	end
+	choose(Vehicles.List[(at - 1 + dir) % #Vehicles.List + 1].id)
+end
+
+garageNav.back.Activated:Connect(function()
+	garageNav.show(false)
+end)
+garageNav.prev.Activated:Connect(function()
+	garageNav.step(-1)
+end)
+garageNav.next.Activated:Connect(function()
+	garageNav.step(1)
+end)
+-- the garage always opens on the list
+garage:GetPropertyChangedSignal("Visible"):Connect(function()
+	if garage.Visible then
+		garageNav.show(false)
+	end
+end)
+
 for _, stats in Vehicles.List do
 	-- its row in the list
 	local row = Instance.new("TextButton")
 	row.Name = stats.id
 	row.AutoButtonColor = false
-	row.BackgroundColor3 = C.yellow
-	row.BackgroundTransparency = 1
+	row.BackgroundColor3 = C.ink
 	row.BorderSizePixel = 0
 	row.Text = ""
-	row.Size = UDim2.new(1, 0, 0, 50)
 	row.LayoutOrder = stats.order
 	row.Parent = rows
 	local rowNext = Instance.new("Frame") -- the car to save for: a yellow edge
 	rowNext.BackgroundColor3 = C.yellow
 	rowNext.BorderSizePixel = 0
-	rowNext.Size = UDim2.new(0, 6, 1, 0)
+	rowNext.Size = UDim2.new(0, 8, 1, 0)
 	rowNext.Visible = false
 	rowNext.Parent = row
-	local rowBay = Style.label(row, string.format("%02d", stats.order), 22, F.display, C.yellow)
-	rowBay.Position = UDim2.fromOffset(6, 2)
-	rowBay.Size = UDim2.new(0, 46, 1, 0)
-	local rowName = Style.label(row, string.upper(stats.name), 20, F.display, C.text)
-	rowName.Position = UDim2.fromOffset(56, 2)
-	rowName.Size = UDim2.new(1, -56 - 112, 1, 0)
+	local rowBay = Style.label(row, string.format("%02d", stats.order), 26, F.display, C.yellow)
+	rowBay.Position = UDim2.fromOffset(12, 2)
+	rowBay.Size = UDim2.new(0, 50, 1, 0)
+	local rowName = Style.label(row, string.upper(stats.name), 24, F.display, C.text)
+	rowName.Position = UDim2.fromOffset(66, 2)
+	rowName.Size = UDim2.new(1, -66 - 140, 1, 0)
 	rowName.TextXAlignment = Enum.TextXAlignment.Left
 	rowName.TextTruncate = Enum.TextTruncate.AtEnd
-	local rowPrice = Style.label(row, "", 17, F.display, C.money)
+	local rowPrice = Style.label(row, "", 21, F.display, C.money)
 	rowPrice.AnchorPoint = Vector2.new(1, 0.5)
-	rowPrice.Position = UDim2.new(1, -14, 0.5, 2)
-	rowPrice.Size = UDim2.fromOffset(108, 24)
+	rowPrice.Position = UDim2.new(1, -16, 0.5, 2)
+	rowPrice.Size = UDim2.fromOffset(132, 28)
 	rowPrice.TextXAlignment = Enum.TextXAlignment.Right
 	local rowTag = Style.pill(row, "", C.money)
-	rowTag.TextSize = 15
-	rowTag.Size = UDim2.fromOffset(0, 22)
+	rowTag.TextSize = 18
+	rowTag.Size = UDim2.fromOffset(0, 28)
 	rowTag.AnchorPoint = Vector2.new(1, 0.5)
-	rowTag.Position = UDim2.new(1, -14, 0.5, 0)
+	rowTag.Position = UDim2.new(1, -16, 0.5, 0)
 	rowTag.Visible = false
 
-	-- its detail panel
+	-- its page: the bay and name in the title row, the picture with the button under it on the left, the
+	-- tabs on the right
 	local card = Instance.new("Frame")
 	card.Name = stats.id
 	card.BackgroundTransparency = 1
 	card.Size = UDim2.fromScale(1, 1)
 	card.Visible = false
 	card.Parent = details
-	local name = Style.label(card, stats.name, 40, F.display, C.text)
-	name.Position = UDim2.fromOffset(24, 16)
-	name.Size = UDim2.new(1, -230, 0, 44)
+	local bay = Style.label(card, string.format("%02d", stats.order), 46, F.display, C.yellow)
+	bay.Position = UDim2.fromOffset(164, 12)
+	bay.Size = UDim2.fromOffset(64, 50)
+	bay.TextXAlignment = Enum.TextXAlignment.Left
+	local name = Style.label(card, stats.name, 46, F.display, C.text)
+	name.Position = UDim2.fromOffset(232, 12)
+	name.Size = UDim2.new(1, -232 - 400, 0, 50) -- clear of < > X and the gamepad's LB / RB chip
 	name.TextXAlignment = Enum.TextXAlignment.Left
 	name.TextScaled = true
 	local nameSize = Instance.new("UITextSizeConstraint")
-	nameSize.MaxTextSize = 40
+	nameSize.MaxTextSize = 46
 	nameSize.Parent = name
-	-- the picture fills what the bottom block leaves
 	local stage = Instance.new("Frame")
 	stage.Name = "Stage"
 	stage.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
 	stage.BorderSizePixel = 0
 	stage.ClipsDescendants = true
-	stage.Position = UDim2.fromOffset(24, 84)
-	stage.Size = UDim2.new(1, -48, 1, -(84 + DETAIL_BOTTOM + 30))
+	stage.Position = UDim2.fromOffset(24, LayoutConfig.GarageHeader + 18)
+	stage.Size = UDim2.new(
+		LayoutConfig.GaragePictureShare,
+		-24,
+		1,
+		-(LayoutConfig.GarageHeader + 18 + LayoutConfig.GarageActionHeight + 12 + 18)
+	)
 	stage.Parent = card
 	local shown = preview(stage, stats, true, true)
-	local bay = Style.label(stage, string.format("%02d", stats.order), 56, F.display, C.yellow)
-	bay.Position = UDim2.fromOffset(14, 8)
-	bay.Size = UDim2.fromOffset(100, 58)
-	bay.TextXAlignment = Enum.TextXAlignment.Left
-	bay.ZIndex = 2
-	Style.outline(bay, 3)
 	-- car of the day and NEXT UP tags in the picture's top-right corner
 	local sale = Style.pill(stage, "", C.pink)
 	Loc.set(sale, "CarOfDay", { pct = math.floor(DailyConfig.DiscountShare * 100 + 0.5) })
 	sale.Name = "Sale"
 	sale.TextColor3 = C.text
-	sale.TextSize = 15
-	sale.Size = UDim2.fromOffset(0, 22)
+	sale.TextSize = 18
+	sale.Size = UDim2.fromOffset(0, 26)
 	sale.AnchorPoint = Vector2.new(1, 0)
 	sale.Position = UDim2.new(1, -12, 0, 12)
 	sale.ZIndex = 2
@@ -973,92 +1039,115 @@ for _, stats in Vehicles.List do
 	local nextUp = Style.pill(stage, "NEXT UP", C.yellow)
 	nextUp.Name = "NextUp"
 	nextUp.TextColor3 = C.ink
-	nextUp.TextSize = 15
-	nextUp.Size = UDim2.fromOffset(0, 22)
+	nextUp.TextSize = 18
+	nextUp.Size = UDim2.fromOffset(0, 26)
 	nextUp.AnchorPoint = Vector2.new(1, 0)
 	nextUp.Position = UDim2.new(1, -12, 0, 12)
 	nextUp.ZIndex = 2
 	nextUp.Visible = false
-
-	local bottom = Instance.new("Frame")
-	bottom.Name = "Bottom"
-	bottom.BackgroundTransparency = 1
-	bottom.AnchorPoint = Vector2.new(0, 1)
-	bottom.Position = UDim2.new(0, 24, 1, -18)
-	bottom.Size = UDim2.new(1, -48, 0, DETAIL_BOTTOM)
-	bottom.Parent = card
-	-- left: the blurb, stat bars, what a hit pays and what it can smash (the reasons to buy the next car)
-	local info = Instance.new("Frame")
-	info.Name = "Info"
-	info.BackgroundTransparency = 1
-	info.Size = UDim2.new(0.5, -12, 1, 0)
-	info.Parent = bottom
-	local blurb = Style.label(info, stats.blurb, 16, F.bold, C.text)
-	blurb.Size = UDim2.new(1, 0, 0, 40)
-	blurb.TextWrapped = true
-	blurb.TextXAlignment = Enum.TextXAlignment.Left
-	blurb.TextYAlignment = Enum.TextYAlignment.Top
-	statBar(info, 46, "SPEED", stats.topSpeed / 250, C.orange)
-	statBar(info, 68, "ACCEL", stats.launch / 15, C.blue)
-	statBar(info, 90, "HANDLING", stats.grip / 22, C.green)
-	statBar(info, 112, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
-	local pay =
-		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
-	local payText = Style.label(info, "", 16, F.heavy, C.money)
-	Loc.set(payText, "AboutPerHit", { money = money(pay) })
-	payText.Position = UDim2.fromOffset(0, 142)
-	payText.Size = UDim2.new(1, 0, 0, 20)
-	payText.TextXAlignment = Enum.TextXAlignment.Left
-	local topples = GarageRules.topples(stats.weight, stats.topSpeed, SmashConfig, stats.maxBreak)
-	local smashText = Style.label(
-		info,
-		if topples then "TOPPLES BUILDINGS" else "SMASHES HOLES",
-		14,
-		F.heavy,
-		if topples then C.orange else C.dim
-	)
-	smashText.Position = UDim2.fromOffset(0, 166)
-	smashText.Size = UDim2.new(1, 0, 0, 18)
-	smashText.TextXAlignment = Enum.TextXAlignment.Left
-	-- right: the paint swatches when you own it, else the price (and the old one struck through on sale)
-	local paintSpot = Instance.new("Frame")
-	paintSpot.Name = "PaintSpot"
-	paintSpot.BackgroundTransparency = 1
-	paintSpot.Position = UDim2.new(0.5, 12, 0, 0)
-	paintSpot.Size = UDim2.new(0.5, -12, 0, 124)
-	paintSpot.Parent = bottom
+	-- the price on a tag in the picture's bottom-right corner while you don't own it (the old one struck
+	-- through on sale)
 	local priceBox = Instance.new("Frame")
 	priceBox.Name = "PriceBox"
-	priceBox.BackgroundTransparency = 1
-	priceBox.Position = UDim2.new(0.5, 12, 0, 0)
-	priceBox.Size = UDim2.new(0.5, -12, 0, 124)
-	priceBox.Parent = bottom
-	local price = Style.label(priceBox, "", 34, F.display, C.money)
-	price.AnchorPoint = Vector2.new(1, 0)
-	price.Position = UDim2.new(1, 0, 0, 30)
-	price.Size = UDim2.new(1, 0, 0, 40)
+	priceBox.BackgroundColor3 = C.ink
+	priceBox.BackgroundTransparency = 0.1
+	priceBox.BorderSizePixel = 0
+	priceBox.AnchorPoint = Vector2.new(1, 1)
+	priceBox.Position = UDim2.new(1, -10, 1, -10)
+	priceBox.Size = UDim2.fromOffset(250, 82)
+	priceBox.ZIndex = 2
+	priceBox.Parent = stage
+	local price = Style.label(priceBox, "", 38, F.display, C.money)
+	price.AnchorPoint = Vector2.new(1, 1)
+	price.Position = UDim2.new(1, -12, 1, -4)
+	price.Size = UDim2.new(1, -24, 0, 44)
 	price.TextXAlignment = Enum.TextXAlignment.Right
-	local was = Style.label(priceBox, "", 18, F.heavy, C.dim)
+	price.ZIndex = 3
+	local was = Style.label(priceBox, "", 20, F.heavy, C.dim)
 	was.Name = "Was"
 	was.AutomaticSize = Enum.AutomaticSize.X
 	was.AnchorPoint = Vector2.new(1, 0)
-	was.Position = UDim2.new(1, 0, 0, 4)
-	was.Size = UDim2.fromOffset(0, 22)
+	was.Position = UDim2.new(1, -12, 0, 6)
+	was.Size = UDim2.fromOffset(0, 24)
 	was.Visible = false
+	was.ZIndex = 3
 	local strike = Instance.new("Frame")
 	strike.BackgroundColor3 = C.pink
 	strike.BorderSizePixel = 0
 	strike.AnchorPoint = Vector2.new(0, 0.5)
 	strike.Position = UDim2.fromScale(0, 0.5)
 	strike.Size = UDim2.new(1, 0, 0, 3)
+	strike.ZIndex = 4
 	strike.Parent = was
-	local action = Style.button(bottom, "SPAWN", "green", 28)
+	-- the button under the picture (the Roadster's FREE TRIAL shares the bar)
+	local actionBar = Instance.new("Frame")
+	actionBar.Name = "ActionBar"
+	actionBar.BackgroundTransparency = 1
+	actionBar.AnchorPoint = Vector2.new(0, 1)
+	actionBar.Position = UDim2.new(0, 24, 1, -18)
+	actionBar.Size =
+		UDim2.new(LayoutConfig.GaragePictureShare, -24, 0, LayoutConfig.GarageActionHeight)
+	actionBar.Parent = card
+	local action = Style.button(actionBar, "SPAWN", "green", 32)
 	action.Name = "Action"
 	action:SetAttribute("VehicleId", stats.id) -- client/Guide finds the button by it
 	action.AnchorPoint = Vector2.new(1, 1)
 	action.Position = UDim2.fromScale(1, 1)
-	action.Size = UDim2.new(0.5, -12, 0, 60)
+	action.Size = UDim2.new(1, 0, 0, LayoutConfig.GarageActionHeight)
 	require(script.Parent.Trial).button(stats.id, action) -- the Roadster's FREE TRIAL beside it
+
+	-- right: the tabs (client/UpgradePanel) over one page at a time; STATS is this blurb, the stat bars, what a
+	-- hit pays and what it can smash (the reasons to buy the next car), and shows alone while you don't own it
+	local bottom = Instance.new("Frame")
+	bottom.Name = "Bottom"
+	bottom.BackgroundTransparency = 1
+	bottom.Position =
+		UDim2.new(LayoutConfig.GaragePictureShare, 24, 0, LayoutConfig.GarageHeader + 18)
+	bottom.Size = UDim2.new(
+		1 - LayoutConfig.GaragePictureShare,
+		-48,
+		1,
+		-(LayoutConfig.GarageHeader + 18 + 18)
+	)
+	bottom.Parent = card
+	local info = Instance.new("Frame")
+	info.Name = "Info"
+	info.BackgroundTransparency = 1
+	info.Size = UDim2.fromScale(1, 1)
+	info.Parent = bottom
+	local blurb = Style.label(info, stats.blurb, 21, F.bold, C.text)
+	blurb.Size = UDim2.new(1, 0, 0, 54)
+	blurb.TextWrapped = true
+	blurb.TextXAlignment = Enum.TextXAlignment.Left
+	blurb.TextYAlignment = Enum.TextYAlignment.Top
+	statBar(info, 62, "SPEED", stats.topSpeed / 250, C.orange)
+	statBar(info, 92, "ACCEL", stats.launch / 15, C.blue)
+	statBar(info, 122, "HANDLING", stats.grip / 22, C.green)
+	statBar(info, 152, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
+	local pay =
+		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
+	local payText = Style.label(info, "", 21, F.heavy, C.money)
+	Loc.set(payText, "AboutPerHit", { money = money(pay) })
+	payText.Position = UDim2.fromOffset(0, 188)
+	payText.Size = UDim2.new(1, 0, 0, 24)
+	payText.TextXAlignment = Enum.TextXAlignment.Left
+	local topples = GarageRules.topples(stats.weight, stats.topSpeed, SmashConfig, stats.maxBreak)
+	local smashText = Style.label(
+		info,
+		if topples then "TOPPLES BUILDINGS" else "SMASHES HOLES",
+		19,
+		F.heavy,
+		if topples then C.orange else C.dim
+	)
+	smashText.Position = UDim2.fromOffset(0, 214)
+	smashText.Size = UDim2.new(1, 0, 0, 22)
+	smashText.TextXAlignment = Enum.TextXAlignment.Left
+	local paintSpot = Instance.new("Frame")
+	paintSpot.Name = "PaintSpot"
+	paintSpot.BackgroundTransparency = 1
+	paintSpot.Size = UDim2.fromScale(1, 1)
+	paintSpot.Visible = false
+	paintSpot.Parent = bottom
 	local picker = PaintPicker.attach(card, stats.id, shown, info, action, function()
 		refreshCards()
 	end, paintSpot)
@@ -1072,6 +1161,11 @@ for _, stats in Vehicles.List do
 		paintSpot = paintSpot,
 		row = row,
 		rowTag = rowTag,
+		onTab = function(picked: string)
+			if picked ~= "Paint" then
+				picker.reset() -- a colour tried on and not bought comes off when you leave PAINT
+			end
+		end,
 	})
 	action.Activated:Connect(function()
 		if picker.action() then
@@ -1097,9 +1191,10 @@ for _, stats in Vehicles.List do
 			Net.waitFor("BuyVehicle"):FireServer(stats.id)
 		end
 	end)
-	-- a tap shows it; on a gamepad, moving onto a row shows it and A goes to its button
+	-- a tap opens its page; on a gamepad, moving onto a row marks it and A opens it on its button
 	row.Activated:Connect(function()
 		choose(stats.id)
+		garageNav.show(true)
 		if Pad.usingGamepad() then
 			GuiService.SelectedObject = action
 		end
@@ -1209,7 +1304,7 @@ function refreshCards()
 			end
 		end
 		-- the chosen row is painted yellow, its words in ink
-		c.row.BackgroundTransparency = if chosen then 0 else 1
+		c.row.BackgroundColor3 = if chosen then C.yellow else C.ink
 		c.rowBay.TextColor3 = if chosen then C.ink else C.yellow
 		if chosen then
 			c.rowName.TextColor3 = C.ink
@@ -1220,12 +1315,35 @@ function refreshCards()
 	end
 end
 
+-- on a gamepad the list starts on the chosen row and a page on its button; B on a page goes back to the
+-- list, LB / RB step through the vehicles
+local function chosenAction(): GuiObject?
+	for _, c in cards do
+		if c.stats.id == chosenId then
+			return c.action
+		end
+	end
+	return nil
+end
 Pad.menu(garage, {
 	first = function()
-		return rows:FindFirstChild(chosenId) :: GuiObject?
+		return if details.Visible
+			then chosenAction()
+			else rows:FindFirstChild(chosenId) :: GuiObject?
 	end,
 	close = function()
-		garage.Visible = false
+		if details.Visible then
+			garageNav.show(false)
+			GuiService.SelectedObject = rows:FindFirstChild(chosenId) :: GuiObject?
+		else
+			garage.Visible = false
+		end
+	end,
+	shoulders = function(dir: number)
+		if details.Visible then
+			garageNav.step(dir)
+			GuiService.SelectedObject = chosenAction()
+		end
 	end,
 })
 
@@ -2069,51 +2187,59 @@ touchGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 touchGui.Parent = playerGui
 Style.fit(touchGui)
 
+-- a screen-sized holder: each key is placed in real pixels (undoing the screen's UI scale) around Roblox's
+-- jump button, so the fan hugs it on every screen
 local touch = Instance.new("Frame")
 touch.BackgroundTransparency = 1
-touch.AnchorPoint = Vector2.new(1, 1)
-touch.Position = UDim2.new(1, -20, 1, -LayoutConfig.TouchClearLarge)
-touch.Size = UDim2.fromOffset(240, 154)
+touch.Size = UDim2.fromScale(1, 1)
 touch.Name = "TouchRack"
 touch.Visible = false
 touch.Parent = touchGui
-local touchFit = Instance.new("UIScale")
-touchFit.Parent = touch
 
--- each button's grid slot name (Config/Layout TouchSlots), filled as they are made
+-- each button's fan slot name (Config/Layout TouchSlots), filled as they are made
 local slotOf: { [TextButton]: string } = {}
-local wideRack: boolean? = nil
 
-local function slotPos(slot: { number }): UDim2
-	return UDim2.fromOffset(slot[1] * LayoutConfig.TouchPitch, slot[2] * LayoutConfig.TouchPitch)
+-- Roblox's jump button: its centre and size in real px from touchGui's top-left, read from its TouchGui
+-- when it's there, else where Roblox puts it on a screen this size
+local function jumpButton(): (number, number, number)
+	local tg = playerGui:FindFirstChild("TouchGui")
+	local jb = tg and tg:FindFirstChild("JumpButton", true)
+	if jb and jb:IsA("GuiObject") and jb.AbsoluteSize.X > 0 then
+		local at = jb.AbsolutePosition - touchGui.AbsolutePosition
+		if (tg :: ScreenGui).IgnoreGuiInset ~= touchGui.IgnoreGuiInset then
+			local inset = GuiService:GetGuiInset()
+			at += if touchGui.IgnoreGuiInset then inset else -inset
+		end
+		local x, y = at.X + jb.AbsoluteSize.X / 2, at.Y + jb.AbsoluteSize.Y / 2
+		-- only trusted where a jump button belongs: the screen's bottom-right quarter
+		if x > touchGui.AbsoluteSize.X / 2 and y > touchGui.AbsoluteSize.Y / 2 then
+			return x, y, jb.AbsoluteSize.X
+		end
+	end
+	local size = touchGui.AbsoluteSize
+	return LayoutRules.jumpButton(size.X, size.Y, LayoutConfig)
 end
 
--- thumb-sized on any screen, and above Roblox's jump button; on short screens the top row folds into a
--- column on the left so it stays off the cash box
+-- thumb-sized on any screen (never under TouchMinScale), fanned out from the jump button
 local function placeTouch()
-	local cam = workspace.CurrentCamera
-	if not cam then
-		return
-	end
 	local s = Style.scale()
-	local boost = LayoutRules.touchBoost(s, LayoutConfig.TouchMinScale)
-	touchFit.Scale = boost
-	local clear = LayoutRules.touchClear(cam.ViewportSize.X, cam.ViewportSize.Y, LayoutConfig)
-	touch.Position = UDim2.new(1, -20, 1, -clear / s)
-	local top = touchGui.AbsolutePosition.Y
-	local wide = LayoutRules.touchWide(
-		touchGui.AbsoluteSize.Y,
-		clear,
-		s * boost,
-		moneyBox.AbsolutePosition.Y + moneyBox.AbsoluteSize.Y - top,
-		LayoutConfig.TouchCashGap * s,
-		LayoutConfig
-	)
-	if wide ~= wideRack then
-		wideRack = wide
-		local slots = if wide then LayoutConfig.TouchSlotsWide else LayoutConfig.TouchSlots
-		for b, name in slotOf do
-			b.Position = slotPos(slots[name])
+	local m = math.max(s, LayoutConfig.TouchMinScale)
+	local key = LayoutConfig.TouchKey * m
+	local jx, jy, js = jumpButton()
+	for b, name in slotOf do
+		local x, y = LayoutRules.touchSpot(
+			LayoutConfig.TouchSlots[name],
+			jx,
+			jy,
+			js,
+			key,
+			LayoutConfig.TouchPitch * m,
+			LayoutConfig.TouchGap * m
+		)
+		b.Position = UDim2.fromOffset(x / s, y / s)
+		local boost = b:FindFirstChildOfClass("UIScale")
+		if boost then
+			boost.Scale = m / s -- drawn at TouchKey * m real px
 		end
 	end
 end
@@ -2139,8 +2265,9 @@ local function holdButton(
 	local b = Style.button(touch, text, "dark", 16)
 	b.BackgroundTransparency = 1
 	b.TextTransparency = 1 -- the label below shows the text; code keeps setting b.Text
+	b.AnchorPoint = Vector2.new(0.5, 0.5)
 	b.Size = UDim2.fromOffset(LayoutConfig.TouchKey, LayoutConfig.TouchKey)
-	b.Position = slotPos(LayoutConfig.TouchSlots[slot])
+	Instance.new("UIScale").Parent = b -- placeTouch keeps it at least TouchMinScale
 	slotOf[b] = slot
 	for _, extra in { b:FindFirstChild("Edge"), b:FindFirstChild("Shadow") } do
 		extra:Destroy()
@@ -2233,6 +2360,7 @@ end, function() end)
 ---------------------------------------------------------------- per frame
 
 local wasDriving = false
+local touchControlsHidden = false
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
 	-- the GOALS tab is painted while the goals sheet is open
@@ -2253,7 +2381,15 @@ RunService.RenderStepped:Connect(function()
 	wasDriving = s.driving
 	controls.Visible = keyboard and controlsOpen
 	keysChip.Visible = keyboard and not controlsOpen
-	touch.Visible = s.driving and UserInputService.TouchEnabled
+	-- hidden while the garage, store, goals or a card is open over the game
+	local busy = Popups.busy()
+	touch.Visible = s.driving and UserInputService.TouchEnabled and not busy
+	-- Roblox's own thumbstick and jump arrow too: on a small phone the jump arrow sits over the garage
+	-- sheet's corner and takes its taps. Set only when it changes, so nothing else's choice is fought.
+	if UserInputService.TouchEnabled and busy ~= touchControlsHidden then
+		touchControlsHidden = busy
+		GuiService.TouchControlsEnabled = not busy
+	end
 	if touch.Visible then
 		placeTouch()
 	end

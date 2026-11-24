@@ -1,7 +1,8 @@
 --!strict
--- The garage's mastery part of each car's panel (client/Hud builds the panel and calls attach): a mastery badge
--- and the "mastery road" (what each level opens) on the 3D picture, UPGRADES / PAINT / DECALS tabs on the right
--- (PAINT is client/PaintPicker's swatches), a yellow piece on the stat bars for the switched-on upgrades, five
+-- The garage's mastery part of each car's page (client/Hud builds the page and calls attach): a mastery badge on
+-- the 3D picture, STATS / UPGRADES / PAINT / DECALS tabs on the right (STATS is client/Hud's info, PAINT is
+-- client/PaintPicker's swatches, UPGRADES has the "mastery road": what each level opens), a yellow piece on the
+-- stat bars for the switched-on upgrades, five
 -- mastery pips on the car's row, and the picture dressed with the car's upgrades and decal. Reads the player's
 -- Owned, VehicleId, Money, Paint, Mastery, Upgrades and Decals attributes (server/Data); asks the server through
 -- BuyUpgrade, SetUpgrade and SetDecal (server/UpgradeService).
@@ -29,19 +30,22 @@ export type Parts = {
 	stats: Vehicles.Vehicle,
 	shown: Model?, -- the 3D picture's model (a full template copy; parts are shown or hidden here)
 	stage: Frame, -- the picture's frame
-	info: Frame, -- the blurb and stat bars (bars are named SPEED, ACCEL, HANDLING, WEIGHT)
-	bottom: Frame, -- the block under the picture
+	info: Frame, -- the blurb and stat bars (bars are named SPEED, ACCEL, HANDLING, WEIGHT): the STATS tab
+	bottom: Frame, -- the block beside the picture that holds the tabs
 	paintSpot: Frame, -- client/PaintPicker's swatches
 	row: TextButton, -- the car's row in the list
 	rowTag: TextLabel,
+	onTab: ((tab: string) -> ())?, -- a tab was picked
 }
 
 export type Panel = { refresh: () -> () }
 
 local ROMAN = { "I", "II", "III" }
-local TABS_H = 30 -- the tab row on top of the right half of the bottom block (Config/Layout GarageDetailBottom has room)
-local RIGHT = UDim2.new(0.5, 12, 0, TABS_H) -- under the tabs, where the swatches sit
-local RIGHT_SIZE = UDim2.new(0.5, -12, 0, 124)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
+local TABS_H = LayoutConfig.GarageTabsHeight -- the tab row on top of the block beside the picture
+local PAGE = UDim2.fromOffset(0, TABS_H + 12) -- a tab's page, under the tabs
+local PAGE_SIZE = UDim2.new(1, 0, 1, -(TABS_H + 12))
+local ROAD_H = 66 -- the mastery road over the upgrade cards
 
 local function json(name: string): { [string]: any }
 	local raw = player:GetAttribute(name)
@@ -105,10 +109,10 @@ local function shares(s: Vehicles.Vehicle): { [string]: number }
 end
 
 local function smallButton(parent: Instance, text: string, kind: string): TextButton
-	local b = Style.button(parent, text, kind, 15)
+	local b = Style.button(parent, text, kind, 18)
 	b.AnchorPoint = Vector2.new(0, 1)
 	b.Position = UDim2.new(0, 8, 1, -8)
-	b.Size = UDim2.new(1, -20, 0, 26)
+	b.Size = UDim2.new(1, -16, 0, 46)
 	return b
 end
 
@@ -116,114 +120,124 @@ function UpgradePanel.attach(p: Parts): Panel
 	local stats = p.stats
 	local id = stats.id
 	local ups = Config.ByVehicle[id] or {}
-	local tab = "Upgrades"
+	local tab = "Stats"
 
 	-- mastery badge on the picture, beside the bay number
 	local badge = Instance.new("Frame")
 	badge.Name = "Mastery"
 	badge.BackgroundColor3 = C.card
 	badge.BorderSizePixel = 0
-	badge.Position = UDim2.fromOffset(112, 14)
-	badge.Size = UDim2.fromOffset(236, 44)
+	badge.Position = UDim2.fromOffset(12, 12)
+	badge.Size = UDim2.fromOffset(250, 50)
 	badge.ZIndex = 2
 	badge.Parent = p.stage
-	local lvlBox = Style.label(badge, "0", 22, F.display, C.ink)
+	local lvlBox = Style.label(badge, "0", 26, F.display, C.ink)
 	lvlBox.BackgroundTransparency = 0
 	lvlBox.BackgroundColor3 = C.yellow
 	lvlBox.Position = UDim2.fromOffset(5, 5)
-	lvlBox.Size = UDim2.fromOffset(36, 34)
+	lvlBox.Size = UDim2.fromOffset(40, 40)
 	lvlBox.ZIndex = 3
-	local lvlText = Style.label(badge, "", 13, F.heavy, C.dim)
-	lvlText.Position = UDim2.fromOffset(50, 5)
-	lvlText.Size = UDim2.new(1, -58, 0, 16)
+	local lvlText = Style.label(badge, "", 16, F.heavy, C.dim)
+	lvlText.Position = UDim2.fromOffset(54, 5)
+	lvlText.Size = UDim2.new(1, -62, 0, 20)
 	lvlText.TextXAlignment = Enum.TextXAlignment.Left
 	lvlText.ZIndex = 3
 	local back, fill = Style.bar(badge, C.yellow)
 	back.BackgroundColor3 = C.ink
 	back.BackgroundTransparency = 0
-	back.Position = UDim2.fromOffset(50, 25)
-	back.Size = UDim2.new(1, -60, 0, 10)
+	back.Position = UDim2.fromOffset(54, 29)
+	back.Size = UDim2.new(1, -64, 0, 12)
 	back.ZIndex = 3
 	fill.ZIndex = 3
 	Style.laneGaps(back, C.card)
 
-	-- the mastery road along the bottom of the picture: what each level opens
+	-- the UPGRADES tab's page: the mastery road (what each level opens) over the three upgrade cards
+	local upPage = Instance.new("Frame")
+	upPage.Name = "UpgradesPage"
+	upPage.BackgroundTransparency = 1
+	upPage.Position = PAGE
+	upPage.Size = PAGE_SIZE
+	upPage.Parent = p.bottom
 	local road = Instance.new("Frame")
 	road.Name = "MasteryRoad"
 	road.BackgroundColor3 = C.ink
-	road.BackgroundTransparency = 0.12
 	road.BorderSizePixel = 0
-	road.AnchorPoint = Vector2.new(0, 1)
-	road.Position = UDim2.fromScale(0, 1)
-	road.Size = UDim2.new(1, 0, 0, 58)
+	road.Size = UDim2.new(1, 0, 0, ROAD_H)
 	road.ZIndex = 2
-	road.Parent = p.stage
+	road.Parent = upPage
 	local lane = Style.dashes(road, C.grey, false, 4)
-	lane.Position = UDim2.new(0.1, 0, 0, 17)
+	lane.Position = UDim2.new(0.1, 0, 0, 18)
 	lane.Size = UDim2.new(0.8, 0, 0, 4)
 	lane.ZIndex = 2
 	local laneDone = Style.dashes(road, C.yellow, false, 4)
-	laneDone.Position = UDim2.new(0.1, 0, 0, 17)
+	laneDone.Position = UDim2.new(0.1, 0, 0, 18)
 	laneDone.ZIndex = 2
 	local stops: { { dot: TextLabel, what: TextLabel } } = {}
 	for level = 1, Config.MaxLevel do
 		local x = 0.1 + 0.8 * (level - 1) / (Config.MaxLevel - 1)
-		local dot = Style.label(road, tostring(level), 16, F.display, C.dim)
+		local dot = Style.label(road, tostring(level), 19, F.display, C.dim)
 		dot.BackgroundTransparency = 0
 		dot.BackgroundColor3 = C.grey
 		dot.AnchorPoint = Vector2.new(0.5, 0)
-		dot.Position = UDim2.new(x, 0, 0, 6)
-		dot.Size = UDim2.fromOffset(26, 26)
+		dot.Position = UDim2.new(x, 0, 0, 5)
+		dot.Size = UDim2.fromOffset(30, 30)
 		dot.ZIndex = 3
 		local upgradeAt = table.find(Config.UpgradeLevel, level)
 		local what = if upgradeAt and ups[upgradeAt]
 			then string.upper(ups[upgradeAt].name)
 			else string.upper(Config.Decals[level].name)
-		local label = Style.label(road, what, 11, F.heavy, C.dim)
+		local label = Style.label(road, what, 15, F.heavy, C.dim)
 		label.AnchorPoint = Vector2.new(0.5, 0)
-		label.Position = UDim2.new(x, 0, 0, 36)
-		label.Size = UDim2.new(0.19, 0, 0, 16)
+		label.Position = UDim2.new(x, 0, 0, 40)
+		label.Size = UDim2.new(0.19, 0, 0, 20)
 		label.TextScaled = true
 		label.ZIndex = 3
 		local cap = Instance.new("UITextSizeConstraint")
-		cap.MaxTextSize = 12
+		cap.MaxTextSize = 15
 		cap.Parent = label
 		table.insert(stops, { dot = dot, what = label })
 	end
 
-	-- tabs over the right half of the bottom block
+	-- four equal tabs across the top of the block beside the picture
 	local tabs = Instance.new("Frame")
 	tabs.Name = "Tabs"
 	tabs.BackgroundTransparency = 1
-	tabs.Position = UDim2.new(0.5, 12, 0, 0)
-	tabs.Size = UDim2.new(0.5, -12, 0, 26)
+	tabs.Size = UDim2.new(1, 0, 0, TABS_H)
 	tabs.Parent = p.bottom
 	local tabList = Instance.new("UIListLayout")
 	tabList.FillDirection = Enum.FillDirection.Horizontal
-	tabList.Padding = UDim.new(0, 6)
+	tabList.Padding = UDim.new(0, 8)
 	tabList.SortOrder = Enum.SortOrder.LayoutOrder
 	tabList.Parent = tabs
 	local tabButtons: { [string]: TextButton } = {}
 	local refresh: () -> ()
-	for i, name in { "Upgrades", "Paint", "Decals" } do
+	local TAB_NAMES = { "Stats", "Upgrades", "Paint", "Decals" }
+	for i, name in TAB_NAMES do
 		local b = Instance.new("TextButton")
 		b.Name = name
 		b.AutoButtonColor = false
 		b.BorderSizePixel = 0
 		b.FontFace = F.display
-		b.TextSize = 16
 		b.Text = string.upper(name)
-		b.AutomaticSize = Enum.AutomaticSize.X
-		b.Size = UDim2.fromOffset(0, 26)
+		-- a longer word in another language shrinks to fit the tab
+		b.TextScaled = true
+		local cap = Instance.new("UITextSizeConstraint")
+		cap.MaxTextSize = 24
+		cap.Parent = b
+		b.Size = UDim2.new(1 / #TAB_NAMES, -6, 1, 0)
 		b.LayoutOrder = i
 		local pad = Instance.new("UIPadding")
-		pad.PaddingLeft = UDim.new(0, 10)
-		pad.PaddingRight = UDim.new(0, 10)
-		pad.PaddingTop = UDim.new(0, 3)
+		pad.PaddingLeft = UDim.new(0, 8)
+		pad.PaddingRight = UDim.new(0, 8)
+		pad.PaddingTop = UDim.new(0, 14)
+		pad.PaddingBottom = UDim.new(0, 10)
 		pad.Parent = b
 		b.Parent = tabs
 		b.Activated:Connect(function()
 			tab = name
+			if p.onTab then
+				p.onTab(name)
+			end
 			refresh()
 		end)
 		tabButtons[name] = b
@@ -233,12 +247,12 @@ function UpgradePanel.attach(p: Parts): Panel
 	local upFrame = Instance.new("Frame")
 	upFrame.Name = "Upgrades"
 	upFrame.BackgroundTransparency = 1
-	upFrame.Position = RIGHT
-	upFrame.Size = RIGHT_SIZE
-	upFrame.Parent = p.bottom
+	upFrame.Position = UDim2.fromOffset(0, ROAD_H + 10)
+	upFrame.Size = UDim2.new(1, 0, 1, -(ROAD_H + 10))
+	upFrame.Parent = upPage
 	local grid = Instance.new("UIGridLayout")
-	grid.CellPadding = UDim2.fromOffset(8, 0)
-	grid.CellSize = UDim2.new(1 / 3, -6, 1, 0)
+	grid.CellPadding = UDim2.fromOffset(10, 0)
+	grid.CellSize = UDim2.new(1 / 3, -7, 1, 0)
 	grid.SortOrder = Enum.SortOrder.LayoutOrder
 	grid.Parent = upFrame
 	local cards: { { frame: Frame, name: TextLabel, eff: TextLabel, state: TextLabel, button: TextButton } } =
@@ -247,26 +261,26 @@ function UpgradePanel.attach(p: Parts): Panel
 		local f = Style.card(upFrame)
 		f.Name = "Upgrade" .. n
 		f.LayoutOrder = n
-		local roman = Style.label(f, ROMAN[n], 14, F.display, C.yellow)
-		roman.Position = UDim2.fromOffset(8, 5)
-		roman.Size = UDim2.fromOffset(30, 16)
+		local roman = Style.label(f, ROMAN[n], 19, F.display, C.yellow)
+		roman.Position = UDim2.fromOffset(10, 6)
+		roman.Size = UDim2.fromOffset(36, 22)
 		roman.TextXAlignment = Enum.TextXAlignment.Left
 		local state = Style.pill(f, "", C.yellow)
-		state.TextSize = 10
+		state.TextSize = 14
 		state.AnchorPoint = Vector2.new(1, 0)
-		state.Position = UDim2.new(1, -6, 0, 5)
-		state.Size = UDim2.fromOffset(0, 15)
-		local name = Style.label(f, string.upper(up.name), 15, F.display, C.text)
-		name.Position = UDim2.fromOffset(8, 22)
-		name.Size = UDim2.new(1, -14, 0, 18)
+		state.Position = UDim2.new(1, -8, 0, 7)
+		state.Size = UDim2.fromOffset(0, 20)
+		local name = Style.label(f, string.upper(up.name), 22, F.display, C.text)
+		name.Position = UDim2.fromOffset(10, 28)
+		name.Size = UDim2.new(1, -18, 0, 24)
 		name.TextXAlignment = Enum.TextXAlignment.Left
 		name.TextScaled = true
 		local nameCap = Instance.new("UITextSizeConstraint")
-		nameCap.MaxTextSize = 15
+		nameCap.MaxTextSize = 22
 		nameCap.Parent = name
-		local eff = Style.label(f, up.text, 11, F.heavy, C.money)
-		eff.Position = UDim2.fromOffset(8, 42)
-		eff.Size = UDim2.new(1, -14, 0, 40)
+		local eff = Style.label(f, up.text, 15, F.heavy, C.money)
+		eff.Position = UDim2.fromOffset(10, 54)
+		eff.Size = UDim2.new(1, -18, 1, -(54 + 58))
 		eff.TextWrapped = true
 		eff.TextXAlignment = Enum.TextXAlignment.Left
 		eff.TextYAlignment = Enum.TextYAlignment.Top
@@ -291,12 +305,12 @@ function UpgradePanel.attach(p: Parts): Panel
 	local decalFrame = Instance.new("Frame")
 	decalFrame.Name = "Decals"
 	decalFrame.BackgroundTransparency = 1
-	decalFrame.Position = RIGHT
-	decalFrame.Size = RIGHT_SIZE
+	decalFrame.Position = PAGE
+	decalFrame.Size = PAGE_SIZE
 	decalFrame.Parent = p.bottom
 	local dgrid = Instance.new("UIGridLayout")
-	dgrid.CellPadding = UDim2.fromOffset(8, 8)
-	dgrid.CellSize = UDim2.new(1 / 3, -6, 0.5, -4)
+	dgrid.CellPadding = UDim2.fromOffset(10, 10)
+	dgrid.CellSize = UDim2.new(1 / 3, -7, 0.5, -5)
 	dgrid.SortOrder = Enum.SortOrder.LayoutOrder
 	dgrid.Parent = decalFrame
 	local tiles: {
@@ -328,24 +342,24 @@ function UpgradePanel.attach(p: Parts): Panel
 		art.Name = "Art"
 		art.BorderSizePixel = 0
 		art.Position = UDim2.fromOffset(4, 4)
-		art.Size = UDim2.new(1, -8, 1, -22)
+		art.Size = UDim2.new(1, -8, 1, -30)
 		art.ScaleType = Enum.ScaleType.Stretch
 		-- the left-side band of the decal image (its top third)
 		art.ImageRectOffset = Vector2.new(0, 0)
 		art.ImageRectSize = Vector2.new(1024, 341)
 		art.Parent = b
 		local name = if d.id == "Signature" then Config.Signature[id] or d.name else d.name
-		local label = Style.label(b, string.upper(name), 11, F.heavy, C.text)
+		local label = Style.label(b, string.upper(name), 17, F.heavy, C.text)
 		label.AnchorPoint = Vector2.new(0, 1)
-		label.Position = UDim2.new(0, 4, 1, -2)
-		label.Size = UDim2.new(1, -8, 0, 15)
+		label.Position = UDim2.new(0, 4, 1, -3)
+		label.Size = UDim2.new(1, -8, 0, 22)
 		label.TextScaled = true
 		local cap = Instance.new("UITextSizeConstraint")
-		cap.MaxTextSize = 11
+		cap.MaxTextSize = 17
 		cap.Parent = label
-		local lock = Style.label(b, "", 12, F.display, C.yellow)
+		local lock = Style.label(b, "", 17, F.display, C.yellow)
 		lock.Position = UDim2.fromOffset(4, 4)
-		lock.Size = UDim2.new(1, -8, 1, -22)
+		lock.Size = UDim2.new(1, -8, 1, -30)
 		lock.ZIndex = 2
 		Style.outline(lock, 2)
 		b.Activated:Connect(function()
@@ -380,8 +394,8 @@ function UpgradePanel.attach(p: Parts): Panel
 	pips.Name = "Pips"
 	pips.BackgroundTransparency = 1
 	pips.AnchorPoint = Vector2.new(1, 0.5)
-	pips.Position = UDim2.new(1, -14, 0.5, 0)
-	pips.Size = UDim2.fromOffset(50, 16)
+	pips.Position = UDim2.new(1, -16, 0.5, 0)
+	pips.Size = UDim2.fromOffset(64, 22)
 	pips.Visible = false
 	pips.Parent = p.row
 	local pipList = Instance.new("UIListLayout")
@@ -393,7 +407,7 @@ function UpgradePanel.attach(p: Parts): Panel
 	for i = 1, Config.MaxLevel do
 		local pip = Instance.new("Frame")
 		pip.BorderSizePixel = 0
-		pip.Size = UDim2.fromOffset(7, 16)
+		pip.Size = UDim2.fromOffset(9, 22)
 		pip.LayoutOrder = i
 		pip.Parent = pips
 		table.insert(pipFrames, pip)
@@ -435,19 +449,21 @@ function UpgradePanel.attach(p: Parts): Panel
 			s.what.TextColor3 = if done then C.text else C.dim
 		end
 
-		-- tabs: only for a car you own; PAINT shows client/PaintPicker's swatches
+		-- tabs: only for a car you own (else STATS shows alone, from the top); PAINT shows client/PaintPicker's
+		-- swatches
 		tabs.Visible = mine
 		for name, b in tabButtons do
 			b.BackgroundColor3 = if name == tab then C.yellow else C.card
 			b.TextColor3 = if name == tab then C.ink else C.dim
 		end
-		upFrame.Visible = mine and tab == "Upgrades"
+		p.info.Visible = not mine or tab == "Stats"
+		p.info.Position = if mine then PAGE else UDim2.new()
+		p.info.Size = if mine then PAGE_SIZE else UDim2.fromScale(1, 1)
+		upPage.Visible = mine and tab == "Upgrades"
 		decalFrame.Visible = mine and tab == "Decals"
-		if mine then
-			-- the swatches move under the tabs, and show only on the PAINT tab
-			p.paintSpot.Position = RIGHT
-			p.paintSpot.Visible = tab == "Paint"
-		end
+		p.paintSpot.Position = PAGE
+		p.paintSpot.Size = PAGE_SIZE
+		p.paintSpot.Visible = mine and tab == "Paint"
 
 		-- upgrade cards
 		for n, c in cards do
