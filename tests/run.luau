@@ -3678,8 +3678,7 @@ local function checkHideUi()
 	local H = require("../src/shared/Rules/HideUi")
 	check("hide ui: the HUD hides", H.hides("ScreenGui", "Hud", Cfg))
 	check("hide ui: name tags hide", H.hides("BillboardGui", "NameTag", Cfg))
-	check("hide ui: its own button stays", not H.hides("ScreenGui", "HideUi", Cfg))
-	check("hide ui: the music button stays", not H.hides("ScreenGui", "Music", Cfg))
+	check("hide ui: the settings tile and panel stay", not H.hides("ScreenGui", "Settings", Cfg))
 	check("hide ui: phone drive buttons stay", not H.hides("ScreenGui", "HudTouch", Cfg))
 	check("hide ui: Roblox's touch stick stays", not H.hides("ScreenGui", "TouchGui", Cfg))
 	check("hide ui: shop signs stay", not H.hides("SurfaceGui", "Sign", Cfg))
@@ -3702,6 +3701,45 @@ local function checkHideUi()
 	check("hide ui: closed while hidden stays closed", not H.restore(d))
 end
 checkHideUi()
+
+-- passengers (Config/Riders, Rules/Riders): who may ride, old saves, seats for every vehicle
+local function checkRiders()
+	local Cfg = require("../src/shared/Config/Riders")
+	local RR = require("../src/shared/Rules/Riders")
+	local SettingsCfg = require("../src/shared/Config/Settings")
+	local V3 = require("@lune/roblox").Vector3
+	check("riders: old saves get the default", RR.mode(nil, Cfg) == Cfg.Default)
+	check("riders: unknown mode gets the default", RR.mode("Strangers", Cfg) == Cfg.Default)
+	check("riders: a known mode is kept", RR.mode("Friends", Cfg) == "Friends")
+	check("riders: default is a mode", table.find(Cfg.Modes, Cfg.Default) ~= nil)
+	check("riders: everyone rides", RR.allowed("Everyone", false, false))
+	check("riders: friends only lets friends in", RR.allowed("Friends", false, true))
+	check("riders: friends only keeps others out", not RR.allowed("Friends", false, false))
+	check("riders: nobody keeps friends out", not RR.allowed("Nobody", false, true))
+	check("riders: never in your own car", not RR.allowed("Everyone", true, true))
+	check("riders: one word per mode", #SettingsCfg.RideWords == #Cfg.Modes)
+	for _, v in Vehicles.List do
+		local seats = Cfg.Seats[v.id]
+		check("riders: " .. v.id .. " has a rider seat", seats ~= nil and #seats > 0)
+		for i, at in seats or {} do
+			local d = math.sqrt(
+				(at[1] - v.seat[1]) ^ 2 + (at[2] - v.seat[2]) ^ 2 + (at[3] - v.seat[3]) ^ 2
+			)
+			check(("riders: %s seat %d clear of the driver"):format(v.id, i), d >= 1.5)
+		end
+	end
+	local seats = {
+		{ pos = V3.new(0, 0, 0), taken = true },
+		{ pos = V3.new(5, 0, 0), taken = false },
+		{ pos = V3.new(-2, 0, 0), taken = false },
+	}
+	check("riders: nearest free seat", RR.nearestFree(seats :: any, V3.new(0, 0, 0) :: any) == 3)
+	seats[2].taken, seats[3].taken = true, true
+	check("riders: no free seat", RR.nearestFree(seats :: any, V3.new(0, 0, 0) :: any) == nil)
+	check("riders: left seat steps out left", RR.exitSide(-1.4) == -1)
+	check("riders: middle seat steps out right", RR.exitSide(0) == 1)
+end
+checkRiders()
 
 -- every lettered board in the map has its drawn artwork (Config/Signs), so a new name never falls back to text
 local function checkSigns()

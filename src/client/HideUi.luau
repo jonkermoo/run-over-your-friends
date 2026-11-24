@@ -1,8 +1,8 @@
 --!strict
--- The UI ON/OFF button left of the MUSIC button (Config/HideUi, Rules/HideUi): pressed (or the U key), it
+-- SHOW UI in the Settings panel (client/Settings, Config/HideUi, Rules/HideUi): switched off (or the U key), it
 -- hides every screen of ours (HUD, cash box, menu strip, event card, goals, pointers, callouts, pop-ups),
--- our name tags and world labels, and Roblox's chat, player list and backpack. It stays up itself, with the
--- MUSIC button and the phone driving buttons. Pressed again, everything goes back to what the game wants
+-- our name tags and world labels, and Roblox's chat, player list and backpack. The SETTINGS tile and its
+-- panel stay up, with the phone driving buttons. Pressed again, everything goes back to what the game wants
 -- shown by then: screens that opened meanwhile come up, screens that closed stay closed.
 
 local Players = game:GetService("Players")
@@ -12,47 +12,10 @@ local UserInputService = game:GetService("UserInputService")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.HideUi)
 local Rules = require(ReplicatedStorage.Shared.Rules.HideUi)
-local Style = require(script.Parent.Style)
 
 local HideUi = {}
 
-local C, F = Style.colors, Style.fonts
 local player = Players.LocalPlayer
-
----------------------------------------------------------------- the button (the MUSIC button's twin)
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "HideUi"
-gui.ResetOnSpawn = false
-Style.fit(gui)
-
-local button = Instance.new("TextButton")
-button.Name = "HideUiButton"
-button.AutoButtonColor = false
-button.BackgroundColor3 = C.panel
-button.BorderSizePixel = 0
-button.Text = ""
-button.AnchorPoint = Vector2.new(1, 0)
--- left of the MUSIC button (client/Music: 54 wide, 10 left of the 196-wide cash box, 14 in)
-button.Position = UDim2.new(1, -(14 + 196 + 10 + 54 + Cfg.Gap), 0, 8)
-button.Size = UDim2.fromOffset(54, 54)
-button.Parent = gui
-Style.shadow(button)
-local word = Style.label(button, "UI", 11, F.heavy, C.yellow)
-word.Position = UDim2.fromOffset(0, 6)
-word.Size = UDim2.new(1, 0, 0, 12)
-local state = Style.label(button, "ON", 20, F.display, C.money)
-state.Position = UDim2.fromOffset(0, 20)
-state.Size = UDim2.new(1, 0, 0, 26)
-local slash = Instance.new("Frame") -- a red strike across while it's off
-slash.AnchorPoint = Vector2.new(0.5, 0.5)
-slash.Position = UDim2.fromScale(0.5, 0.5)
-slash.Size = UDim2.new(1.1, 0, 0, 4)
-slash.Rotation = -35
-slash.BackgroundColor3 = C.red
-slash.BorderSizePixel = 0
-slash.Visible = false
-slash.Parent = button
 
 ---------------------------------------------------------------- hiding
 
@@ -89,10 +52,16 @@ local function cover(d: Instance)
 	)
 end
 
+local listeners: { () -> () } = {}
 local function show()
-	state.Text = if hidden then "OFF" else "ON"
-	state.TextColor3 = if hidden then C.dim else C.money
-	slash.Visible = hidden
+	for _, f in listeners do
+		task.spawn(f)
+	end
+end
+
+-- called whenever the UI is hidden or shown
+function HideUi.changed(f: () -> ())
+	table.insert(listeners, f)
 end
 
 local function hideAll()
@@ -158,15 +127,12 @@ function HideUi.hidden(): boolean
 end
 
 function HideUi.start()
-	show()
-	Style.onTap(button, HideUi.toggle)
 	local key = (Enum.KeyCode :: any)[Cfg.Key] :: Enum.KeyCode
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if not processed and input.KeyCode == key then
 			HideUi.toggle()
 		end
 	end)
-	gui.Parent = player:WaitForChild("PlayerGui")
 end
 
 return HideUi

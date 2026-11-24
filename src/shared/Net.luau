@@ -28,6 +28,7 @@ Net.Messages = table.freeze({
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from its CLAIM pop-up (client/Guide)
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
+	SetRideMode = "SetRideMode", -- (mode: string): who may ride in my car (Config/Riders Modes), saved
 	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
 	OpenChest = "OpenChest", -- (set: "Daily" | "Weekly"): open one of your unopened challenge chests
 	-- (kind: "Open" | "View" | "Offer" | "State" | "Ready", a, b): client-only facts for analytics, each value
@@ -97,6 +98,7 @@ export type MessageName =
 	| "Boards"
 	| "Daily"
 	| "SetMusic"
+	| "SetRideMode"
 	| "Podium"
 	| "ServerGoal"
 	| "Track"

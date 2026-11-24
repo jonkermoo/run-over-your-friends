@@ -18,6 +18,7 @@ local CarDetailRules = require(ReplicatedStorage.Shared.Rules.CarDetail)
 local Cockpit = require(ReplicatedStorage.Shared.Config.Cockpit)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Look = require(ReplicatedStorage.Shared.Config.Look)
+local RidersConfig = require(ReplicatedStorage.Shared.Config.Riders)
 local Sheen = require(ReplicatedStorage.Shared.Rules.Sheen)
 local Tracks = require(ReplicatedStorage.Shared.Rules.Tracks)
 local UpgradeConfig = require(ReplicatedStorage.Shared.Config.Upgrades)
@@ -508,6 +509,28 @@ function VehicleBuilder.build(id: string, on: { number }?): Model
 	seat.Disabled = true
 	seat.Parent = model
 	weld("SeatWeld", chassis, seat)
+
+	-- passengers' seats (Config/Riders), the same thin seat; riders are sat in by VehicleService's RIDE prompt
+	for i, at in RidersConfig.Seats[id] or {} do
+		local rider = Instance.new("Seat")
+		rider.Name = "RiderSeat" .. i
+		local p = vec(at) * S
+		if model:FindFirstChild("Interior") then
+			rider.Size = Vector3.new(2, 0.2, 2)
+			rider.CFrame = CFrame.new(p + Vector3.new(0, 0.075, 0))
+		else
+			rider.Size = Vector3.new(2, 1, 2)
+			rider.CFrame = CFrame.new(p)
+		end
+		rider.Transparency = 1
+		rider.CanCollide = false
+		rider.CanTouch = true
+		rider.Massless = true
+		rider.Disabled = true -- no sitting by touch, as with the driver's seat
+		rider:SetAttribute("SeatX", at[1])
+		rider.Parent = model
+		weld("RiderWeld" .. i, chassis, rider)
+	end
 
 	local att = Instance.new("Attachment")
 	att.Name = "Centre"

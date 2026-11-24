@@ -10,6 +10,8 @@ local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local RiderRules = require(ReplicatedStorage.Shared.Rules.Riders)
+local RidersConfig = require(ReplicatedStorage.Shared.Config.Riders)
 
 -- every remote exists before any client asks for it
 for name in Net.Messages do
@@ -234,6 +236,20 @@ Net.remote("SetMusic").OnServerEvent:Connect(function(player, off)
 	local profile = Data.get(player)
 	if profile and profile.musicOff ~= off then
 		profile.musicOff = off
+		Data.changed(player)
+	end
+end)
+
+-- who may ride in this player's car (the Settings panel), saved; VehicleService watches the attribute
+Net.remote("SetRideMode").OnServerEvent:Connect(function(player, mode)
+	if typeof(mode) ~= "string" or not RateLimit.allow(player, "rideMode", 0.3) then
+		return
+	end
+	local profile = Data.get(player)
+	local m = RiderRules.mode(mode, RidersConfig)
+	if profile and m == mode and profile.rideMode ~= m then
+		profile.rideMode = m
+		player:SetAttribute("RideMode", m)
 		Data.changed(player)
 	end
 end)
