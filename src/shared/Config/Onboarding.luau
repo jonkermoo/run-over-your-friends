@@ -9,18 +9,33 @@ local Steps = table.freeze({
 	Goal = 6,
 	Buy = 7,
 	Event = 8,
+	Garage = 10, -- the garage tour (added 2026-11-24): car page, upgrades, paint, decals, the next car
 	Done = 99,
+})
+
+-- the first-join offer, saved per player as profile.offer (player attribute "TutorialOffer" while it waits for
+-- an answer, "TutorialTab" while the menu strip's TUTORIAL tab shows)
+local Offer = table.freeze({
+	New = 0, -- never asked
+	Accepted = 1, -- said yes (or was already part way through the tutorial before the offer existed)
+	DeclinedOnce = 2, -- said no once: asked once more on a later join, and the TUTORIAL tab shows
+	DeclinedTwice = 3, -- said no twice: only the TUTORIAL tab
+	Old = 4, -- finished the tutorial before the offer existed: never asked, no tab
 })
 
 return table.freeze({
 	Steps = Steps,
+	Offer = Offer,
+	-- the event step comes before the buy step since 2026-11-24: the finish bonus is paid as the lessons end, so
+	-- the last step is spending it on a car
 	Order = table.freeze({
 		Steps.Spawn,
 		Steps.Hits,
 		Steps.Smash,
+		Steps.Garage,
 		Steps.Goal,
-		Steps.Buy,
 		Steps.Event,
+		Steps.Buy,
 	}),
 	-- saved steps no longer in Order, and where they go: 3 meant "save for the next car", 4 was "take a ramp"
 	-- (removed 2026-11-20: a quarter of new players quit there)
@@ -35,8 +50,9 @@ return table.freeze({
 	StepTitles = table.freeze({
 		[Steps.Hits] = "HIT PEOPLE WITH YOUR CAR",
 		[Steps.Smash] = "SMASH A BUILDING",
+		[Steps.Garage] = "TUNE YOUR CAR",
 		[Steps.Goal] = "FINISH YOUR FIRST GOAL",
-		[Steps.Buy] = "BUY A NEW RIDE",
+		[Steps.Buy] = "SPEND YOUR BONUS",
 		[Steps.Event] = "JOIN AN EVENT",
 	}),
 	-- first step: the server puts a new player in the starter car on its own (ad players decide in seconds)
@@ -62,6 +78,12 @@ return table.freeze({
 		[Steps.Goal] = "FIRST GOAL CLAIMED!",
 		[Steps.Event] = "YOU JOINED AN EVENT!",
 	}),
+	-- paid once, the first time the tutorial reaches its last step (or its end) after a yes: enough with the
+	-- step rewards for the first real car (the Sedan, Config/Economy RookieUntil)
+	FinishBonus = 2500,
+	OfferDelay = 1, -- seconds after the data is ready before the offer shows, so the screen has settled
+	-- the garage tour's pages, in order (client/Guide; analytics TutorialTour field 01)
+	TourPages = table.freeze({ "Open", "Car", "Upgrades", "Paint", "Decals", "NextCar", "Done" }),
 	SpawnCrowd = 12, -- NPCs that always hang around the spawn plaza
 	HintAfter = 20, -- seconds stuck on a step before the hint pulses
 	SkipAfter = 10, -- seconds on a step before its SKIP button shows

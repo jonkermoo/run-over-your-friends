@@ -10,6 +10,7 @@ export type Config = {
 	SmashGoal: number,
 	EventWait: number,
 	CountFrom: number,
+	Offer: { [string]: number },
 }
 
 -- what the player has done this session
@@ -58,7 +59,66 @@ end
 
 function Rules.canSkip(step: number, config: Config): boolean
 	local S = config.Steps
-	return step == S.Smash or step == S.Goal or step == S.Buy or step == S.Event
+	return step == S.Smash or step == S.Goal or step == S.Buy or step == S.Event or step == S.Garage
+end
+
+-- has the tutorial got as far as `mark` (or finished)? Steps run in Order, not by number
+function Rules.reached(step: number, mark: number, config: Config): boolean
+	if step == config.Steps.Done then
+		return true
+	end
+	local i, m = table.find(config.Order, step), table.find(config.Order, mark)
+	return i ~= nil and m ~= nil and i >= m
+end
+
+-- the first-join offer: "First" for a new player who hasn't answered, "Again" on the join after one "No
+-- thanks", nil when it shouldn't show (answered, asked twice, bonus already paid, from before the offer)
+function Rules.offerWhere(state: number, step: number, bonusPaid: boolean, config: Config): string?
+	local O = config.Offer
+	if bonusPaid then
+		return nil
+	elseif state == O.New and step ~= config.Steps.Done then
+		return "First"
+	elseif state == O.DeclinedOnce and step == config.Steps.Done then
+		return "Again"
+	end
+	return nil
+end
+
+-- the saved answer after a "No thanks"
+function Rules.declined(state: number, config: Config): number
+	return if state == config.Offer.New
+		then config.Offer.DeclinedOnce
+		else config.Offer.DeclinedTwice
+end
+
+-- the menu strip's TUTORIAL tab: for a player who said no and hasn't done the tutorial since
+function Rules.tabShows(state: number, step: number, bonusPaid: boolean, config: Config): boolean
+	local O = config.Offer
+	return not bonusPaid
+		and step == config.Steps.Done
+		and (state == O.DeclinedOnce or state == O.DeclinedTwice)
+end
+
+-- the finish bonus: paid once, when a player who said yes lands on the last step or past it
+function Rules.bonusDue(state: number, landing: number, bonusPaid: boolean, config: Config): boolean
+	local last = config.Order[#config.Order]
+	return not bonusPaid
+		and state == config.Offer.Accepted
+		and (landing == last or landing == config.Steps.Done)
+end
+
+-- a save from before the offer existed: finished players are never asked, players part way through carry on
+function Rules.migrateOffer(saved: unknown, step: number, config: Config): number
+	local n = tonumber(saved)
+	if n then
+		for _, v in config.Offer do
+			if v == n then
+				return n
+			end
+		end
+	end
+	return if step == config.Steps.Done then config.Offer.Old else config.Offer.Accepted
 end
 
 -- the event step ends by itself once nothing is live or about to start and it has waited long enough

@@ -27,6 +27,10 @@ Net.Messages = table.freeze({
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from its CLAIM pop-up (client/Guide)
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
+	-- (action: "Shown" | "Start" | "Decline" | "Restart"): the first-join tutorial offer showed, was answered, or
+	-- the menu strip's TUTORIAL tab was pressed (server/Onboarding checks each against the saved answer)
+	TutorialOffer = "TutorialOffer",
+	TutorialTour = "TutorialTour", -- (page: string): the garage tour reached a page (Config/Onboarding TourPages)
 	SetMusic = "SetMusic", -- (off: boolean): the background music on or off, saved
 	SetRideMode = "SetRideMode", -- (mode: string): who may ride in my car (Config/Riders Modes), saved
 	StarterDealSeen = "StarterDealSeen", -- (): the Starter Pack card showed; starts its discount window once
@@ -91,6 +95,8 @@ export type MessageName =
 	| "ClaimDaily"
 	| "TutorialClaim"
 	| "TutorialSkip"
+	| "TutorialOffer"
+	| "TutorialTour"
 	| "Fling"
 	| "Popup"
 	| "Celebrate"

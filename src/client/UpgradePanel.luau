@@ -452,6 +452,7 @@ function UpgradePanel.attach(p: Parts): Panel
 		-- tabs: only for a car you own (else STATS shows alone, from the top); PAINT shows client/PaintPicker's
 		-- swatches
 		tabs.Visible = mine
+		tabs:SetAttribute("Tab", tab) -- the open tab, for client/Guide's garage tour
 		for name, b in tabButtons do
 			b.BackgroundColor3 = if name == tab then C.yellow else C.card
 			b.TextColor3 = if name == tab then C.ink else C.dim

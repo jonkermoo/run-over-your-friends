@@ -15,6 +15,7 @@ local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local Challenges = require(script.Parent.Challenges)
 local Pad = require(script.Parent.Pad)
@@ -453,7 +454,7 @@ function Goals.start()
 		local step = (player:GetAttribute("Tutorial") or 99) :: number
 		panel.Visible = open
 			and player:GetAttribute("DataReady") == true
-			and step >= Onboarding.Steps.Goal
+			and OnboardingRules.reached(step, Onboarding.Steps.Goal, Onboarding)
 			and next(state) ~= nil
 		local now = os.clock()
 		if now - last < 0.5 then

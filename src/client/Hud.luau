@@ -623,6 +623,14 @@ mapButton.Name = "MapButton"
 local inviteButton = tab("INVITE", 5)
 inviteButton.Name = "InviteButton"
 inviteButton.TextColor3 = C.pink
+-- after a "No thanks" to the tutorial offer: starts the tutorial again (client/TutorialOffer shows it and
+-- handles the press)
+do
+	local b = tab("TUTORIAL", 6)
+	b.Name = "TutorialButton"
+	b.TextColor3 = C.yellow
+	b.Visible = false
+end
 -- gamepad: D-pad right puts the selection on the tabs (client/Pad)
 Pad.strip(tabRow, Enum.KeyCode.DPadRight, function()
 	return garageButton
@@ -632,7 +640,11 @@ end)
 local function markTab(active: TextButton?)
 	for _, b in tabs do
 		b.BackgroundTransparency = if b == active then 0 else 1
-		b.TextColor3 = if b == active then C.ink elseif b == inviteButton then C.pink else C.text
+		b.TextColor3 = if b == active
+			then C.ink
+			elseif b == inviteButton then C.pink
+			elseif b.Name == "TutorialButton" then C.yellow
+			else C.text
 	end
 end
 
@@ -2487,9 +2499,11 @@ function Hud.start()
 	player:GetAttributeChangedSignal("Paints"):Connect(refreshCards)
 	player:GetAttributeChangedSignal("GroupClaimed"):Connect(refreshStore)
 	player:GetAttributeChangedSignal("Bought"):Connect(refreshStore)
+	local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 	local function tutorialStep()
 		local step = (player:GetAttribute("Tutorial") or 0) :: number
-		goalsButton.Visible = step >= Onboarding.Steps.Goal
+		-- steps don't run in number order (Config/Onboarding Order)
+		goalsButton.Visible = OnboardingRules.reached(step, Onboarding.Steps.Goal, Onboarding)
 	end
 	player:GetAttributeChangedSignal("Tutorial"):Connect(tutorialStep)
 	tutorialStep()

@@ -147,3 +147,8 @@ TrialBar,{cash} / {price},,,{cash} / {price},{cash} / {price}
 TrialWarn,{n} SECONDS LEFT IN THE ROADSTER!,,,¡QUEDAN {n} SEGUNDOS EN EL ROADSTER!,FALTAM {n} SEGUNDOS NO ROADSTER!
 MapRidingIn,RIDING IN {name}'S,,,EN EL AUTO DE {name},NO CARRO DE {name}
 MapRiding,RIDING,,,DE PASAJERO,DE CARONA
+FinishBonusSub,+${n} finish bonus. Go buy your next car!,,,+${n} de bono final. ¡Ve a comprar tu próximo auto!,+${n} de bônus final. Vá comprar seu próximo carro!
+TourNextCar,NEXT CAR: {car},,,PRÓXIMO AUTO: {car},PRÓXIMO CARRO: {car}
+TourNextCarLine,You have {cash} of {price}. Finish the tutorial for +{bonus}!,,,Tienes {cash} de {price}. ¡Termina el tutorial y gana +{bonus}!,Você tem {cash} de {price}. Termine o tutorial e ganhe +{bonus}!
+OfferLater,No problem! Tap TUTORIAL any time for +${n},,,¡Sin problema! Toca TUTORIAL cuando quieras por +${n},Sem problema! Toque em TUTORIAL quando quiser por +${n}
+TourNextCarReady,"You have {cash}: you can buy it now! Finish the tutorial for +{bonus} more.",,,"Tienes {cash}: ¡ya puedes comprarlo! Termina el tutorial y gana +{bonus} más.","Você tem {cash}: já pode comprar! Termine o tutorial e ganhe mais +{bonus}."

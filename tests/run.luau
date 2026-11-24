@@ -2649,12 +2649,12 @@ do
 		local none = { pieces = 0, ownsExtra = false }
 		local spawnN, total = Rules.stepNumber(S.Spawn, Config)
 		local hitsN = Rules.stepNumber(S.Hits, Config)
-		local eventN = Rules.stepNumber(S.Event, Config)
+		local lastN = Rules.stepNumber(S.Buy, Config)
 		check(
 			"tutorial: steps count from the first one you play (the spawn shares 1), the last is the total",
 			spawnN == 1
 				and hitsN == 1
-				and eventN == total
+				and lastN == total
 				and total == #Config.Order - 1
 				and Rules.stepNumber(S.Done, Config) == nil
 		)
@@ -2711,9 +2711,13 @@ do
 			at = Rules.after(at, Config)
 		end
 		check(
-			"tutorial: the steps run spawn, hits, smash, goal, buy, event",
+			"tutorial: the steps run spawn, hits, smash, garage tour, goal, event, buy",
 			table.concat(order, ",")
-				== table.concat({ S.Spawn, S.Hits, S.Smash, S.Goal, S.Buy, S.Event }, ",")
+				== table.concat({ S.Spawn, S.Hits, S.Smash, S.Garage, S.Goal, S.Event, S.Buy }, ",")
+		)
+		check(
+			"tutorial: the garage tour has a new number, never an old or retired one",
+			S.Garage == 10 and Config.Retired[S.Garage] == nil
 		)
 		check("tutorial: no ramp step", (S :: any).Ramp == nil)
 		local landing, passed = Rules.landing(S.Smash, none, Config)
@@ -2721,23 +2725,90 @@ do
 		landing, passed =
 			Rules.landing(S.Smash, { pieces = Config.SmashGoal, ownsExtra = false }, Config)
 		check(
-			"tutorial: a smash done early passes that step, and stops at the goal",
-			landing == S.Goal and #passed == 1
+			"tutorial: a smash done early passes that step, and stops at the garage tour",
+			landing == S.Garage and #passed == 1
 		)
 		landing =
 			Rules.landing(S.Smash, { pieces = Config.SmashGoal - 1, ownsExtra = true }, Config)
 		check("tutorial: too few pieces don't pass the smash step", landing == S.Smash)
 		landing, passed = Rules.landing(S.Buy, { pieces = 0, ownsExtra = true }, Config)
 		check(
-			"tutorial: a car bought early passes the buy step",
-			landing == S.Event and #passed == 1
+			"tutorial: a car bought early passes the buy step, the last one",
+			landing == S.Done and #passed == 1
+		)
+		check(
+			"tutorial: reached follows the order, not the numbers",
+			Rules.reached(S.Garage, S.Smash, Config)
+				and not Rules.reached(S.Garage, S.Goal, Config)
+				and Rules.reached(S.Buy, S.Event, Config)
+				and not Rules.reached(S.Hits, S.Goal, Config)
+				and Rules.reached(S.Done, S.Goal, Config)
+				and not Rules.reached(0, S.Goal, Config)
+		)
+		local O = Config.Offer
+		check(
+			"tutorial offer: a new player is asked first, again on the join after one no, then never",
+			Rules.offerWhere(O.New, S.Spawn, false, Config) == "First"
+				and Rules.offerWhere(O.New, S.Hits, false, Config) == "First"
+				and Rules.offerWhere(O.DeclinedOnce, S.Done, false, Config) == "Again"
+				and Rules.offerWhere(O.DeclinedTwice, S.Done, false, Config) == nil
+				and Rules.offerWhere(O.Accepted, S.Smash, false, Config) == nil
+				and Rules.offerWhere(O.Old, S.Done, false, Config) == nil
+				and Rules.offerWhere(O.DeclinedOnce, S.Done, true, Config) == nil
+		)
+		check(
+			"tutorial offer: a no counts up once, then stays",
+			Rules.declined(O.New, Config) == O.DeclinedOnce
+				and Rules.declined(O.DeclinedOnce, Config) == O.DeclinedTwice
+				and Rules.declined(O.DeclinedTwice, Config) == O.DeclinedTwice
+		)
+		check(
+			"tutorial offer: the TUTORIAL tab shows only after a no, outside the tutorial, until the bonus",
+			Rules.tabShows(O.DeclinedOnce, S.Done, false, Config)
+				and Rules.tabShows(O.DeclinedTwice, S.Done, false, Config)
+				and not Rules.tabShows(O.DeclinedTwice, S.Hits, false, Config)
+				and not Rules.tabShows(O.DeclinedOnce, S.Done, true, Config)
+				and not Rules.tabShows(O.New, S.Done, false, Config)
+				and not Rules.tabShows(O.Old, S.Done, false, Config)
+		)
+		check(
+			"tutorial offer: the finish bonus is due once, after a yes, on the last step or the end",
+			Rules.bonusDue(O.Accepted, S.Buy, false, Config)
+				and Rules.bonusDue(O.Accepted, S.Done, false, Config)
+				and not Rules.bonusDue(O.Accepted, S.Event, false, Config)
+				and not Rules.bonusDue(O.Accepted, S.Buy, true, Config)
+				and not Rules.bonusDue(O.DeclinedOnce, S.Done, false, Config)
+				and not Rules.bonusDue(O.Old, S.Done, false, Config)
+		)
+		check(
+			"tutorial offer: old saves never get asked when finished, carry on when part way",
+			Rules.migrateOffer(nil, S.Done, Config) == O.Old
+				and Rules.migrateOffer(nil, S.Goal, Config) == O.Accepted
+				and Rules.migrateOffer(O.DeclinedOnce, S.Done, Config) == O.DeclinedOnce
+				and Rules.migrateOffer(O.New, S.Spawn, Config) == O.New
+				and Rules.migrateOffer(77, S.Done, Config) == O.Old
+		)
+		check(
+			"tutorial offer: the bonus with the step rewards buys the first real car",
+			(function()
+				local paid = Config.FinishBonus + Config.HitsReward
+				for _, r in Config.Rewards do
+					paid += r
+				end
+				return paid >= Vehicles.ById[Economy.RookieUntil].price
+			end)()
+		)
+		check(
+			"tutorial: the garage tour ends on its Done page",
+			Config.TourPages[#Config.TourPages] == "Done"
+				and table.find(Config.TourPages, "Upgrades") ~= nil
 		)
 		check(
 			"tutorial: the first goal is short and claims itself",
 			Config.GoalHits > 0 and Config.GoalHits <= 5 and Config.ClaimAutoAfter > 0
 		)
 		local skippable = true
-		for _, s in { S.Smash, S.Goal, S.Buy, S.Event } do
+		for _, s in { S.Smash, S.Garage, S.Goal, S.Buy, S.Event } do
 			skippable = skippable and Rules.canSkip(s, Config)
 		end
 		check(

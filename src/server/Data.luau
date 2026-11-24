@@ -23,6 +23,8 @@ export type Profile = {
 	groupClaimed: boolean,
 	roadsterPassPaid: boolean,
 	tutorial: number, -- Config/Onboarding Steps
+	offer: number, -- the first-join tutorial offer's answer (Config/Onboarding Offer)
+	bonusPaid: boolean, -- the tutorial's finish bonus was paid (Config/Onboarding FinishBonus)
 	quests: { [string]: any }, -- Hourly/Daily goal sets, checked by QuestService
 	stats: { [string]: any }, -- leaderboard numbers, checked by LeaderboardService
 	receipts: { [string]: boolean }, -- Robux purchase ids already granted
@@ -79,6 +81,8 @@ local function default(): Profile
 		groupClaimed = false,
 		roadsterPassPaid = false,
 		tutorial = 1,
+		offer = Onboarding.Offer.New,
+		bonusPaid = false,
 		quests = {},
 		stats = {},
 		receipts = {},
@@ -326,6 +330,9 @@ local function load(player: Player)
 				-- saves from before the tutorial skip it, and so do saves past its old end
 				profile.tutorial =
 					OnboardingRules.migrate(tonumber(decoded.tutorial) or 99, Onboarding)
+				profile.offer =
+					OnboardingRules.migrateOffer(decoded.offer, profile.tutorial, Onboarding)
+				profile.bonusPaid = decoded.bonusPaid == true
 				if typeof(decoded.quests) == "table" then
 					profile.quests = decoded.quests
 				end

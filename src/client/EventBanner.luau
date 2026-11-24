@@ -15,6 +15,7 @@ local EventRules = require(ReplicatedStorage.Shared.Rules.Events)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
+local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local Popups = require(script.Parent.Popups)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Style = require(script.Parent.Style)
@@ -315,7 +316,7 @@ local function update()
 	-- a player still early in the tutorial isn't interrupted by the big title (the card still shows it);
 	-- from the tutorial's event step on, it plays
 	local step = (Players.LocalPlayer:GetAttribute("Tutorial") or 0) :: number
-	local inTutorial = step < Onboarding.Steps.Event
+	local inTutorial = not OnboardingRules.reached(step, Onboarding.Steps.Event, Onboarding)
 	if phase == "live" and (lastPhase ~= "live" or lastKey ~= key) and not inTutorial then
 		bigTitle(event)
 	end

@@ -32,6 +32,15 @@ return table.freeze({
 	-- seconds on a tutorial step before it was skipped: 10-20, 20-40, 40-60, 60+ (SKIP shows after
 	-- Config/Onboarding SkipAfter = 10 s; 0-10 only if the server's step clock started late)
 	SkipBuckets = table.freeze({ 10, 20, 40, 60 }),
+	-- TutorialOffer field 01 stages and field 02 where it came from (docs/ANALYTICS.md)
+	TutorialOfferStages = table.freeze({
+		"Shown",
+		"Accepted",
+		"Declined",
+		"Restarted",
+		"RewardPaid",
+	}),
+	TutorialOfferWhere = table.freeze({ "First", "Again", "Button" }),
 	-- TutorialSkipped field 01 when the event step ended itself (Config/Onboarding EventWait)
 	EventTimeout = "EventTimeout",
 	-- cars owned (the starter included) on LeftOwning: 1, 2, 3, 4-5, 6-8, 9+

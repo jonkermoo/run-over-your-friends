@@ -38,7 +38,9 @@ Item names in the purchase events: `Product:<key>` (Robux products in `Config/Pr
 | `LeftWhile` | session minutes | `Driving` / `Menu` / `Idle` / `Wrecked` / `OnFoot` | minutes bucket | What players were doing when they quit. `Wrecked`: another player's car flung them in the last `WreckedSeconds`; `Menu`: a menu or card was open; `Idle`: no input for `IdleSeconds`; `Driving`: in their car's driver seat (tracked while they play, and still counted if they were stood up within `SeatGraceSeconds`, since leaving removes the car before the leave is logged). |
 | `LoadTime` | seconds | seconds bucket (`0-5`, `5-10`, `10-20`, `20-40`, `40+`) | `Ready` / `Timeout` | Load time per device: from client start to spawn-ready (the loading cover's ready check). `Timeout`: the cover gave up waiting. |
 | `FirstVehicleBought` | total minutes played | vehicle id | total minutes bucket (`0-10`, `10-30`, `30-60`, `60-120`, `120-240`, `240+`) | The money curve: how long until players afford their first car beyond the starter, and which car it is. Logged on the first car bought with game money; cars from the Roadster pass or the Starter Pack don't count as bought. Minutes count all sessions (saved as `playSeconds` in the profile from this release on). |
-| `TutorialSkipped` | 1 | step skipped (`Smash`, `Goal`, `Buy`, `Event`; the hits step has no SKIP; `EventTimeout` when the event step ended itself after `EventWait`) | seconds on the step (`10-20`, `20-40`, `40-60`, `60+`; `0-10` only if the server's step clock started late) | Tells skipping from quitting: every tutorial step left without finishing it (SKIP press, shown after `SkipAfter` = 10 s, or the event step's timeout). Skipped steps are not funnel steps. |
+| `TutorialSkipped` | 1 | step skipped (`Smash`, `Garage`, `Goal`, `Buy`, `Event`; the hits step has no SKIP; `EventTimeout` when the event step ended itself after `EventWait`) | seconds on the step (`10-20`, `20-40`, `40-60`, `60+`; `0-10` only if the server's step clock started late) | Tells skipping from quitting: every tutorial step left without finishing it (SKIP press, shown after `SkipAfter` = 10 s, or the event step's timeout). Skipped steps are not funnel steps. |
+| `TutorialOffer` | 1 (`RewardPaid`: the bonus paid) | `Shown` / `Accepted` / `Declined` / `Restarted` / `RewardPaid` | `First` (first join) / `Again` (the join after one "No thanks") / `Button` (the menu strip's TUTORIAL tab) | The first-join tutorial offer (added 2026-11-24): how many new players take the tutorial, how many come back to it, and how many finish it for the bonus (`FinishBonus` in `Config/Onboarding`). `Restarted` is a TUTORIAL tab press; `RewardPaid`'s field 02 is how that run started (`First` when it started in an earlier session). Players who were part way through the tutorial before this release are treated as having said yes; players who had finished it never see the offer. |
+| `TutorialTour` | 1 | page reached: `Open`, `Car`, `Upgrades`, `Paint`, `Decals`, `NextCar`, `Done` (`Config/Onboarding` TourPages) | | The garage tour step (after the smash step): where players drop out of it, once per page per session. `Done` ends the step. |
 | `LeftOwning` | session minutes | cars owned (`1`, `2`, `3`, `4-5`, `6-8`, `9+`, the starter included) | minutes bucket | Retention against car progress: logged with `PlayerLeft` and `LeftWhile` at every leave (`PlayerLeft` has no free field for it). |
 | `CarOwned` | total minutes played | vehicle id | cars owned now (a number, the starter included) | Car progression: every car that comes to a player (bought with cash, the Roadster pass, a Starter Pack car), with the play time it took. |
 | `NextCarProgress` | total minutes played | vehicle id (the cheapest car not owned yet, the Roadster included) | `25` / `50` / `75` / `100` (percent of its full price in cash) | How far players get toward their next car, and how long it takes. Each step once per car per player (saved as `progress` in the profile); a jump past several steps logs each one. |
@@ -63,6 +65,11 @@ funnel stays continuous and step 5's completion means nothing. The release of 20
 funnel for players who joined in between is mixed up. The same release made the goal step a short goal of its
 own (a few hits, then a CLAIM pop-up that claims itself after a few seconds) instead of opening the GOALS sheet.
 
+Since 2026-11-24 the tutorial runs spawn, hits, smash, a garage tour (no funnel step of its own: see
+`TutorialTour`), first goal, event, then the buy step last, after the finish bonus. So step 9 (Joined an event)
+now comes before step 8 (First vehicle bought) for new players; the numbers are unchanged. A player who says
+"No thanks" to the offer has the tutorial ended without step 10.
+
 Steps 5, 6 and 8 are logged by `src/server/Onboarding.luau` when the tutorial passes that step (also when it
 was done before the step came up); a step the player skips is not logged. Answers: where new players drop out
 of the first session.
@@ -82,6 +89,9 @@ vehicle id) and paints. Answers: where money comes from and goes to (Creator Hub
 - Empty-server churn: `PlayerLeft` broken down by field 01 (players) and field 02 (minutes).
 - Quit points: `LeftWhile` by field 01.
 - Phone load time: `LoadTime` by field 03 = `Phone`, field 01 buckets.
+- Tutorial offer: `TutorialOffer` Shown -> Accepted / Declined by field 02, then RewardPaid; compare
+  `LeftOwning` and `PlayerLeft` minutes for players before and after the release.
+- Garage tour drop-off: `TutorialTour` count per field 01, in page order.
 - Tutorial skips: skips per step = `TutorialSkipped` by field 01, compared with the funnel's drop at that step
   (a big drop with few skips means players quit there; with many skips they move on without finishing).
 - Roadster trial: `RoadsterTrial` Offered -> Started -> Ended (Time) -> Converted; day-1 return of trial players

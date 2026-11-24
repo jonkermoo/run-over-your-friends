@@ -1,8 +1,10 @@
 --!strict
--- First-session guidance: the job card under the menu strip (spawn, run over 3, smash, first goal, buy, event;
--- after that the pinned goals sit there, PinnedGoals), a big bouncing marker over the target with a light
--- column and an off-screen edge pointer, an arrow at the button to press, timed hints for stuck players, the
--- first goal's big CLAIM pop-up, one-time tips when you first drive a vehicle with a feature, and the confetti moment.
+-- First-session guidance: the job card under the menu strip (spawn, run over 3, smash, garage tour, first goal,
+-- event, buy; after that the pinned goals sit there, PinnedGoals), a big bouncing marker over the target with a
+-- light column and an off-screen edge pointer, an arrow at the button to press, timed hints for stuck players,
+-- the first goal's big CLAIM pop-up, the garage tour's box (one page at a time, Config/Onboarding TourPages),
+-- one-time tips when you first drive a vehicle with a feature, and the confetti moment. All of it waits while the
+-- tutorial offer is up (client/TutorialOffer).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -135,6 +137,74 @@ claimBack.ZIndex = 21
 claimFill.ZIndex = 22
 -- when it showed (0: not showing) and whether this one was pressed
 local claimState = { shownAt = 0, sent = false }
+
+---------------------------------------------------------------- the garage tour's box
+
+-- over the bottom left of the garage sheet (the car page's picture), one page at a time: a title, a line, the
+-- next car's money bar on the last page, and NEXT / DONE (gamepad Y)
+local TOUR_W, TOUR_H = 400, 168
+local tourBox = Style.panel(gui)
+tourBox.Name = "TourBox"
+tourBox.AnchorPoint = Vector2.new(0, 1)
+tourBox.Size = UDim2.fromOffset(TOUR_W, TOUR_H)
+tourBox.ZIndex = 20
+tourBox.Visible = false
+Style.stroke(tourBox, GOLD, 3, 0)
+local tourStripe = Instance.new("Frame")
+tourStripe.BorderSizePixel = 0
+tourStripe.BackgroundColor3 = GOLD
+tourStripe.Size = UDim2.new(0, 7, 1, 0)
+tourStripe.ZIndex = 21
+tourStripe.Parent = tourBox
+local tourTitle = label(tourBox, "", 26, BOLD, GOLD)
+tourTitle.Position = UDim2.fromOffset(20, 10)
+tourTitle.Size = UDim2.new(1, -36, 0, 30)
+tourTitle.TextXAlignment = Enum.TextXAlignment.Left
+tourTitle.TextScaled = true
+tourTitle.ZIndex = 21
+local tourTitleFit = Instance.new("UITextSizeConstraint")
+tourTitleFit.MaxTextSize = 26
+tourTitleFit.Parent = tourTitle
+local tourText = label(tourBox, "", 16, F.bold, WHITE)
+tourText.Position = UDim2.fromOffset(20, 44)
+tourText.Size = UDim2.new(1, -36, 0, 58)
+tourText.TextXAlignment = Enum.TextXAlignment.Left
+tourText.TextYAlignment = Enum.TextYAlignment.Top
+tourText.TextWrapped = true
+tourText.ZIndex = 21
+local tourBack, tourFill = Style.bar(tourBox, MONEY)
+tourBack.BackgroundColor3 = C.card
+tourBack.BackgroundTransparency = 0
+tourBack.Position = UDim2.fromOffset(20, 124)
+tourBack.Size = UDim2.new(1, -180, 0, 8)
+tourBack.ZIndex = 21
+tourFill.ZIndex = 22
+local tourNext = Style.button(tourBox, "NEXT", "green", 22)
+tourNext.Name = "TourNext"
+tourNext.AnchorPoint = Vector2.new(1, 1)
+tourNext.Position = UDim2.new(1, -14, 1, -14)
+tourNext.Size = UDim2.fromOffset(130, 48)
+tourNext.ZIndex = 21
+-- which page (Config/Onboarding TourPages), whose car page it shows, and which pages were reported
+local TOUR = Onboarding.TourPages
+local tour = { page = 1, car = Vehicles.Starter, sent = {} :: { [string]: boolean } }
+
+local function tourSend(page: string)
+	if not tour.sent[page] then
+		tour.sent[page] = true
+		Net.waitFor("TutorialTour"):FireServer(page)
+	end
+end
+
+-- what each tab page is for, said once the player is on it
+local TAB_LINES: { [string]: { string } } = {
+	Upgrades = {
+		"MASTERY AND UPGRADES",
+		"Every hit and smash in this car earns mastery. Each level opens an upgrade: faster, tougher, harder hits.",
+	},
+	Paint = { "PAINT", "Try a colour on, then buy it to keep it. Every car has its own paint job." },
+	Decals = { "DECALS", "Put a decal on the side. Mastery levels open more of them." },
+}
 
 ---------------------------------------------------------------- markers
 
@@ -647,8 +717,13 @@ local function update()
 	local dashH = if dash and dash.Visible then dash.Size.Y.Offset else 0
 	tipBox.Position = UDim2.new(0.5, 0, 1, -(18 + dashH + 14))
 	local stepValue = (player:GetAttribute("Tutorial") or Steps.Done) :: number
-	if not player:GetAttribute("DataReady") then
+	tourBox.Visible = false
+	if not player:GetAttribute("DataReady") or player:GetAttribute("TutorialOffer") ~= nil then
+		-- the offer card is up: nothing of the tutorial shows yet, and the step's banner waits for the answer
 		card.Visible = false
+		hintText.Visible = false
+		showTarget(nil, nil)
+		showPress(nil)
 		return
 	end
 	if stepValue ~= lastStep then
@@ -673,6 +748,14 @@ local function update()
 		end
 		stepStarted = os.clock()
 		stepEntered = stepStarted
+		-- the tour always opens on your own car: the one you're driving, else the starter
+		tour.page, tour.sent = 1, {}
+		local id = Drive.state.vehicleId
+		tour.car = if Drive.state.driving
+				and id ~= ""
+				and Vehicles.ById[id]
+			then id
+			else Vehicles.Starter
 	end
 	local count = (player:GetAttribute("TutorialCount") or 0) :: number
 	if count ~= lastCount then
@@ -771,6 +854,93 @@ local function update()
 		if not needCar() and stuck then
 			say(hintText, "Hit the walls at full speed")
 			hintText.Visible = true
+		end
+	elseif stepValue == Steps.Garage then
+		local page = TOUR[tour.page] or "Done"
+		say(goalText, "Look around your GARAGE")
+		barFill.Size = UDim2.fromScale(math.clamp((tour.page - 1) / (#TOUR - 1), 0, 1), 1)
+		tourSend(page)
+		local details = garage and garage:FindFirstChild("Details") :: GuiObject?
+		local onPage = garageOpen and details ~= nil and details.Visible
+		local carPage = details and details:FindFirstChild(tour.car) :: GuiObject?
+		local onCar = onPage and carPage ~= nil and carPage.Visible
+		local rows = garage and garage:FindFirstChild("Rows", true)
+		local back = garage and garage:FindFirstChild("Back", true) :: GuiObject?
+		-- a car's row in the list; from a car page, BACK first
+		local function toRow(id: string): GuiObject?
+			if onPage then
+				return back
+			end
+			local row = rows and rows:FindFirstChild(id) :: GuiObject?
+			if row and not scrolled then
+				scrolled = true
+				bringIntoView(row)
+			end
+			pressFromSide = row ~= nil
+			return row
+		end
+		local function boxSay(title: string | Loc.Msg, line: string | Loc.Msg, button: string)
+			tourBox.Visible = true
+			say(tourTitle, title)
+			say(tourText, line)
+			tourNext.AutoLocalize = false
+			tourNext.Text = Loc.resolve(button)
+			tourBack.Visible = false
+		end
+		if not garageOpen then
+			glowGarage = true
+			pressTarget = garageButton
+		elseif page == "Open" then
+			tour.page += 1
+		elseif page == "Car" then
+			if onCar then
+				tour.page += 1
+			else
+				pressTarget = toRow(tour.car)
+			end
+		elseif TAB_LINES[page] then
+			local tabs = onCar and carPage and carPage:FindFirstChild("Tabs", true)
+			if not tabs then
+				pressTarget = toRow(tour.car)
+			elseif tabs:GetAttribute("Tab") ~= page then
+				pressTarget = tabs:FindFirstChild(page) :: GuiObject?
+			else
+				local lines = TAB_LINES[page]
+				boxSay(lines[1], lines[2], "NEXT")
+				pressTarget = tourNext
+				pressFromSide = true
+			end
+		elseif page == "NextCar" then
+			local car, price = cheapestCar()
+			local cash = (player:GetAttribute("Money") or 0) :: number
+			if car then
+				pressTarget = toRow(car.id)
+				boxSay(
+					Loc.msg("TourNextCar", { car = string.upper(car.name) }),
+					Loc.msg(if cash >= price then "TourNextCarReady" else "TourNextCarLine", {
+						cash = Style.money(cash),
+						price = Style.money(price),
+						bonus = Style.money(Onboarding.FinishBonus),
+					}),
+					"DONE"
+				)
+				tourBack.Visible = true
+				tourFill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
+			else
+				boxSay("YOUR GARAGE", "Every car you buy waits for you here.", "DONE")
+				pressTarget = tourNext
+				pressFromSide = true
+			end
+		end
+		-- the box sits over the bottom left of the sheet, the car page's picture
+		if tourBox.Visible and garage then
+			local k = Style.scale()
+			local at, size = garage.AbsolutePosition / k, garage.AbsoluteSize / k
+			tourBox.Position = UDim2.fromOffset(at.X + 18, at.Y + size.Y - 18)
+		end
+		-- in the garage the job card would sit on the sheet's BACK button; the tour box carries the step
+		if garageOpen then
+			card.Visible = false
 		end
 	elseif stepValue == Steps.Goal then
 		local n = math.min(count, Onboarding.GoalHits)
@@ -954,6 +1124,18 @@ function Guide.start()
 		Net.waitFor("TutorialSkip"):FireServer(player:GetAttribute("Tutorial"))
 	end
 	Style.onTap(skip, skipStep)
+	-- the garage tour: NEXT goes to the next page, DONE (the last) ends the step
+	local function tourOn()
+		if not tourBox.Visible then
+			return
+		end
+		tour.page += 1
+		if TOUR[tour.page] == "Done" then
+			tourSend("Done")
+		end
+	end
+	Style.onTap(tourNext, tourOn)
+	Pad.press(tourNext, Enum.KeyCode.ButtonY, tourOn)
 	Pad.press(skip, Enum.KeyCode.DPadDown, skipStep) -- gamepad: D-pad down while SKIP shows
 	RunService.RenderStepped:Connect(update)
 end

@@ -396,6 +396,27 @@ function Analytics.tutorialSkipped(player: Player, stepName: string, seconds: nu
 	end)
 end
 
+-- the first-join tutorial offer: field 01 the stage (Shown / Accepted / Declined / Restarted / RewardPaid), field 02
+-- where (First: the first join, Again: the join after a "No thanks", Button: the menu strip's TUTORIAL tab);
+-- RewardPaid's value is the bonus paid
+function Analytics.tutorialOffer(player: Player, stage: string, where: string, value: number?)
+	safe(function()
+		if
+			Rules.oneOf(Cfg.TutorialOfferStages, stage)
+			and Rules.oneOf(Cfg.TutorialOfferWhere, where)
+		then
+			log(player, "TutorialOffer", value or 1, stage, where)
+		end
+	end)
+end
+
+-- the garage tour reached a page (Config/Onboarding TourPages), field 01 the page
+function Analytics.tutorialTour(player: Player, page: string)
+	safe(function()
+		log(player, "TutorialTour", 1, page)
+	end)
+end
+
 ---------------- car progression and the Roadster free trial
 
 -- a car came to the player (bought with cash, from a pass or a pack): field 01 the car, field 02 how many cars
