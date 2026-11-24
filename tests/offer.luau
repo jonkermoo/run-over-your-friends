@@ -32,7 +32,7 @@ return function(check: (string, boolean) -> ())
 	end
 	check(
 		"starter pack worth: cash + Muscle + Bulldozer",
-		Offer.worth(S, prices) == 275000 + 25000 + 100000
+		Offer.worth(S, prices) == 275000 + prices.Muscle + prices.Bulldozer
 	)
 	check(
 		"worth ignores unknown vehicles",

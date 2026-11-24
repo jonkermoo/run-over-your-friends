@@ -231,6 +231,12 @@ function NpcService.knock(
 		combo.last = now
 		comboCount = combo.count
 		local pay = Impact.npcPayout(energy, combo.count, Economy) * share
+		-- each car's own pay step (Config/Vehicles `pay`): better cars pay clearly more a hit
+		local car = VehicleService.of(player)
+		local carStats = car and VehicleService.stats(car)
+		if carStats then
+			pay *= carStats.pay
+		end
 		if (state.lastPaid[player] or -math.huge) + Economy.RepeatWindow > now then
 			pay *= 0.5
 		end

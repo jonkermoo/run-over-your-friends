@@ -16,6 +16,9 @@ return table.freeze({
 	RookieUntil = "Sedan", -- ...until they first hold this vehicle's price in cash or own one at least as dear
 	MinHitSpeed = 6.7, -- m/s (15 mph): slower bumps don't count
 	GaragePaySpeedShare = 0.5, -- the garage's "about $N a hit" is one hit at this share of the car's top speed
+	-- each car's own pay multiplier is Config/Vehicles `pay`. Along the cash cars in price order the garage's
+	-- pay a hit always rises (tests/economy), except these side cars that trade pay for something else
+	PaySideCars = table.freeze({ "Bulldozer" }), -- slow, but brings whole buildings down
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
 	-- VIP pass: hit cash times this. The money passes multiply: 2x Money alone 2, VIP alone 1.25, both 2.5

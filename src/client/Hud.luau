@@ -1140,8 +1140,13 @@ for _, stats in Vehicles.List do
 	statBar(info, 92, "ACCEL", stats.launch / 15, C.blue)
 	statBar(info, 122, "HANDLING", stats.grip / 22, C.green)
 	statBar(info, 152, "WEIGHT", math.log10(stats.weight / 50) / math.log10(20000 / 50), C.pink)
-	local pay =
-		GarageRules.hitPay(stats.weight, stats.topSpeed, Economy.GaragePaySpeedShare, Economy)
+	local pay = GarageRules.hitPay(
+		stats.weight,
+		stats.topSpeed,
+		Economy.GaragePaySpeedShare,
+		Economy,
+		stats.pay
+	)
 	local payText = Style.label(info, "", 21, F.heavy, C.money)
 	Loc.set(payText, "AboutPerHit", { money = money(pay) })
 	payText.Position = UDim2.fromOffset(0, 188)

@@ -10,15 +10,17 @@ local Garage = {}
 
 local MPH = 0.44704 -- metres a second in one mph
 
--- about what one hit on a person pays (no combo, no boosts), at `share` of the car's top speed, to the dollar
+-- about what one hit on a person pays (no combo, no boosts), at `share` of the car's top speed, times the car's
+-- own pay multiplier (Config/Vehicles `pay`), to the dollar
 function Garage.hitPay(
 	weightKg: number,
 	topSpeedMph: number,
 	share: number,
-	economy: Impact.PayoutConfig
+	economy: Impact.PayoutConfig,
+	payScale: number
 ): number
 	local speed = topSpeedMph * share * MPH
-	local pay = Impact.npcPayout(Impact.energy(weightKg, speed), 1, economy)
+	local pay = Impact.npcPayout(Impact.energy(weightKg, speed), 1, economy) * payScale
 	return math.floor(pay + 0.5)
 end
 

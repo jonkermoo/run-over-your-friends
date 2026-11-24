@@ -52,20 +52,20 @@ Upgrade price = a share of the car's price, with a floor so starter cars aren't 
 | Car (price) | I | II | III | All three |
 |---|---|---|---|---|
 | Hatchback (free) | $300 | $750 | $1,500 | $2,550 |
-| Scooter ($200) | $300 | $750 | $1,500 | $2,550 |
-| Shopping Cart ($400) | $300 | $750 | $1,500 | $2,550 |
+| Scooter ($500) | $300 | $750 | $1,500 | $2,550 |
+| Shopping Cart ($1,000) | $300 | $750 | $1,500 | $2,550 |
 | Sedan ($3,000) | $300 | $750 | $1,500 | $2,550 |
 | Taxi ($6,000) | $600 | $1,200 | $1,800 | $3,600 |
-| Muscle Car ($25,000) | $2,500 | $5,000 | $7,500 | $15,000 |
-| Ice-Cream Truck ($50,000) | $5,000 | $10,000 | $15,000 | $30,000 |
-| Fire Truck ($70,000) | $7,000 | $14,000 | $21,000 | $42,000 |
-| Semi Truck ($80,000) | $8,000 | $16,000 | $24,000 | $48,000 |
+| Ice-Cream Truck ($12,000) | $1,200 | $2,400 | $3,600 | $7,200 |
+| Muscle Car ($23,000) | $2,300 | $4,600 | $6,900 | $13,800 |
+| Fire Truck ($40,000) | $4,000 | $8,000 | $12,000 | $24,000 |
+| Semi Truck ($70,000) | $7,000 | $14,000 | $21,000 | $42,000 |
 | Bulldozer ($100,000) | $10,000 | $20,000 | $30,000 | $60,000 |
 | Monster Truck ($120,000) | $12,000 | $24,000 | $36,000 | $72,000 |
-| Supercar ($150,000) | $15,000 | $30,000 | $45,000 | $90,000 |
+| Supercar ($400,000; priced as $200,000) | $20,000 | $40,000 | $60,000 | $120,000 |
 | Roadster ($1,000,000; priced as $200,000) | $20,000 | $40,000 | $60,000 | $120,000 |
 
-Everything on every car: about $400,000. Bought upgrades can be switched on and off in the garage (look and
+Everything on every car: about $473,000. Bought upgrades can be switched on and off in the garage (look and
 stats go together); buying is once, per car.
 
 ## 3. Upgrades per vehicle
