@@ -11,7 +11,13 @@ local function near(a: number, b: number): boolean
 end
 
 return function(check: (string, boolean) -> ())
-	check("city map: square picture", Cfg.Span > 0 and Cfg.Pixels > 0 and Cfg.Pixels <= 1024)
+	check(
+		"city map: square picture in whole tiles",
+		Cfg.Span > 0
+			and #Cfg.Tiles == Cfg.TileGrid * Cfg.TileGrid
+			and Cfg.Pixels / Cfg.TileGrid <= 1024
+	)
+	check("city map: zoom range", Cfg.MinZoom == 1 and Cfg.MaxZoom > 1 and Cfg.ZoomStep > 1)
 	check("city map: sends about once a second", Cfg.SendEvery >= 0.5 and Cfg.SendEvery <= 2)
 	check(
 		"city map: dots slide in under one update",
@@ -90,6 +96,18 @@ return function(check: (string, boolean) -> ())
 	local dots = { { x = 0, y = 0 }, { x = 20, y = 0 }, { x = 100, y = 100 } }
 	check("pick: closest dot", Rules.pick(dots, 14, 0, 30) == 2)
 	check("pick: nothing out of reach", Rules.pick(dots, 60, 50, 30) == nil)
+
+	-- zooming keeps the point under the cursor still, and the canvas always covers the window
+	local S = 400
+	local pan = Rules.zoomAbout(0, 100, 1, 2) -- zoom in about x = 100
+	check(
+		"zoom: point under the cursor stays",
+		near(pan, -100) and near((100 - pan) / (S * 2), 100 / S)
+	)
+	check("zoom: back out to where it was", near(Rules.zoomAbout(pan, 100, 2, 1), 0))
+	check("pan: can't leave a gap on the left", Rules.clampPan(30, 2, S) == 0)
+	check("pan: can't leave a gap on the right", Rules.clampPan(-900, 2, S) == -400)
+	check("pan: none at zoom 1", Rules.clampPan(-50, 1, S) == 0)
 
 	-- key places sit on the picture
 	local placesOk = #Cfg.Places >= 2

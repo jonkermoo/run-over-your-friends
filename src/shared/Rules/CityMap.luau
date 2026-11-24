@@ -1,6 +1,7 @@
 --!strict
 -- The city map's sums (Config/CityMap): world spots to places on the picture and back, which way a dot's
--- arrow points, the server's compact update packing, sliding dots between updates, and which dot a tap picks.
+-- arrow points, the server's compact update packing, sliding dots between updates, which dot a tap picks, and
+-- zooming and moving the picture.
 -- Pure Luau, no Roblox objects, so Lune tests it (tests/citymap).
 
 local CityMap = {}
@@ -105,6 +106,17 @@ function CityMap.pick(
 		end
 	end
 	return best
+end
+
+-- zooming from z to z2 while the point `at` (window px from the window's edge) stays put: the canvas's new
+-- offset along that axis (the canvas is z times the window's size, moved by `pan`)
+function CityMap.zoomAbout(pan: number, at: number, z: number, z2: number): number
+	return at - (at - pan) * z2 / z
+end
+
+-- the canvas's offset kept so it always covers the window (size px) at zoom z: between size - size * z and 0
+function CityMap.clampPan(pan: number, z: number, size: number): number
+	return math.clamp(pan, size - size * z, 0)
 end
 
 return CityMap

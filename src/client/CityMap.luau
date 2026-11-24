@@ -1,8 +1,9 @@
 --!strict
--- The full-screen city map: a top-down picture of the city (Config/CityMap.Image) with a dot per player. You are
--- a big pink arrow turned the way you face, friends are bright yellow dots with their names, everyone else is
--- a small faded dot, and the live contest's leader wears a crown. Tap or click a dot (gamepad: LB / RB) to see
--- who it is and what they drive. The stunt park, the stadium and the live event's spot are marked.
+-- The full-screen city map: a top-down picture of the city (Config/CityMap.Tiles) with a pin per player. You are
+-- a pink arrow turned the way you face, friends are yellow pins with their names, everyone else is a small faded
+-- white pin, and the live contest's leader wears a crown. Tap or click a pin (gamepad: LB / RB) to see who it is
+-- and what they drive. The stunt park, Stadium Row and the live event's spot are marked. Zoom with the mouse
+-- wheel, a pinch, the + / - buttons or gamepad Y / X; drag (or the right stick) to move round; ME centres on you.
 -- Opens from the MAP tab or M (and Config PadKey on a gamepad, if set); closes from its X, the same again, or B. Driving
 -- goes on behind it; it counts as a menu (Popups.addBusy), so the phone driving buttons hide while it's open.
 -- The server sends spots once a second only while it's open (MapOpen / MapDots, server/CityMapService); dots
@@ -70,22 +71,41 @@ pickHint.Position = UDim2.new(1, -170, 0, 29)
 local headLine = Style.dashes(sheet, C.yellow, false, 4)
 headLine.Position = UDim2.fromOffset(0, Cfg.Header - 2)
 
--- the picture, and the layers drawn on it (places, the event, dots, names), all in its 0..1 square
-local picture = Instance.new("ImageLabel")
+-- the window onto the map ("Picture"), and inside it the canvas: the whole picture in tiles with the layers
+-- drawn on it (places, the event, pins, names), all in its 0..1 square. Zooming sizes the canvas, moving shifts it.
+local picture = Instance.new("Frame")
 picture.Name = "Picture"
 picture.BackgroundColor3 = C.card
 picture.BorderSizePixel = 0
-picture.Image = if Cfg.Image ~= 0 then `rbxassetid://{Cfg.Image}` else ""
-picture.ScaleType = Enum.ScaleType.Stretch
 picture.ClipsDescendants = true
 picture.Parent = sheet
 Style.stroke(picture, C.ink, 3, 0)
+local canvas = Instance.new("Frame")
+canvas.Name = "Canvas"
+canvas.BackgroundTransparency = 1
+canvas.Size = UDim2.fromScale(1, 1)
+canvas.Parent = picture
+do
+	local g = Cfg.TileGrid
+	for i, id in Cfg.Tiles do
+		local col, row = (i - 1) % g, (i - 1) // g
+		local t = Instance.new("ImageLabel")
+		t.Name = `Tile{i}`
+		t.BackgroundTransparency = 1
+		t.Image = if id ~= 0 then `rbxassetid://{id}` else ""
+		t.ScaleType = Enum.ScaleType.Stretch
+		t.Position = UDim2.fromScale(col / g, row / g)
+		t.Size = UDim2.new(1 / g, 1, 1 / g, 1) -- one px over, so no seam shows between tiles
+		t.Parent = canvas
+	end
+end
+-- taps, clicks, drags and the wheel land here (over the canvas, under the zoom buttons)
 local tapArea = Instance.new("TextButton")
-tapArea.Name = "TapArea" -- not a gamepad stop (Pad.selectAll skips it): LB / RB pick dots there
+tapArea.Name = "TapArea" -- not a gamepad stop (Pad.selectAll skips it): LB / RB pick players there
 tapArea.BackgroundTransparency = 1
 tapArea.Text = ""
 tapArea.Size = UDim2.fromScale(1, 1)
-tapArea.ZIndex = 1
+tapArea.ZIndex = 10
 tapArea.Parent = picture
 
 local function layer(name: string, z: number): Frame
@@ -94,13 +114,42 @@ local function layer(name: string, z: number): Frame
 	f.BackgroundTransparency = 1
 	f.Size = UDim2.fromScale(1, 1)
 	f.ZIndex = z
-	f.Parent = picture
+	f.Parent = canvas
 	return f
 end
 local placesLayer = layer("Places", 2)
 local othersLayer = layer("Others", 3)
 local friendsLayer = layer("Friends", 4)
 local selfLayer = layer("You", 6)
+
+-- + / - and ME in the window's top-right corner
+local zoomBar = Instance.new("Frame")
+zoomBar.Name = "Zoom"
+zoomBar.BackgroundTransparency = 1
+zoomBar.AnchorPoint = Vector2.new(1, 0)
+zoomBar.Position = UDim2.new(1, -8, 0, 8)
+zoomBar.Size = UDim2.fromOffset(40, 3 * 40 + 2 * 8)
+zoomBar.ZIndex = 20
+zoomBar.Parent = picture
+local zoomList = Instance.new("UIListLayout")
+zoomList.Padding = UDim.new(0, 8)
+zoomList.SortOrder = Enum.SortOrder.LayoutOrder
+zoomList.Parent = zoomBar
+local function zoomButton(text: string, name: string, order: number, kind: string): TextButton
+	local b = Style.button(zoomBar, text, kind, if #text > 1 then 15 else 24)
+	b.Name = name
+	b.LayoutOrder = order
+	b.Size = UDim2.fromOffset(40, 40)
+	b.ZIndex = 20
+	return b
+end
+local zoomIn = zoomButton("+", "ZoomIn", 1, "gold")
+local zoomOut = zoomButton("-", "ZoomOut", 2, "gold")
+local meButton = zoomButton("ME", "ZoomMe", 3, "purple")
+local zoomHint = Pad.chip(picture, { Enum.KeyCode.ButtonY, Enum.KeyCode.ButtonX }, "zoom")
+zoomHint.AnchorPoint = Vector2.new(1, 1)
+zoomHint.Position = UDim2.new(1, -8, 1, -8)
+zoomHint.ZIndex = 20
 
 -- the side column: the picked player's card over a key to the dots
 local side = Instance.new("Frame")
@@ -166,22 +215,14 @@ local function legendRow(order: number, text: string, draw: (Frame) -> ())
 	l.TextXAlignment = Enum.TextXAlignment.Left
 end
 
--- a round dot, centred on its holder
-local function dot(parent: Instance, size: number, color: Color3, fade: number): Frame
-	local d = Instance.new("Frame")
-	d.Name = "Dot"
-	d.AnchorPoint = Vector2.new(0.5, 0.5)
-	d.Position = UDim2.fromScale(0.5, 0.5)
+-- a map pin (Config/CityMap.Pin) tinted `color`, its tip on the holder's spot
+local function pin(parent: Instance, size: number, color: Color3, fade: number): ImageLabel
+	local d = Style.image(parent, Cfg.Pin, color)
+	d.Name = "Pin"
+	d.AnchorPoint = Vector2.new(0.5, 1)
+	d.Position = UDim2.fromOffset(0, 0)
 	d.Size = UDim2.fromOffset(size, size)
-	d.BackgroundColor3 = color
-	d.BackgroundTransparency = fade
-	d.BorderSizePixel = 0
-	d.Parent = parent
-	local round = Instance.new("UICorner")
-	round.CornerRadius = UDim.new(0.5, 0)
-	round.Parent = d
-	local edge = Style.stroke(d, C.ink, 2, 0)
-	edge.Transparency = fade
+	d.ImageTransparency = fade
 	return d
 end
 
@@ -208,10 +249,10 @@ legendRow(1, Loc.text("BoardYou"), function(f)
 	arrow(f, 26)
 end)
 legendRow(2, "FRIEND", function(f)
-	dot(f, Cfg.FriendDot, C.yellow, 0)
+	pin(f, 26, C.yellow, 0).Position = UDim2.fromScale(0.5, 1)
 end)
 legendRow(3, "PLAYER", function(f)
-	dot(f, Cfg.OtherDot, C.text, Cfg.OtherFade)
+	pin(f, 20, C.text, Cfg.OtherFade).Position = UDim2.fromScale(0.5, 0.9)
 end)
 legendRow(4, "EVENT LEADER", function(f)
 	local c = crown(f, 26)
@@ -258,7 +299,7 @@ eventPin.AnchorPoint = Vector2.new(0.5, 0.5)
 eventPin.Size = UDim2.fromOffset(0, 0)
 eventPin.Visible = false
 eventPin.ZIndex = 5
-eventPin.Parent = picture
+eventPin.Parent = canvas
 do
 	local s = Style.image(eventPin, Icons.Sign, Color3.new(1, 1, 1))
 	s.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -271,10 +312,11 @@ end
 type Dot = {
 	id: number,
 	holder: Frame,
-	mark: GuiObject, -- the dot or the arrow
+	mark: GuiObject, -- the pin or your arrow
+	size: number, -- the mark's size when not picked
+	pinned: boolean, -- a pin (tip on the spot), not your arrow (centred)
 	name: TextLabel,
 	crown: ImageLabel,
-	ring: UIStroke?,
 	-- where it slides from and to, and when the last update came
 	fromX: number,
 	fromZ: number,
@@ -338,14 +380,20 @@ local function makeDot(id: number, x: number, z: number, h: number): Dot
 	holder.Size = UDim2.fromOffset(0, 0)
 	holder.Parent = if you then selfLayer elseif friend then friendsLayer else othersLayer
 	local mark: GuiObject
+	local size = if you then Cfg.SelfArrow elseif friend then Cfg.FriendPin else Cfg.OtherPin
 	if you then
-		mark = arrow(holder, Cfg.SelfArrow)
-	elseif friend then
-		mark = dot(holder, Cfg.FriendDot, C.yellow, 0)
+		mark = arrow(holder, size)
 	else
-		mark = dot(holder, Cfg.OtherDot, C.text, Cfg.OtherFade)
+		mark = pin(
+			holder,
+			size,
+			if friend then C.yellow else C.text,
+			if friend then 0 else Cfg.OtherFade
+		)
 	end
-	local size = mark.Size.X.Offset
+	-- a pin's name hangs under its tip and its crown sits on its head; your arrow is centred on your spot
+	local below = if you then size / 2 + 2 else 2
+	local top = if you then -size / 2 + 2 else -size + 2
 	local name = Style.label(
 		holder,
 		if p then p.DisplayName else "",
@@ -355,19 +403,20 @@ local function makeDot(id: number, x: number, z: number, h: number): Dot
 	)
 	Style.outline(name, 2)
 	name.AnchorPoint = Vector2.new(0.5, 0)
-	name.Position = UDim2.fromOffset(0, size / 2 + 2)
+	name.Position = UDim2.fromOffset(0, below)
 	name.Size = UDim2.fromOffset(200, Cfg.NameText + 4)
 	name.Visible = friend
 	local c = crown(holder, Cfg.Crown)
-	c.Position = UDim2.fromOffset(0, -size / 2 + 2)
+	c.Position = UDim2.fromOffset(0, top)
 	c.Visible = false
 	local d: Dot = {
 		id = id,
 		holder = holder,
 		mark = mark,
+		size = size,
+		pinned = not you,
 		name = name,
 		crown = c,
-		ring = nil,
 		fromX = x,
 		fromZ = z,
 		fromH = h,
@@ -454,34 +503,18 @@ end
 
 ---------------------------------------------------------------- the picked player's card
 
+-- the picked player's pin grows, shows full strength and shows their name (friends' names always show)
 local function setRing(id: number?)
 	for did, d in dots do
 		local want = did == id
-		if want and not d.ring then
-			local r = Instance.new("UIStroke")
-			r.Color = C.text
-			r.Thickness = 3
-			r.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			-- the arrow has no box edge to ring: the dot underneath does it for everyone else
-			if d.mark:IsA("Frame") then
-				r.Parent = d.mark
-				local edge = d.mark:FindFirstChildOfClass("UIStroke")
-				if edge and edge ~= r then
-					edge.Enabled = false
-				end
-				d.ring = r
-			else
-				r:Destroy()
-			end
-		elseif not want and d.ring then
-			d.ring:Destroy()
-			d.ring = nil
-			local edge = d.mark:FindFirstChildOfClass("UIStroke")
-			if edge then
-				edge.Enabled = true
-			end
+		if d.pinned then
+			local size = if want then d.size * Cfg.PickedGrow else d.size
+			d.mark.Size = UDim2.fromOffset(size, size)
+			local img = d.mark :: ImageLabel
+			img.ImageTransparency = if want or d.friend then 0 else Cfg.OtherFade
+			d.holder.ZIndex = if want then 2 else 1
+			d.crown.Position = UDim2.fromOffset(0, -size + 2)
 		end
-		-- a picked player's name shows even if they aren't a friend
 		d.name.Visible = d.friend or (want and did ~= player.UserId)
 	end
 end
@@ -518,6 +551,215 @@ local function pick(id: number?)
 	refreshCard()
 end
 
+---------------------------------------------------------------- zoom and move
+
+local zoom = 1
+local panX, panY = 0, 0 -- the canvas's offset in the window, layout px
+
+local function windowSize(): number
+	return picture.Size.X.Offset
+end
+
+local function applyView()
+	local w = windowSize()
+	panX = Rules.clampPan(panX, zoom, w)
+	panY = Rules.clampPan(panY, zoom, w)
+	canvas.Size = UDim2.fromOffset(w * zoom, w * zoom)
+	canvas.Position = UDim2.fromOffset(panX, panY)
+end
+
+-- zoom to z, keeping the window point (ax, ay) (layout px from its top left; the middle if not given) still
+local function zoomTo(z: number, ax: number?, ay: number?)
+	local w = windowSize()
+	z = math.clamp(z, Cfg.MinZoom, Cfg.MaxZoom)
+	panX = Rules.zoomAbout(panX, ax or w / 2, zoom, z)
+	panY = Rules.zoomAbout(panY, ay or w / 2, zoom, z)
+	zoom = z
+	applyView()
+end
+
+-- put a spot on the picture (u, v: 0..1) in the window's middle (as near as the edges allow)
+local function centreOn(u: number, v: number)
+	local w = windowSize()
+	panX = w / 2 - u * w * zoom
+	panY = w / 2 - v * w * zoom
+	applyView()
+end
+
+local function centreOnPlayer(id: number?)
+	local d = if id then dots[id] else nil
+	if d then
+		local u, v = Rules.toMap(d.x, d.z, Cfg)
+		centreOn(u, v)
+	end
+end
+
+-- a real-px point as layout px from the window's top left
+local function inWindow(pos: Vector2): (number, number)
+	local k = Style.scale()
+	local a = picture.AbsolutePosition
+	return (pos.X - a.X) / k, (pos.Y - a.Y) / k
+end
+
+-- the marker nearest a tap or click (real px), if one is close enough and the point is inside the window
+local function pickAt(pos: Vector2)
+	local a, sz = picture.AbsolutePosition, picture.AbsoluteSize
+	if pos.X < a.X or pos.Y < a.Y or pos.X > a.X + sz.X or pos.Y > a.Y + sz.Y then
+		return
+	end
+	local pts, ids = {}, {}
+	for id, d in dots do
+		local m = d.mark.AbsolutePosition + d.mark.AbsoluteSize / 2
+		table.insert(pts, { x = m.X, y = m.Y })
+		table.insert(ids, id)
+	end
+	local i = Rules.pick(pts, pos.X, pos.Y, Cfg.TapRadius * Style.scale())
+	pick(if i then ids[i] else nil)
+end
+
+local mouseDown = false
+local pressAt = Vector2.zero
+local lastMouse = Vector2.zero
+local moved = false
+local touches: { [InputObject]: Vector2 } = {}
+
+local function touchCount(): number
+	local n = 0
+	for _ in touches do
+		n += 1
+	end
+	return n
+end
+
+local function at2(input: InputObject): Vector2
+	return Vector2.new(input.Position.X, input.Position.Y)
+end
+
+tapArea.InputBegan:Connect(function(input)
+	local pos = at2(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		mouseDown, moved = true, false
+		pressAt, lastMouse = pos, pos
+	elseif input.UserInputType == Enum.UserInputType.Touch then
+		touches[input] = pos
+		if touchCount() == 1 then
+			pressAt, moved = pos, false
+		else
+			moved = true -- a pinch is never a tap
+		end
+	end
+end)
+
+-- the mouse wheel over the window zooms about the pointer
+tapArea.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseWheel then
+		local ax, ay = inWindow(at2(input))
+		zoomTo(zoom * Cfg.WheelStep ^ input.Position.Z, ax, ay)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if not isOpen then
+		return
+	end
+	local k = Style.scale()
+	local pos = at2(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement and mouseDown then
+		if (pos - pressAt).Magnitude > Cfg.DragStart * k then
+			moved = true
+		end
+		if moved then
+			local delta = (pos - lastMouse) / k
+			panX += delta.X
+			panY += delta.Y
+			applyView()
+		end
+		lastMouse = pos
+	elseif input.UserInputType == Enum.UserInputType.Touch and touches[input] then
+		local before = touches[input]
+		local other: Vector2? = nil
+		for t, p in touches do
+			if t ~= input then
+				other = p
+			end
+		end
+		touches[input] = pos
+		if not other then
+			if (pos - pressAt).Magnitude > Cfg.DragStart * k then
+				moved = true
+			end
+			if moved then
+				local delta = (pos - before) / k
+				panX += delta.X
+				panY += delta.Y
+				applyView()
+			end
+		else
+			-- two fingers: follow their middle, and zoom by how much further apart they are, about it
+			local d0, d1 = (before - other).Magnitude, (pos - other).Magnitude
+			local mid0, mid1 = (before + other) / 2, (pos + other) / 2
+			panX += (mid1.X - mid0.X) / k
+			panY += (mid1.Y - mid0.Y) / k
+			if d0 > 1 then
+				local ax, ay = inWindow(mid1)
+				zoomTo(zoom * d1 / d0, ax, ay)
+			else
+				applyView()
+			end
+		end
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 and mouseDown then
+		mouseDown = false
+		if isOpen and not moved then
+			pickAt(at2(input))
+		end
+	elseif input.UserInputType == Enum.UserInputType.Touch and touches[input] then
+		touches[input] = nil
+		if isOpen and not moved and touchCount() == 0 then
+			pickAt(at2(input))
+		end
+	end
+end)
+
+Style.onTap(zoomIn, function()
+	zoomTo(zoom * Cfg.ZoomStep)
+end)
+Style.onTap(zoomOut, function()
+	zoomTo(zoom / Cfg.ZoomStep)
+end)
+Style.onTap(meButton, function()
+	pick(player.UserId)
+	zoomTo(math.max(zoom, Cfg.MeZoom))
+	centreOnPlayer(player.UserId)
+end)
+
+-- gamepad: the right stick moves it, Y / X zoom (bound only while it's open, over the camera and the car's keys)
+local padPan = Vector2.zero
+local function bindPad()
+	ContextActionService:BindActionAtPriority("RoyfCityMapPan", function(_, _, input)
+		padPan = at2(input)
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.Thumbstick2)
+	ContextActionService:BindActionAtPriority("RoyfCityMapZoom", function(_, state, input)
+		if state == Enum.UserInputState.Begin then
+			zoomTo(
+				if input.KeyCode == Enum.KeyCode.ButtonY
+					then zoom * Cfg.ZoomStep
+					else zoom / Cfg.ZoomStep
+			)
+		end
+		return Enum.ContextActionResult.Sink
+	end, false, Enum.ContextActionPriority.High.Value, Enum.KeyCode.ButtonY, Enum.KeyCode.ButtonX)
+end
+local function unbindPad()
+	ContextActionService:UnbindAction("RoyfCityMapPan")
+	ContextActionService:UnbindAction("RoyfCityMapZoom")
+	padPan = Vector2.zero
+end
+
 -- the players in the order LB / RB steps through them: you, then friends, then everyone else, by name
 local function order(): { number }
 	local list = {}
@@ -544,20 +786,10 @@ local function step(dir: number)
 	local at = table.find(list, selectedId or -math.huge)
 	local i = if at then (at - 1 + dir) % #list + 1 elseif dir > 0 then 1 else #list
 	pick(list[i])
-end
-
-tapArea.Activated:Connect(function(input: InputObject)
-	local pos = input.Position
-	local k = Style.scale()
-	local pts, ids = {}, {}
-	for id, d in dots do
-		local a = d.holder.AbsolutePosition
-		table.insert(pts, { x = a.X, y = a.Y })
-		table.insert(ids, id)
+	if zoom > 1 then
+		centreOnPlayer(list[i])
 	end
-	local i = Rules.pick(pts, pos.X, pos.Y, Cfg.TapRadius * k)
-	pick(if i then ids[i] else nil)
-end)
+end
 
 ---------------------------------------------------------------- layout and drawing
 
@@ -573,6 +805,7 @@ local function layout()
 	local x0 = math.max(GAP, (w - used) / 2)
 	picture.Position = UDim2.fromOffset(x0, bodyTop)
 	picture.Size = UDim2.fromOffset(size, size)
+	applyView()
 	side.Position = UDim2.fromOffset(x0 + size + GAP, bodyTop)
 	side.Size = UDim2.fromOffset(SIDE_W, size)
 	legend.Position = UDim2.fromOffset(0, card.Size.Y.Offset + GAP)
@@ -584,8 +817,16 @@ end
 sheet:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 
 local lastCard = 0
+local lastDraw = os.clock()
 local function draw()
 	local now = os.clock()
+	local dt = math.min(now - lastDraw, 0.1)
+	lastDraw = now
+	if padPan.Magnitude > Cfg.PadDead then
+		panX -= padPan.X * Cfg.PadPan * dt
+		panY += padPan.Y * Cfg.PadPan * dt
+		applyView()
+	end
 	local sx, sz, sh = selfSpot()
 	if sx and sz and sh then
 		local me = dots[player.UserId] or makeDot(player.UserId, sx, sz, sh)
@@ -636,8 +877,10 @@ function CityMap.open()
 		CityMap.onOpen()
 	end
 	isOpen = true
+	zoom, panX, panY = 1, 0, 0
 	layout()
 	sheet.Visible = true
+	bindPad()
 	Net.remote("MapOpen"):FireServer(true)
 	drawing = RunService.RenderStepped:Connect(draw)
 	draw()
@@ -650,6 +893,9 @@ function CityMap.close()
 	end
 	isOpen = false
 	sheet.Visible = false
+	unbindPad()
+	mouseDown = false
+	table.clear(touches)
 	Net.remote("MapOpen"):FireServer(false)
 	if drawing then
 		drawing:Disconnect()

@@ -6,12 +6,17 @@
 export type Place = { key: string, name: string, x: number, z: number }
 
 return table.freeze({
-	Image = 103558712537964, -- the picture (Decal 119674023637024); 0 draws a plain dark square
+	-- the picture in TileGrid x TileGrid square tiles (row by row from the top left, image ids; 0 draws a plain dark
+	-- square), so it stays sharp zoomed in (Roblox images are at most 1024 px)
+	-- (Decals 93532832023487, 85092606596375, 131173764802988, 92427439764671)
+	Tiles = table.freeze({ 136864239624231, 104129370694010, 91126024038278, 139658215713133 }),
+	TileGrid = 2,
+	Pin = 123493636137749, -- (Decal 105196457864314) the player marker (tools/map/pin.py): a white map pin, tinted; its tip is the spot
 	-- world x, z under the picture's middle, and the studs it covers edge to edge both ways (it is square): the
 	-- beaches in the west to the far suburbs in the east (tools/map/scan.luau uses the same numbers)
 	Centre = table.freeze({ 1350, 50 }),
 	Span = 8400,
-	Pixels = 1024, -- the picture's size, both ways (tools/map)
+	Pixels = 2048, -- the whole picture's size, both ways (tools/map)
 
 	-- the server sends every player's spot to each client that has the map open, this often
 	SendEvery = 1,
@@ -27,15 +32,27 @@ return table.freeze({
 	Side = 14,
 	Header = 58, -- the title row over the picture
 	-- dots, layout px
-	SelfArrow = 34, -- you: a big arrow turned the way you face
-	FriendDot = 18,
-	OtherDot = 11,
-	OtherFade = 0.45, -- everyone who isn't a friend: this see-through
-	Crown = 24, -- over the live contest's leader
+	SelfArrow = 24, -- you: an arrow turned the way you face
+	FriendPin = 20, -- friends' pins (the square picture; the pin is a bit narrower)
+	OtherPin = 15, -- everyone else's
+	OtherFade = 0.35, -- everyone who isn't a friend: this see-through
+	PickedGrow = 1.35, -- the picked player's pin grows this much
+	Crown = 20, -- over the live contest's leader
 	NameText = 15, -- friends' names under their dots
-	TapRadius = 30, -- a tap or click this close to a dot picks it
+	TapRadius = 24, -- a tap or click this close to a marker picks it
 	PlaceText = 16,
-	EventPin = 30, -- the live event's spot (the giant)
+	EventPin = 26, -- the live event's spot (the giant)
+
+	-- zoom and move: mouse wheel, pinch, the + / - buttons (and gamepad Y / X) zoom, dragging (and the right stick)
+	-- moves it. Zoom is how many times the window the whole picture is.
+	MinZoom = 1,
+	MaxZoom = 5,
+	ZoomStep = 1.5, -- one press of + or -
+	WheelStep = 1.2, -- one notch of the mouse wheel
+	DragStart = 6, -- layout px a press must move before it's a drag, not a tap
+	PadPan = 700, -- layout px a second the right stick moves it, fully pushed
+	PadDead = 0.2, -- stick dead zone
+	MeZoom = 2.5, -- the ME button zooms in at least this far, centred on you
 
 	StudioFriends = true, -- in Studio, test players (user id <= 0) count as friends, so the friend look can be tried
 	Key = "M", -- PC key

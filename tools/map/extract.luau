@@ -7,7 +7,8 @@ local place, out = process.args[1], process.args[2]
 local game = roblox.deserializePlace(fs.readFile(place))
 local folder = game:GetService("ServerStorage"):FindFirstChild("MapCap")
 local rows = {}
-for i = 0, 1023 do
+local n = #folder:GetChildren()
+for i = 0, n - 1 do
 	rows[i + 1] = folder:FindFirstChild(string.format("%04d", i)).Value
 end
 fs.writeFile(out, table.concat(rows, "\n"))
