@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Crowd)
+local SpreadConfig = require(ReplicatedStorage.Shared.Config.CrowdSpread)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Interiors = require(ReplicatedStorage.Shared.Config.Interiors)
@@ -18,6 +19,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local Ragdoll = require(ReplicatedStorage.Shared.Ragdoll)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
 local Rules = require(ReplicatedStorage.Shared.Rules.Crowd)
+local Spread = require(ReplicatedStorage.Shared.Rules.Spread)
 local World = require(ReplicatedStorage.Shared.Config.World)
 local NpcLooks = require(script.Parent.NpcLooks)
 local Places = require(script.Parent.Places)
@@ -285,15 +287,21 @@ local function wander(p: Person)
 	startRoute(p)
 end
 
--- one of the nearest places of a kind
-local function nearPlace(kind: string, pos: Vector3): Place?
+-- one of the nearest places of a kind, no further than `range` (nil when there's none that close)
+local function nearPlace(kind: string, pos: Vector3, range: number): Place?
 	local list = placesOf[kind]
 	if not list or #list == 0 then
 		return nil
 	end
 	local best: { { place: Place, d: number } } = {}
 	for _, pl in list do
-		table.insert(best, { place = pl, d = (pl.door - pos).Magnitude })
+		local d = (pl.door - pos).Magnitude
+		if d <= range then
+			table.insert(best, { place = pl, d = d })
+		end
+	end
+	if #best == 0 then
+		return nil
 	end
 	table.sort(best, function(a, b)
 		return a.d < b.d
@@ -314,7 +322,19 @@ end
 
 local function decide(p: Person)
 	local home = p.home
-	local goal = Rules.nextGoal(p.role, p.at ~= nil and p.at == home, rng, Config)
+	local atHome = p.at ~= nil and p.at == home
+	local goal = Rules.nextGoal(p.role, atHome, rng, Config)
+	-- people who live or work somewhere go out only on foot along the sidewalks, and only a short walk
+	local outingPlace: Place? = nil
+	if home and atHome and Spread.isOuting(goal) then
+		goal = Spread.goal(goal, home.node ~= nil, SpreadConfig.OffNetworkOutings)
+		if goal ~= "stay" and goal ~= "wander" then
+			outingPlace = nearPlace(goal, p.pos, SpreadConfig.OutingRange)
+			if not outingPlace then
+				goal = "stay"
+			end
+		end
+	end
 	if goal == "stay" and p.at then
 		local spot = visitorSpot(p.at :: Place)
 		if spot or p.mode == "idle" then
@@ -346,7 +366,7 @@ local function decide(p: Person)
 	elseif goal == "wander" or goal == "stay" then
 		wander(p)
 	else
-		local place = nearPlace(goal, p.pos)
+		local place = outingPlace or nearPlace(goal, p.pos, math.huge)
 		if place then
 			goTo(p, place, visitorSpot(place), false)
 		else
@@ -502,6 +522,25 @@ function CrowdService.setup(placesList: { Place }, grid: Routes.Grid)
 		table.insert(kinds, pl.kind)
 	end
 	local roster = Rules.roster(kinds, Config, Onboarding.SpawnCrowd, rng)
+	-- no stretch of the map gets more than its share of residents (a big suburb would outnumber downtown)
+	local residents: { Spread.Resident } = {}
+	local residentAt: { number } = {}
+	for k, r in roster do
+		if r.role == "resident" and r.home then
+			local door = placesList[r.home].door
+			table.insert(
+				residents,
+				{ cell = Spread.cell(door.X, door.Z, SpreadConfig.AreaCell), home = r.home }
+			)
+			table.insert(residentAt, k)
+		end
+	end
+	local keep = Spread.thin(residents, SpreadConfig.AreaMaxResidents)
+	for k = #residentAt, 1, -1 do
+		if not keep[k] then
+			table.remove(roster, residentAt[k])
+		end
+	end
 	Rules.pickFriends(roster, Config.FriendEvery, rng)
 	for _, r in roster do
 		local p = newPerson(r.role, r.outfit, if r.home then placesList[r.home] else nil, r.friend)

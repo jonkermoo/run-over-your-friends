@@ -528,6 +528,7 @@ require("./localization")(check)
 require("./upgrades")(check)
 require("./cardetail")(check)
 require("./trial")(check)
+require("./spread")(check)
 require("./horizon")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
