@@ -38,6 +38,25 @@ function EventService.setGiantSpots(points: { Vector3 })
 	giantSpots = points
 end
 
+-- the live contest's leader (user id), if one is running and someone has scored (the city map's crown)
+function EventService.leader(): number?
+	local c = running
+	if not c then
+		return nil
+	end
+	local st = Contest.standings(c.scores)
+	return if st[1] then st[1].id else nil
+end
+
+-- where the live event is happening, if it has one spot (the giant, while it stands)
+function EventService.spot(): Vector3?
+	local g = giant
+	if g and g.Parent and not g:GetAttribute("Down") then
+		return g:GetPivot().Position
+	end
+	return nil
+end
+
 local function nearPlayers(npc: Model): number
 	local best = math.huge
 	for _, p in Players:GetPlayers() do

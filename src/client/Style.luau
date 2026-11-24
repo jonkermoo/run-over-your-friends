@@ -73,7 +73,7 @@ function Style.keepClear(): { { x: number, y: number, w: number, h: number } }
 	return out
 end
 
--- a sheet (Garage, Store or Goals) is open over the screen
+-- a sheet (Garage, Store, Goals or the city map) is open over the screen
 function Style.sheetOpen(): boolean
 	local player = game:GetService("Players").LocalPlayer
 	local pg = player and player:FindFirstChild("PlayerGui")
@@ -87,6 +87,8 @@ function Style.sheetOpen(): boolean
 			hud and hud:FindFirstChild("Garage"),
 			hud and hud:FindFirstChild("Store"),
 			goals and goals:FindFirstChild("GoalsSheet"),
+			pg:FindFirstChild("CityMap")
+				and (pg:FindFirstChild("CityMap") :: Instance):FindFirstChild("Sheet"),
 		}
 	do
 		if g and g:IsA("GuiObject") and g.Visible then

@@ -530,6 +530,7 @@ require("./cardetail")(check)
 require("./trial")(check)
 require("./spread")(check)
 require("./horizon")(check)
+require("./citymap")(check)
 
 -- events: first at 90 s, 120 s long, then 360 s quiet, 20 s warning
 local function ph(t: number, offset: number?)

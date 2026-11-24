@@ -36,7 +36,11 @@ Net.Messages = table.freeze({
 	-- (action: "Offered" | "Start"): the garage showed the Roadster's FREE TRIAL button, or it was pressed
 	-- (starts a trial, or brings the trial car back while one runs); server/TrialService checks everything
 	RoadsterTrial = "RoadsterTrial",
+	MapOpen = "MapOpen", -- (open: boolean): the city map opened or closed; the server sends MapDots only while it's open
 	-- server -> client
+	-- (spots: { number }, leader: number, eventX: number?, eventZ: number?): every player's spot packed by
+	-- Rules/CityMap.pack, the live contest's leader (user id, 0 = none) and the live event's spot (the giant)
+	MapDots = "MapDots",
 	TrialOver = "TrialOver", -- (): the Roadster trial ended on time; the end card shows (client/Trial)
 	FriendNames = "FriendNames", -- ({ [friendKey: string]: name }): names of this player's own friends in the crowd (FriendKey attribute)
 	Traffic = "Traffic", -- (snapshot: buffer): every traffic car, packed by TrafficService (Rules/Roads CarBytes)
@@ -105,6 +109,8 @@ export type MessageName =
 	| "ChestPrize"
 	| "RoadsterTrial"
 	| "TrialOver"
+	| "MapOpen"
+	| "MapDots"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

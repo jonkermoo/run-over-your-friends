@@ -77,6 +77,7 @@ local StuntService = require(script.StuntService)
 local DayNightService = require(script.DayNightService)
 local LookService = require(script.LookService)
 local TrialService = require(script.TrialService)
+local CityMapService = require(script.CityMapService)
 local TrialConfig = require(ReplicatedStorage.Shared.Config.Trial)
 local StreetLife = require(script.StreetLife)
 
@@ -143,6 +144,7 @@ ServerGoalService.start()
 StuntService.start()
 DayNightService.start()
 TrialService.start()
+CityMapService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)

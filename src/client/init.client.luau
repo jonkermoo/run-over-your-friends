@@ -15,6 +15,7 @@ local Features = require(script.Features)
 local Fx = require(script.Fx)
 local GiantFinder = require(script.GiantFinder)
 local Challenges = require(script.Challenges)
+local CityMap = require(script.CityMap)
 local Goals = require(script.Goals)
 local Guide = require(script.Guide)
 local HideUi = require(script.HideUi)
@@ -38,15 +39,32 @@ local Track = require(script.Track)
 local Trial = require(script.Trial)
 local Stunts = require(script.Stunts)
 
-Hud.onGoals = Goals.toggle
-Hud.onMenu = Goals.close
+-- one sheet at a time: the garage / store, the goals and the city map close each other
+Hud.onGoals = function()
+	CityMap.close()
+	Goals.toggle()
+end
+Hud.onMenu = function()
+	Goals.close()
+	CityMap.close()
+end
+Hud.onMap = CityMap.toggle
+Hud.mapOpen = CityMap.isOpen
+CityMap.onOpen = function()
+	Hud.closeSheets()
+	Goals.close()
+end
 Drive.start()
 Cockpit.start()
 Hud.start()
 Guide.start()
 Goals.start()
-Challenges.onOpenGoals = Goals.open
+Challenges.onOpenGoals = function()
+	CityMap.close()
+	Goals.open()
+end
 Challenges.start()
+CityMap.start()
 PinnedGoals.start()
 Fx.start()
 Crumble.start()

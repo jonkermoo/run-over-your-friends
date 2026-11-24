@@ -46,6 +46,8 @@ local playerGui = player:WaitForChild("PlayerGui") :: PlayerGui
 local Hud = {}
 Hud.onGoals = nil :: (() -> ())? -- set by the goals sheet; the GOALS tab calls it
 Hud.onMenu = nil :: (() -> ())? -- set by the goals sheet; called when the garage or store opens
+Hud.onMap = nil :: (() -> ())? -- set by the city map; the MAP tab calls it
+Hud.mapOpen = nil :: (() -> boolean)? -- set by the city map; the MAP tab is painted while it's open
 local C, F = Style.colors, Style.fonts
 local money = Style.money
 
@@ -616,7 +618,9 @@ local goalsButton = tab("GOALS", 3)
 goalsButton.Name = "GoalsButton"
 goalsButton.Visible = false
 -- invite friends (Config/Social): Roblox's invite prompt; a friend who joins from it pays you a bonus
-local inviteButton = tab("INVITE", 4)
+local mapButton = tab("MAP", 4) -- the full-screen city map (client/CityMap)
+mapButton.Name = "MapButton"
+local inviteButton = tab("INVITE", 5)
 inviteButton.Name = "InviteButton"
 inviteButton.TextColor3 = C.pink
 -- gamepad: D-pad right puts the selection on the tabs (client/Pad)
@@ -2146,6 +2150,16 @@ goalsButton.Activated:Connect(function()
 		Hud.onGoals()
 	end
 end)
+mapButton.Activated:Connect(function()
+	if Hud.onMap then
+		Hud.onMap()
+	end
+end)
+-- the garage and the store close for the city map
+function Hud.closeSheets()
+	garage.Visible = false
+	store.Visible = false
+end
 -- Roblox's own invite prompt, carrying who invited (SocialService pays the bonus when the friend joins)
 local inviting = false
 inviteButton.Activated:Connect(function()
@@ -2367,7 +2381,12 @@ RunService.RenderStepped:Connect(function()
 	local goalsGui = playerGui:FindFirstChild("Goals")
 	local sheet = goalsGui and goalsGui:FindFirstChild("GoalsSheet") :: GuiObject?
 	if not (garage.Visible or store.Visible) then
-		markTab(if sheet and sheet.Visible then goalsButton else nil)
+		markTab(
+			if sheet and sheet.Visible
+				then goalsButton
+				elseif Hud.mapOpen and Hud.mapOpen() then mapButton
+				else nil
+		)
 	end
 	dash.Visible = s.driving
 	local guide = playerGui:FindFirstChild("Guide")
