@@ -8,13 +8,12 @@ type Config = {
 	RefHeight: number,
 	MinScale: number,
 	SmallScreen: number,
-	TouchClearSmall: number,
-	TouchClearLarge: number,
 	ThumbZoneWidth: number,
 	ThumbZoneTop: number,
-	TouchPitch: number,
-	TouchKey: number,
+	JumpSmall: Jump,
+	JumpLarge: Jump,
 }
+type Jump = { size: number, right: number, bottom: number }
 
 -- the scale for a screen with this much GUI area: 1 when the layout fits, smaller when it doesn't
 function Layout.scale(width: number, height: number, cfg: Config): number
@@ -38,26 +37,28 @@ function Layout.touchBoost(scale: number, minScale: number): number
 	return math.max(scale, minScale) / scale
 end
 
--- how far above the bottom edge the touch buttons stay, in real pixels, to clear the jump button
-function Layout.touchClear(width: number, height: number, cfg: Config): number
-	return if math.min(width, height) <= cfg.SmallScreen
-		then cfg.TouchClearSmall
-		else cfg.TouchClearLarge
+-- Roblox's jump button on a screen this size when it can't be read from the screen: its centre and size,
+-- real pixels from the GUI's top-left (Roblox makes it smaller when the short side is SmallScreen or less)
+function Layout.jumpButton(width: number, height: number, cfg: Config): (number, number, number)
+	local j = if math.min(width, height) <= cfg.SmallScreen then cfg.JumpSmall else cfg.JumpLarge
+	return width - j.right - j.size / 2, height - j.bottom - j.size / 2, j.size
 end
 
--- should the touch buttons use the wide two-row rack? Yes when the three-row rack's top would come within
--- gap of the cash box's bottom. All real pixels from the GUI's top: guiHeight, clear (above the bottom
--- edge), cashBottom, gap; keyScale is the buttons' real size per layout px.
-function Layout.touchWide(
-	guiHeight: number,
-	clear: number,
-	keyScale: number,
-	cashBottom: number,
-	gap: number,
-	cfg: Config
-): boolean
-	local tall = (2 * cfg.TouchPitch + cfg.TouchKey) * keyScale
-	return guiHeight - clear - tall < cashBottom + gap
+-- the centre of a touch key in slot {left, up} of the fan around the jump button (centre jx, jy, size
+-- jumpSize), all real pixels: the first step clears the jump button's edge by gap, each further one is pitch
+function Layout.touchSpot(
+	slot: { number },
+	jx: number,
+	jy: number,
+	jumpSize: number,
+	key: number,
+	pitch: number,
+	gap: number
+): (number, number)
+	local function along(steps: number): number
+		return if steps <= 0 then 0 else jumpSize / 2 + gap + key / 2 + (steps - 1) * pitch
+	end
+	return jx - along(slot[1]), jy - along(slot[2])
 end
 
 -- is this point (real pixels) where the thumbstick takes touches? Buttons there would steal them.

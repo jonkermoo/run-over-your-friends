@@ -23,10 +23,12 @@ local PaintPicker = {}
 export type Picker = {
 	refresh: () -> (), -- after money, owned cars or paint change
 	action: () -> boolean, -- the card's action button was pressed: true when the picker handled it (a BUY)
+	reset: () -> (), -- back to the saved colour (a colour tried on comes off)
 }
 
 local SWATCH, GAP, PER_ROW = 22, 5, 8
-local INLINE_SWATCH = 30 -- the showroom's bigger swatches
+-- the garage page's swatches: INLINE_ROW across the PAINT tab's width, up to INLINE_SWATCH px square
+local INLINE_ROW, INLINE_SWATCH, INLINE_GAP = 9, 56, 7
 local SEND_AFTER = 0.5 -- seconds of no tapping before the chosen colour is sent
 
 local function isVip(): boolean
@@ -91,9 +93,17 @@ function PaintPicker.attach(
 	sheet.Size = if inline then UDim2.fromScale(1, 1) else UDim2.new(1, -28, 0, 104)
 	sheet.Visible = false
 	sheet.Parent = inline or card
-	local caption = Style.label(sheet, "", if inline then 15 else 13, F.heavy, C.text)
-	caption.Position = UDim2.fromOffset(0, 3 * (swatch + GAP) + 2)
-	caption.Size = UDim2.new(1, 0, 0, if inline then 20 else 16)
+	local rowsOf = math.ceil(#Config.List / (if inline then INLINE_ROW else PER_ROW))
+	local caption = Style.label(sheet, "", if inline then 20 else 13, F.heavy, C.text)
+	caption.Position = UDim2.fromOffset(
+		0,
+		rowsOf * (swatch + (if inline then INLINE_GAP else GAP)) + (if inline then 6 else 2)
+	)
+	caption.Size = UDim2.new(1, 0, 0, if inline then 26 else 16)
+	caption.TextScaled = inline ~= nil
+	local captionCap = Instance.new("UITextSizeConstraint")
+	captionCap.MaxTextSize = if inline then 20 else 13
+	captionCap.Parent = caption
 	caption.TextXAlignment = Enum.TextXAlignment.Left
 
 	local function show(paintId: string)
@@ -131,13 +141,26 @@ function PaintPicker.attach(
 			b.BorderSizePixel = 0
 			local rgb = PaintRules.colour(vehicleId, p.id) or { 128, 128, 128 }
 			b.BackgroundColor3 = Color3.fromRGB(rgb[1], rgb[2], rgb[3])
-			b.Position = UDim2.fromOffset(
-				((i - 1) % PER_ROW) * (swatch + GAP),
-				(i - 1) // PER_ROW * (swatch + GAP)
-			)
-			b.Size = UDim2.fromOffset(swatch, swatch)
+			if inline then
+				-- a ninth of the width each (less the gap), never taller than INLINE_SWATCH: kept square
+				b.Position = UDim2.new(
+					((i - 1) % INLINE_ROW) / INLINE_ROW,
+					0,
+					0,
+					(i - 1) // INLINE_ROW * (swatch + INLINE_GAP)
+				)
+				b.Size = UDim2.new(1 / INLINE_ROW, -INLINE_GAP, 0, swatch)
+				local square = Instance.new("UIAspectRatioConstraint")
+				square.Parent = b
+			else
+				b.Position = UDim2.fromOffset(
+					((i - 1) % PER_ROW) * (swatch + GAP),
+					(i - 1) // PER_ROW * (swatch + GAP)
+				)
+				b.Size = UDim2.fromOffset(swatch, swatch)
+			end
 			b.FontFace = F.display
-			b.TextSize = if inline then 17 else 13
+			b.TextSize = if inline then 22 else 13
 			b.TextColor3 = C.text
 			b.Text = ""
 			b.Parent = sheet
@@ -278,7 +301,14 @@ function PaintPicker.attach(
 		return true
 	end
 
-	return { refresh = refresh, action = onAction }
+	local function reset()
+		if selected ~= saved(vehicleId) then
+			selected = saved(vehicleId)
+			changed()
+		end
+	end
+
+	return { refresh = refresh, action = onAction, reset = reset }
 end
 
 return PaintPicker

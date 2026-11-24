@@ -892,13 +892,15 @@ local function update()
 					then detailList:FindFirstChild(id) :: GuiObject?
 					else nil
 				local mine = garageOpen and glowCard ~= nil and cardFrame ~= nil and id == glowCard
-				-- the garage shows one vehicle at a time: while another is shown, point at this one's row
-				local shown = cardFrame ~= nil and cardFrame.Visible
+				-- the garage shows one vehicle's page at a time: from the list, point at this one's row; from
+				-- another vehicle's page, at BACK
+				local onPage = detailList ~= nil and (detailList :: GuiObject).Visible
+				local shown = cardFrame ~= nil and cardFrame.Visible and onPage
 				local rowList = garage:FindFirstChild("Rows", true)
-				local row = if mine
-						and not shown
-						and rowList
-					then rowList:FindFirstChild(id :: string) :: GuiObject?
+				local row = if mine and not shown
+					then (if onPage
+						then garage:FindFirstChild("Back", true)
+						else rowList and rowList:FindFirstChild(id :: string)) :: GuiObject?
 					else nil
 				glow(c, mine and shown)
 				if mine and (stepValue == Steps.Buy or stepValue == Steps.Spawn) then

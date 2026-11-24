@@ -65,7 +65,8 @@ local function onScreen(g: GuiObject): boolean
 	return at ~= nil and at:IsA("ScreenGui") and at.Enabled
 end
 
--- the garage card's FREE TRIAL button, left of its action button (GET PASS); only on the trial car's card
+-- the garage card's FREE TRIAL button: the left half of its action button's bar (GET PASS takes the right);
+-- only on the trial car's card
 function Trial.button(vehicleId: string, action: TextButton)
 	if vehicleId ~= Cfg.Car then
 		return
@@ -73,9 +74,9 @@ function Trial.button(vehicleId: string, action: TextButton)
 	local fullSize, fullText = action.Size, action.TextSize
 	local b = Style.button(action.Parent :: Instance, "FREE TRIAL", "gold", 22)
 	b.Name = "Trial"
-	b.AnchorPoint = Vector2.new(1, 1)
-	b.Position = UDim2.new(0.75, 6, 1, 0)
-	b.Size = UDim2.new(0.25, -12, 0, fullSize.Y.Offset)
+	b.AnchorPoint = Vector2.new(0, 1)
+	b.Position = UDim2.fromScale(0, 1)
+	b.Size = UDim2.new(0.5, -6, 0, fullSize.Y.Offset)
 	b.Visible = false
 	local ready = false -- a trial can start (or resume) from this button
 	local offered = false
@@ -84,7 +85,7 @@ function Trial.button(vehicleId: string, action: TextButton)
 		local left = player:GetAttribute("TrialLeft")
 		local show = not owns() and step >= Onboarding.Steps.Done
 		b.Visible = show
-		action.Size = if show then UDim2.new(0.25, -12, 0, fullSize.Y.Offset) else fullSize
+		action.Size = if show then UDim2.new(0.5, -6, 0, fullSize.Y.Offset) else fullSize
 		action.TextSize = if show then 22 else fullText
 		if not show then
 			ready = false

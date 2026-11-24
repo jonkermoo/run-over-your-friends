@@ -3029,41 +3029,57 @@ do
 		math.abs(phone * Layout.touchBoost(phone, cfg.TouchMinScale) - cfg.TouchMinScale) < 1e-6
 	)
 	check("layout: no boost at full size", Layout.touchBoost(1, cfg.TouchMinScale) == 1)
-	check(
-		"layout: a phone clears the small jump button",
-		Layout.touchClear(848, 395, cfg) == cfg.TouchClearSmall
-	)
-	check(
-		"layout: a tablet clears the big jump button",
-		Layout.touchClear(1024, 768, cfg) == cfg.TouchClearLarge
-	)
 	check("layout: thumb zone covers lower left", Layout.inThumbZone(100, 200, 848, 395, cfg))
 	check("layout: top left is clear of the thumb", not Layout.inThumbZone(100, 100, 848, 395, cfg))
 	check(
 		"layout: right side is clear of the thumb",
 		not Layout.inThumbZone(600, 300, 848, 395, cfg)
 	)
-	-- the touch rack folds to two rows where its top row would reach the cash box (real GUI px under
-	-- Roblox's top bar, measured in Studio's emulator: iPhone 14 749x323; iPhone SE about 667x317)
-	local function wideAt(guiW: number, guiH: number): boolean
-		local s = Layout.scale(guiW, guiH, cfg)
-		local key = math.max(s, cfg.TouchMinScale)
-		local clear = Layout.touchClear(guiW, guiH, cfg)
-		return Layout.touchWide(guiH, clear, key, 62 * s, cfg.TouchCashGap * s, cfg)
-	end
-	check("layout: a short phone folds the touch rack", wideAt(667, 317))
-	check("layout: a normal phone folds the touch rack", wideAt(749, 323))
-	check("layout: a tablet keeps three rows", not wideAt(1024, 732))
-	local filled: { [string]: boolean } = {}
-	for name, slot in cfg.TouchSlotsWide do
-		local k = `{slot[1]},{slot[2]}`
-		check(`layout: wide rack slot {name} is free`, not filled[k])
-		filled[k] = true
-		check(`layout: wide rack has no top row ({name})`, slot[2] >= 0)
-	end
-	for name in cfg.TouchSlots do
-		check(`layout: {name} has a wide slot`, cfg.TouchSlotsWide[name] ~= nil)
-	end
+	-- the touch keys fan out from the jump button (real GUI px under Roblox's top bar, measured in Studio's
+	-- emulator: iPhone 14 749x323; iPhone SE about 667x317): every key stays on screen, off the jump button,
+	-- off the others, right of the speedometer (bottom middle, 300 layout px wide) and under the cash box
+	-- (in its own function: the test chunk is at Luau's 200 local registers)
+	local fanChecked = (function()
+		for _, screen in { { 667, 317 }, { 749, 323 }, { 858, 338 }, { 1024, 732 }, { 1366, 960 } } do
+			local w, h = screen[1], screen[2]
+			local s = Layout.scale(w, h, cfg)
+			local m = math.max(s, cfg.TouchMinScale)
+			local key, step, gap = cfg.TouchKey * m, cfg.TouchPitch * m, cfg.TouchGap * m
+			local jx, jy, js = Layout.jumpButton(w, h, cfg)
+			local spots: { { number } } = {}
+			for name, slot in cfg.TouchSlots do
+				local x, y = Layout.touchSpot(slot, jx, jy, js, key, step, gap)
+				local tag = `layout: {name} at {w}x{h}`
+				check(
+					`{tag} on screen`,
+					x - key / 2 >= 0 and y - key / 2 >= 0 and x + key / 2 <= w and y + key / 2 <= h
+				)
+				check(
+					`{tag} off the jump button`,
+					math.abs(x - jx) >= (key + js) / 2 or math.abs(y - jy) >= (key + js) / 2
+				)
+				check(
+					`{tag} right of the speedometer`,
+					x - key / 2 > w / 2 + 150 * s or y + key / 2 < h - 100 * s
+				)
+				check(`{tag} under the cash box`, y - key / 2 > 100 * s)
+				for _, o in spots do
+					check(
+						`{tag} off the other keys`,
+						math.abs(x - o[1]) >= key - 0.5 or math.abs(y - o[2]) >= key - 0.5
+					)
+				end
+				table.insert(spots, { x, y })
+			end
+		end
+		return true
+	end)()
+	check("layout: the fan was checked", fanChecked)
+	local jx, jy = Layout.jumpButton(749, 323, cfg)
+	local hx, hy = Layout.touchSpot(cfg.TouchSlots.Honk, jx, jy, 70, 63, 68, 4)
+	check("layout: HONK sits left of the jump button", hy == jy and hx < jx)
+	local vx, vy = Layout.touchSpot(cfg.TouchSlots.View, jx, jy, 70, 63, 68, 4)
+	check("layout: VIEW sits over the jump button", vx == jx and vy < jy)
 end
 do
 	local Rules = require("../src/shared/Rules/DriveHud")

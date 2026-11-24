@@ -13,45 +13,40 @@ return table.freeze({
 	SheetBottom = 18,
 	SheetMaxWidth = 1100, -- the garage and store sheet never grows past this on big screens
 	SheetMaxHeight = 760,
-	-- the garage: the vehicle list's width, and the chosen vehicle's block under its picture (blurb, stats,
-	-- paint or price, the button); the picture takes the rest of the sheet's height
-	GarageListWidth = 330,
-	GarageDetailBottom = 226, -- +30 for the UPGRADES / PAINT / DECALS tabs (client/UpgradePanel)
+	-- the garage, two pages: every vehicle in a list (GarageColumns across, rows GarageRowHeight tall), then
+	-- one vehicle's page: its picture (GaragePictureShare of the width) over its SPAWN / BUY button, and the
+	-- STATS / UPGRADES / PAINT / DECALS tabs beside it (client/UpgradePanel)
+	GarageColumns = 2,
+	GarageRowHeight = 70,
+	GarageHeader = 70, -- the title row: BACK, the name, < >, X (GarageHeaderButton square)
+	GarageHeaderButton = 60,
+	GaragePictureShare = 0.45,
+	GarageActionHeight = 70,
+	GarageTabsHeight = 60,
 	GoalsWidth = 420, -- the goals sheet, which hangs from the top left
 
 	-- the phone driving buttons stay at least this big, however much the rest shrinks
 	TouchMinScale = 0.85,
-	-- they sit above Roblox's jump button, which is smaller on small screens
 	SmallScreen = 500, -- short side at or under this counts as small (Roblox's own touch-button rule)
-	TouchClearSmall = 100,
-	TouchClearLarge = 196,
-	-- the buttons sit on a grid: TouchKey px keys every TouchPitch px. Slots are {column, row} from the
-	-- rack's top-left; row -1 is the top row (VIEW / HONK / STUCK?) over the main block.
+	-- they fan out from Roblox's jump button: slots are {left, up} steps from it (the jump button is {0, 0});
+	-- the first step clears the jump button's edge by TouchGap, each further step is TouchPitch. Layout px.
 	TouchPitch = 80,
 	TouchKey = 74,
+	TouchGap = 5,
 	TouchSlots = table.freeze({
-		View = { 0, -1 },
-		Honk = { 1, -1 },
-		Stuck = { 2, -1 },
-		Feature = { 1, 0 },
+		Honk = { 1, 0 },
 		Fly = { 2, 0 },
-		RollL = { 0, 1 },
-		RollR = { 1, 1 },
-		Boost = { 2, 1 },
+		View = { 0, 1 },
+		Feature = { 1, 1 },
+		Stuck = { 2, 1 },
+		RollR = { 0, 2 },
+		RollL = { 1, 2 },
+		Boost = { 2, 2 },
 	}),
-	-- on short screens, where that top row would reach the cash box (top right), it folds into the empty
-	-- slot and a column on the left: a wider rack two rows tall
-	TouchSlotsWide = table.freeze({
-		View = { 0, 0 },
-		Honk = { -1, 0 },
-		Stuck = { -1, 1 },
-		Feature = { 1, 0 },
-		Fly = { 2, 0 },
-		RollL = { 0, 1 },
-		RollR = { 1, 1 },
-		Boost = { 2, 1 },
-	}),
-	TouchCashGap = 8, -- layout px kept clear under the cash box
+	-- where Roblox puts its jump button when it can't be read from the screen (TouchGui): size and its gaps to
+	-- the right and bottom edges, real px, on small and large screens
+	JumpSmall = table.freeze({ size = 70, right = 25, bottom = 20 }),
+	JumpLarge = table.freeze({ size = 120, right = 50, bottom = 90 }),
 
 	-- Roblox's dynamic thumbstick takes touches on the left of the screen, from a third of the way down
 	ThumbZoneWidth = 0.4,
