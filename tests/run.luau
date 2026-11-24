@@ -528,6 +528,7 @@ require("./localization")(check)
 require("./upgrades")(check)
 require("./cardetail")(check)
 require("./trial")(check)
+require("./economy")(check)
 require("./spread")(check)
 require("./horizon")(check)
 require("./citymap")(check)
@@ -2061,14 +2062,14 @@ do
 	local V = require("../src/shared/Config/Vehicles")
 	local function pay(id: string): number
 		local v = V.ById[id]
-		return Garage.hitPay(v.weight, v.topSpeed, Eco.GaragePaySpeedShare, Eco)
+		return Garage.hitPay(v.weight, v.topSpeed, Eco.GaragePaySpeedShare, Eco, 1)
 	end
 	check(
-		"a heavier car shows more pay a hit",
+		"a heavier car hits harder (before its pay multiplier)",
 		pay("Monster") > pay("Hatchback") and pay("Semi") > pay("Sedan")
 	)
 	check(
-		"the joke rides show the base pay",
+		"the joke rides hit at the base pay (before their pay multiplier)",
 		pay("Cart") == Eco.NpcBase and pay("Scooter") == Eco.NpcBase
 	)
 	local function topples(id: string): boolean
