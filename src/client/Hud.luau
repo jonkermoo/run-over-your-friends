@@ -2360,6 +2360,7 @@ end, function() end)
 ---------------------------------------------------------------- per frame
 
 local wasDriving = false
+local touchControlsHidden = false
 RunService.RenderStepped:Connect(function()
 	local s = Drive.state
 	-- the GOALS tab is painted while the goals sheet is open
@@ -2381,7 +2382,14 @@ RunService.RenderStepped:Connect(function()
 	controls.Visible = keyboard and controlsOpen
 	keysChip.Visible = keyboard and not controlsOpen
 	-- hidden while the garage, store, goals or a card is open over the game
-	touch.Visible = s.driving and UserInputService.TouchEnabled and not Popups.busy()
+	local busy = Popups.busy()
+	touch.Visible = s.driving and UserInputService.TouchEnabled and not busy
+	-- Roblox's own thumbstick and jump arrow too: on a small phone the jump arrow sits over the garage
+	-- sheet's corner and takes its taps. Set only when it changes, so nothing else's choice is fought.
+	if UserInputService.TouchEnabled and busy ~= touchControlsHidden then
+		touchControlsHidden = busy
+		GuiService.TouchControlsEnabled = not busy
+	end
 	if touch.Visible then
 		placeTouch()
 	end
