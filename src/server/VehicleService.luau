@@ -9,6 +9,8 @@ local RunService = game:GetService("RunService")
 local Ground = require(ReplicatedStorage.Shared.Ground)
 local Net = require(ReplicatedStorage.Shared.Net)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
+local RiderRules = require(ReplicatedStorage.Shared.Rules.Riders)
+local RidersConfig = require(ReplicatedStorage.Shared.Config.Riders)
 local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Data = require(script.Parent.Data)
@@ -27,6 +29,9 @@ local cooldownUntil: { [Player]: number } = {}
 local spawnPoints: { Vector3 } = {}
 local spawnListeners: { (Player, string) -> () } = {}
 local trialCar: { [Player]: string } = {} -- a car the player may drive without owning it (server/TrialService)
+-- passengers: who each rider seat was given to (only they may sit there), and server friend checks
+local seatedFor: { [Seat]: Player } = {}
+local friendCache: { [string]: { yes: boolean, at: number } } = {}
 
 -- let the player spawn this car without owning it (a free trial), or nil to stop
 function VehicleService.setTrial(player: Player, id: string?)
@@ -122,10 +127,75 @@ local function setHidden(character: Model, hidden: boolean)
 	end
 end
 
-function VehicleService.despawn(player: Player)
+-- the rider seats of a vehicle, in seat order
+local function riderSeats(model: Model): { Seat }
+	local out = {}
+	for i = 1, 8 do
+		local s = model:FindFirstChild("RiderSeat" .. i)
+		if not (s and s:IsA("Seat")) then
+			break
+		end
+		table.insert(out, s)
+	end
+	return out
+end
+
+-- the players riding in a vehicle, in seat order
+function VehicleService.riders(model: Model): { Player }
+	local out = {}
+	for _, s in riderSeats(model) do
+		local who = s.Occupant and Players:GetPlayerFromCharacter(s.Occupant.Parent)
+		if who then
+			table.insert(out, who)
+		end
+	end
+	return out
+end
+
+-- stand a rider up and put them beside the vehicle, on their seat's side
+local function stepOut(model: Model, seat: Seat, humanoid: Humanoid)
+	local chassis = model.PrimaryPart
+	local ch = humanoid.Parent
+	local root = ch and ch:FindFirstChild("HumanoidRootPart") :: BasePart?
+	humanoid.Sit = false
+	if not (chassis and root and humanoid.Health > 0) then
+		return
+	end
+	local _, size = model:GetBoundingBox()
+	local x = seat:GetAttribute("SeatX")
+	local side = RiderRules.exitSide(if typeof(x) == "number" then x else 1)
+	local along = chassis.CFrame:PointToObjectSpace(seat.Position).Z
+	local exit = chassis.CFrame * CFrame.new(side * (size.X / 2 + RidersConfig.ExitGap), 2, along)
+	local look = chassis.CFrame.LookVector * Vector3.new(1, 0, 1)
+	-- the seat's weld outlives Sit = false for a moment when the server stands them up (a setting change):
+	-- moving them while it holds would drag the whole car along, so cut it. And the rider's own client owns
+	-- their character: a move made before it has seen them unseated is overwritten by where it still has
+	-- them (left standing in the seat spot), so wait for SeatPart to clear, then move them
+	for _, w in seat:GetChildren() do
+		if w:IsA("Weld") and w.Part1 and ch and w.Part1:IsDescendantOf(ch) then
+			w:Destroy()
+		end
+	end
+	task.spawn(function()
+		local t = os.clock()
+		while humanoid.SeatPart and os.clock() - t < 1 do
+			task.wait()
+		end
+		task.wait()
+		if root.Parent and humanoid.Health > 0 and not humanoid.SeatPart then
+			root.AssemblyLinearVelocity = Vector3.zero
+			root.CFrame = CFrame.lookAt(exit.Position, exit.Position + look)
+		end
+	end)
+end
+
+-- take the car away; its riders step out beside it, unless `keepRiders` (a swap or refit), when they're
+-- stood up and handed back to be seated in the next car
+function VehicleService.despawn(player: Player, keepRiders: boolean?): { Player }
 	local m = owned[player]
 	owned[player] = nil
 	player:SetAttribute("VehicleId", nil)
+	local kept = {}
 	if m then
 		local seat = m:FindFirstChild("DriverSeat") :: VehicleSeat?
 		local occupant = seat and seat.Occupant
@@ -133,8 +203,79 @@ function VehicleService.despawn(player: Player)
 		if occupant then
 			occupant.Sit = false
 		end
+		for _, s in riderSeats(m) do
+			local h = s.Occupant
+			local who = h and Players:GetPlayerFromCharacter(h.Parent)
+			if h and who then
+				if keepRiders then
+					table.insert(kept, who)
+					h.Sit = false
+				else
+					stepOut(m, s, h)
+				end
+			end
+			seatedFor[s] = nil
+		end
 		m:Destroy()
 	end
+	return kept
+end
+
+-- is `who` friends with `owner` (asked of Roblox, cached for a while)
+local function friends(who: Player, owner: Player): boolean
+	local key = who.UserId .. ":" .. owner.UserId
+	local c = friendCache[key]
+	if c and os.clock() - c.at < RidersConfig.FriendCache then
+		return c.yes
+	end
+	local ok, yes = pcall(function()
+		return who:IsFriendsWith(owner.UserId)
+	end)
+	local result = ok and yes == true
+	friendCache[key] = { yes = result, at = os.clock() }
+	return result
+end
+
+local function modeOf(owner: Player): string
+	return RiderRules.mode(owner:GetAttribute("RideMode"), RidersConfig)
+end
+
+local function mayRide(who: Player, owner: Player): boolean
+	local mode = modeOf(owner)
+	local friend = mode == "Friends" and friends(who, owner)
+	return RiderRules.allowed(mode, who == owner, friend)
+end
+
+-- seat a player in the vehicle's free rider seat nearest them; false if none is free or they may not ride
+local function seatRider(model: Model, owner: Player, who: Player): boolean
+	local ch = who.Character
+	local h = ch and ch:FindFirstChildOfClass("Humanoid")
+	local root = ch and ch:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not (h and root and h.Health > 0) or h.SeatPart or model:GetAttribute("Despawning") then
+		return false
+	end
+	if not mayRide(who, owner) then
+		return false
+	end
+	local seats = riderSeats(model)
+	local list = {}
+	for _, s in seats do
+		table.insert(list, { pos = s.Position, taken = s.Occupant ~= nil or seatedFor[s] ~= nil })
+	end
+	local i = RiderRules.nearestFree(list, root.Position)
+	if not i then
+		return false
+	end
+	local seat = seats[i]
+	seatedFor[seat] = who
+	seat:Sit(h)
+	task.delay(1, function()
+		-- the sit never took (they died or jumped first): free the seat again
+		if seatedFor[seat] == who and seat.Occupant ~= h then
+			seatedFor[seat] = nil
+		end
+	end)
+	return true
 end
 
 local function blocked(cf: CFrame, size: Vector3, ignore: { Instance }): boolean
@@ -191,7 +332,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		humanoid.Sit = false
 		task.wait()
 	end
-	VehicleService.despawn(player)
+	local riders = VehicleService.despawn(player, true)
 
 	local model =
 		VehicleBuilder.build(id, if trial then {} else UpgradeRules.onList(profile.upgrades[id]))
@@ -252,8 +393,10 @@ function VehicleService.spawn(player: Player, id: string): boolean
 	local turn = chassis:FindFirstChild("Turn") :: AngularVelocity
 	local drive = chassis:FindFirstChild("Drive") :: LinearVelocity
 
-	-- the owner gets back in with a prompt
+	-- the owner gets back in with a prompt (client/Riding shows it to the owner only, while Open)
 	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "DrivePrompt"
+	prompt:SetAttribute("Open", true)
 	prompt.ActionText = "Drive"
 	prompt.ObjectText = stats.name
 	prompt.KeyboardKeyCode = Enum.KeyCode.F
@@ -268,32 +411,131 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		end
 	end)
 
+	-- everyone else rides along (client/Riding shows it to the others, while Open)
+	local riderSeatList = riderSeats(model)
+	local ride: ProximityPrompt? = nil
+	if #riderSeatList > 0 then
+		local r = Instance.new("ProximityPrompt")
+		r.Name = "RidePrompt"
+		r.ActionText = "Ride"
+		r.ObjectText = player.DisplayName .. "'s " .. stats.name
+		r.KeyboardKeyCode = Enum.KeyCode.F
+		r.HoldDuration = 0
+		r.MaxActivationDistance = math.max(RidersConfig.PromptRange, size.Z * 0.6)
+		r.RequiresLineOfSight = false
+		r.Parent = chassis
+		r.Triggered:Connect(function(who)
+			if who == player or not RateLimit.allow(who, "ride", 0.5) then
+				return
+			end
+			if not mayRide(who, player) then
+				Net.remote("Popup"):FireClient(
+					who,
+					if modeOf(player) == "Friends"
+						then "Only " .. player.DisplayName .. "'s friends can ride"
+						else player.DisplayName .. " isn't taking riders",
+					"info"
+				)
+				return
+			end
+			seatRider(model, player, who)
+		end)
+		ride = r
+	end
+	local function updateRide()
+		local mode = modeOf(player)
+		model:SetAttribute("RideMode", mode)
+		if ride then
+			local free = false
+			for _, s in riderSeatList do
+				if s.Occupant == nil and seatedFor[s] == nil then
+					free = true
+				end
+			end
+			ride:SetAttribute("Open", free and mode ~= "Nobody")
+		end
+	end
+	updateRide()
+
 	-- only the owner sits: a seat holds whoever its SeatWeld holds, and Sit = false can't undo that weld
 	-- (seat:Sit even seats a crowd NPC whose Seated state is off), so any weld to someone else is cut.
 	-- Occupant changes before the weld is made, so this watches the welds themselves.
-	local function unseat(w: Instance)
-		if not w:IsA("Weld") then
-			return
-		end
-		task.defer(function()
-			local part = w.Part1
-			local mine = player.Character
-			if w.Parent == seat and part and not (mine and part:IsDescendantOf(mine)) then
-				w:Destroy()
-				-- the cut weld leaves SeatPart stuck on (Sit is already false), and Bodies never hits a humanoid
-				-- with a SeatPart: sitting it for a frame and standing it again clears it
-				local body = part.Parent
-				local h = body and body:FindFirstChildOfClass("Humanoid")
-				task.wait()
-				if h and h.Parent and h.SeatPart == seat then
-					h.Sit = true
+	-- the same holds for each rider seat and the player it was given to
+	local function guard(onSeat: BasePart, whose: () -> Player?): (Instance) -> ()
+		return function(w: Instance)
+			if not w:IsA("Weld") then
+				return
+			end
+			task.defer(function()
+				local part = w.Part1
+				local who = whose()
+				local mine = who and who.Character
+				if w.Parent == onSeat and part and not (mine and part:IsDescendantOf(mine)) then
+					w:Destroy()
+					-- the cut weld leaves SeatPart stuck on (Sit is already false), and Bodies never hits a
+					-- humanoid with a SeatPart: sitting it for a frame and standing it again clears it
+					local body = part.Parent
+					local h = body and body:FindFirstChildOfClass("Humanoid")
 					task.wait()
-					h.Sit = false
+					if h and h.Parent and h.SeatPart == onSeat then
+						h.Sit = true
+						task.wait()
+						h.Sit = false
+					end
+				end
+			end)
+		end
+	end
+	seat.ChildAdded:Connect(guard(seat, function()
+		return player
+	end))
+
+	-- riders: getting out (jumping) steps them out on their seat's side
+	for _, s in riderSeatList do
+		s.ChildAdded:Connect(guard(s, function()
+			return seatedFor[s]
+		end))
+		local rider: Humanoid? = nil
+		s:GetPropertyChangedSignal("Occupant"):Connect(function()
+			local now = s.Occupant
+			if now then
+				local who = Players:GetPlayerFromCharacter(now.Parent)
+				if who and who == seatedFor[s] then
+					rider = now
+					-- the driver's client keeps simulating the car with a rider welded on
+					if seat.Occupant then
+						pcall(function()
+							own(model, player)
+						end)
+					end
+				end
+			else
+				local left = rider
+				rider = nil
+				seatedFor[s] = nil
+				if left and left.Parent and not model:GetAttribute("Despawning") then
+					stepOut(model, s, left)
 				end
 			end
+			updateRide()
 		end)
 	end
-	seat.ChildAdded:Connect(unseat)
+	-- the owner changed who may ride: anyone who no longer may gets out
+	local modeConn = player:GetAttributeChangedSignal("RideMode"):Connect(function()
+		for _, s in riderSeatList do
+			local h = s.Occupant
+			local who = h and Players:GetPlayerFromCharacter(h.Parent)
+			if h and who and not mayRide(who, player) then
+				Net.remote("Popup")
+					:FireClient(who, player.DisplayName .. " changed who can ride", "info")
+				h.Sit = false
+			end
+		end
+		updateRide()
+	end)
+	model.Destroying:Connect(function()
+		modeConn:Disconnect()
+	end)
 
 	local driver: Humanoid? = nil
 	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
@@ -304,7 +546,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 				return -- only the owner drives: unseat cuts the weld and stands them up
 			end
 			driver = now
-			prompt.Enabled = false
+			prompt:SetAttribute("Open", false)
 			pcall(function()
 				own(model, player)
 			end)
@@ -314,7 +556,7 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		else
 			local left = driver
 			driver = nil
-			prompt.Enabled = true
+			prompt:SetAttribute("Open", true)
 			drive.Enabled = true
 			turn.Enabled = true
 			drive.VectorVelocity = Vector3.zero
@@ -407,11 +649,25 @@ function VehicleService.spawn(player: Player, id: string): boolean
 		end
 	end)
 
-	-- a moment after spawning, once any old seat has let go
+	-- a moment after spawning, once any old seat has let go; riders from the car it replaced get back in
+	-- (any without a seat here, or no longer allowed, are stood beside it)
 	task.delay(0.15, function()
 		if humanoid.Health > 0 and model.Parent and not humanoid.SeatPart then
 			humanoid.Jump = false
 			seat:Sit(humanoid)
+		end
+		for _, who in riders do
+			if who.Parent and model.Parent and not seatRider(model, player, who) then
+				local h = who.Character and who.Character:FindFirstChildOfClass("Humanoid")
+				local r = who.Character
+					and who.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if h and r and h.Health > 0 and not h.SeatPart then
+					local exit = chassis.CFrame
+						* CFrame.new(size.X / 2 + RidersConfig.ExitGap, 2, 0)
+					r.AssemblyLinearVelocity = Vector3.zero
+					r.CFrame = CFrame.new(exit.Position)
+				end
+			end
 		end
 	end)
 	return true

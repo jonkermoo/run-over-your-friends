@@ -39,7 +39,9 @@ return table.freeze({
 
 	StudioFriends = true, -- in Studio, test players (user id <= 0) count as friends, so the friend look can be tried
 	Key = "M", -- PC key
-	PadKey = "ButtonSelect", -- gamepad: Back / View
+	-- a gamepad key that opens and closes it ("" = none: the menu strip's MAP tab, D-pad right, still does). View is
+	-- the Settings panel's (Config/Settings PadKey), so the map has none of its own for now.
+	PadKey = "",
 
 	-- key places, marked on the map (measured from the built map in Studio)
 	Places = table.freeze({

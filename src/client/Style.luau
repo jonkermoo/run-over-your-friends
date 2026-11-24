@@ -73,7 +73,7 @@ function Style.keepClear(): { { x: number, y: number, w: number, h: number } }
 	return out
 end
 
--- a sheet (Garage, Store, Goals or the city map) is open over the screen
+-- a sheet (Garage, Store, Goals, Settings or the city map) is open over the screen
 function Style.sheetOpen(): boolean
 	local player = game:GetService("Players").LocalPlayer
 	local pg = player and player:FindFirstChild("PlayerGui")
@@ -82,11 +82,13 @@ function Style.sheetOpen(): boolean
 	end
 	local hud = pg:FindFirstChild("Hud")
 	local goals = pg:FindFirstChild("Goals")
+	local settings = pg:FindFirstChild("Settings")
 	for _, g in
 		{
 			hud and hud:FindFirstChild("Garage"),
 			hud and hud:FindFirstChild("Store"),
 			goals and goals:FindFirstChild("GoalsSheet"),
+			settings and settings:FindFirstChild("SettingsSheet"),
 			pg:FindFirstChild("CityMap")
 				and (pg:FindFirstChild("CityMap") :: Instance):FindFirstChild("Sheet"),
 		}

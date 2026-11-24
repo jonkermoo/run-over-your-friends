@@ -1,6 +1,6 @@
 --!strict
 -- Background music (Config/Audio Music): upbeat funk tracks shuffled at a low volume, dipping while a big
--- callout has the middle of the screen (Style.stage). On by default; the speaker button left of the cash box
+-- callout has the middle of the screen (Style.stage). On by default; the Settings panel (client/Settings)
 -- turns it off and on, and the choice is saved (SetMusic, player attribute MusicOff).
 
 local Players = game:GetService("Players")
@@ -15,7 +15,6 @@ local Style = require(script.Parent.Style)
 local Music = {}
 
 local M = Audio.Music
-local C, F = Style.colors, Style.fonts
 local player = Players.LocalPlayer
 
 local track = Instance.new("Sound")
@@ -26,44 +25,30 @@ track.Parent = SoundService
 local off = false
 local level = 0 -- 0..1 of M.Volume, eased toward where it should be
 
----------------------------------------------------------------- the speaker button
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "Music"
-gui.ResetOnSpawn = false
-Style.fit(gui)
-
-local button = Instance.new("TextButton")
-button.Name = "MusicButton"
-button.AutoButtonColor = false
-button.BackgroundColor3 = C.panel
-button.BorderSizePixel = 0
-button.Text = ""
-button.AnchorPoint = Vector2.new(1, 0)
-button.Position = UDim2.new(1, -(14 + 196 + 10), 0, 8) -- left of the cash box (client/Hud: 196 wide, 14 in)
-button.Size = UDim2.fromOffset(54, 54)
-button.Parent = gui
-Style.shadow(button)
-local word = Style.label(button, "MUSIC", 11, F.heavy, C.yellow)
-word.Position = UDim2.fromOffset(0, 6)
-word.Size = UDim2.new(1, 0, 0, 12)
-local state = Style.label(button, "ON", 20, F.display, C.money)
-state.Position = UDim2.fromOffset(0, 20)
-state.Size = UDim2.new(1, 0, 0, 26)
-local slash = Instance.new("Frame") -- a red strike across while it's off
-slash.AnchorPoint = Vector2.new(0.5, 0.5)
-slash.Position = UDim2.fromScale(0.5, 0.5)
-slash.Size = UDim2.new(1.1, 0, 0, 4)
-slash.Rotation = -35
-slash.BackgroundColor3 = C.red
-slash.BorderSizePixel = 0
-slash.Visible = false
-slash.Parent = button
-
+local listeners: { () -> () } = {}
 local function show()
-	state.Text = if off then "OFF" else "ON"
-	state.TextColor3 = if off then C.dim else C.money
-	slash.Visible = off
+	for _, f in listeners do
+		task.spawn(f)
+	end
+end
+
+function Music.isOff(): boolean
+	return off
+end
+
+-- turn the music off or on, and save it
+function Music.setOff(value: boolean)
+	if off == value then
+		return
+	end
+	off = value
+	show()
+	Net.waitFor("SetMusic"):FireServer(off)
+end
+
+-- called whenever it's turned off or on
+function Music.changed(f: () -> ())
+	table.insert(listeners, f)
 end
 
 ---------------------------------------------------------------- playing
@@ -97,12 +82,6 @@ function Music.start()
 		off = player:GetAttribute("MusicOff") == true
 		show()
 	end)
-	Style.onTap(button, function()
-		off = not off
-		show()
-		Net.waitFor("SetMusic"):FireServer(off)
-	end)
-	gui.Parent = player:WaitForChild("PlayerGui")
 	playNext()
 	-- ease the volume: off, ducked under a big callout, or full
 	RunService.Heartbeat:Connect(function(dt)

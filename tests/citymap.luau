@@ -3,6 +3,7 @@
 
 local Cfg = require("../src/shared/Config/CityMap")
 local Net = require("../src/shared/Net")
+local SettingsCfg = require("../src/shared/Config/Settings")
 local Rules = require("../src/shared/Rules/CityMap")
 
 local function near(a: number, b: number): boolean
@@ -19,6 +20,11 @@ return function(check: (string, boolean) -> ())
 	check(
 		"city map: remotes named in Net",
 		Net.Messages.MapOpen ~= nil and Net.Messages.MapDots ~= nil
+	)
+
+	check(
+		"city map: its gamepad key isn't the Settings panel's",
+		Cfg.PadKey == "" or Cfg.PadKey ~= SettingsCfg.PadKey
 	)
 
 	-- the picture's middle is the Centre, its corners Span / 2 away

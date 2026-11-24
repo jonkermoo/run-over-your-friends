@@ -3,7 +3,7 @@
 -- a big pink arrow turned the way you face, friends are bright yellow dots with their names, everyone else is
 -- a small faded dot, and the live contest's leader wears a crown. Tap or click a dot (gamepad: LB / RB) to see
 -- who it is and what they drive. The stunt park, the stadium and the live event's spot are marked.
--- Opens from the MAP tab, M, or Back / View on a gamepad; closes from its X, the same again, or B. Driving
+-- Opens from the MAP tab or M (and Config PadKey on a gamepad, if set); closes from its X, the same again, or B. Driving
 -- goes on behind it; it counts as a menu (Popups.addBusy), so the phone driving buttons hide while it's open.
 -- The server sends spots once a second only while it's open (MapOpen / MapDots, server/CityMapService); dots
 -- slide between updates. Your own arrow follows your character every frame.
@@ -687,13 +687,15 @@ function CityMap.start()
 			CityMap.toggle()
 		end
 	end)
-	-- Back / View: sunk, so Roblox doesn't also take it for its own menu selection
-	ContextActionService:BindActionAtPriority("RoyfCityMap", function(_, state)
-		if state == Enum.UserInputState.Begin then
-			CityMap.toggle()
-		end
-		return Enum.ContextActionResult.Sink
-	end, false, Enum.ContextActionPriority.High.Value, (Enum.KeyCode :: any)[Cfg.PadKey])
+	-- its own gamepad key, if it has one (sunk, so nothing else takes the same press)
+	if Cfg.PadKey ~= "" then
+		ContextActionService:BindActionAtPriority("RoyfCityMap", function(_, state)
+			if state == Enum.UserInputState.Begin then
+				CityMap.toggle()
+			end
+			return Enum.ContextActionResult.Sink
+		end, false, Enum.ContextActionPriority.High.Value, (Enum.KeyCode :: any)[Cfg.PadKey])
+	end
 	Players.PlayerRemoving:Connect(function(p)
 		destroyDot(p.UserId)
 		friends[p.UserId] = nil

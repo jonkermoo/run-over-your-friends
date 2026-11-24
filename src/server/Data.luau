@@ -12,6 +12,8 @@ local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local PaintRules = require(ReplicatedStorage.Shared.Rules.Paints)
+local RiderRules = require(ReplicatedStorage.Shared.Rules.Riders)
+local RidersConfig = require(ReplicatedStorage.Shared.Config.Riders)
 local UpgradeRules = require(ReplicatedStorage.Shared.Rules.Upgrades)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 
@@ -33,6 +35,7 @@ export type Profile = {
 	invited: { [string]: boolean }, -- user ids of friends this player was paid for inviting (Config/Social)
 	welcomed: boolean, -- got the welcome bonus for joining from an invite
 	musicOff: boolean, -- turned the background music off (client/Music)
+	rideMode: string, -- who may ride in this player's car (Config/Riders Modes); old saves have none = Default
 	starterDealEnds: number, -- os.time the Starter Pack discount ends; 0 = not started (Config/Products)
 	playSeconds: number, -- seconds played in all sessions, counted up to the last save (analytics)
 	mastery: { [string]: number }, -- vehicle id -> mastery points (Config/Upgrades)
@@ -86,6 +89,7 @@ local function default(): Profile
 		invited = {},
 		welcomed = false,
 		musicOff = false,
+		rideMode = RidersConfig.Default,
 		starterDealEnds = 0,
 		playSeconds = 0,
 		mastery = {},
@@ -131,6 +135,7 @@ local function publish(player: Player, profile: Profile)
 	player:SetAttribute("Owned", table.concat(owned, ","))
 	player:SetAttribute("GroupClaimed", profile.groupClaimed)
 	player:SetAttribute("MusicOff", profile.musicOff)
+	player:SetAttribute("RideMode", profile.rideMode)
 	player:SetAttribute("StarterDealEnds", profile.starterDealEnds)
 	player:SetAttribute("Tutorial", profile.tutorial)
 	local bought = {}
@@ -299,6 +304,7 @@ local function load(player: Player)
 				profile.rookieDone = decoded.rookieDone == true
 				profile.welcomed = decoded.welcomed == true
 				profile.musicOff = decoded.musicOff == true
+				profile.rideMode = RiderRules.mode(decoded.rideMode, RidersConfig)
 				profile.starterDealEnds = tonumber(decoded.starterDealEnds) or 0
 				profile.playSeconds = math.max(0, tonumber(decoded.playSeconds) or 0)
 				profile.trialAt = math.max(0, tonumber(decoded.trialAt) or 0)
