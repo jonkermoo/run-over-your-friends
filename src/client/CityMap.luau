@@ -4,7 +4,7 @@
 -- white pin, and the live contest's leader wears a crown. Tap or click a pin (gamepad: LB / RB) to see who it is
 -- and what they drive. The stunt park, Stadium Row and the live event's spot are marked. Zoom with the mouse
 -- wheel, a pinch, the + / - buttons or gamepad Y / X; drag (or the right stick) to move round; ME centres on you.
--- Opens from the MAP tab or M (and Config PadKey on a gamepad, if set); closes from its X, the same again, or B. Driving
+-- Opens from the MAP tab, M or a left-stick click (Config Key / PadKey); closes from its X, the same again, or B. Driving
 -- goes on behind it; it counts as a menu (Popups.addBusy), so the phone driving buttons hide while it's open.
 -- The server sends spots once a second only while it's open (MapOpen / MapDots, server/CityMapService); dots
 -- slide between updates. Your own arrow follows your character every frame.
@@ -330,6 +330,7 @@ type Dot = {
 	h: number,
 	friend: boolean,
 	inCar: boolean,
+	ride: number?, -- whose car they ride in, when it's someone else's
 }
 
 local dots: { [number]: Dot } = {}
@@ -434,17 +435,19 @@ local function makeDot(id: number, x: number, z: number, h: number): Dot
 	return d
 end
 
--- your own car while you're sitting in it
-local function selfCar(): Model?
+-- the car you're sitting in (yours, or someone else's as a rider: a model with an OwnerId) and its owner's id
+local function selfCar(): (Model?, number?)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-	local car = seat and seat:FindFirstAncestorOfClass("Model")
-	return if car and car:GetAttribute("OwnerId") then car else nil
-end
-
-local function selfInCar(): boolean
-	return selfCar() ~= nil
+	local at: Instance? = humanoid and humanoid.SeatPart and humanoid.SeatPart.Parent
+	while at and at ~= workspace do
+		local owner = at:GetAttribute("OwnerId")
+		if at:IsA("Model") and typeof(owner) == "number" then
+			return at, owner
+		end
+		at = at.Parent
+	end
+	return nil, nil
 end
 
 -- your own spot, straight from your character (or your car while you're in it)
@@ -482,12 +485,13 @@ local function onDots(flat: { any }, leader: any, ex: any, ez: any)
 			seen[s.id] = true
 			local d = dots[s.id]
 			if not d then
-				makeDot(s.id, s.x, s.z, s.h).inCar = s.car
+				local fresh = makeDot(s.id, s.x, s.z, s.h)
+				fresh.inCar, fresh.ride = s.car, s.ride
 			else
 				d.fromX, d.fromZ, d.fromH = d.x, d.z, d.h
 				d.toX, d.toZ, d.toH = s.x, s.z, s.h
 				d.at = now
-				d.inCar = s.car
+				d.inCar, d.ride = s.car, s.ride
 			end
 		end
 	end
@@ -537,11 +541,28 @@ local function refreshCard()
 	cardLeader.Position = UDim2.fromOffset(14 + cardTag.AbsoluteSize.X / Style.scale() + 6, 14)
 	cardName.Text = p.DisplayName
 	cardName.TextColor3 = if friend then C.yellow else C.text
-	local carId = p:GetAttribute("VehicleId")
+	-- driving their own car, riding in someone else's, or on foot
 	local d = dots[p.UserId]
-	local seated = if you then selfInCar() else (d ~= nil and d.inCar)
-	local car = seated and typeof(carId) == "string" and Vehicles.ById[carId] or nil
-	cardCarWord.Text = if car then "DRIVING" else "ON FOOT"
+	local seated, rideId = false, nil
+	if you then
+		local inside, owner = selfCar()
+		seated = inside ~= nil and owner == player.UserId
+		rideId = if inside and owner ~= player.UserId then owner else nil
+	elseif d then
+		seated, rideId = d.inCar, d.ride
+	end
+	local owner = if rideId then Players:GetPlayerByUserId(rideId) else (if seated then p else nil)
+	local carId = owner and owner:GetAttribute("VehicleId")
+	local car = typeof(carId) == "string" and Vehicles.ById[carId] or nil
+	-- the rider line is translated here (with the name in it); the fixed words AutoLocalize
+	cardCarWord.AutoLocalize = rideId == nil
+	if rideId then
+		cardCarWord.Text = if owner
+			then Loc.text("MapRidingIn", { name = Loc.upper(owner.DisplayName) })
+			else Loc.text("MapRiding")
+	else
+		cardCarWord.Text = if car then "DRIVING" else "ON FOOT"
+	end
 	cardCar.Text = if car then string.upper(car.name) else ""
 end
 

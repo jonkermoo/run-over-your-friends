@@ -42,4 +42,29 @@ function Events.phase(
 	return { phase = "quiet", index = nextIndex, endsIn = untilNext - warn }
 end
 
+-- where the event sign goes, kept clear of the menu strip (the tab strip, top left). All in layout px from the
+-- top left of the screen area both sit in: y, h, w are the sign's top, height and width (it's centred on a
+-- screen screenW wide), menu the strip's edges (nil while it's hidden). With no top bar to sit in (a Studio
+-- client, some consoles) the sign shares the strip's row, so where the two would touch, the sign drops under
+-- the strip.
+export type Box = { left: number, top: number, right: number, bottom: number }
+function Events.signTop(
+	y: number,
+	h: number,
+	w: number,
+	screenW: number,
+	menu: Box?,
+	gap: number
+): number
+	if not menu then
+		return y
+	end
+	local rowsApart = y >= menu.bottom + gap or y + h + gap <= menu.top
+	local besideIt = screenW / 2 - w / 2 >= menu.right + gap
+	if rowsApart or besideIt then
+		return y
+	end
+	return menu.bottom + gap
+end
+
 return Events

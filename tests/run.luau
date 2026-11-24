@@ -547,6 +547,33 @@ check(
 check("events cycle through the list", ph(90 + 4 * 480).index == 1 and ph(90 + 3 * 480).index == 4)
 check("offset rotates the order", ph(90, 2).index == 3)
 check("no events, always quiet", EventRules.phase(100, 0, 90, 360, 120, 20, 0).phase == "quiet")
+do
+	-- the event sign never touches the menu strip, at any screen width, while it shares the strip's row
+	local menu = { left = 14, top = 8, right = 14 + 560, bottom = 8 + 46 }
+	local clear = true
+	for screenW = 320, 2600, 5 do
+		for _, w in { 112, 250, 320, 360 } do
+			for _, h in { 42, 62 } do
+				local y = EventRules.signTop(8, h, w, screenW, menu, 8)
+				local left = screenW / 2 - w / 2
+				clear = clear and (y >= menu.bottom + 8 or left >= menu.right + 8)
+			end
+		end
+	end
+	check("event sign: clear of the menu strip at every width", clear)
+	check(
+		"event sign: stays put on a wide screen",
+		EventRules.signTop(8, 42, 360, 2000, menu, 8) == 8
+	)
+	check(
+		"event sign: stays put in the top bar",
+		EventRules.signTop(-50, 42, 360, 800, menu, 8) == -50
+	)
+	check(
+		"event sign: stays put with the menu hidden",
+		EventRules.signTop(8, 42, 360, 800, nil, 8) == 8
+	)
+end
 local evKeys = {}
 for _, e in EventConfig.List do
 	evKeys[e.key] = true
@@ -3093,18 +3120,21 @@ do
 		end
 		return table.concat(list, ",")
 	end
-	check("drive hud: a plain car lists the basics", keyList(Rules.rows({})) == "WASD,SPACE,V,H,T")
+	check(
+		"drive hud: a plain car lists the basics",
+		keyList(Rules.rows({})) == "WASD,SPACE,V,H,T,M"
+	)
 	check(
 		"drive hud: the unstuck row counts down",
 		Rules.rows({ unstuckWait = 4 })[5].label == "Unstuck (4)"
 	)
 	check(
 		"drive hud: a thruster car adds R",
-		keyList(Rules.rows({ thruster = true })) == "WASD,SPACE,V,H,T,R"
+		keyList(Rules.rows({ thruster = true })) == "WASD,SPACE,V,H,T,R,M"
 	)
 	check(
 		"drive hud: a jet car lists its flight keys, not the thruster",
-		keyList(Rules.rows({ jet = true, thruster = true })) == "WASD,SPACE,V,H,T,SHIFT,Q/E,S,R"
+		keyList(Rules.rows({ jet = true, thruster = true })) == "WASD,SPACE,V,H,T,SHIFT,Q/E,S,R,M"
 	)
 	check(
 		"drive hud: a taxi's G row reads Taxi!",
@@ -3125,7 +3155,7 @@ do
 	check(
 		"drive hud: a pad lists the car's buttons and the menu",
 		padList(Rules.padRows({ view = view }))
-			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,DPadRight`
+			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,DPadRight,ButtonL3`
 	)
 	check(
 		"drive hud: the pad's unstuck row counts down",
@@ -3134,7 +3164,7 @@ do
 	check(
 		"drive hud: a jet car's pad rows match Drive's bindings",
 		padList(Rules.padRows({ view = view, jet = true, thruster = true }))
-			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,ButtonB,ButtonL1+ButtonR1,ButtonL2,ButtonX,DPadRight`
+			== `ButtonR2+ButtonL2,Thumbstick1,ButtonA,{view},DPadUp,DPadLeft,ButtonB,ButtonL1+ButtonR1,ButtonL2,ButtonX,DPadRight,ButtonL3`
 	)
 	check(
 		"drive hud: the pad's feature row is Y, the water aims with the camera",
@@ -3143,8 +3173,8 @@ do
 	)
 	check(
 		"drive hud: D-pad down skips only while the tutorial runs",
-		Rules.padRows({ view = view, tutorial = true })[8].keys[1] == "DPadDown"
-			and #Rules.padRows({ view = view }) == 7
+		Rules.padRows({ view = view, tutorial = true })[9].keys[1] == "DPadDown"
+			and #Rules.padRows({ view = view }) == 8
 	)
 	check(
 		"drive hud: the card is open on the first drives",

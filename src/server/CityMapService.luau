@@ -2,7 +2,8 @@
 -- The city map's dots (client/CityMap): far players aren't streamed in on a client, so once a second the
 -- server sends every player's spot and heading (Rules/CityMap.pack), the live contest's leader and the live
 -- event's spot to each client that has its map open, and to nobody else. Which car a player has out is the
--- VehicleId player attribute, already on every client; each spot says whether they're in it. Numbers: Config/CityMap.
+-- VehicleId player attribute, already on every client; each spot says whether they're in it, or whose car they
+-- ride in (a rider seat in someone else's car). Numbers: Config/CityMap.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,7 +19,21 @@ local CityMapService = {}
 
 local watching: { [Player]: boolean } = {}
 
--- where a player is, which way they face and whether they're in their car (then it's the car's spot and facing)
+-- the car a seat belongs to (a model with an OwnerId: VehicleService.spawn) and its owner's user id
+local function carOfSeat(seat: BasePart): (Model?, number?)
+	local at: Instance? = seat.Parent
+	while at and at ~= workspace do
+		local owner = at:GetAttribute("OwnerId")
+		if at:IsA("Model") and typeof(owner) == "number" then
+			return at, owner
+		end
+		at = at.Parent
+	end
+	return nil, nil
+end
+
+-- where a player is, which way they face, and whether they're in their car or riding in someone else's (then
+-- it's the car's spot and facing)
 local function spotOf(player: Player): Rules.Spot?
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -32,8 +47,15 @@ local function spotOf(player: Player): Rules.Spot?
 		and humanoid ~= nil
 		and humanoid.SeatPart ~= nil
 		and humanoid.SeatPart:IsDescendantOf(car)
+	local ride: number? = nil
 	if inCar and car then
 		cf = car:GetPivot()
+	elseif humanoid and humanoid.SeatPart then
+		local other, owner = carOfSeat(humanoid.SeatPart)
+		if other and owner and owner ~= player.UserId then
+			cf = other:GetPivot()
+			ride = owner
+		end
 	end
 	local look = cf.LookVector
 	return {
@@ -42,6 +64,7 @@ local function spotOf(player: Player): Rules.Spot?
 		z = cf.Position.Z,
 		h = Rules.heading(look.X, look.Z),
 		car = inCar,
+		ride = ride,
 	}
 end
 

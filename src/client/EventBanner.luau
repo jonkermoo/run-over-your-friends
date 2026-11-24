@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
+local EventRules = require(ReplicatedStorage.Shared.Rules.Events)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
@@ -258,6 +259,28 @@ local function topY(): number
 	return Card.Gap
 end
 
+-- the menu strip's edges in this gui's layout px, or nil while it isn't showing (Hud's "Menu")
+local menu: GuiObject? = nil
+local function menuBox(): EventRules.Box?
+	if not (menu and menu.Parent) then
+		local hud = playerGui:FindFirstChild("Hud")
+		menu = hud and hud:FindFirstChild("Menu") :: GuiObject?
+	end
+	local m = menu
+	local hud = m and m:FindFirstAncestorWhichIsA("ScreenGui")
+	if not (m and hud and hud.Enabled and m.Visible and m.AbsoluteSize.X > 0) then
+		return nil
+	end
+	local k, o = Style.scale(), gui.AbsolutePosition
+	local a, s = m.AbsolutePosition, m.AbsoluteSize
+	return {
+		left = (a.X - o.X) / k,
+		top = (a.Y - o.Y) / k,
+		right = (a.X + s.X - o.X) / k,
+		bottom = (a.Y + s.Y - o.Y) / k,
+	}
+end
+
 local function update()
 	local phase = workspace:GetAttribute("EventPhase")
 	local key = workspace:GetAttribute("EventKey")
@@ -274,7 +297,17 @@ local function update()
 	banner.Visible = not shrunk
 	hide.Visible = not shrunk
 	chip.Visible = shrunk
-	local y = topY()
+	-- clear of the menu strip (sized as last frame: the sign's size is set below)
+	local sign = if shrunk then chip else banner
+	local k0 = Style.scale()
+	local y = EventRules.signTop(
+		topY(),
+		sign.Size.Y.Offset,
+		sign.Size.X.Offset,
+		gui.AbsoluteSize.X / k0,
+		menuBox(),
+		Card.Gap
+	)
 	banner.Position = UDim2.new(0.5, 0, 0, y)
 	chip.Position = UDim2.new(0.5, 0, 0, y)
 	local color = Style.colors[event.color] or C.gold

@@ -32,6 +32,16 @@ return function(check: (string, boolean) -> ())
 		"city map: its gamepad key isn't the Settings panel's",
 		Cfg.PadKey == "" or Cfg.PadKey ~= SettingsCfg.PadKey
 	)
+	do
+		-- the driving controls card names the map's keys
+		local DriveHud = require("../src/shared/Rules/DriveHud")
+		local pc = DriveHud.rows({})
+		local pad = DriveHud.padRows({ view = "ButtonR3" })
+		check(
+			"city map: the driving card lists its keys",
+			pc[#pc].key == Cfg.Key and pc[#pc].label == "Map" and pad[#pad].keys[1] == Cfg.PadKey
+		)
+	end
 
 	-- the picture's middle is the Centre, its corners Span / 2 away
 	local cx, cz = Cfg.Centre[1], Cfg.Centre[2]
@@ -68,10 +78,10 @@ return function(check: (string, boolean) -> ())
 
 	local spots = {
 		{ id = 7, x = 10.4, z = -20.6, h = 359.7, car = true },
-		{ id = -1, x = 0, z = 5, h = 90, car = false },
+		{ id = -1, x = 0, z = 5, h = 90, car = false, ride = -2 },
 	}
 	local flat = Rules.pack(spots)
-	check("pack: five numbers a spot", #flat == 10)
+	check("pack: six numbers a spot", #flat == 12)
 	local back = Rules.unpack(flat)
 	check(
 		"pack: round trip in whole studs and degrees",
@@ -84,10 +94,12 @@ return function(check: (string, boolean) -> ())
 			and back[2].h == 90
 			and back[1].car == true
 			and back[2].car == false
+			and back[1].ride == nil
+			and back[2].ride == -2
 	)
 	check(
 		"unpack: bad lists give nothing",
-		#Rules.unpack({ 1, 2, 3 }) == 0 and #Rules.unpack({ 1, 2, "x", 4, 0 }) == 0
+		#Rules.unpack({ 1, 2, 3 }) == 0 and #Rules.unpack({ 1, 2, "x", 4, 0, 0 }) == 0
 	)
 
 	check("slide: halfway", near(Rules.slide(0.4, 0.8), 0.5))

@@ -6,12 +6,12 @@
 
 local CityMap = {}
 
-local WIDTH = 5 -- numbers a spot packs into
+local WIDTH = 6 -- numbers a spot packs into
 
 export type Cfg = { Centre: { number }, Span: number }
--- one player on the map: user id, world x and z, heading (degrees clockwise from north), and whether they're in
--- their car
-export type Spot = { id: number, x: number, z: number, h: number, car: boolean }
+-- one player on the map: user id, world x and z, heading (degrees clockwise from north), whether they're in
+-- their car, and whose car they ride in when it's someone else's (that player's user id)
+export type Spot = { id: number, x: number, z: number, h: number, car: boolean, ride: number? }
 
 -- a world spot (x, z) to the picture's 0..1 square (u right, v down), held on the picture's edge, and
 -- whether it was inside
@@ -46,7 +46,8 @@ function CityMap.blendHeading(from: number, to: number, t: number): number
 	return (from + CityMap.turn(from, to) * math.clamp(t, 0, 1)) % 360
 end
 
--- every spot in one flat list of whole numbers (id, x, z, h, car 1/0, id, x, z...), for the remote
+-- every spot in one flat list of whole numbers (id, x, z, h, car 1/0, ride (0 = none), id, x, z...), for the
+-- remote
 function CityMap.pack(spots: { Spot }): { number }
 	local out = table.create(#spots * WIDTH)
 	for _, s in spots do
@@ -55,6 +56,7 @@ function CityMap.pack(spots: { Spot }): { number }
 		table.insert(out, math.round(s.z))
 		table.insert(out, math.round(s.h) % 360)
 		table.insert(out, if s.car then 1 else 0)
+		table.insert(out, s.ride or 0)
 	end
 	return out
 end
@@ -66,17 +68,22 @@ function CityMap.unpack(flat: { any }): { Spot }
 		return out
 	end
 	for i = 1, #flat, WIDTH do
-		local id, x, z, h, car = flat[i], flat[i + 1], flat[i + 2], flat[i + 3], flat[i + 4]
+		local id, x, z, h, car, ride =
+			flat[i], flat[i + 1], flat[i + 2], flat[i + 3], flat[i + 4], flat[i + 5]
 		if
 			typeof(id) ~= "number"
 			or typeof(x) ~= "number"
 			or typeof(z) ~= "number"
 			or typeof(h) ~= "number"
 			or typeof(car) ~= "number"
+			or typeof(ride) ~= "number"
 		then
 			return {}
 		end
-		table.insert(out, { id = id, x = x, z = z, h = h, car = car == 1 })
+		table.insert(
+			out,
+			{ id = id, x = x, z = z, h = h, car = car == 1, ride = if ride ~= 0 then ride else nil }
+		)
 	end
 	return out
 end

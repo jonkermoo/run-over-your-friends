@@ -145,3 +145,5 @@ TrialResume,TRIAL {time},,,PRUEBA {time},TESTE {time}
 TrialIn,TRIAL IN {time},,,PRUEBA EN {time},TESTE EM {time}
 TrialBar,{cash} / {price},,,{cash} / {price},{cash} / {price}
 TrialWarn,{n} SECONDS LEFT IN THE ROADSTER!,,,¡QUEDAN {n} SEGUNDOS EN EL ROADSTER!,FALTAM {n} SEGUNDOS NO ROADSTER!
+MapRidingIn,RIDING IN {name}'S,,,EN EL AUTO DE {name},NO CARRO DE {name}
+MapRiding,RIDING,,,DE PASAJERO,DE CARONA

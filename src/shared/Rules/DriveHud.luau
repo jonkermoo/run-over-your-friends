@@ -67,11 +67,13 @@ function DriveHud.rows(car: Car): { Row }
 	elseif car.thruster then
 		table.insert(rows, { key = "R", label = "Thruster" })
 	end
+	table.insert(rows, { key = "M", label = "Map" }) -- Config/CityMap Key
 	return rows
 end
 
 -- the same card for a gamepad: the buttons Drive.bind and the vehicle seat use (RT/LT and the left stick
--- drive, A gets out), D-pad right for the menu tabs (Pad.strip) and D-pad down for the tutorial's SKIP
+-- drive, A gets out), D-pad right for the menu tabs (Pad.strip), a left-stick click for the city map and D-pad
+-- down for the tutorial's SKIP
 function DriveHud.padRows(car: PadCar): { PadRow }
 	local wait = car.unstuckWait or 0
 	local rows: { PadRow } = {
@@ -99,6 +101,7 @@ function DriveHud.padRows(car: PadCar): { PadRow }
 		table.insert(rows, { keys = { "ButtonX" }, label = "Thruster" })
 	end
 	table.insert(rows, { keys = { "DPadRight" }, label = "Menu" })
+	table.insert(rows, { keys = { "ButtonL3" }, label = "Map" }) -- Config/CityMap PadKey
 	if car.tutorial then
 		table.insert(rows, { keys = { "DPadDown" }, label = "Skip step" })
 	end
