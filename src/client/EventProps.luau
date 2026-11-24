@@ -155,7 +155,7 @@ local function build(which: string): Copy?
 	bar.Size = UDim2.fromOffset(H.Width, H.Height + H.Text + 4)
 	bar.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + H.Above, 0)
 	bar.LightInfluence = 0
-	bar.AlwaysOnTop = true
+	bar.AlwaysOnTop = false -- buildings in front hide it, like the finder's column
 	bar.MaxDistance = 900
 	bar.Adornee = body
 	local name = Style.label(bar, titleOf(which), H.Text, F.display, C.text)
