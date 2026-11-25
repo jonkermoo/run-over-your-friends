@@ -43,6 +43,9 @@ Net.Messages = table.freeze({
 	RoadsterTrial = "RoadsterTrial",
 	HitEventProp = "HitEventProp", -- (velocity: Vector3): the driver's vehicle ran into the live event's truck (server/EventProps checks)
 	MapOpen = "MapOpen", -- (open: boolean): the city map opened or closed; the server sends MapDots only while it's open
+	-- client -> server: (areaKey: string) teleport to that area (Config/Teleport; server/TeleportService checks
+	-- everything); server -> client: (ok: boolean, reason: string?) the answer (Rules/Teleport.refusal reasons)
+	Teleport = "Teleport",
 	-- server -> client
 	-- (spots: { number }, leader: number, eventX: number?, eventZ: number?): every player's spot packed by
 	-- Rules/CityMap.pack, the live contest's leader (user id, 0 = none) and the live event's spot (the giant)
@@ -121,6 +124,7 @@ export type MessageName =
 	| "HitEventProp"
 	| "MapOpen"
 	| "MapDots"
+	| "Teleport"
 
 -- Roblox services are fetched lazily so the name table above stays testable in Lune.
 function Net.remote(name: MessageName): RemoteEvent

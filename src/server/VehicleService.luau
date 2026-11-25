@@ -304,6 +304,37 @@ local function ground(pos: Vector3, ignore: { Instance }): Vector3
 	return if hit then hit.Position else pos - Vector3.new(0, 3, 0)
 end
 
+-- would a car of this size at cf hit the world or another car? (server/TeleportService)
+function VehicleService.blockedAt(cf: CFrame, size: Vector3, ignore: { Instance }): boolean
+	return blocked(cf, size, ignore)
+end
+
+-- move a player's car (and its trailer and everyone seated in it) to cf, standing on the ground there: the
+-- server takes over the physics for a moment so the driver's client can't put it back, then hands it back to
+-- the owner if they're still driving (server/TeleportService)
+function VehicleService.moveTo(player: Player, model: Model, cf: CFrame)
+	pcall(own, model, nil)
+	model:PivotTo(cf + Vector3.new(0, 0.4, 0))
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") and not part.Anchored then
+			part.AssemblyLinearVelocity = Vector3.zero
+			part.AssemblyAngularVelocity = Vector3.zero
+		end
+	end
+	task.delay(0.3, function()
+		local seat = model:FindFirstChild("DriverSeat") :: VehicleSeat?
+		local occupant = seat and seat.Occupant
+		if
+			model.Parent
+			and owned[player] == model
+			and occupant
+			and Players:GetPlayerFromCharacter(occupant.Parent) == player
+		then
+			pcall(own, model, player)
+		end
+	end)
+end
+
 function VehicleService.spawn(player: Player, id: string): boolean
 	local stats = Vehicles.ById[id]
 	local profile = Data.get(player)

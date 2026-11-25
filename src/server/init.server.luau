@@ -80,6 +80,7 @@ local DayNightService = require(script.DayNightService)
 local LookService = require(script.LookService)
 local TrialService = require(script.TrialService)
 local CityMapService = require(script.CityMapService)
+local TeleportService = require(script.TeleportService)
 local TrialConfig = require(ReplicatedStorage.Shared.Config.Trial)
 local StreetLife = require(script.StreetLife)
 
@@ -112,6 +113,7 @@ BuildingService.registerProps(world.props)
 CrowdService.setup(world.places, world.grid)
 TrafficService.setup(world.grid)
 VehicleService.setSpawnPoints(world.spawnPoints)
+TeleportService.setRoadPoints(world.spawnPoints)
 -- the giant appears at a downtown crossing
 local downtown = {}
 for _, p in world.spawnPoints do
@@ -147,6 +149,7 @@ StuntService.start()
 DayNightService.start()
 TrialService.start()
 CityMapService.start()
+TeleportService.start()
 
 -- analytics hooks
 Data.onEarn(Analytics.earned)
