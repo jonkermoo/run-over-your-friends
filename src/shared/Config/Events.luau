@@ -63,6 +63,8 @@ return table.freeze({
 	WarnSeconds = 20, -- the banner counts down before it starts (part of the gap)
 	-- an event won early (the crate claimed, the truck cracked, the boss beaten) ends this many seconds later
 	EndLinger = 6,
+	-- a hitter's car weight (kg) when its vehicle isn't in Config/Vehicles (Money Truck knocks, Boss Truck damage)
+	HitterWeight = 1500,
 	-- every new event payout (Money Truck, Cash Drop, Boss Truck) is its number below times this, then the
 	-- player's money passes (Passes.moneyMultiplier). One number to retune them against hit pay.
 	PayScale = 1,
@@ -233,8 +235,10 @@ return table.freeze({
 
 	-- Money Truck (tier 3): an armoured van drives a route; every hit spills cash, the last hit cracks it
 	MoneyTruck = table.freeze({
-		Vehicle = "IceCream", -- the model (ReplicatedStorage.VehicleModels), repainted
-		Scale = 1.35, -- times Game.VehicleScale
+		-- the armoured bank van (ReplicatedStorage.VehicleModels; tools/blender/export_bank_van.py), its armour
+		-- (Paint) and gold band and vault doors (Trim) coloured here
+		Vehicle = "BankVan",
+		Scale = 1, -- times Game.VehicleScale
 		Paint = table.freeze({ 52, 78, 60 }), -- armour green
 		Trim = table.freeze({ 255, 196, 40 }), -- gold
 		Speed = 40,
@@ -245,6 +249,20 @@ return table.freeze({
 		SpillValue = 300,
 		Jackpot = 8000, -- to whoever cracks it
 		JackpotSpill = 8, -- and this many bundles burst out for anyone
+		-- every hit but the last knocks it flying like a hit car (Rules/Events.knockSpeed, Config/PlayerHits caps):
+		-- Weight kg against the hitter's (that ratio clamped RatioMin-RatioMax, as a car hitting a car), Lift up per
+		-- 1 along the ground, never faster than MaxSpeed studs/s (a starter car throws it ~15 studs up, the cap
+		-- ~40), Flips turns in the air (at least one), then it drives back into its lane over PlayerHits'
+		-- parkedRecover seconds; no hits count while it flies
+		Knock = table.freeze({
+			Weight = 1500,
+			RatioMin = 0.25,
+			RatioMax = 4,
+			Scale = 1.5,
+			MaxSpeed = 160,
+			Lift = 1.2,
+			Flips = 1,
+		}),
 		Mark = "TRUCK", -- the screen-edge pointer's word
 	}),
 	-- the cash bundles a hit spills (pooled parts): grabbed by driving or walking through them

@@ -11,9 +11,11 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
+local HitConfig = require(ReplicatedStorage.Shared.Config.PlayerHits)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
+local EventRules = require(ReplicatedStorage.Shared.Rules.Events)
 local Route = require(ReplicatedStorage.Shared.Rules.Route)
 local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Drive = require(script.Parent.Drive)
@@ -346,7 +348,31 @@ local function stepTruck(dt: number)
 		end
 	end
 	local yaw = math.atan2(-hx, -hz)
-	c.body.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0) * c.rel
+	local turn = CFrame.Angles(0, yaw, 0) * c.rel
+	-- knocked by a hit (Money Truck): it flies and flips over its middle, then drives back into its lane
+	local kv, kat = workspace:GetAttribute("EventKnock"), workspace:GetAttribute("EventKnockAt")
+	local knocked = false
+	if typeof(kv) == "Vector3" and typeof(kat) == "number" then
+		local back = HitConfig.Normal.parkedRecover
+		local g = workspace.Gravity
+		local t = now - kat
+		knocked = t >= 0 and t < EventRules.airTime(kv.Y, g) + back
+		if knocked then
+			local ox, oy, oz, k = EventRules.knockOffset(t, kv.X, kv.Y, kv.Z, g, back)
+			local flat = kv * Vector3.new(1, 0, 1)
+			local axis = if flat.Magnitude > 0.1
+				then Vector3.new(0, 1, 0):Cross(flat.Unit)
+				else Vector3.new(1, 0, 0)
+			local flips = math.max(1, math.floor(Config.MoneyTruck.Knock.Flips + 0.5))
+			local mid = Vector3.new(0, c.height / 2, 0)
+			local centre = Vector3.new(x + ox, y + oy, z + oz) + mid
+			local roll = CFrame.fromAxisAngle(axis, math.pi * 2 * flips * k)
+			c.body.CFrame = CFrame.new(centre) * roll * CFrame.new(-mid) * turn
+		end
+	end
+	if not knocked then
+		c.body.CFrame = CFrame.new(x, y, z) * turn
+	end
 	spin -= speed * dt / (1.6 * cfgOf(which).Scale)
 	for _, m in c.wheels do
 		m.Transform = CFrame.Angles(spin, 0, 0)
@@ -367,7 +393,9 @@ local function stepTruck(dt: number)
 			r.Transparency = 1
 		end
 	end
-	checkHit(c, x, z, hx, hz, speed)
+	if not knocked then
+		checkHit(c, x, z, hx, hz, speed)
+	end
 end
 
 -- the crate: lifted on this screen while it falls (the server keeps it where it lands)

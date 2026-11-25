@@ -626,6 +626,31 @@ do
 	-- a solo player beats the boss in a sensible number of solid hits
 	local hits = BT.Hp / base
 	check("boss: about 8-20 solid hits alone", hits >= 8 and hits <= 20)
+	-- a hit knocks the Money Truck flying: harder with heavier cars, never past the hitter's cap
+	local K = MT.Knock
+	local light = EventRules.knockSpeed(120, 1100, 999, K)
+	local heavy = EventRules.knockSpeed(120, 6000, 999, K)
+	check(
+		"money truck: heavier cars knock it further, within the cap",
+		heavy > light
+			and light > 0
+			and EventRules.knockSpeed(250, 9000, 100, K) <= 100
+			and EventRules.knockSpeed(250, 9000, 999, K) <= K.MaxSpeed
+	)
+	local air = EventRules.airTime(60, 196.2)
+	local _, upMid, _, kMid = EventRules.knockOffset(air / 2, 50, 60, 0, 196.2, 1.5)
+	local xLand, yLand, _, kLand = EventRules.knockOffset(air + 0.01, 50, 60, 0, 196.2, 1.5)
+	local xBack, yBack = EventRules.knockOffset(air + 2, 50, 60, 0, 196.2, 1.5)
+	check(
+		"money truck: a knock flies up, lands, and comes back to its lane",
+		upMid > 5
+			and near(kMid, 0.5, 1e-6)
+			and kLand == 1
+			and yLand == 0
+			and xLand > 25
+			and xBack == 0
+			and yBack == 0
+	)
 end
 
 -- event vehicles' route (Rules/Route)

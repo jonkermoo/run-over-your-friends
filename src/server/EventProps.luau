@@ -2,8 +2,8 @@
 -- The things the new events put in town (Config/Events): the Money Truck and the Boss Truck, which drive the
 -- road network (Rules/Route), and the Cash Drop's crate, plus the cash bundles a truck spills.
 -- The trucks have no parts on the server: the route goes in workspace attributes (EventProp, EventRoute,
--- EventRouteAt, EventHp, EventHpMax, EventBroken, BossSlamAt) and every screen draws its own copy
--- (client/EventProps), which reports a crash (Net HitEventProp); it's checked here against where the route says
+-- EventRouteAt, EventHp, EventHpMax, EventBroken, BossSlamAt, EventKnock, EventKnockAt) and every screen draws
+-- its own copy (client/EventProps), which reports a crash (Net HitEventProp); it's checked here against where the route says
 -- the truck is. The crate and the cash bundles are real parts, made once and kept for the next event.
 
 local Players = game:GetService("Players")
@@ -12,7 +12,10 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config.Events)
 local Game = require(ReplicatedStorage.Shared.Config.Game)
+local HitConfig = require(ReplicatedStorage.Shared.Config.PlayerHits)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local HitRules = require(ReplicatedStorage.Shared.Rules.PlayerHits)
+local Impact = require(ReplicatedStorage.Shared.Rules.Impact)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
@@ -47,6 +50,7 @@ local startAt = 0 -- server time it set off
 local speed = 0
 local halfW, halfL = 0, 0
 local hp, hpMax = 0, 0
+local knockedUntil = 0 -- server time a knocked Money Truck is back in its lane
 
 -- the crate
 local crateSpot: Vector3? = nil
@@ -299,6 +303,33 @@ end
 
 ---------------------------------------------------------------- hits
 
+-- a hit knocks the Money Truck flying like a hit car (Config/Events MoneyTruck.Knock); every screen flies its
+-- copy from the EventKnock velocity and EventKnockAt time (client/EventProps)
+local function knock(player: Player, vel: Vector3, toward: Vector3, closing: number)
+	local K = MT.Knock
+	local id = player:GetAttribute("VehicleId")
+	local spec = if typeof(id) == "string" then Vehicles.ById[id] else nil
+	local weight = if spec then spec.weight else Config.HitterWeight
+	local price = if spec then spec.price else 0
+	local launch = Rules.knockSpeed(
+		Impact.launchSpeed(Impact.energy(weight, closing)),
+		weight,
+		HitRules.carLaunchCap(price, HitConfig),
+		K
+	)
+	local flat = vel * Vector3.new(1, 0, 1)
+	if flat.Magnitude < 0.1 then
+		flat = toward * Vector3.new(1, 0, 1)
+	end
+	local dir = if flat.Magnitude > 0.1 then flat.Unit else Vector3.new(0, 0, -1)
+	local velocity = (dir + Vector3.new(0, K.Lift, 0)).Unit * launch
+	local t = now()
+	-- no hits count until it's landed and back in its lane (the server checks hits against the route)
+	knockedUntil = t + Rules.airTime(velocity.Y, workspace.Gravity) + HitConfig.Normal.parkedRecover
+	workspace:SetAttribute("EventKnock", velocity)
+	workspace:SetAttribute("EventKnockAt", t)
+end
+
 local function onHit(player: Player, velocity: unknown)
 	if
 		(kind ~= "MoneyTruck" and kind ~= "BossTruck")
@@ -308,6 +339,9 @@ local function onHit(player: Player, velocity: unknown)
 		or not RateLimit.allow(player, "eventProp", Config.HitGap)
 	then
 		return
+	end
+	if kind == "MoneyTruck" and now() < knockedUntil then
+		return -- it's flying, or not back in its lane yet
 	end
 	local vehicle = VehicleService.of(player)
 	local chassis = vehicle and vehicle.PrimaryPart
@@ -349,11 +383,15 @@ local function onHit(player: Player, velocity: unknown)
 			Net.remote("Fx"):FireAllClients("Break", at, 30, 24, player.UserId)
 		else
 			Net.remote("Popup"):FireClient(player, Loc.msg("TruckHit", { left = hp }), "big")
+			knock(player, vel, Vector3.new(x, 0, z) - chassis.Position, closing)
 		end
 	else
 		local id = player:GetAttribute("VehicleId")
 		local spec = if typeof(id) == "string" then Vehicles.ById[id] else nil
-		local dmg = math.min(Rules.damage(closing, if spec then spec.weight else 1500, BT), hp)
+		local dmg = math.min(
+			Rules.damage(closing, if spec then spec.weight else Config.HitterWeight, BT),
+			hp
+		)
 		hp -= dmg
 		if hooks then
 			hooks.score(player, dmg)
@@ -584,6 +622,7 @@ end
 function EventProps.begin(key: string, h: Hooks)
 	hooks = h
 	beaten = false
+	knockedUntil = 0
 	kind = key
 	if key == "MoneyTruck" or key == "BossTruck" then
 		startTruck(key)
@@ -610,6 +649,8 @@ function EventProps.finish()
 			"EventHpMax",
 			"EventBroken",
 			"BossSlamAt",
+			"EventKnock",
+			"EventKnockAt",
 		}
 	do
 		workspace:SetAttribute(a, nil)
