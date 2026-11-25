@@ -232,6 +232,7 @@ function UpgradePanel.attach(p: Parts): Panel
 		pad.PaddingTop = UDim.new(0, 14)
 		pad.PaddingBottom = UDim.new(0, 10)
 		pad.Parent = b
+		Style.corner(b, 7)
 		b.Parent = tabs
 		b.Activated:Connect(function()
 			tab = name

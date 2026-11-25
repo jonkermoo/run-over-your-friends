@@ -83,10 +83,12 @@ function GiftRows.build(body: Instance, y: number): number
 		Loc.set(name, "GiftNext", { m = minute })
 		name.Position = UDim2.fromOffset(12, 5)
 		name.Size = UDim2.new(1, -150, 0, 20)
+		name.TextXAlignment = Enum.TextXAlignment.Left
 		local prize = Style.label(row, prizeText(i), 14, F.heavy, C.money)
 		prize.AutoLocalize = false
 		prize.Position = UDim2.fromOffset(12, 25)
 		prize.Size = UDim2.new(1, -150, 0, 16)
+		prize.TextXAlignment = Enum.TextXAlignment.Left
 		if i <= claimed then
 			local done = Style.label(row, "CLAIMED", 15, F.heavy, C.dim)
 			done.AnchorPoint = Vector2.new(1, 0.5)

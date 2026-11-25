@@ -60,12 +60,7 @@ function PadControls.start(gui: ScreenGui, opts: Options)
 	card.AnchorPoint = Vector2.new(1, 1)
 	card.Position = UDim2.new(1, -CFG.Margin, 1, -CFG.Margin)
 	card.Visible = false
-	local edge = Instance.new("Frame")
-	edge.BackgroundColor3 = C.pink
-	edge.BorderSizePixel = 0
-	edge.Size = UDim2.new(0, 4, 1, 0)
-	edge.Parent = card
-	local title = Style.label(card, "CONTROLS", 17, F.display, C.pink)
+	local title = Style.label(card, "CONTROLS", 17, F.display, C.yellow)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Position = UDim2.fromOffset(PAD + 4, PAD - 2)
 	title.Size = UDim2.fromOffset(100, CFG.TitleHeight)
