@@ -2219,6 +2219,13 @@ do
 		"next up skips cars under the minimum price",
 		Garage.nextUp(list, { A = true }, 100, price, { R = true }, 1000) == "C"
 	)
+	check(
+		"buy next: the cheapest car not owned, affordable or not",
+		Garage.buyNext(list, { A = true }, price, { R = true }) == "B"
+			and Garage.buyNext(list, { A = true }, price, { R = true }, 1000) == "C"
+			and Garage.buyNext(list, { A = true, B = true, C = true }, price, { R = true })
+				== nil
+	)
 end
 
 do

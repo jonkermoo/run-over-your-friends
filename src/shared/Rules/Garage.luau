@@ -34,6 +34,18 @@ function Garage.topples(
 	return Impact.collapses(weightKg, topSpeedMph * MPH, smash, maxBreak)
 end
 
+-- the next car to buy, affordable or not: the cheapest one not owned, at least minPrice, not skipped (the
+-- next-car bar under the cash). nil when every such car is owned.
+function Garage.buyNext(
+	list: { { id: string, price: number } },
+	owned: { [string]: boolean },
+	priceOf: (string) -> number,
+	skip: { [string]: boolean },
+	minPrice: number?
+): string?
+	return Garage.nextUp(list, owned, -math.huge, priceOf, skip, minPrice)
+end
+
 -- the car to save for: the cheapest one not owned that costs more than the cash in hand and at least
 -- minPrice (so cheap joke rides that are a step down aren't pushed); skip: ones that aren't bought with cash,
 -- like a pass car. nil when every car is owned or affordable.

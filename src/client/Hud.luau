@@ -87,7 +87,7 @@ moneyFit.Parent = moneyLabel
 local feed = Instance.new("Frame")
 feed.BackgroundTransparency = 1
 feed.AnchorPoint = Vector2.new(1, 0)
-feed.Position = UDim2.new(1, -14, 0, 76)
+feed.Position = UDim2.new(1, -14, 0, 128)
 feed.Size = UDim2.fromOffset(320, 260)
 feed.Parent = gui
 local feedItems: { GuiObject } = {}
@@ -97,7 +97,7 @@ local friendChip = Style.pill(gui, "", C.pink)
 friendChip.Name = "FriendChip"
 friendChip.TextColor3 = C.text
 friendChip.AnchorPoint = Vector2.new(1, 0)
-friendChip.Position = UDim2.new(1, -14, 0, 70)
+friendChip.Position = UDim2.new(1, -14, 0, 122) -- under the next-car bar (client/NextCar)
 friendChip.Visible = false
 local function refreshFriends()
 	local n = (player:GetAttribute("Friends") or 0) :: number
@@ -105,7 +105,7 @@ local function refreshFriends()
 		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
 	Loc.set(friendChip, if n == 1 then "FriendsHere1" else "FriendsHere", { n = n, pct = pct })
 	friendChip.Visible = n > 0
-	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 98 else 76)
+	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 150 else 128)
 end
 
 local function fadeOut(obj: GuiObject, seconds: number)
@@ -764,6 +764,7 @@ local garageNav = {} :: {
 	next: TextButton,
 	show: (car: boolean) -> (),
 	step: (dir: number) -> (),
+	landOn: string?, -- set by Hud.openCar: the garage opens on this car's page instead of the list
 }
 do
 	local size = LayoutConfig.GarageHeaderButton
@@ -964,10 +965,11 @@ end)
 garageNav.next.Activated:Connect(function()
 	garageNav.step(1)
 end)
--- the garage always opens on the list
+-- the garage opens on the list, or on one car's page when Hud.openCar asked for it
 garage:GetPropertyChangedSignal("Visible"):Connect(function()
 	if garage.Visible then
-		garageNav.show(false)
+		garageNav.show(garageNav.landOn ~= nil)
+		garageNav.landOn = nil
 	end
 end)
 
@@ -2150,6 +2152,22 @@ garageButton.Activated:Connect(function()
 		require(script.Parent.Track).viewed("Garage", chosenId)
 	end
 end)
+-- open the garage straight on one car's page (the next-car bar under the cash)
+function Hud.openCar(id: string)
+	if not Vehicles.ById[id] then
+		return
+	end
+	store.Visible = false
+	choose(id)
+	if garage.Visible then
+		garageNav.show(true)
+		return
+	end
+	garageNav.landOn = id
+	refreshCards()
+	open(garage)
+	require(script.Parent.Track).opened("Garage")
+end
 storeButton.Activated:Connect(function()
 	garage.Visible = false
 	if store.Visible then
