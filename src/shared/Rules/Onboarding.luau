@@ -11,6 +11,7 @@ export type Config = {
 	EventWait: number,
 	CountFrom: number,
 	Offer: { [string]: number },
+	BonusAt: number,
 }
 
 -- what the player has done this session
@@ -100,12 +101,11 @@ function Rules.tabShows(state: number, step: number, bonusPaid: boolean, config:
 		and (state == O.DeclinedOnce or state == O.DeclinedTwice)
 end
 
--- the finish bonus: paid once, when a player who said yes lands on the last step or past it
+-- the finish bonus: paid once, when a player who said yes lands on BonusAt or past it
 function Rules.bonusDue(state: number, landing: number, bonusPaid: boolean, config: Config): boolean
-	local last = config.Order[#config.Order]
 	return not bonusPaid
 		and state == config.Offer.Accepted
-		and (landing == last or landing == config.Steps.Done)
+		and Rules.reached(landing, config.BonusAt, config)
 end
 
 -- a save from before the offer existed: finished players are never asked, players part way through carry on

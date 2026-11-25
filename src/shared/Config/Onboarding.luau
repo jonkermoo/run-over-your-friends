@@ -27,16 +27,18 @@ return table.freeze({
 	Steps = Steps,
 	Offer = Offer,
 	-- the event step comes before the buy step since 2026-11-24: the finish bonus is paid as the lessons end, so
-	-- the last step is spending it on a car
+	-- the last step is spending it on a car. Since 2026-11-25 the garage tour runs right before that, as the bonus
+	-- lands (it lost 65% of players when it came after the smash step)
 	Order = table.freeze({
 		Steps.Spawn,
 		Steps.Hits,
 		Steps.Smash,
-		Steps.Garage,
 		Steps.Goal,
 		Steps.Event,
+		Steps.Garage,
 		Steps.Buy,
 	}),
+	BonusAt = Steps.Garage, -- the finish bonus is paid as a player who said yes reaches this step
 	-- saved steps no longer in Order, and where they go: 3 meant "save for the next car", 4 was "take a ramp"
 	-- (removed 2026-11-20: a quarter of new players quit there)
 	Retired = table.freeze({
@@ -83,7 +85,9 @@ return table.freeze({
 	FinishBonus = 2500,
 	OfferDelay = 1, -- seconds after the data is ready before the offer shows, so the screen has settled
 	-- the garage tour's pages, in order (client/Guide; analytics TutorialTour field 01)
-	TourPages = table.freeze({ "Open", "Car", "Upgrades", "Paint", "Decals", "NextCar", "Done" }),
+	-- the garage tour: press GARAGE (Open), your car's page (Car), the car to buy next (NextCar); two pages since
+	-- 2026-11-25 (the Upgrades, Paint and Decals pages are gone)
+	TourPages = table.freeze({ "Open", "Car", "NextCar", "Done" }),
 	SpawnCrowd = 12, -- NPCs that always hang around the spawn plaza
 	HintAfter = 20, -- seconds stuck on a step before the hint pulses
 	SkipAfter = 10, -- seconds on a step before its SKIP button shows

@@ -196,16 +196,6 @@ local function tourSend(page: string)
 	end
 end
 
--- what each tab page is for, said once the player is on it
-local TAB_LINES: { [string]: { string } } = {
-	Upgrades = {
-		"MASTERY AND UPGRADES",
-		"Every hit and smash in this car earns mastery. Each level opens an upgrade: faster, tougher, harder hits.",
-	},
-	Paint = { "PAINT", "Try a colour on, then buy it to keep it. Every car has its own paint job." },
-	Decals = { "DECALS", "Put a decal on the side. Mastery levels open more of them." },
-}
-
 ---------------------------------------------------------------- markers
 
 local Z_ARROW = 30 -- arrows sit above the sheets they point into
@@ -894,21 +884,15 @@ local function update()
 			tour.page += 1
 		elseif page == "Car" then
 			if onCar then
-				tour.page += 1
-			else
-				pressTarget = toRow(tour.car)
-			end
-		elseif TAB_LINES[page] then
-			local tabs = onCar and carPage and carPage:FindFirstChild("Tabs", true)
-			if not tabs then
-				pressTarget = toRow(tour.car)
-			elseif tabs:GetAttribute("Tab") ~= page then
-				pressTarget = tabs:FindFirstChild(page) :: GuiObject?
-			else
-				local lines = TAB_LINES[page]
-				boxSay(lines[1], lines[2], "NEXT")
+				boxSay(
+					"THIS IS YOUR CAR",
+					"Upgrades and paint make every hit pay more. Next: the car you are saving for.",
+					"NEXT"
+				)
 				pressTarget = tourNext
 				pressFromSide = true
+			else
+				pressTarget = toRow(tour.car)
 			end
 		elseif page == "NextCar" then
 			local car, price = cheapestCar()
@@ -917,10 +901,9 @@ local function update()
 				pressTarget = toRow(car.id)
 				boxSay(
 					Loc.msg("TourNextCar", { car = string.upper(car.name) }),
-					Loc.msg(if cash >= price then "TourNextCarReady" else "TourNextCarLine", {
+					Loc.msg(if cash >= price then "TourNextCarBuy" else "TourNextCarSave", {
 						cash = Style.money(cash),
 						price = Style.money(price),
-						bonus = Style.money(Onboarding.FinishBonus),
 					}),
 					"DONE"
 				)

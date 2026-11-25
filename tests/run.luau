@@ -2839,9 +2839,9 @@ do
 			at = Rules.after(at, Config)
 		end
 		check(
-			"tutorial: the steps run spawn, hits, smash, garage tour, goal, event, buy",
+			"tutorial: the steps run spawn, hits, smash, goal, event, garage tour, buy",
 			table.concat(order, ",")
-				== table.concat({ S.Spawn, S.Hits, S.Smash, S.Garage, S.Goal, S.Event, S.Buy }, ",")
+				== table.concat({ S.Spawn, S.Hits, S.Smash, S.Goal, S.Event, S.Garage, S.Buy }, ",")
 		)
 		check(
 			"tutorial: the garage tour has a new number, never an old or retired one",
@@ -2853,8 +2853,8 @@ do
 		landing, passed =
 			Rules.landing(S.Smash, { pieces = Config.SmashGoal, ownsExtra = false }, Config)
 		check(
-			"tutorial: a smash done early passes that step, and stops at the garage tour",
-			landing == S.Garage and #passed == 1
+			"tutorial: a smash done early passes that step, and stops at the first goal",
+			landing == S.Goal and #passed == 1
 		)
 		landing =
 			Rules.landing(S.Smash, { pieces = Config.SmashGoal - 1, ownsExtra = true }, Config)
@@ -2866,8 +2866,8 @@ do
 		)
 		check(
 			"tutorial: reached follows the order, not the numbers",
-			Rules.reached(S.Garage, S.Smash, Config)
-				and not Rules.reached(S.Garage, S.Goal, Config)
+			Rules.reached(S.Garage, S.Event, Config)
+				and not Rules.reached(S.Goal, S.Garage, Config)
 				and Rules.reached(S.Buy, S.Event, Config)
 				and not Rules.reached(S.Hits, S.Goal, Config)
 				and Rules.reached(S.Done, S.Goal, Config)
@@ -2900,8 +2900,10 @@ do
 				and not Rules.tabShows(O.Old, S.Done, false, Config)
 		)
 		check(
-			"tutorial offer: the finish bonus is due once, after a yes, on the last step or the end",
-			Rules.bonusDue(O.Accepted, S.Buy, false, Config)
+			"tutorial offer: the finish bonus is due once, after a yes, as the garage tour starts or later",
+			Config.BonusAt == S.Garage
+				and Rules.bonusDue(O.Accepted, S.Garage, false, Config)
+				and Rules.bonusDue(O.Accepted, S.Buy, false, Config)
 				and Rules.bonusDue(O.Accepted, S.Done, false, Config)
 				and not Rules.bonusDue(O.Accepted, S.Event, false, Config)
 				and not Rules.bonusDue(O.Accepted, S.Buy, true, Config)
@@ -2927,9 +2929,8 @@ do
 			end)()
 		)
 		check(
-			"tutorial: the garage tour ends on its Done page",
-			Config.TourPages[#Config.TourPages] == "Done"
-				and table.find(Config.TourPages, "Upgrades") ~= nil
+			"tutorial: the garage tour is your car, then the next car, then Done",
+			table.concat(Config.TourPages, ",") == "Open,Car,NextCar,Done"
 		)
 		check(
 			"tutorial: the first goal is short and claims itself",
