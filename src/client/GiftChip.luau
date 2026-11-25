@@ -106,8 +106,10 @@ function GiftChip.start()
 				return
 			end
 			title.Text = Loc.text("GiftTomorrow")
-			sub.Text =
-				Loc.text("TomorrowPays", { n = player:GetAttribute("TomorrowDay") or 2, pay = pay })
+			sub.Text = Loc.text(
+				"TomorrowPays",
+				{ n = player:GetAttribute("TomorrowDay") or 2, pay = Style.money(pay) }
+			)
 			box.Visible = false
 		end
 		chip.Visible = true

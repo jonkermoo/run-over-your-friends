@@ -239,7 +239,7 @@ local function rebuild()
 		Loc.set(
 			line,
 			"TomorrowPays",
-			{ n = player:GetAttribute("TomorrowDay") or 2, pay = tomorrowPay }
+			{ n = player:GetAttribute("TomorrowDay") or 2, pay = Style.money(tomorrowPay) }
 		)
 		line.Position = UDim2.fromOffset(12, y + 6)
 		line.Size = UDim2.new(1, -24, 0, 22)

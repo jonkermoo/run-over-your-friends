@@ -63,7 +63,7 @@ local function turntable(stats: Vehicles.Vehicle)
 		Loc.set(
 			line,
 			"TomorrowPays",
-			{ n = player:GetAttribute("TomorrowDay") or 2, pay = tomorrowPay }
+			{ n = player:GetAttribute("TomorrowDay") or 2, pay = Style.money(tomorrowPay) }
 		)
 		line.Position = UDim2.fromOffset(0, 262)
 		line.Size = UDim2.new(1, 0, 0, 20)

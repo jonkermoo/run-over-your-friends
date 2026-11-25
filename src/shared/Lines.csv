@@ -17,7 +17,7 @@ GiftOpen,OPEN YOUR GIFT!,,,¡ABRE TU REGALO!,ABRA SEU PRESENTE!
 GiftTap,TAP TO CLAIM,,,TOCA PARA RECLAMAR,TOQUE PARA PEGAR
 GiftTomorrow,ALL GIFTS OPENED,,,REGALOS ABIERTOS,PRESENTES ABERTOS
 GiftPay,{m} MINUTE GIFT  +${pay},,,REGALO DE {m} MINUTOS  +${pay},PRESENTE DE {m} MINUTOS  +${pay}
-TomorrowPays,Come back tomorrow: Day {n} pays ${pay},,,Vuelve mañana: el día {n} paga ${pay},Volte amanhã: o dia {n} paga ${pay}
+TomorrowPays,Come back tomorrow: Day {n} pays {pay},,,Vuelve mañana: el día {n} paga {pay},Volte amanhã: o dia {n} paga {pay}
 StreakPay,DAY {n} STREAK  +${pay},,,RACHA DE {n} DÍAS  +${pay},SEQUÊNCIA DE {n} DIAS  +${pay}
 GroupPay,+${pay}  Thanks for joining!,,,+${pay}  ¡Gracias por unirte!,+${pay}  Valeu por entrar!
 ContestPay,+${pay}  {label},,,+${pay}  {label},+${pay}  {label}
