@@ -41,7 +41,7 @@ return function(check: (string, boolean) -> ())
 			prices
 		) == 5
 	)
-	-- the best cash rate is the Money Truck's ~2,007 $/R$: 400k for 49 R$ is 4.1x, for 99 R$ 2.0x
+	-- the best cash rate is the Vault Heist's ~2,007 $/R$: 400k for 49 R$ is 4.1x, for 99 R$ 2.0x
 	local worth = Offer.worth(S, prices)
 	check("deal value times", Offer.valueTimes(worth, D.robux, Products.MoneyPacks) == 4)
 	check("full value times", Offer.valueTimes(worth, S.robux, Products.MoneyPacks) == 2)

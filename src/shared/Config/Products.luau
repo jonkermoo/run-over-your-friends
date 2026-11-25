@@ -50,7 +50,7 @@ return table.freeze({
 		p({
 			key = "Cash4",
 			id = 3731574885,
-			title = "Money Truck",
+			title = "Vault Heist",
 			money = 600000,
 			robux = 299,
 			once = false,
