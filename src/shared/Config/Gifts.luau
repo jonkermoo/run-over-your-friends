@@ -7,12 +7,12 @@
 export type Prize = { cash: number, paint: string? }
 
 return table.freeze({
-	Minutes = table.freeze({ 5, 10, 15, 30 }),
+	Minutes = table.freeze({ 5, 10, 15, 20 }), -- one every 5 minutes
 	Prizes = table.freeze({
 		table.freeze({ cash = 500 }),
 		table.freeze({ cash = 1000 }),
 		table.freeze({ cash = 2500, paint = "Pink" }), -- Hot Pink, a $2,500 shop paint
-		table.freeze({ cash = 5000, paint = "Chrome" }), -- the rare one: a chest-only paint
+		table.freeze({ cash = 4000, paint = "Chrome" }), -- the rare one: a chest-only paint
 	} :: { Prize }),
 	Slack = 3, -- seconds the server allows a claim early (clocks and the tap's trip)
 	HitEvery = 4,
