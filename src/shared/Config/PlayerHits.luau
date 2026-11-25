@@ -4,7 +4,7 @@
 -- Plain numbers only (Lune tests read this).
 
 return table.freeze({
-	BigCarPrice = 100000, -- cars at or over this shop price hit with the Big terms (Bulldozer and up)
+	BigCarPrice = 35000, -- cars at or over this shop price hit with the Big terms (Bulldozer and up)
 	SpawnShield = 3, -- seconds after a spawn when nobody can hit you
 	-- the whole spawn block (World.Map.BlockSize, kerb to kerb) is a safe zone: players on foot and their cars
 	-- there can't be hit; it reaches this many studs past the kerb into the roads round it
@@ -16,7 +16,7 @@ return table.freeze({
 	RepeatFloor = 0.25,
 	-- a car's knock on another car grows with its price: CheapCarLaunchCap at CheapCarPrice and below,
 	-- rising (log scale) to Normal.carLaunchCap at BigCarPrice
-	CheapCarPrice = 3000, -- Hatchback and Sedan
+	CheapCarPrice = 1500, -- Hatchback, the joke rides and the Sedan
 	CheapCarLaunchCap = 100, -- studs/s
 	Normal = table.freeze({
 		shield = 6, -- seconds after a hit when this attacker can't hit the victim again
