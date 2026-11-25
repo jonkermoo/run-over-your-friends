@@ -3668,23 +3668,23 @@ local function checkLand()
 	local LandCfg = require("../src/shared/Config/Land")
 	local Land = require("../src/shared/Rules/Land")
 	local Suburbs = require("../src/shared/Config/Suburbs")
-	local seaEdge = -2203 -- the port's quay (Outskirts zones at the default ring), as measured in Studio
+	local seaEdge = -2061 -- the port's quay (Outskirts zones at the default ring: 7 x 7 blocks)
 	check("the coast is straight along the beaches", Land.coast(LandCfg, seaEdge, 2999) == seaEdge)
 	check("the coast curves inland past them", Land.coast(LandCfg, seaEdge, 4000) > seaEdge + 200)
 	local inside = true
 	for _, p in
 		{
-			{ 2650, 2650 },
-			{ 2650, -2650 },
-			{ -1950, -2800 },
-			{ 2400, 0 },
-			{ 0, -2700 },
-			{ 0, 2700 },
+			{ 2450, 2350 }, -- the motocross's far corner
+			{ 2450, -2450 }, -- the farm's
+			{ -1850, -2550 }, -- the forest's
+			{ 2261, 0 }, -- the stunt park's east edge
+			{ 0, -2300 }, -- past the building site
+			{ 0, 2450 }, -- past the desert
 		}
 	do
 		inside = inside and Land.isLand(LandCfg, seaEdge, p[1], p[2], 200)
 	end
-	check("the old map's far corners are well inside the island", inside)
+	check("the zones' far corners are well inside the island", inside)
 	local outline = Land.outline(LandCfg, seaEdge, 120)
 	local ok = #outline == 120
 	for _, p in outline do

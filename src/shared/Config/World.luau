@@ -118,8 +118,8 @@ return table.freeze({
 		GroundSize = 6000,
 		BlockSize = 220, -- city block, kerb to kerb
 		RoadWidth = 64, -- wide enough for the semi and the fire truck
-		BlocksX = 8,
-		BlocksZ = 8,
+		BlocksX = 7, -- odd, so the spawn block sits right in the middle (was 8 x 8: compacted)
+		BlocksZ = 7,
 		FloorHeight = 14,
 		PanelWidth = 12,
 		WallThickness = 1.5,

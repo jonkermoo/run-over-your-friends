@@ -54,7 +54,7 @@ return table.freeze({
 
 	-- the building site in one car park's north-west corner, clear of both ramps' runs
 	Site = table.freeze({
-		Block = table.freeze({ 426, 426 }), -- the car park's middle (world x, z)
+		Block = table.freeze({ 568, 568 }), -- the car park's middle (world x, z): the south-east one
 		Area = table.freeze({ -100, -100, -14, -54 }) :: Rect,
 		Ground = { 150, 120, 88 } :: RGB,
 		Hoarding = 12, -- one board this long round the site (each a prop), the gate left open

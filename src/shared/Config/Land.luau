@@ -6,14 +6,15 @@
 export type Wave = { k: number, amp: number, phase: number }
 
 return table.freeze({
-	Radius = 5100, -- the edge's mean distance from the middle
+	Radius = 4000, -- the edge's mean distance from the middle (was 5100: compacted so less open grass)
 	-- the edge wobbles by these waves round the circle: k bumps, `amp` studs in and out
 	Waves = table.freeze({
-		table.freeze({ k = 2, amp = 220, phase = 0.7 }),
-		table.freeze({ k = 3, amp = 260, phase = 2.1 }),
-		table.freeze({ k = 5, amp = 150, phase = 4.0 }),
-		table.freeze({ k = 7, amp = 80, phase = 1.3 }),
-		table.freeze({ k = 11, amp = 40, phase = 5.2 }),
+		-- phased so the bulges fall where the suburbs and lakes reach furthest, which the tests check
+		table.freeze({ k = 2, amp = 140, phase = 1.4 }),
+		table.freeze({ k = 3, amp = 165, phase = 3.4 }),
+		table.freeze({ k = 5, amp = 95, phase = 4.0 }),
+		table.freeze({ k = 7, amp = 50, phase = 1.3 }),
+		table.freeze({ k = 11, amp = 25, phase = 5.2 }),
 	}) :: { Wave },
 	CoastStraight = 3000, -- the coast runs straight this far north and south of the middle (port, beaches)...
 	CoastBend = 2600, -- ...then curves inland by (|z| - straight)^2 / bend

@@ -42,10 +42,10 @@ function CityPlan.centre(blocksX: number, blocksZ: number): (number, number)
 	return blocksX // 2, blocksZ // 2
 end
 
--- how far a block is from the spawn block, in blocks (the downtown ring is < 2.5)
+-- how far a block is from the middle of the grid, in blocks (the downtown ring is < 2.5); on an odd grid the
+-- middle is the spawn block itself
 function CityPlan.distance(i: number, j: number, blocksX: number, blocksZ: number): number
-	local ci, cj = CityPlan.centre(blocksX, blocksZ)
-	return math.max(math.abs(i - ci + 0.5), math.abs(j - cj + 0.5))
+	return math.max(math.abs(i - (blocksX - 1) / 2), math.abs(j - (blocksZ - 1) / 2))
 end
 
 -- kinds[i][j] for i in 0..blocksX-1, j in 0..blocksZ-1

@@ -10,7 +10,7 @@
 -- under the city's roads count as asphalt (low) or sidewalk (raised). Other see-through parts, the far
 -- skyline stand-ins and anything outside workspace.Map are skipped.
 
-local CX, CZ, SPAN, OUT, SS = 1350, 50, 8400, 2048, 2
+local CX, CZ, SPAN, OUT, SS = 850, 100, 7000, 2048, 2
 local ASPH = Color3.fromRGB(58, 60, 66)
 local WALK = Color3.fromRGB(176, 174, 168)
 

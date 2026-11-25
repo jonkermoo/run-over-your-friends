@@ -8,14 +8,14 @@ export type Place = { key: string, name: string, x: number, z: number }
 return table.freeze({
 	-- the picture in TileGrid x TileGrid square tiles (row by row from the top left, image ids; 0 draws a plain dark
 	-- square), so it stays sharp zoomed in (Roblox images are at most 1024 px)
-	-- (Decals 93532832023487, 85092606596375, 131173764802988, 92427439764671)
-	Tiles = table.freeze({ 136864239624231, 104129370694010, 91126024038278, 139658215713133 }),
+	-- (Decals 126830927606578, 103021315203907, 89133872365004, 139739612073418)
+	Tiles = table.freeze({ 95819431331767, 123428804733195, 128784584278736, 110697980419299 }),
 	TileGrid = 2,
 	Pin = 123493636137749, -- (Decal 105196457864314) the player marker (tools/map/pin.py): a white map pin, tinted; its tip is the spot
 	-- world x, z under the picture's middle, and the studs it covers edge to edge both ways (it is square): the
-	-- beaches in the west to the far suburbs in the east (tools/map/scan.luau uses the same numbers)
-	Centre = table.freeze({ 1350, 50 }),
-	Span = 8400,
+	-- beaches in the west to the island's east edge (tools/map/scan.luau uses the same numbers)
+	Centre = table.freeze({ 850, 100 }),
+	Span = 7000,
 	Pixels = 2048, -- the whole picture's size, both ways (tools/map)
 
 	-- the server sends every player's spot to each client that has the map open, this often
@@ -63,8 +63,8 @@ return table.freeze({
 
 	-- key places, marked on the map (measured from the built map in Studio)
 	Places = table.freeze({
-		table.freeze({ key = "StuntPark", name = "STUNT PARK", x = 1953, z = -2 }),
+		table.freeze({ key = "StuntPark", name = "STUNT PARK", x = 1811, z = 0 }),
 		-- the Stadium Row district (Rules/Districts: the north middle of the grid)
-		table.freeze({ key = "Stadium", name = "STADIUM ROW", x = 142, z = -852 }),
+		table.freeze({ key = "Stadium", name = "STADIUM ROW", x = 142, z = -710 }),
 	}) :: { Place },
 })

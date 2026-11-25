@@ -1,6 +1,6 @@
 --!strict
 -- Builds the world from World.Map at server start (same seed, same city every time):
--- an 8x8 city grid with wide roads; blocks from the city plan (offices, homes, the burger place, the parcel
+-- a 7x7 city grid with wide roads; blocks from the city plan (offices, homes, the burger place, the parcel
 -- warehouse, shops, parks, plazas) with destructible chunked buildings and places for the crowd,
 -- parking lots with kickers; the ground, the highway ring and the zones beyond it come from OutskirtsKit.
 
