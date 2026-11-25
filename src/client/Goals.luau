@@ -94,6 +94,7 @@ local state: { [string]: SetView } = {}
 local serverSet: SetView? = nil -- from its own remote; kept when the player's sets arrive
 local clockOffset = 0 -- server unix time minus local unix time
 local open = false
+local forGifts = false -- opened from the gift chip: shows even before the tutorial's goals step
 local fullUntil = 0 -- the count pill says "MAX 3 PINNED" until then, after a pin past the limit
 local countdowns: { [string]: TextLabel } = {}
 local function fmt(seconds: number): string
@@ -370,6 +371,9 @@ end
 
 function Goals.toggle()
 	open = not open
+	if not open then
+		forGifts = false
+	end
 	if open then
 		Challenges.sheetOpened()
 	end
@@ -381,6 +385,12 @@ function Goals.open()
 	if not open then
 		Goals.toggle()
 	end
+end
+
+-- from the HUD gift chip: the sheet with its PLAY GIFTS section, even early in the tutorial
+function Goals.openGifts()
+	forGifts = true
+	Goals.open()
 end
 
 function Goals.close()
@@ -474,8 +484,8 @@ function Goals.start()
 		local step = (player:GetAttribute("Tutorial") or 99) :: number
 		panel.Visible = open
 			and player:GetAttribute("DataReady") == true
-			and OnboardingRules.reached(step, Onboarding.Steps.Goal, Onboarding)
-			and next(state) ~= nil
+			and (forGifts or OnboardingRules.reached(step, Onboarding.Steps.Goal, Onboarding))
+			and (forGifts or next(state) ~= nil)
 		local now = os.clock()
 		if now - last < 0.5 then
 			return

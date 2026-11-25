@@ -130,7 +130,7 @@ function GiftChip.start()
 	-- the gifts are claimed in the goals sheet (client/GiftRows)
 	Style.onTap(chip, function()
 		Hud.closeSheets()
-		Goals.open()
+		Goals.openGifts()
 	end)
 	task.spawn(function()
 		while true do
