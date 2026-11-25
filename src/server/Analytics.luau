@@ -411,7 +411,6 @@ function Analytics.tutorialOffer(player: Player, stage: string, where: string, v
 	end)
 end
 
--- the garage tour reached a page (Config/Onboarding TourPages), field 01 the page
 -- a play-time gift claimed: its minute mark, and whether it gave cash or a paint (Config/Gifts)
 function Analytics.giftClaimed(player: Player, minute: number, kind: string)
 	safe(function()
@@ -419,6 +418,7 @@ function Analytics.giftClaimed(player: Player, minute: number, kind: string)
 	end)
 end
 
+-- the garage tour reached a page (Config/Onboarding TourPages), field 01 the page
 function Analytics.tutorialTour(player: Player, page: string)
 	safe(function()
 		log(player, "TutorialTour", 1, page)
