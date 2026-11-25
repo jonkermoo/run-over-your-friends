@@ -153,6 +153,7 @@ end
 
 local function build(gui: ScreenGui, preview: Preview)
 	card = Style.panel(gui)
+	Style.posts(card)
 	card.Name = "StarterCard"
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.Position = UDim2.fromScale(0.5, 0.5)
@@ -160,7 +161,6 @@ local function build(gui: ScreenGui, preview: Preview)
 	card.ZIndex = 10
 	card.Visible = false
 	Style.stroke(card, C.yellow, 4, 0)
-	Style.setShadow(card, C.pink)
 	Style.hazard(card, CARD_W, 14)
 
 	local title = Style.label(card, "STARTER PACK", 52, F.display, C.yellow)

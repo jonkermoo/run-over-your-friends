@@ -158,7 +158,6 @@ local function fillCard(card: Card, g: GoalView)
 		else "$" .. shortNumber(g.reward)
 	card.reward.BackgroundColor3 = if g.done then C.green else C.gold
 	card.text.TextColor3 = if g.done or g == WAITING then C.dim else C.text
-	Style.setShadow(card.frame, if g.done then C.green else C.ink)
 	-- the server goal's tag carries its clock: time left, then (done or between goals) time to the next
 	local s = sets[card.pin.set]
 	if card.pin.set == "Server" and s then

@@ -47,7 +47,7 @@ sheet.Name = "Sheet"
 sheet.Position = UDim2.fromOffset(Cfg.Side, Cfg.Top)
 sheet.Size = UDim2.new(1, -2 * Cfg.Side, 1, -(Cfg.Top + Cfg.Bottom))
 sheet.Visible = false
-Style.setShadow(sheet, C.yellow)
+Style.sign(sheet, "orange")
 
 local title = Style.label(sheet, "CITY MAP", 32, F.display, C.text)
 title.Position = UDim2.fromOffset(16, 10)
@@ -57,7 +57,7 @@ local hint = Style.label(sheet, "TAP A DOT TO SEE WHO IT IS", 14, F.heavy, C.dim
 hint.Position = UDim2.fromOffset(196, 12)
 hint.Size = UDim2.new(1, -420, 0, 36)
 hint.TextXAlignment = Enum.TextXAlignment.Left
-local close = Style.button(sheet, "X", "gold", 22)
+local close = Style.button(sheet, "X", "dark", 22)
 close.Name = "Close"
 close.AnchorPoint = Vector2.new(1, 0)
 close.Position = UDim2.new(1, -10, 0, 7)
@@ -209,7 +209,7 @@ local function legendRow(order: number, text: string, draw: (Frame) -> ())
 	icon.Size = UDim2.fromOffset(28, 28)
 	icon.Parent = row
 	draw(icon)
-	local l = Style.label(row, text, 16, F.heavy, C.text)
+	local l = Style.label(row, text, 16, F.heavy, C.ink) -- black on the orange sign
 	l.Position = UDim2.fromOffset(40, 0)
 	l.Size = UDim2.new(1, -40, 1, 0)
 	l.TextXAlignment = Enum.TextXAlignment.Left
@@ -540,7 +540,7 @@ local function refreshCard()
 	cardTag.TextColor3 = if you then C.text else C.ink
 	cardLeader.Position = UDim2.fromOffset(14 + cardTag.AbsoluteSize.X / Style.scale() + 6, 14)
 	cardName.Text = p.DisplayName
-	cardName.TextColor3 = if friend then C.yellow else C.text
+	cardName.TextColor3 = if friend then C.blue else C.ink
 	-- driving their own car, riding in someone else's, or on foot
 	local d = dots[p.UserId]
 	local seated, rideId = false, nil

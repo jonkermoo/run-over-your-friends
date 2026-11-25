@@ -44,7 +44,7 @@ tile.AnchorPoint = Vector2.new(1, 0)
 tile.Position = UDim2.new(1, -(14 + 196 + Cfg.TileGap), 0, 8)
 tile.Size = UDim2.fromOffset(Cfg.TileWidth, Cfg.TileHeight)
 tile.Parent = gui
-Style.shadow(tile)
+Style.sign(tile, "white", true)
 local tileTag = Style.label(tile, "GAME", 11, F.heavy, C.yellow)
 tileTag.Position = UDim2.fromOffset(0, 6)
 tileTag.Size = UDim2.new(1, 0, 0, 12)
@@ -63,8 +63,7 @@ sheet.AnchorPoint = Vector2.new(0.5, 0.5)
 sheet.Size = UDim2.fromOffset(W, H)
 sheet.Visible = false
 sheet.ZIndex = 5
-Style.stroke(sheet, C.text, 3, 0)
-Style.setShadow(sheet, C.yellow)
+Style.sign(sheet, "white")
 
 local title = Style.label(sheet, "SETTINGS", 32, F.display, C.yellow)
 title.Position = UDim2.fromOffset(Cfg.Pad, 12)
@@ -72,7 +71,7 @@ title.Size = UDim2.new(1, -(Cfg.Pad + 70), 0, 40)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 6
 
-local close = Style.button(sheet, "X", "gold", 22)
+local close = Style.button(sheet, "X", "dark", 22)
 close.Name = "Close"
 close.AnchorPoint = Vector2.new(1, 0)
 close.Position = UDim2.new(1, -14, 0, 10)

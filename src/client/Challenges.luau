@@ -312,7 +312,6 @@ card.Position = UDim2.fromScale(0.5, 0.5)
 card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
 Style.stroke(card, C.yellow, 4, 0)
-Style.setShadow(card, DAILY_COLOR)
 local cardScale = Instance.new("UIScale")
 cardScale.Parent = card
 Style.hazard(card, W, 14)
@@ -449,7 +448,6 @@ function Challenges.open(set: "Daily" | "Weekly")
 	resetChest()
 	cardTitle.Text = if set == "Daily" then "DAILY CHEST" else "WEEKLY CHEST"
 	cardTitle.TextColor3 = if set == "Daily" then C.yellow else C.orange
-	Style.setShadow(card, if set == "Daily" then DAILY_COLOR else WEEKLY_COLOR)
 	card.Visible = true
 	cardScale.Scale = 0.8
 	tween(cardScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
@@ -538,7 +536,6 @@ nudge.Position = UDim2.fromScale(0.5, 0.5)
 nudge.Size = UDim2.fromOffset(NUDGE_W, NUDGE_H)
 nudge.Visible = false
 Style.stroke(nudge, C.yellow, 4, 0)
-Style.setShadow(nudge, DAILY_COLOR)
 Style.hazard(nudge, NUDGE_W, 12)
 local nTitle = Style.label(nudge, "DAILY CHALLENGES", 34, F.display, C.yellow)
 nTitle.Position = UDim2.fromOffset(0, 26)

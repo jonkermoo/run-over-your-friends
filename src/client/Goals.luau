@@ -55,7 +55,7 @@ panel.Name = "GoalsSheet"
 panel.Position = UDim2.fromOffset(14, TOP)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
-Style.setShadow(panel, C.blue)
+Style.sign(panel, "brown")
 local headLine = Style.dashes(panel, C.yellow, false, 4)
 headLine.Position = UDim2.fromOffset(0, HEAD_H - 6)
 
@@ -68,7 +68,7 @@ countPill.TextSize = 15
 countPill.Size = UDim2.fromOffset(0, 24)
 countPill.AnchorPoint = Vector2.new(0, 0.5)
 countPill.Position = UDim2.fromOffset(122, 31)
-local close = Style.button(panel, "X", "gold", 22)
+local close = Style.button(panel, "X", "dark", 22)
 close.Name = "Close"
 close.AnchorPoint = Vector2.new(1, 0)
 close.Position = UDim2.new(1, -10, 0, 8)

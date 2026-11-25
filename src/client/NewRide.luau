@@ -38,6 +38,7 @@ local function turntable(stats: Vehicles.Vehicle)
 		return
 	end
 	local card = Style.panel(gui)
+	Style.posts(card)
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.Position = UDim2.fromScale(0.5, 0.45)
 	card.Size = UDim2.fromOffset(420, 270)

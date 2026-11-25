@@ -59,7 +59,8 @@ function NextCar.start()
 	bar.Size = UDim2.fromOffset(WIDTH, HEIGHT)
 	bar.Visible = false
 	bar.Parent = hud
-	local edge = Style.stroke(bar, C.text, 2, 0.35)
+	Style.sign(bar, "green", true)
+	local edge = bar:FindFirstChild("SignEdge") :: UIStroke
 	local tag = Style.label(bar, "NEXT CAR", 10, F.heavy, C.yellow)
 	tag.Position = UDim2.fromOffset(10, 5)
 	tag.Size = UDim2.fromOffset(90, 11)
@@ -84,24 +85,13 @@ function NextCar.start()
 
 	-- the GARAGE tab's red dot while the next car can be bought
 	local garageButton = hud:FindFirstChild("GarageButton", true) :: GuiObject?
-	-- a red "!" badge on the tab's top right corner, clear of the letters (the tab's text stops 16 px short)
-	local dot = Instance.new("TextLabel")
+	-- a stop-sign "!" badge on the sign's top right corner
+	local dot = Style.stop(hud, "!", 22)
 	dot.Name = "AffordDot"
 	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, -3, 0, 3)
-	dot.Size = UDim2.fromOffset(20, 20)
-	dot.BackgroundColor3 = C.red
-	dot.BorderSizePixel = 0
-	dot.Text = "!"
-	dot.TextColor3 = C.text
-	dot.TextSize = 15
-	dot.FontFace = F.display
+	dot.Position = UDim2.new(1, -4, 0, 12)
 	dot.ZIndex = 5
 	dot.Visible = false
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0.5, 0)
-	corner.Parent = dot
-	Style.stroke(dot, C.ink, 2, 0)
 	local pulse = Instance.new("UIScale")
 	pulse.Parent = dot
 	TweenService:Create(
@@ -129,8 +119,8 @@ function NextCar.start()
 		progress.Visible = not ready
 		buy.Visible = ready
 		fill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
-		edge.Color = if ready then C.yellow else C.text
-		edge.Transparency = if ready then 0 else 0.35
+		edge.Color = if ready then C.yellow else Style.signs.green.edge
+		edge.Thickness = if ready then 3 else 2
 	end
 
 	Style.onTap(bar, function()

@@ -39,13 +39,13 @@ gui.Parent = playerGui
 Style.fit(gui)
 
 local card = Style.panel(gui)
+Style.posts(card)
 card.Name = "StreakCard"
 card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.fromScale(0.5, 0.5)
 card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
 Style.stroke(card, C.yellow, 4, 0)
-Style.setShadow(card, C.blue)
 local scale = Instance.new("UIScale")
 scale.Parent = card
 Style.hazard(card, W, 14)
@@ -58,12 +58,12 @@ local sub = Style.label(card, "", 16, F.bold, C.text)
 sub.Position = UDim2.fromOffset(20, 76)
 sub.Size = UDim2.new(1, -40, 0, 22)
 
--- the week: tiles stand on one line, today's taller
+-- the week: a row of mile markers (small green signs on posts), today's yellow and raised
 local row = Instance.new("Frame")
 row.BackgroundTransparency = 1
 row.AnchorPoint = Vector2.new(0.5, 0)
 row.Position = UDim2.new(0.5, 0, 0, 110)
-row.Size = UDim2.fromOffset((TILES - 1) * (TILE_W + TILE_GAP) + PRIZE_W, TODAY_H)
+row.Size = UDim2.fromOffset((TILES - 1) * (TILE_W + TILE_GAP) + PRIZE_W, TODAY_H + 10)
 row.Parent = card
 
 type Tile = {
@@ -78,12 +78,21 @@ type Tile = {
 local tiles: { Tile } = {}
 for i = 1, TILES do
 	local prize = i == TILES
-	local f = Style.card(row)
+	local f = Instance.new("Frame")
 	f.AnchorPoint = Vector2.new(0, 1)
-	f.Position = UDim2.new(0, (i - 1) * (TILE_W + TILE_GAP), 1, 0)
+	f.Position = UDim2.new(0, (i - 1) * (TILE_W + TILE_GAP), 1, -10)
 	f.Size = UDim2.fromOffset(if prize then PRIZE_W else TILE_W, TILE_H)
-	local edge = Style.stroke(f, C.yellow, 3, 0)
-	edge.Enabled = prize
+	f.Parent = row
+	local post = Instance.new("Frame")
+	post.Name = "Post"
+	post.BackgroundColor3 = C.steel
+	post.BorderSizePixel = 0
+	post.AnchorPoint = Vector2.new(0.5, 0)
+	post.Position = UDim2.new(0.5, 0, 1, 2)
+	post.Size = UDim2.fromOffset(7, 10)
+	post.Parent = f
+	Style.sign(f, "green", true)
+	local edge = f:FindFirstChild("SignEdge") :: UIStroke
 	local day = Style.label(f, "", 14, F.heavy, C.dim)
 	day.Position = UDim2.fromOffset(0, 6)
 	day.Size = UDim2.new(1, 0, 0, 18)
@@ -161,13 +170,20 @@ local function draw()
 		t.stamp.Visible = got
 		t.frame.Size =
 			UDim2.fromOffset(if t.prize then PRIZE_W else TILE_W, if big then TODAY_H else TILE_H)
-		t.edge.Enabled = t.prize and not now
+		t.edge.Color = if t.prize and not now then C.yellow else Style.signs.green.edge
+		t.edge.Thickness = if t.prize and not now then 3 else 2
+		local line = t.frame:FindFirstChild("Line")
+		if line then
+			((line :: Frame):FindFirstChildOfClass("UIStroke") :: UIStroke).Color = if now
+				then C.ink
+				else C.edge
+		end
 		local ink = if now then C.ink elseif got then C.dim elseif t.prize then C.yellow else C.text
 		t.frame.BackgroundColor3 = if now
 			then C.yellow
-			elseif got then C.card
 			elseif t.prize then C.prize
-			else C.grey
+			else Color3.fromRGB(11, 125, 75)
+		t.frame.BackgroundTransparency = if got then 0.4 else 0
 		t.day.TextColor3 = if now or t.prize then ink else C.dim
 		t.pay.TextColor3 = ink
 	end

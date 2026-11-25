@@ -176,13 +176,13 @@ end
 -- shadow, the car and a lane-line bar of cash toward it, then the pass (gold) and KEEP DRIVING (dark)
 local CARD_W, CARD_H = 500, 360
 local card = Style.panel(gui)
+Style.posts(card)
 card.Name = "TrialOver"
 card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.fromScale(0.5, 0.5)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.Visible = false
 Style.stroke(card, C.yellow, 4, 0)
-Style.setShadow(card, C.pink)
 Style.hazard(card, CARD_W, 14)
 local title = Style.label(card, "TRIAL OVER!", 40, F.display, C.yellow)
 title.Position = UDim2.fromOffset(0, 26)

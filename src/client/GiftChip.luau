@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Gifts)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Gifts = require(ReplicatedStorage.Shared.Rules.Gifts)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Goals = require(script.Parent.Goals)
@@ -22,24 +23,11 @@ local TOP, WIDTH, HEIGHT = 120, 196, 40 -- layout px: under the next-car bar (cl
 
 local GiftChip = {}
 
--- a small gift box drawn from frames: gold box, pink ribbon
-local function giftBox(parent: Instance): Frame
-	local box = Instance.new("Frame")
-	box.Size = UDim2.fromOffset(24, 20)
-	box.Position = UDim2.fromOffset(9, 11)
-	box.BackgroundColor3 = C.yellow
-	box.BorderSizePixel = 0
-	box.Parent = parent
-	Style.stroke(box, C.ink, 2, 0)
-	for _, s in { UDim2.new(0, 4, 1, 0), UDim2.new(1, 0, 0, 4) } do
-		local band = Instance.new("Frame")
-		band.AnchorPoint = Vector2.new(0.5, 0.5)
-		band.Position = UDim2.fromScale(0.5, 0.5)
-		band.Size = s
-		band.BackgroundColor3 = C.pink
-		band.BorderSizePixel = 0
-		band.Parent = box
-	end
+-- the gift pictogram, white on the blue sign
+local function giftBox(parent: Instance): ImageLabel
+	local box = Style.image(parent, Icons.SignGift, C.text)
+	box.Size = UDim2.fromOffset(26, 26)
+	box.Position = UDim2.fromOffset(9, 7)
 	return box
 end
 
@@ -62,7 +50,8 @@ function GiftChip.start()
 	chip.Size = UDim2.fromOffset(WIDTH, HEIGHT)
 	chip.Visible = false
 	chip.Parent = hud
-	local edge = Style.stroke(chip, C.text, 2, 0.35)
+	Style.sign(chip, "blue", true)
+	local edge = chip:FindFirstChild("SignEdge") :: UIStroke
 	local box = giftBox(chip)
 	local title = Style.label(chip, "", 16, F.display, C.text)
 	title.AutoLocalize = false
@@ -114,8 +103,8 @@ function GiftChip.start()
 			box.Visible = false
 		end
 		chip.Visible = true
-		edge.Color = if ready then C.yellow else C.text
-		edge.Transparency = if ready then 0 else 0.35
+		edge.Color = if ready then C.yellow else Style.signs.blue.edge
+		edge.Thickness = if ready then 3 else 2
 		title.TextColor3 = if ready then C.yellow else C.text
 		if ready ~= wasReady then
 			if ready then

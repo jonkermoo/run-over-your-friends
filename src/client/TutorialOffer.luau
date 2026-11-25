@@ -47,13 +47,13 @@ dim.Selectable = false
 dim.Parent = gui
 
 local card = Style.panel(gui)
+Style.posts(card)
 card.Name = "OfferCard"
 card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.fromScale(0.5, 0.5)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.ZIndex = 2
 Style.stroke(card, C.yellow, 4, 0)
-Style.setShadow(card, C.pink)
 Style.hazard(card, CARD_W, 14)
 local scale = Instance.new("UIScale")
 scale.Parent = card

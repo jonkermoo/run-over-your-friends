@@ -60,22 +60,19 @@ Style.fit(gui)
 
 ---------------------------------------------------------------- money and pop-ups
 
--- top right: the money in a parking-bay box (white painted lines round asphalt)
+-- top right: the money on a green sign with a yellow CASH tab on its top edge
 local moneyBox = Style.panel(gui)
 moneyBox.AnchorPoint = Vector2.new(1, 0)
-moneyBox.Position = UDim2.new(1, -14, 0, 8)
-moneyBox.Size = UDim2.fromOffset(196, 54)
-Style.stroke(moneyBox, C.text, 3, 0)
+moneyBox.Position = UDim2.new(1, -14, 0, 14)
+moneyBox.Size = UDim2.fromOffset(196, 50)
 local moneyScale = Instance.new("UIScale")
 moneyScale.Parent = moneyBox
-local cashTag = Style.label(moneyBox, "CASH", 11, F.heavy, C.yellow)
-cashTag.AnchorPoint = Vector2.new(1, 0)
-cashTag.Position = UDim2.new(1, -12, 0, 5)
-cashTag.Size = UDim2.fromOffset(60, 12)
-cashTag.TextXAlignment = Enum.TextXAlignment.Right
-local moneyLabel = Style.label(moneyBox, "$0", 30, F.display, C.money)
+local cashTag = Style.pill(moneyBox, "CASH", C.yellow)
+cashTag.TextSize = 11
+cashTag.Position = UDim2.fromOffset(12, -11)
+local moneyLabel = Style.label(moneyBox, "$0", 30, F.display, C.text)
 moneyLabel.AnchorPoint = Vector2.new(1, 0)
-moneyLabel.Position = UDim2.new(1, -12, 0, 17)
+moneyLabel.Position = UDim2.new(1, -14, 0, 10)
 moneyLabel.Size = UDim2.new(1, -20, 0, 32)
 moneyLabel.TextXAlignment = Enum.TextXAlignment.Right
 moneyLabel.TextScaled = true
@@ -181,7 +178,14 @@ local function plate(
 	end
 	l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 	fit()
-	Style.shadow(l, C.ink, 4)
+	-- a small sign: green ones get the white inner line, the rest a dark edge and lip
+	if fill == C.panel then
+		Style.sign(l, "green", true)
+	else
+		Style.corner(l, 7)
+		Style.stroke(l, C.ink, 2, 0)
+		Style.shadow(l, C.ink, 3)
+	end
 	return l
 end
 
@@ -212,7 +216,7 @@ local function popup(line: string | Loc.Msg, kind: string)
 		item = plate(text, C.panel, C.text, 15, F.heavy, Icons.Sign, C.yellow)
 		hold = 2.4
 	else
-		item = plate(text, C.money, C.ink, 24, F.display, Icons.Coin)
+		item = plate(text, C.panel, C.money, 24, F.display, Icons.Coin)
 	end
 	pushFeed(item, hold, item.TextSize + 8)
 end
@@ -288,34 +292,34 @@ end
 
 ---------------------------------------------------------------- speedometer
 
--- bottom centre: an asphalt plate with a yellow lane line along the top, a gear chip, the big number and a
--- yellow MPH; flight and thruster meters run under it as dashed lane bars
-local DASH_W, DASH_H, METER_H = 220, 70, 12
+-- bottom centre: a white speed-limit sign (SPEED, the big number, MPH) with the gear on a small blue plate
+-- beside it; flight and thruster meters run under the number
+local DASH_W, DASH_H, METER_H = 104, 96, 12
 local dash = Style.panel(gui)
 dash.Name = "Speedometer"
 dash.AnchorPoint = Vector2.new(0.5, 1)
 dash.Position = UDim2.new(0.5, 0, 1, -18)
 dash.Size = UDim2.fromOffset(DASH_W, DASH_H)
 dash.Visible = false
-local dashTop = Instance.new("Frame")
-dashTop.BackgroundColor3 = C.yellow
-dashTop.BorderSizePixel = 0
-dashTop.Size = UDim2.new(1, 0, 0, 4)
-dashTop.Parent = dash
-local gearLabel = Style.label(dash, "D", 28, F.display, C.text)
+Style.sign(dash, "white", true)
+local dashTop = Style.label(dash, "SPEED", 14, F.heavy, C.ink)
+dashTop.Position = UDim2.fromOffset(0, 8)
+dashTop.Size = UDim2.new(1, 0, 0, 14)
+local gearLabel = Style.label(dash, "D", 20, F.display, C.text)
 gearLabel.BackgroundColor3 = C.blue
 gearLabel.BackgroundTransparency = 0
-gearLabel.Position = UDim2.fromOffset(10, 14)
-gearLabel.Size = UDim2.fromOffset(38, 46)
-local speedLabel = Style.label(dash, "0", 54, F.display, C.text)
-speedLabel.TextXAlignment = Enum.TextXAlignment.Right
-speedLabel.Position = UDim2.fromOffset(54, 12)
-speedLabel.Size = UDim2.new(1, -54 - 58, 0, DASH_H - 12)
-local unitLabel = Style.label(dash, "MPH", 18, F.display, C.yellow)
-unitLabel.TextXAlignment = Enum.TextXAlignment.Left
-unitLabel.TextYAlignment = Enum.TextYAlignment.Bottom
-unitLabel.Position = UDim2.new(1, -52, 0, 14)
-unitLabel.Size = UDim2.fromOffset(46, 40)
+gearLabel.TextColor3 = C.text
+gearLabel.AnchorPoint = Vector2.new(1, 1)
+gearLabel.Position = UDim2.fromOffset(-8, DASH_H)
+gearLabel.Size = UDim2.fromOffset(34, 34)
+Style.corner(gearLabel, 6)
+Style.stroke(gearLabel, C.ink, 2, 0)
+local speedLabel = Style.label(dash, "0", 50, F.sign, C.ink)
+speedLabel.Position = UDim2.fromOffset(4, 22)
+speedLabel.Size = UDim2.new(1, -8, 0, 50)
+local unitLabel = Style.label(dash, "MPH", 14, F.heavy, C.ink)
+unitLabel.Position = UDim2.fromOffset(0, DASH_H - 24)
+unitLabel.Size = UDim2.new(1, 0, 0, 14)
 
 local function meter(color: Color3): (Frame, Frame)
 	local back, fill = Style.bar(dash, color)
@@ -323,16 +327,6 @@ local function meter(color: Color3): (Frame, Frame)
 	back.BackgroundTransparency = 0
 	back.Size = UDim2.new(1, -16, 0, 6)
 	back.Visible = false
-	-- gaps every 14 px make it a painted lane line
-	for x = 10, DASH_W, 14 do
-		local gap = Instance.new("Frame")
-		gap.BackgroundColor3 = C.panel
-		gap.BorderSizePixel = 0
-		gap.Position = UDim2.fromOffset(x, 0)
-		gap.Size = UDim2.new(0, 4, 1, 0)
-		gap.ZIndex = 2
-		gap.Parent = back
-	end
 	back.ClipsDescendants = true
 	return back, fill
 end
@@ -384,12 +378,13 @@ controls.AnchorPoint = Vector2.new(1, 1)
 controls.Position = UDim2.new(1, -DriveHudConfig.Margin, 1, -DriveHudConfig.Margin)
 controls.Visible = false
 local controlsEdge = Instance.new("Frame")
-controlsEdge.BackgroundColor3 = C.pink
+controlsEdge.BackgroundColor3 = C.yellow
 controlsEdge.BorderSizePixel = 0
 controlsEdge.Size = UDim2.new(0, 4, 1, 0)
+controlsEdge.Visible = false -- signs carry their own edge
 controlsEdge.Parent = controls
 local PAD = DriveHudConfig.CardPad
-local controlsTitle = Style.label(controls, "CONTROLS", 17, F.display, C.pink)
+local controlsTitle = Style.label(controls, "CONTROLS", 17, F.display, C.yellow)
 controlsTitle.TextXAlignment = Enum.TextXAlignment.Left
 controlsTitle.Position = UDim2.fromOffset(PAD + 4, PAD - 2)
 controlsTitle.Size = UDim2.fromOffset(100, DriveHudConfig.TitleHeight)
@@ -529,7 +524,7 @@ end
 local hint = Style.panel(gui)
 hint.Name = "DriveHint"
 hint.AnchorPoint = Vector2.new(0.5, 1)
-hint.Position = UDim2.new(0.5, 0, 1, -104)
+hint.Position = UDim2.new(0.5, 0, 1, -128)
 hint.Size = UDim2.fromOffset(260, 38)
 hint.Visible = false
 local hintEdge = Instance.new("Frame")
@@ -563,51 +558,33 @@ end
 
 ---------------------------------------------------------------- side buttons and panels
 
--- top left: one asphalt strip of tabs split by dashed lane lines (the left middle of the screen is
--- the phone thumbstick's, so no buttons there)
-local strip = Style.panel(gui)
+-- top left: a steel gantry with a pictogram sign hanging from it for each menu (client/SignMenu); the left
+-- middle of the screen is the phone thumbstick's, so no buttons there
+local strip = require(script.Parent.SignMenu).strip(gui)
 strip.Name = "Menu"
-strip.Position = UDim2.fromOffset(14, 8)
-strip.Size = UDim2.fromOffset(0, 46)
-Style.setShadow(strip, C.pink)
-local tabRow = Instance.new("Frame") -- the layout lives in here so it doesn't move the shadow
+strip.Position = UDim2.fromOffset(14, 4)
+strip.Size = UDim2.fromOffset(0, require(script.Parent.SignMenu).HEIGHT)
+local tabRow = Instance.new("Frame") -- the layout lives in here so it doesn't move the gantry
 tabRow.BackgroundTransparency = 1
 tabRow.Size = UDim2.fromScale(0, 1)
 tabRow.AutomaticSize = Enum.AutomaticSize.X
 tabRow.Parent = strip
 tabRow:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	strip.Size = UDim2.fromOffset(tabRow.AbsoluteSize.X / Style.scale(), 46)
+	strip.Size = UDim2.fromOffset(
+		tabRow.AbsoluteSize.X / Style.scale(),
+		require(script.Parent.SignMenu).HEIGHT
+	)
 end)
 local stripList = Instance.new("UIListLayout")
 stripList.FillDirection = Enum.FillDirection.Horizontal
 stripList.SortOrder = Enum.SortOrder.LayoutOrder
+stripList.Padding = UDim.new(0, 2)
 stripList.Parent = tabRow
 
 local tabs: { TextButton } = {}
 local function tab(text: string, order: number): TextButton
-	if order > 1 then
-		local divider = Style.dashes(tabRow, C.yellow, true, 3)
-		divider.LayoutOrder = order * 2 - 1
-		divider.Size = UDim2.new(0, 3, 1, 0)
-	end
-	local b = Instance.new("TextButton")
-	b.AutoButtonColor = false
-	b.BackgroundColor3 = C.yellow
-	b.BackgroundTransparency = 1
-	b.BorderSizePixel = 0
-	b.Text = text
-	b.TextSize = 21
-	b.FontFace = F.display
-	b.TextColor3 = C.text
-	b.AutomaticSize = Enum.AutomaticSize.X
-	b.Size = UDim2.fromOffset(0, 46)
-	b.LayoutOrder = order * 2
-	b.Parent = tabRow
-	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 16)
-	pad.PaddingRight = UDim.new(0, 16)
-	pad.PaddingTop = UDim.new(0, 5)
-	pad.Parent = b
+	local b = require(script.Parent.SignMenu).tab(tabRow, text)
+	b.LayoutOrder = order
 	table.insert(tabs, b)
 	return b
 end
@@ -622,13 +599,11 @@ local mapButton = tab("MAP", 4) -- the full-screen city map (client/CityMap)
 mapButton.Name = "MapButton"
 local inviteButton = tab("INVITE", 5)
 inviteButton.Name = "InviteButton"
-inviteButton.TextColor3 = C.pink
 -- after a "No thanks" to the tutorial offer: starts the tutorial again (client/TutorialOffer shows it and
 -- handles the press)
 do
 	local b = tab("TUTORIAL", 6)
 	b.Name = "TutorialButton"
-	b.TextColor3 = C.yellow
 	b.Visible = false
 end
 -- gamepad: D-pad right puts the selection on the tabs (client/Pad)
@@ -636,15 +611,10 @@ Pad.strip(tabRow, Enum.KeyCode.DPadRight, function()
 	return garageButton
 end)
 
--- the open tab is painted yellow
+-- the open tab's plaque is painted yellow
 local function markTab(active: TextButton?)
 	for _, b in tabs do
-		b.BackgroundTransparency = if b == active then 0 else 1
-		b.TextColor3 = if b == active
-			then C.ink
-			elseif b == inviteButton then C.pink
-			elseif b.Name == "TutorialButton" then C.yellow
-			else C.text
+		require(script.Parent.SignMenu).mark(b, b == active)
 	end
 end
 
@@ -671,14 +641,14 @@ if screenFit then
 	screenFit:GetPropertyChangedSignal("Scale"):Connect(placeSheets)
 end
 
--- an empty sheet in the middle of the screen with its accent shadow
-local function sheetFrame(accent: Color3): Frame
+-- an empty sheet in the middle of the screen, a sign in its menu's colour
+local function sheetFrame(kind: string): Frame
 	local p = Style.panel(gui)
 	p.AnchorPoint = Vector2.new(0.5, 0.5)
 	p.Size = UDim2.new(1, -28, 1, -(TOP + BOTTOM))
 	p.Visible = false
 	p.ZIndex = 5
-	Style.setShadow(p, accent)
+	Style.sign(p, kind)
 	local limit = Instance.new("UISizeConstraint")
 	limit.MaxSize = SHEET_MAX
 	limit.Parent = p
@@ -687,9 +657,9 @@ local function sheetFrame(accent: Color3): Frame
 	return p
 end
 
--- the yellow X in a sheet's top-right corner
+-- the white X plate in a sheet's top-right corner
 local function closeButton(p: Frame, y: number): TextButton
-	local close = Style.button(p, "X", "gold", 22)
+	local close = Style.button(p, "X", "dark", 22)
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -14, 0, y)
@@ -724,7 +694,7 @@ end
 -- DECALS tabs beside it (client/UpgradePanel). BACK goes back to the list, < and > (LB / RB) step through the
 -- vehicles. Each vehicle has its own page frame under Details, named by its id with its button named Action
 -- (client/Guide points at them); only the chosen one shows.
-local garage = sheetFrame(C.pink)
+local garage = sheetFrame("blue")
 garage.Name = "Garage"
 local listPage = Instance.new("Frame")
 listPage.Name = "List"
@@ -982,7 +952,10 @@ for _, stats in Vehicles.List do
 	row.BorderSizePixel = 0
 	row.Text = ""
 	row.LayoutOrder = stats.order
+	row.BackgroundTransparency = 0.72 -- a recessed box in the sign (Style.card)
 	row.Parent = rows
+	Style.corner(row, 8)
+	Style.stroke(row, C.text, 1.5, 0.78)
 	local rowNext = Instance.new("Frame") -- the car to save for: a yellow edge
 	rowNext.BackgroundColor3 = C.yellow
 	rowNext.BorderSizePixel = 0
@@ -1328,6 +1301,7 @@ function refreshCards()
 		end
 		-- the chosen row is painted yellow, its words in ink
 		c.row.BackgroundColor3 = if chosen then C.yellow else C.ink
+		c.row.BackgroundTransparency = if chosen then 0 else 0.72
 		c.rowBay.TextColor3 = if chosen then C.ink else C.yellow
 		if chosen then
 			c.rowName.TextColor3 = C.ink
@@ -1374,11 +1348,12 @@ Pad.menu(garage, {
 -- LB/RB on a gamepad), and the right side is one scrolling page: the Starter Pack banner, the money packs,
 -- the game passes, and the group reward. The section in view names the page and lights its tab.
 local RAIL = 200
-local store = sheetFrame(C.blue)
+local store = sheetFrame("green")
 store.Name = "Store"
 local rail = Instance.new("Frame")
 rail.Name = "Rail"
 rail.BackgroundColor3 = C.ink
+rail.BackgroundTransparency = 0.75
 rail.BorderSizePixel = 0
 rail.Size = UDim2.new(0, RAIL, 1, 0)
 rail.Parent = store
@@ -1976,7 +1951,6 @@ offer.Size = UDim2.fromOffset(OFFER_W, OFFER_H)
 offer.ZIndex = 10
 offer.Visible = false
 Style.stroke(offer, C.yellow, 4, 0)
-Style.setShadow(offer, C.pink)
 Style.hazard(offer, OFFER_W, 14)
 local offerTitle = Style.label(offer, "", 40, F.display, C.yellow)
 offerTitle.Position = UDim2.fromOffset(0, 26)
@@ -2296,60 +2270,65 @@ local function placeTouch()
 	end
 end
 
-local RIM = {
-	blue = C.blue,
-	gold = C.yellow,
-	orange = C.orange,
-	red = C.red,
-	pink = C.pink,
-	dark = C.yellow,
+-- the pictogram each touch button carries (none: the word alone)
+local TOUCH_ICONS = {
+	Boost = Icons.SignBoost,
+	Honk = Icons.SignHorn,
+	View = Icons.SignView,
+	Stuck = Icons.SignUnstuck,
 }
 local function holdButton(
 	text: string,
 	slot: string,
-	kind: string,
+	_kind: string,
 	down: () -> (),
 	up: () -> ()
 ): TextButton
-	-- a big key cap like the controls card's: an asphalt plate with a rim and a thick bottom lip in the
-	-- button's colour (yellow for most, orange BOOST, blue FLY, pink STUCK?). The touch area is the 74 px
-	-- square; the plate is drawn a little inside it so neighbours keep a clear gap.
+	-- a plain round button, not a sign: a dark see-through disc with a white rim, a white pictogram and a
+	-- short word (BOOST is bigger and solid yellow with black). The touch area is the TouchKey square; the
+	-- disc is drawn a little inside it so neighbours keep a clear gap.
 	local b = Style.button(touch, text, "dark", 16)
 	b.BackgroundTransparency = 1
-	b.TextTransparency = 1 -- the label below shows the text; code keeps setting b.Text
+	b.TextTransparency = 1 -- the caption shows the text; code keeps setting b.Text
 	b.AnchorPoint = Vector2.new(0.5, 0.5)
 	b.Size = UDim2.fromOffset(LayoutConfig.TouchKey, LayoutConfig.TouchKey)
 	Instance.new("UIScale").Parent = b -- placeTouch keeps it at least TouchMinScale
 	slotOf[b] = slot
-	for _, extra in { b:FindFirstChild("Edge"), b:FindFirstChild("Shadow") } do
-		extra:Destroy()
+	for _, name in { "Edge", "Shadow", "Line", "Bolts", "ExitArrow" } do
+		local extra = b:FindFirstChild(name)
+		if extra then
+			extra:Destroy()
+		end
 	end
+	local big = slot == "Boost"
+	local ink = if big then C.ink else C.text
 	local face = Instance.new("Frame")
 	face.Name = "Face"
-	face.BackgroundColor3 = C.panel
+	face.BackgroundColor3 = if big then C.yellow else Color3.fromRGB(24, 26, 29)
+	face.BackgroundTransparency = if big then 0 else 0.3
 	face.BorderSizePixel = 0
 	face.AnchorPoint = Vector2.new(0.5, 0.5)
 	face.Position = UDim2.fromScale(0.5, 0.5)
-	face.Size = UDim2.new(1, -10, 1, -10)
+	face.Size = if big then UDim2.fromScale(1, 1) else UDim2.new(1, -10, 1, -10)
 	face.Parent = b
-	local rim = RIM[kind] or C.yellow
-	Style.stroke(face, rim, 2, 0)
-	Style.shadow(face, C.ink, 3)
-	local lip = Instance.new("Frame")
-	lip.Name = "Lip"
-	lip.BackgroundColor3 = rim
-	lip.BorderSizePixel = 0
-	lip.AnchorPoint = Vector2.new(0, 1)
-	lip.Position = UDim2.fromScale(0, 1)
-	lip.Size = UDim2.new(1, 0, 0, 7)
-	lip.Parent = face
-	local caption = Style.label(face, text, 16, F.display, C.text)
-	caption.Size = UDim2.new(1, -6, 1, -7)
-	caption.Position = UDim2.fromOffset(3, 0)
-	-- a longer word in another language (¿ATORADO?) shrinks to fit the key
+	Style.corner(face, 999);
+	(face:FindFirstChildOfClass("UICorner") :: UICorner).CornerRadius = UDim.new(0.5, 0)
+	Style.stroke(face, if big then C.ink else C.text, 3, 0)
+	local iconId = TOUCH_ICONS[slot :: any] or 0
+	if iconId ~= 0 then
+		local pic = Style.image(face, iconId, ink)
+		pic.AnchorPoint = Vector2.new(0.5, 0.5)
+		pic.Position = UDim2.fromScale(0.5, 0.4)
+		pic.Size = UDim2.fromScale(0.42, 0.42)
+	end
+	local caption = Style.label(face, text, if iconId ~= 0 then 11 else 15, F.heavy, ink)
+	caption.AnchorPoint = Vector2.new(0.5, 0)
+	caption.Position = if iconId ~= 0 then UDim2.fromScale(0.5, 0.64) else UDim2.fromScale(0.5, 0.3)
+	caption.Size = if iconId ~= 0 then UDim2.fromScale(0.8, 0.18) else UDim2.fromScale(0.84, 0.4)
+	-- a longer word in another language (¿ATORADO?) shrinks to fit the disc
 	caption.TextScaled = true
 	local fit = Instance.new("UITextSizeConstraint")
-	fit.MaxTextSize = 16
+	fit.MaxTextSize = if iconId ~= 0 then 12 else 15
 	fit.Parent = caption
 	b:GetPropertyChangedSignal("Text"):Connect(function()
 		caption.Text = b.Text
