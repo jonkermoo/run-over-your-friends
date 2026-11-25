@@ -59,6 +59,12 @@ local function sample(player: Player, now: number)
 	end
 end
 
+-- the server moved the player's car itself (server/TeleportService): start a fresh track, so the jump isn't
+-- taken for a cheat's teleport
+function HitGuard.moved(player: Player)
+	tracks[player] = nil
+end
+
 -- the speed (studs a second) to pay a hit at: the claim capped by the vehicle's limit and by what the server
 -- saw it do lately; 0 just after a teleport
 function HitGuard.speed(

@@ -488,6 +488,11 @@ function Analytics.tookPart(player: Player)
 	end)
 end
 
+-- a teleport from the city map (server/TeleportService): where to, and whether the car came along
+function Analytics.teleported(player: Player, area: string, inCar: boolean)
+	log(player, "Teleported", 1, area, if inCar then "Car" else "OnFoot")
+end
+
 -- a live event ended: logged once per run, on one player in the server. value = players who took part;
 -- outcome "Won" (claimed, cracked, beaten) or "Time" (ran out)
 function Analytics.eventEnded(key: string, outcome: string)

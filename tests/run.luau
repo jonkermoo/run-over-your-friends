@@ -532,6 +532,7 @@ require("./economy")(check)
 require("./spread")(check)
 require("./horizon")(check)
 require("./citymap")(check)
+require("./teleport")(check)
 
 -- events: the next one and its wait (Rules/Events.pick)
 do

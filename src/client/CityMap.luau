@@ -8,6 +8,8 @@
 -- goes on behind it; it counts as a menu (Popups.addBusy), so the phone driving buttons hide while it's open.
 -- The server sends spots once a second only while it's open (MapOpen / MapDots, server/CityMapService); dots
 -- slide between updates. Your own arrow follows your character every frame.
+-- Purple rings mark the areas you can teleport to (Config/Teleport): tap one and its card's TELEPORT button
+-- sends you there, car and all (server/TeleportService), then counts down the cooldown.
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -16,6 +18,11 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.CityMap)
+local Country = require(ReplicatedStorage.Shared.Config.Country)
+local Suburbs = require(ReplicatedStorage.Shared.Config.Suburbs)
+local TeleportCfg = require(ReplicatedStorage.Shared.Config.Teleport)
+local TeleportRules = require(ReplicatedStorage.Shared.Rules.Teleport)
+local World = require(ReplicatedStorage.Shared.Config.World)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -187,11 +194,37 @@ local cardEmpty = Style.label(card, "PICK A DOT ON THE MAP", 16, F.heavy, C.dim)
 cardEmpty.Size = UDim2.fromScale(1, 1)
 cardEmpty.TextWrapped = true
 
+-- the picked teleport area's card (in place of the player card while a ring is picked)
+local tpCard = Style.card(side)
+tpCard.Name = "Teleport"
+tpCard.Size = UDim2.fromOffset(SIDE_W, 196)
+tpCard.Visible = false
+local tpTag = Style.pill(tpCard, "TELEPORT", C.purple)
+tpTag.Position = UDim2.fromOffset(14, 14)
+tpTag.TextSize = 13
+tpTag.TextColor3 = C.text
+tpTag.Size = UDim2.fromOffset(0, 22)
+local tpName = Style.label(tpCard, "", 28, F.display, C.text)
+tpName.Position = UDim2.fromOffset(14, 42)
+tpName.Size = UDim2.new(1, -28, 0, 36)
+tpName.TextXAlignment = Enum.TextXAlignment.Left
+tpName.TextTruncate = Enum.TextTruncate.AtEnd
+local tpNote = Style.label(tpCard, "YOU AND YOUR CAR", 13, F.heavy, C.dim)
+tpNote.Position = UDim2.fromOffset(14, 80)
+tpNote.Size = UDim2.new(1, -28, 0, 18)
+tpNote.TextXAlignment = Enum.TextXAlignment.Left
+tpNote.TextTruncate = Enum.TextTruncate.AtEnd
+-- big enough to tap on a phone, where the UI shrinks to 0.6 (72 layout px = 43 real px)
+local tpGo = Style.button(tpCard, "TELEPORT", "gold", 24)
+tpGo.Name = "Go"
+tpGo.Position = UDim2.fromOffset(14, 108)
+tpGo.Size = UDim2.new(1, -28, 0, 72)
+
 -- the key: what each mark means
 local legend = Instance.new("Frame")
 legend.Name = "Key"
 legend.BackgroundTransparency = 1
-legend.Size = UDim2.fromOffset(SIDE_W, 5 * 34)
+legend.Size = UDim2.fromOffset(SIDE_W, 6 * 34)
 legend.Parent = side
 local legendList = Instance.new("UIListLayout")
 legendList.SortOrder = Enum.SortOrder.LayoutOrder
@@ -263,6 +296,25 @@ legendRow(5, "LIVE EVENT", function(f)
 	s.Size = UDim2.fromScale(1, 1)
 end)
 
+-- a teleport ring: purple, white edge (the picked one is gold and bigger)
+local function tpRing(parent: Instance, size: number): Frame
+	local r = Instance.new("Frame")
+	r.Name = "Ring"
+	r.AnchorPoint = Vector2.new(0.5, 0.5)
+	r.Position = UDim2.fromScale(0.5, 0.5)
+	r.Size = UDim2.fromOffset(size, size)
+	r.BackgroundColor3 = C.purple
+	r.Parent = parent
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = r
+	Style.stroke(r, C.text, 3, 0)
+	return r
+end
+legendRow(6, "TELEPORT", function(f)
+	tpRing(f, 22)
+end)
+
 ---------------------------------------------------------------- key places and the event's spot
 
 local function placeLabel(parent: Instance, text: string, u: number, v: number): Frame
@@ -287,9 +339,33 @@ local function placeLabel(parent: Instance, text: string, u: number, v: number):
 	return holder
 end
 
+-- the teleport areas (Config/Teleport) and their rings; a place label on the same spot gives way to the ring
+local areas = TeleportRules.areas(TeleportCfg.Places, World.Map, Suburbs.Hoods, Country.Moto.Rect)
+local rings: { [string]: { holder: Frame, ring: Frame, name: Frame } } = {}
+local teleportLayer = layer("Teleports", 5)
+
 for _, p in Cfg.Places do
-	local u, v = Rules.toMap(p.x, p.z, Cfg)
-	placeLabel(placesLayer, p.name, u, v).Name = p.key
+	if not TeleportRules.find(areas, p.key) then
+		local u, v = Rules.toMap(p.x, p.z, Cfg)
+		placeLabel(placesLayer, p.name, u, v).Name = p.key
+	end
+end
+
+for _, a in areas do
+	local u, v = Rules.toMap(a.x, a.z, Cfg)
+	local holder = Instance.new("Frame")
+	holder.Name = a.key
+	holder.BackgroundTransparency = 1
+	holder.AnchorPoint = Vector2.new(0.5, 0.5)
+	holder.Position = UDim2.fromScale(u, v)
+	holder.Size = UDim2.fromOffset(TeleportCfg.RingPicked, TeleportCfg.RingPicked)
+	holder.Parent = teleportLayer
+	local ring = tpRing(holder, TeleportCfg.Ring)
+	-- its name shows under it while it's picked
+	local name = placeLabel(holder, a.name, 0.5, 1)
+	name.Position = UDim2.new(0.5, 0, 1, 14)
+	name.Visible = false
+	rings[a.key] = { holder = holder, ring = ring, name = name }
 end
 
 local eventPin = Instance.new("Frame")
@@ -337,6 +413,8 @@ local dots: { [number]: Dot } = {}
 local friends: { [number]: boolean } = {}
 local leaderId = 0
 local selectedId: number? = nil
+local selectedArea: TeleportRules.Area? = nil
+local tpAnswer = "" -- the server's last refusal, shown on the card until the next pick
 local isOpen = false
 
 -- whether a player is one of yours (asked once each; Studio test players count when Config says so)
@@ -566,10 +644,67 @@ local function refreshCard()
 	cardCar.Text = if car then string.upper(car.name) else ""
 end
 
+-- the teleport card: the picked area, and the button's cooldown or why it was refused
+local REFUSED = {
+	Cooldown = "NOT READY YET",
+	Passenger = "ONLY THE DRIVER CAN",
+	Event = "TOO CLOSE TO THE EVENT",
+	Dead = "WAIT TO RESPAWN",
+	Unknown = "NO ROOM THERE, TRY AGAIN",
+}
+local function refreshTeleport()
+	local a = selectedArea
+	tpCard.Visible = a ~= nil
+	card.Visible = a == nil
+	legend.Position = UDim2.fromOffset(0, (if a then tpCard else card).Size.Y.Offset + GAP)
+	if not a then
+		return
+	end
+	tpName.Text = a.name
+	local readyAt = player:GetAttribute("TeleportReadyAt")
+	local left = TeleportRules.secondsLeft(
+		workspace:GetServerTimeNow(),
+		if typeof(readyAt) == "number" then readyAt else 0
+	)
+	-- the countdown is translated here (with the time in it); TELEPORT AutoLocalizes
+	tpGo.AutoLocalize = left == 0
+	if left > 0 then
+		tpGo.Text =
+			Loc.text("TeleportReady", { time = string.format("%d:%02d", left // 60, left % 60) })
+		Style.setKind(tpGo, "dark")
+	else
+		tpGo.Text = "TELEPORT"
+		Style.setKind(tpGo, "gold")
+	end
+	tpNote.Text = if tpAnswer ~= "" then tpAnswer else "YOU AND YOUR CAR"
+	tpNote.TextColor3 = if tpAnswer ~= "" then C.yellow else C.dim
+end
+
+local function showRings()
+	for key, r in rings do
+		local on = selectedArea ~= nil and selectedArea.key == key
+		local size = if on then TeleportCfg.RingPicked else TeleportCfg.Ring
+		r.ring.Size = UDim2.fromOffset(size, size)
+		r.ring.BackgroundColor3 = if on then C.yellow else C.purple
+		r.name.Visible = on
+		r.holder.ZIndex = if on then 2 else 1
+	end
+end
+
+local function pickArea(a: TeleportRules.Area?)
+	selectedArea = a
+	tpAnswer = ""
+	showRings()
+	refreshTeleport()
+end
+
 local function pick(id: number?)
 	selectedId = id
 	setRing(id)
 	refreshCard()
+	if id ~= nil and selectedArea then
+		pickArea(nil)
+	end
 end
 
 ---------------------------------------------------------------- zoom and move
@@ -627,6 +762,21 @@ local function pickAt(pos: Vector2)
 	local a, sz = picture.AbsolutePosition, picture.AbsoluteSize
 	if pos.X < a.X or pos.Y < a.Y or pos.X > a.X + sz.X or pos.Y > a.Y + sz.Y then
 		return
+	end
+	-- a teleport ring beats a player dot
+	do
+		local rpts, keys = {}, {}
+		for key, r in rings do
+			local m = r.ring.AbsolutePosition + r.ring.AbsoluteSize / 2
+			table.insert(rpts, { x = m.X, y = m.Y })
+			table.insert(keys, key)
+		end
+		local i = Rules.pick(rpts, pos.X, pos.Y, TeleportCfg.TapRadius * Style.scale())
+		if i then
+			pick(nil)
+			pickArea(TeleportRules.find(areas, keys[i]))
+			return
+		end
 	end
 	local pts, ids = {}, {}
 	for id, d in dots do
@@ -829,7 +979,8 @@ local function layout()
 	applyView()
 	side.Position = UDim2.fromOffset(x0 + size + GAP, bodyTop)
 	side.Size = UDim2.fromOffset(SIDE_W, size)
-	legend.Position = UDim2.fromOffset(0, card.Size.Y.Offset + GAP)
+	legend.Position =
+		UDim2.fromOffset(0, (if selectedArea then tpCard else card).Size.Y.Offset + GAP)
 	hint.Visible = w > 760
 	hint.Text = if UserInputService.TouchEnabled
 		then "TAP A DOT TO SEE WHO IT IS"
@@ -879,6 +1030,7 @@ local function draw()
 			end
 		end
 		refreshCard()
+		refreshTeleport()
 	end
 end
 
@@ -940,6 +1092,22 @@ end
 function CityMap.start()
 	Net.waitFor("MapDots").OnClientEvent:Connect(onDots)
 	close.Activated:Connect(CityMap.close)
+	Style.onTap(tpGo, function()
+		local a = selectedArea
+		if a then
+			tpAnswer = ""
+			Net.remote("Teleport"):FireServer(a.key)
+		end
+	end)
+	Net.waitFor("Teleport").OnClientEvent:Connect(function(ok: any, reason: any)
+		if ok == true then
+			pickArea(nil)
+			CityMap.close()
+			return
+		end
+		tpAnswer = if typeof(reason) == "string" then REFUSED[reason] or "" else ""
+		refreshTeleport()
+	end)
 	Popups.addBusy(CityMap.isOpen)
 	Pad.menu(sheet, {
 		first = function()
