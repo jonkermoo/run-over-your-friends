@@ -19,6 +19,19 @@ return table.freeze({
 	-- each car's own pay multiplier is Config/Vehicles `pay`. Along the cash cars in price order the garage's
 	-- pay a hit always rises (tests/economy), except these side cars that trade pay for something else
 	PaySideCars = table.freeze({ "Bulldozer" }), -- slow, but brings whole buildings down
+	-- the garage's price ladder (tests/economy): no car costs more than PriceCap; the cars of one tier are
+	-- choices at about the same price (the dearest at most TierSpread times the cheapest), and every tier
+	-- costs more than the one before. The joke rides (Scooter, Cart) sit outside the tiers.
+	PriceCap = 200000,
+	TierSpread = 1.2,
+	Tiers = table.freeze({
+		table.freeze({ "Sedan", "Taxi" }),
+		table.freeze({ "IceCream", "FireTruck" }),
+		table.freeze({ "Muscle", "Semi" }),
+		table.freeze({ "Bulldozer", "Monster" }),
+		table.freeze({ "Supercar" }),
+		table.freeze({ "Roadster" }),
+	}),
 	CannonShare = 0.5, -- fire-truck cannon knockdowns pay this share
 	DoubleMoney = 2,
 	-- VIP pass: hit cash times this. The money passes multiply: 2x Money alone 2, VIP alone 1.25, both 2.5
@@ -26,8 +39,8 @@ return table.freeze({
 	VipMoney = 1.25,
 	-- one-time cash for joining the game's Roblox group; 0 = no group yet (the row is hidden live, a test grant in Studio)
 	GroupId = 987419590,
-	GroupReward = 25000,
-	RoadsterPassMoney = 50000, -- a head start, not enough to skip the garage
+	GroupReward = 12500,
+	RoadsterPassMoney = 25000, -- a head start, not enough to skip the garage
 	AutosaveSeconds = 60,
 	-- game pass ids; 0 until the passes exist on the Creator Hub. In Studio the shop toggles them for testing.
 	Passes = table.freeze({

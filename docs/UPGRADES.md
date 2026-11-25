@@ -47,25 +47,25 @@ Upgrade price = a share of the car's price, with a floor so starter cars aren't 
 | | Upgrade I | Upgrade II | Upgrade III |
 |---|---|---|---|
 | Share of car price | 10% | 20% | 30% |
-| Floor | $300 | $750 | $1,500 |
+| Floor | $150 | $375 | $750 |
 
 | Car (price) | I | II | III | All three |
 |---|---|---|---|---|
-| Hatchback (free) | $300 | $750 | $1,500 | $2,550 |
-| Scooter ($500) | $300 | $750 | $1,500 | $2,550 |
-| Shopping Cart ($1,000) | $300 | $750 | $1,500 | $2,550 |
-| Sedan ($3,000) | $300 | $750 | $1,500 | $2,550 |
-| Taxi ($6,000) | $600 | $1,200 | $1,800 | $3,600 |
-| Ice-Cream Truck ($12,000) | $1,200 | $2,400 | $3,600 | $7,200 |
-| Muscle Car ($23,000) | $2,300 | $4,600 | $6,900 | $13,800 |
-| Fire Truck ($40,000) | $4,000 | $8,000 | $12,000 | $24,000 |
-| Semi Truck ($70,000) | $7,000 | $14,000 | $21,000 | $42,000 |
-| Bulldozer ($100,000) | $10,000 | $20,000 | $30,000 | $60,000 |
-| Monster Truck ($120,000) | $12,000 | $24,000 | $36,000 | $72,000 |
-| Supercar ($400,000; priced as $200,000) | $20,000 | $40,000 | $60,000 | $120,000 |
-| Roadster ($1,000,000; priced as $200,000) | $20,000 | $40,000 | $60,000 | $120,000 |
+| Hatchback (free) | $150 | $375 | $750 | $1,275 |
+| Scooter ($150) | $150 | $375 | $750 | $1,275 |
+| Shopping Cart ($250) | $150 | $375 | $750 | $1,275 |
+| Sedan ($1,500) | $200 | $375 | $750 | $1,325 |
+| Taxi ($1,750) | $200 | $400 | $750 | $1,350 |
+| Ice-Cream Truck ($4,000) | $400 | $800 | $1,200 | $2,400 |
+| Fire Truck ($4,500) | $500 | $900 | $1,400 | $2,800 |
+| Muscle Car ($6,000) | $600 | $1,200 | $1,800 | $3,600 |
+| Semi Truck ($6,750) | $700 | $1,400 | $2,000 | $4,100 |
+| Bulldozer ($35,000) | $3,500 | $7,000 | $10,500 | $21,000 |
+| Monster Truck ($40,000) | $4,000 | $8,000 | $12,000 | $24,000 |
+| Supercar ($110,000) | $11,000 | $22,000 | $33,000 | $66,000 |
+| Roadster ($200,000) | $20,000 | $40,000 | $60,000 | $120,000 |
 
-Everything on every car: about $473,000. Bought upgrades can be switched on and off in the garage (look and
+Everything on every car: about $250,000. Bought upgrades can be switched on and off in the garage (look and
 stats go together); buying is once, per car.
 
 ## 3. Upgrades per vehicle

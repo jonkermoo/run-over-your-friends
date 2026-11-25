@@ -52,9 +52,9 @@ return table.freeze({
 		SlowScale = 0.3, -- how fast time runs in it
 		SlowCooldown = 6, -- seconds before the next collapse can slow things down again
 		PaySeconds = 2.4, -- when the money lands, after the hit (once the fall has happened, slow motion and all)
-		PayPerPiece = 4, -- money per piece that came down
-		PayMin = 300,
-		PayMax = 2500,
+		PayPerPiece = 2, -- money per piece that came down
+		PayMin = 150,
+		PayMax = 1250,
 		GoalPieces = 260, -- most pieces one collapse counts for goals and events
 		CrumbleBudget = 140, -- most bricks the pieces thrown out near the hit break into (each screen's own)
 		CrumbleEach = 8, -- ...and most bricks one of them breaks into

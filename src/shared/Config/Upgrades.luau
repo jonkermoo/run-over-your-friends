@@ -69,10 +69,10 @@ Upgrades.UpgradeLevel = table.freeze({ 1, 3, 5 })
 
 -- price of upgrade n: this share of the car's price, at least the floor
 Upgrades.PriceShare = table.freeze({ 0.1, 0.2, 0.3 })
-Upgrades.PriceFloor = table.freeze({ 300, 750, 1500 })
--- cars priced as if they cost this for upgrades (the Roadster's price is a pass in all but name; the $400k
--- Supercar's would make its upgrades dearer than the Roadster's)
-Upgrades.PriceBasis = table.freeze({ Roadster = 200000, Supercar = 200000 } :: { [string]: number })
+Upgrades.PriceFloor = table.freeze({ 150, 375, 750 })
+-- cars priced as if they cost this for upgrades (the Roadster is also a pass, so its upgrades stay put if its
+-- cash price moves)
+Upgrades.PriceBasis = table.freeze({ Roadster = 200000 } :: { [string]: number })
 
 Upgrades.SetEvery = 0.4 -- seconds between upgrade or decal changes a player may make
 Upgrades.PopupSeconds = 3 -- the driving mastery bar shows this long after points come in

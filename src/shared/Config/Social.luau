@@ -13,7 +13,7 @@ return table.freeze({
 	FlightSampleEvery = 0.15,
 	-- invites (the INVITE tab): when a friend you invited joins your server you get InviteReward, once per
 	-- friend and for at most InviteMaxPaid friends ever; they get InviteWelcome, once ever
-	InviteReward = 2500,
+	InviteReward = 1250,
 	InviteWelcome = 1000,
 	InviteMaxPaid = 10,
 	InviteMessage = "Come run me over!", -- shown in the Roblox invite

@@ -195,18 +195,18 @@ return table.freeze({
 		Daily = table.freeze({
 			-- cash: one of these, by weight
 			Cash = table.freeze({
-				table.freeze({ amount = 1000, weight = 40 }),
-				table.freeze({ amount = 2000, weight = 30 }),
-				table.freeze({ amount = 3500, weight = 20 }),
-				table.freeze({ amount = 5000, weight = 10 }),
+				table.freeze({ amount = 500, weight = 40 }),
+				table.freeze({ amount = 1000, weight = 30 }),
+				table.freeze({ amount = 1750, weight = 20 }),
+				table.freeze({ amount = 2500, weight = 10 }),
 			}),
 			PaintChance = 0.2, -- instead of cash, a chest-only paint the player doesn't have yet
 		}),
 		Weekly = table.freeze({
-			Cash = table.freeze({ table.freeze({ amount = 10000, weight = 1 }) }),
+			Cash = table.freeze({ table.freeze({ amount = 5000, weight = 1 }) }),
 			PaintChance = 1, -- always a paint, and the cash as well
 			PaintAndCash = true,
-			NoPaintCash = 15000, -- with every chest paint already owned: this cash instead
+			NoPaintCash = 7500, -- with every chest paint already owned: this cash instead
 		}),
 	}),
 	OpenEvery = 1, -- seconds between chest opens a player may ask for

@@ -65,7 +65,7 @@ return table.freeze({
 	EndLinger = 6,
 	-- every new event payout (Money Truck, Cash Drop, Boss Truck) is its number below times this, then the
 	-- player's money passes (Passes.moneyMultiplier). One number to retune them against hit pay.
-	PayScale = 1,
+	PayScale = 0.5,
 	List = table.freeze({
 		table.freeze({
 			key = "LowGravity",
@@ -161,8 +161,8 @@ return table.freeze({
 	GoldenRespawnChance = 0.25,
 	GiantScale = 5,
 	GiantHits = 5,
-	GiantHitPay = 1500,
-	GiantToppleBonus = 5000,
+	GiantHitPay = 750,
+	GiantToppleBonus = 2500,
 	-- the giant is stood on the real (colliding) ground under its spawn spot: a ray from Up studs over the
 	-- spot (clear of kerbs, under lamps and trees) to Down studs below it; the feet start GiantSpawnLift over it
 	GiantGroundProbe = table.freeze({ Up = 6, Down = 60 }),
@@ -193,8 +193,8 @@ return table.freeze({
 	StampedeExtraNpcs = 25,
 	StampedeMultiplier = 2,
 	-- contests: places 1, 2, 3, then everyone else who scored at least once
-	ContestPrizes = table.freeze({ 5000, 3000, 2000 }),
-	ContestTakePart = 500,
+	ContestPrizes = table.freeze({ 2500, 1500, 1000 }),
+	ContestTakePart = 250,
 	ContestFullField = 4, -- with fewer taking part, the top-3 prizes shrink in step (Rules/Contest.prizes)
 	ContestShown = 3, -- standings sent to each player (the banner shows the leader and you)
 	-- the event sign (top centre, src/client/EventBanner): one line (LIVE pill, title, timer) sitting in the

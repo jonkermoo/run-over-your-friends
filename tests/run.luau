@@ -53,7 +53,7 @@ check("JumpPower is positive", Game.Player.JumpPower > 0)
 -- vehicles
 check("13 vehicles", #Vehicles.List == 13)
 check("starter is free", Vehicles.ById[Vehicles.Starter].price == 0)
-check("Roadster costs 1M", Vehicles.ById.Roadster.price == 1000000)
+check("Roadster costs 200k", Vehicles.ById.Roadster.price == 200000)
 local ids, orders = {}, {}
 local allGood = true
 for _, v in Vehicles.List do

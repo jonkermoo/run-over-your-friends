@@ -28,7 +28,7 @@ return table.freeze({
 	MinPlayers = 1, -- a small server's target is sized as if this many were on
 	Seconds = 600, -- time to finish one goal
 	Pause = 30, -- seconds between one goal ending and the next
-	Reward = 1000, -- paid to each player who added to a finished goal
+	Reward = 500, -- paid to each player who added to a finished goal
 	-- running out of time at this share of the target or more still pays each helper that share of Reward
 	PartialShare = 0.5,
 })

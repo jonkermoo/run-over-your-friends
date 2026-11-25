@@ -61,7 +61,7 @@ return table.freeze({
 	AutoSpawnRetry = 2, -- seconds between tries
 	GarageFallback = 12, -- seconds after the data loads: still not in a car, the client opens the garage
 	HitsGoal = 3,
-	HitsReward = 250,
+	HitsReward = 125,
 	SmashGoal = 5, -- building pieces
 	-- the first goal: a few more hits, then a big CLAIM pop-up that claims itself if left alone
 	GoalHits = 4,
@@ -69,9 +69,9 @@ return table.freeze({
 	ClaimDelay = 0.6, -- seconds between the last hit and the pop-up, so the hit lands first
 	-- paid when the step is done (or was done before you got to it), not when it's skipped
 	Rewards = table.freeze({
-		[Steps.Smash] = 150,
-		[Steps.Goal] = 200,
-		[Steps.Event] = 300,
+		[Steps.Smash] = 75,
+		[Steps.Goal] = 100,
+		[Steps.Event] = 150,
 	}),
 	Cheers = table.freeze({
 		[Steps.Smash] = "BUILDING SMASHED!",
@@ -80,7 +80,7 @@ return table.freeze({
 	}),
 	-- paid once, the first time the tutorial reaches its last step (or its end) after a yes: enough with the
 	-- step rewards for the first real car (the Sedan, Config/Economy RookieUntil)
-	FinishBonus = 2500,
+	FinishBonus = 1250,
 	OfferDelay = 1, -- seconds after the data is ready before the offer shows, so the screen has settled
 	-- the garage tour's pages, in order (client/Guide; analytics TutorialTour field 01)
 	TourPages = table.freeze({ "Open", "Car", "Upgrades", "Paint", "Decals", "NextCar", "Done" }),

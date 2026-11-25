@@ -212,7 +212,7 @@ return function(check: (string, boolean) -> ())
 	local p3 = C.prize("Daily", 0.1, 0.99, paints, all, Cfg)
 	check("chest: every paint owned gives cash", p3.paint == nil and p3.cash > 0)
 	local w1 = C.prize("Weekly", 0.7, 0.3, paints, hasNone, Cfg)
-	check("weekly chest: a paint and cash", w1.paint ~= nil and w1.cash == 10000)
+	check("weekly chest: a paint and cash", w1.paint ~= nil and w1.cash == 5000)
 	local w2 = C.prize("Weekly", 0.7, 0.3, paints, all, Cfg)
 	check(
 		"weekly chest: all paints owned pays more cash",

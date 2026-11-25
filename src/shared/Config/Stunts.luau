@@ -8,10 +8,10 @@ return table.freeze({
 	-- a real launch: leaving the ground at least this fast (m/s, across the ground)...
 	MinLaunchSpeed = 4,
 	MinHeight = 3, -- ...and rising this many studs over where it left the ground, or dropping this far below
-	PerSecond = 40, -- $ per second in the air
-	Spin = 100, -- $ per full turn flat (a 360)
+	PerSecond = 20, -- $ per second in the air
+	Spin = 50, -- $ per full turn flat (a 360)
 	TrickSlack = 60, -- degrees short of a full turn that still count as one
-	MaxPay = 2000, -- one jump never pays more than this
+	MaxPay = 1000, -- one jump never pays more than this
 	Park = 2, -- times the pay in the stunt park
 	-- slow vehicles earn more per jump: boost = RefSpeed / top speed, between 1 and MaxBoost
 	RefSpeed = 95,

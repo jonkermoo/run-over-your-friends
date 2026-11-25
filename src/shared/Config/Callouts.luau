@@ -35,7 +35,7 @@ return table.freeze({
 	NewRideHold = 1.8, -- a new car turns on its turntable this long before the NEW RIDE! cheer (client/NewRide)
 	NewRideTurn = 1.6, -- seconds for one full turn
 	PodiumHold = 4, -- the contest podium stays up this long (client/Podium)
-	CashBigGain = 1000, -- a gain this big makes the cash box bump harder, flash green and throw coins
+	CashBigGain = 500, -- a gain this big makes the cash box bump harder, flash green and throw coins
 	CashSparks = 8, -- coins and bills it throws
 	CashSparkSize = 22, -- layout px: each one's box
 	AirTickerSize = 28, -- the air-time count while airborne
