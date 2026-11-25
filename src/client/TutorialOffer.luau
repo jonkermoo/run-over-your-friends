@@ -14,6 +14,7 @@ local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local Pad = require(script.Parent.Pad)
 local Popups = require(script.Parent.Popups)
+local PopupsConfig = require(ReplicatedStorage.Shared.Config.Popups)
 local Style = require(script.Parent.Style)
 
 local TutorialOffer = {}
@@ -139,7 +140,7 @@ local function hide()
 	shownWhere = nil
 end
 
-local function show(where: string)
+local function show(where: string, again: boolean?)
 	if shownWhere == where then
 		return
 	end
@@ -149,7 +150,9 @@ local function show(where: string)
 	card.Visible = true
 	scale.Scale = 0.6
 	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
-	Net.waitFor("TutorialOffer"):FireServer("Shown")
+	if not again then
+		Net.waitFor("TutorialOffer"):FireServer("Shown")
+	end
 end
 
 local function answer(action: string)
@@ -161,7 +164,24 @@ local function answer(action: string)
 	Net.waitFor("TutorialOffer"):FireServer(action)
 end
 
+-- X: away without an answer; it comes back after a while if still unanswered (Config/Popups ReturnSeconds)
+local snoozedUntil = 0
+Style.closeX(card, function()
+	local where = shownWhere
+	hide()
+	snoozedUntil = os.clock() + PopupsConfig.ReturnSeconds
+	task.delay(PopupsConfig.ReturnSeconds, function()
+		local now = player:GetAttribute("TutorialOffer")
+		if where and now == where and not shownWhere and not answered then
+			show(where, true)
+		end
+	end)
+end)
+
 local function refresh()
+	if os.clock() < snoozedUntil then
+		return
+	end
 	local where = player:GetAttribute("TutorialOffer")
 	if typeof(where) == "string" then
 		show(where)

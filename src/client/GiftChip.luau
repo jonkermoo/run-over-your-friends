@@ -1,7 +1,7 @@
 --!strict
 -- The play-time gift chip in the right column, under the next-car bar (the left middle is the phone
--- thumbstick's): a countdown to the next gift, OPEN! once it can be claimed (one tap claims it, the server
--- checks), and after the last gift the first-day "come back tomorrow" line, else nothing. GiftService publishes
+-- thumbstick's): a countdown to the next gift, OPEN! once it can be claimed (a tap opens the goals sheet,
+-- where client/GiftRows claims it), and after the last gift the first-day "come back tomorrow" line, else nothing. GiftService publishes
 -- GiftStart and GiftsClaimed; DailyService publishes TomorrowDay and TomorrowPays.
 
 local Players = game:GetService("Players")
@@ -11,7 +11,8 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config.Gifts)
 local Gifts = require(ReplicatedStorage.Shared.Rules.Gifts)
 local Loc = require(ReplicatedStorage.Shared.Loc)
-local Net = require(ReplicatedStorage.Shared.Net)
+local Goals = require(script.Parent.Goals)
+local Hud = require(script.Parent.Hud)
 local Style = require(script.Parent.Style)
 
 local C, F = Style.colors, Style.fonts
@@ -126,10 +127,10 @@ function GiftChip.start()
 		end
 	end
 
+	-- the gifts are claimed in the goals sheet (client/GiftRows)
 	Style.onTap(chip, function()
-		if ready then
-			Net.waitFor("ClaimGift"):FireServer()
-		end
+		Hud.closeSheets()
+		Goals.open()
 	end)
 	task.spawn(function()
 		while true do

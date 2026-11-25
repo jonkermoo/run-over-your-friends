@@ -28,6 +28,7 @@ local queue: { Entry } = {}
 local busyChecks: { () -> boolean } = {}
 local stillSince: number? = nil
 local closedAt: number? = nil
+local snoozed: { [string]: boolean } = {} -- closed with X, waiting to come back
 
 -- ask for a card; a lower order goes first. Asking again for one already waiting does nothing.
 function Popups.want(
@@ -37,6 +38,9 @@ function Popups.want(
 	hide: () -> (),
 	isOpen: () -> boolean
 )
+	if snoozed[id] then
+		return
+	end
 	for _, e in queue do
 		if e.id == id then
 			return
@@ -57,12 +61,35 @@ end
 
 -- the card isn't needed any more (collected elsewhere): takes it off the screen if it's up
 function Popups.drop(id: string)
+	snoozed[id] = nil
 	for i, e in queue do
 		if e.id == id then
 			table.remove(queue, i)
 			if e.open then
 				e.hide()
 			end
+			return
+		end
+	end
+end
+
+-- the player closed the card with its X: it goes now and comes back after ReturnSeconds (at a stop, like any
+-- card), unless it was dropped meanwhile
+function Popups.snooze(id: string)
+	for i, e in queue do
+		if e.id == id then
+			table.remove(queue, i)
+			if e.open then
+				e.hide()
+				closedAt = os.clock()
+			end
+			snoozed[id] = true
+			task.delay(Cfg.ReturnSeconds, function()
+				if snoozed[id] then
+					snoozed[id] = nil
+					Popups.want(e.id, e.order, e.show, e.hide, e.isOpen)
+				end
+			end)
 			return
 		end
 	end

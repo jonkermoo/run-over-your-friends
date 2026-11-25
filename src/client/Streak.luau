@@ -196,6 +196,9 @@ end
 local function isOpen(): boolean
 	return card.Visible
 end
+Style.closeX(card, function()
+	Popups.snooze("Streak")
+end)
 
 local function update()
 	local step = (player:GetAttribute("Tutorial") or 0) :: number

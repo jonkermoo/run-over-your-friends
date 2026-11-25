@@ -18,6 +18,7 @@ local Onboarding = require(ReplicatedStorage.Shared.Config.Onboarding)
 local OnboardingRules = require(ReplicatedStorage.Shared.Rules.Onboarding)
 local QuestConfig = require(ReplicatedStorage.Shared.Config.Quests)
 local Challenges = require(script.Parent.Challenges)
+local GiftRows = require(script.Parent.GiftRows)
 local Pad = require(script.Parent.Pad)
 local PinnedGoals = require(script.Parent.PinnedGoals)
 local Style = require(script.Parent.Style)
@@ -120,7 +121,7 @@ local function maxHeight(): number
 end
 
 local function shape(): string
-	local parts = { tostring(open), tostring(maxHeight()), Challenges.shape() }
+	local parts = { tostring(open), tostring(maxHeight()), Challenges.shape(), GiftRows.key() }
 	for _, name in ORDER do
 		local set = state[name]
 		if set then
@@ -231,6 +232,7 @@ local function rebuild()
 	table.clear(countdowns)
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
+	y = GiftRows.build(body, y)
 	y = Challenges.build(body, y)
 	-- first day: what coming back tomorrow pays (DailyService publishes it once today's reward is in)
 	local tomorrowPay = player:GetAttribute("TomorrowPays")
@@ -388,6 +390,11 @@ function Goals.close()
 end
 
 close.Activated:Connect(Goals.close)
+GiftRows.changed = function()
+	if open and shape() ~= builtShape then
+		rebuild()
+	end
+end
 
 -- gamepad: B closes; a gamepad player starts on a chest's OPEN, else the first pin, else the X
 Pad.menu(panel, {

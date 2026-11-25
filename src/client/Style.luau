@@ -472,6 +472,18 @@ function Style.pill(parent: Instance, text: string, color: Color3): TextLabel
 	return p
 end
 
+-- the X in a card's top right corner: every pop-up has one
+function Style.closeX(card: GuiObject, onClose: () -> ()): TextButton
+	local x = Style.button(card, "X", "dark", 22)
+	x.Name = "CloseX"
+	x.AnchorPoint = Vector2.new(1, 0)
+	x.Position = UDim2.new(1, -8, 0, 8)
+	x.Size = UDim2.fromOffset(42, 42)
+	x.ZIndex = card.ZIndex + 10
+	Style.onTap(x, onClose)
+	return x
+end
+
 function Style.money(n: number): string
 	local s = tostring(math.floor(n))
 	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()

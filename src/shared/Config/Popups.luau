@@ -7,4 +7,5 @@ return table.freeze({
 	StoppedSeconds = 1.5, -- ...once it has lasted this long
 	MovingMph = 15, -- a card still open when the car gets up to this goes away and comes back at the next stop
 	GapSeconds = 90, -- after one card is answered, the next waits this long
+	ReturnSeconds = 300, -- a card closed with its X comes back after this long (unless it was answered meanwhile)
 })

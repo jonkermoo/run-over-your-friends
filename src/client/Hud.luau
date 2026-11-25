@@ -2055,6 +2055,9 @@ end)
 offerNo.Activated:Connect(function()
 	offer.Visible = false
 end)
+Style.closeX(offer, function()
+	offer.Visible = false
+end)
 -- gamepad: it starts on GET IT, and B is KEEP DRIVING
 Pad.menu(offer, {
 	first = function()

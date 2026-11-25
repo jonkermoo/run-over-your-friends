@@ -244,6 +244,9 @@ Pad.menu(card, {
 	end,
 })
 
+Style.closeX(card, function()
+	Popups.snooze("TrialOver")
+end)
 local function endCard()
 	local cash = (player:GetAttribute("Money") or 0) :: number
 	barFill.Size = UDim2.fromScale(Rules.progress(cash, PRICE), 1)
