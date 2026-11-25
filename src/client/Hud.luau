@@ -87,7 +87,7 @@ moneyFit.Parent = moneyLabel
 local feed = Instance.new("Frame")
 feed.BackgroundTransparency = 1
 feed.AnchorPoint = Vector2.new(1, 0)
-feed.Position = UDim2.new(1, -14, 0, 128)
+feed.Position = UDim2.new(1, -14, 0, 172)
 feed.Size = UDim2.fromOffset(320, 260)
 feed.Parent = gui
 local feedItems: { GuiObject } = {}
@@ -97,7 +97,7 @@ local friendChip = Style.pill(gui, "", C.pink)
 friendChip.Name = "FriendChip"
 friendChip.TextColor3 = C.text
 friendChip.AnchorPoint = Vector2.new(1, 0)
-friendChip.Position = UDim2.new(1, -14, 0, 122) -- under the next-car bar (client/NextCar)
+friendChip.Position = UDim2.new(1, -14, 0, 166) -- under the next-car bar and gift chip (client/NextCar, GiftChip)
 friendChip.Visible = false
 local function refreshFriends()
 	local n = (player:GetAttribute("Friends") or 0) :: number
@@ -105,7 +105,7 @@ local function refreshFriends()
 		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
 	Loc.set(friendChip, if n == 1 then "FriendsHere1" else "FriendsHere", { n = n, pct = pct })
 	friendChip.Visible = n > 0
-	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 150 else 128)
+	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 194 else 172)
 end
 
 local function fadeOut(obj: GuiObject, seconds: number)

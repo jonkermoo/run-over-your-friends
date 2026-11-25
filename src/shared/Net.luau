@@ -25,6 +25,7 @@ Net.Messages = table.freeze({
 	SetUpgrade = "SetUpgrade", -- (vehicleId, n, on: boolean): switch a bought upgrade on or off
 	SetDecal = "SetDecal", -- (vehicleId, decalId): the decal that vehicle wears ("None" takes it off)
 	ClaimDaily = "ClaimDaily", -- (): collect today's login streak reward
+	ClaimGift = "ClaimGift", -- (): claim the next play-time gift once it has opened (Config/Gifts)
 	TutorialClaim = "TutorialClaim", -- (): the tutorial's first goal, claimed from its CLAIM pop-up (client/Guide)
 	TutorialSkip = "TutorialSkip", -- (step: number): skip the tutorial step the job card shows
 	-- (action: "Shown" | "Start" | "Decline" | "Restart"): the first-join tutorial offer showed, was answered, or
@@ -94,6 +95,7 @@ export type MessageName =
 	| "BuyPaint"
 	| "SetPaint"
 	| "ClaimDaily"
+	| "ClaimGift"
 	| "TutorialClaim"
 	| "TutorialSkip"
 	| "TutorialOffer"

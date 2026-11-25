@@ -232,6 +232,19 @@ local function rebuild()
 	table.clear(rowViews)
 	local y, done, total = 0, 0, 0
 	y = Challenges.build(body, y)
+	-- first day: what coming back tomorrow pays (DailyService publishes it once today's reward is in)
+	local tomorrowPay = player:GetAttribute("TomorrowPays")
+	if typeof(tomorrowPay) == "number" then
+		local line = Style.label(body, "", 16, F.heavy, C.yellow)
+		Loc.set(
+			line,
+			"TomorrowPays",
+			{ n = player:GetAttribute("TomorrowDay") or 2, pay = tomorrowPay }
+		)
+		line.Position = UDim2.fromOffset(12, y + 6)
+		line.Size = UDim2.new(1, -24, 0, 22)
+		y += 32
+	end
 	for _, name in ORDER do
 		local set = state[name]
 		if not set then

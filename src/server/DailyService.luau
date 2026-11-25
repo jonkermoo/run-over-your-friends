@@ -66,6 +66,11 @@ local function send(player: Player, force: boolean?)
 		streak = nextStreak or (if profile.daily then profile.daily.streak else 0),
 		ready = nextStreak ~= nil,
 	}
+	-- first day only: once today's reward is collected, what tomorrow pays (the "come back tomorrow" line)
+	local day, pay =
+		Daily.tomorrow(profile.daily, today(), Config.StreakRewards, Config.TomorrowUpTo)
+	player:SetAttribute("TomorrowDay", day)
+	player:SetAttribute("TomorrowPays", pay)
 	local key = `{state.streak}/{state.ready}`
 	if force or sent[player] ~= key then
 		sent[player] = key

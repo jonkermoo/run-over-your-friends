@@ -520,6 +520,7 @@ end
 check("bigger packs give more money per Robux", ascending)
 check("starter ad waits at least a minute of play", Products.StarterOfferAfter >= 60)
 require("./offer")(check)
+require("./gifts")(check)
 require("./vip")(check)
 require("./challenges")(check)
 require("./analytics")(check)

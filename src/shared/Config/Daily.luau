@@ -5,6 +5,7 @@ return table.freeze({
 	DaySeconds = 86400,
 	-- streak day 1, 2, ... 7; every day after the 7th pays the last one
 	StreakRewards = table.freeze({ 500, 1000, 1500, 2500, 3500, 5000, 10000 }),
+	TomorrowUpTo = 1, -- "come back tomorrow: Day 2 pays $1,000" shows while the streak is at most this many days
 	CoinBelow = 1000, -- the streak card draws smaller day pay as a coin, this much and up as a banknote
 	-- one car a day is this share off, picked for each player from the cars they don't own yet
 	DiscountShare = 0.25,

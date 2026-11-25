@@ -55,6 +55,19 @@ local function turntable(stats: Vehicles.Vehicle)
 	name.Position = UDim2.fromOffset(0, 222)
 	name.Size = UDim2.new(1, 0, 0, 36)
 	Style.outline(name, 2)
+	-- first day: what coming back tomorrow pays (DailyService publishes it once today's reward is in)
+	local tomorrowPay = player:GetAttribute("TomorrowPays")
+	if typeof(tomorrowPay) == "number" then
+		card.Size = UDim2.fromOffset(420, 296)
+		local line = Style.label(card, "", 15, F.heavy, C.money)
+		Loc.set(
+			line,
+			"TomorrowPays",
+			{ n = player:GetAttribute("TomorrowDay") or 2, pay = tomorrowPay }
+		)
+		line.Position = UDim2.fromOffset(0, 262)
+		line.Size = UDim2.new(1, 0, 0, 20)
+	end
 	-- a light sweep across the picture
 	local sweep = Instance.new("Frame")
 	sweep.BackgroundColor3 = Color3.new(1, 1, 1)

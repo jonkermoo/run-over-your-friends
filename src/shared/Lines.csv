@@ -12,6 +12,12 @@ NewRideKeys,{car} is yours. Open the GARAGE to drive it!,,,¡{car} es tuyo! Abre
 GiantToppledSub,{name} brought it down.,,,{name} lo derribó.,{name} derrubou ele.
 HitCombo,+${pay}  x{mult} COMBO,,,+${pay}  COMBO x{mult},+${pay}  COMBO x{mult}
 GiantHitPay,+${pay}  GIANT HIT!,,,+${pay}  ¡GOLPE AL GIGANTE!,+${pay}  BATIDA NO GIGANTE!
+GiftNext,{m} MIN GIFT,,,REGALO {m} MIN,PRESENTE {m} MIN
+GiftOpen,OPEN YOUR GIFT!,,,¡ABRE TU REGALO!,ABRA SEU PRESENTE!
+GiftTap,TAP TO CLAIM,,,TOCA PARA RECLAMAR,TOQUE PARA PEGAR
+GiftTomorrow,ALL GIFTS OPENED,,,REGALOS ABIERTOS,PRESENTES ABERTOS
+GiftPay,{m} MINUTE GIFT  +${pay},,,REGALO DE {m} MINUTOS  +${pay},PRESENTE DE {m} MINUTOS  +${pay}
+TomorrowPays,Come back tomorrow: Day {n} pays ${pay},,,Vuelve mañana: el día {n} paga ${pay},Volte amanhã: o dia {n} paga ${pay}
 StreakPay,DAY {n} STREAK  +${pay},,,RACHA DE {n} DÍAS  +${pay},SEQUÊNCIA DE {n} DIAS  +${pay}
 GroupPay,+${pay}  Thanks for joining!,,,+${pay}  ¡Gracias por unirte!,+${pay}  Valeu por entrar!
 ContestPay,+${pay}  {label},,,+${pay}  {label},+${pay}  {label}

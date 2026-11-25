@@ -28,6 +28,21 @@ function Daily.reward(streak: number, rewards: { number }): number
 	return rewards[math.clamp(streak, 1, #rewards)]
 end
 
+-- "come back tomorrow": the streak day and pay a player gets tomorrow, once today's reward is collected and only
+-- while the streak is at most `upTo` days (the first day); nil otherwise
+function Daily.tomorrow(
+	saved: Streak?,
+	today: number,
+	rewards: { number },
+	upTo: number
+): (number?, number?)
+	if not saved or saved.day ~= today or saved.streak > upTo then
+		return nil, nil
+	end
+	local day = saved.streak + 1
+	return day, Daily.reward(day, rewards)
+end
+
 -- a * b mod 2^32 without losing bits in a double (each half product stays under 2^49)
 local function mul32(a: number, b: number): number
 	local lo = bit32.band(a, 0xFFFF) * b
