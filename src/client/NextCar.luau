@@ -84,25 +84,30 @@ function NextCar.start()
 
 	-- the GARAGE tab's red dot while the next car can be bought
 	local garageButton = hud:FindFirstChild("GarageButton", true) :: GuiObject?
-	local dot = Instance.new("Frame")
+	-- a red "!" badge on the tab's top right corner, clear of the letters (the tab's text stops 16 px short)
+	local dot = Instance.new("TextLabel")
 	dot.Name = "AffordDot"
 	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, -6, 0, 6)
-	dot.Size = UDim2.fromOffset(16, 16)
+	dot.Position = UDim2.new(1, -3, 0, 3)
+	dot.Size = UDim2.fromOffset(20, 20)
 	dot.BackgroundColor3 = C.red
 	dot.BorderSizePixel = 0
+	dot.Text = "!"
+	dot.TextColor3 = C.text
+	dot.TextSize = 15
+	dot.FontFace = F.display
 	dot.ZIndex = 5
 	dot.Visible = false
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.5, 0)
 	corner.Parent = dot
-	Style.stroke(dot, C.text, 2, 0)
+	Style.stroke(dot, C.ink, 2, 0)
 	local pulse = Instance.new("UIScale")
 	pulse.Parent = dot
 	TweenService:Create(
 		pulse,
 		TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-		{ Scale = 1.25 }
+		{ Scale = 1.15 }
 	):Play()
 	dot.Parent = garageButton
 
