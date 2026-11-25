@@ -44,8 +44,9 @@ Style.fit(gui)
 
 local sheet = Style.panel(gui)
 sheet.Name = "Sheet"
-sheet.Position = UDim2.fromOffset(Cfg.Side, Cfg.Top)
-sheet.Size = UDim2.new(1, -2 * Cfg.Side, 1, -(Cfg.Top + Cfg.Bottom))
+sheet.AnchorPoint = Vector2.new(0.5, 0)
+sheet.Position = UDim2.new(0.5, 0, 0, Cfg.Top)
+sheet.Size = UDim2.new(1, -2 * Cfg.Side, 1, -(Cfg.Top + Cfg.Bottom)) -- layout() fits it to the map
 sheet.Visible = false
 Style.sign(sheet, "orange")
 
@@ -814,16 +815,19 @@ end
 
 ---------------------------------------------------------------- layout and drawing
 
--- the picture as big a square as fits, with the side column on its right
+-- the picture as big a square as fits on the screen, with the side column on its right; the sheet wraps
+-- them tightly, centred, so there is no empty sign around the map
 local function layout()
 	local k = Style.scale()
-	local w = sheet.AbsoluteSize.X / k
-	local h = sheet.AbsoluteSize.Y / k
+	local w = gui.AbsoluteSize.X / k - 2 * Cfg.Side
+	local h = gui.AbsoluteSize.Y / k - (Cfg.Top + Cfg.Bottom)
 	local bodyTop = Cfg.Header + GAP
 	local bodyH = h - bodyTop - GAP
 	local size = math.max(120, math.min(bodyH, w - SIDE_W - 3 * GAP))
 	local used = size + GAP + SIDE_W
-	local x0 = math.max(GAP, (w - used) / 2)
+	local x0 = GAP
+	w = used + 2 * GAP
+	sheet.Size = UDim2.fromOffset(w, bodyTop + size + GAP)
 	picture.Position = UDim2.fromOffset(x0, bodyTop)
 	picture.Size = UDim2.fromOffset(size, size)
 	applyView()
@@ -835,7 +839,7 @@ local function layout()
 		then "TAP A DOT TO SEE WHO IT IS"
 		else "CLICK A DOT TO SEE WHO IT IS"
 end
-sheet:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
 
 local lastCard = 0
 local lastDraw = os.clock()

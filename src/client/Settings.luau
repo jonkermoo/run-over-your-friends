@@ -16,6 +16,7 @@ local Net = require(ReplicatedStorage.Shared.Net)
 local RiderRules = require(ReplicatedStorage.Shared.Rules.Riders)
 local RidersConfig = require(ReplicatedStorage.Shared.Config.Riders)
 local HideUi = require(script.Parent.HideUi)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Music = require(script.Parent.Music)
 local Pad = require(script.Parent.Pad)
 local Style = require(script.Parent.Style)
@@ -44,13 +45,12 @@ tile.AnchorPoint = Vector2.new(1, 0)
 tile.Position = UDim2.new(1, -(14 + 196 + Cfg.TileGap), 0, 8)
 tile.Size = UDim2.fromOffset(Cfg.TileWidth, Cfg.TileHeight)
 tile.Parent = gui
-Style.sign(tile, "white", true)
-local tileTag = Style.label(tile, "GAME", 11, F.heavy, C.yellow)
-tileTag.Position = UDim2.fromOffset(0, 6)
-tileTag.Size = UDim2.new(1, 0, 0, 12)
-local tileWord = Style.label(tile, "SETTINGS", 19, F.display, C.text)
-tileWord.Position = UDim2.fromOffset(0, 20)
-tileWord.Size = UDim2.new(1, 0, 0, 26)
+Style.sign(tile, "grey", true)
+-- just a white wrench on the grey plate
+local wrench = Style.image(tile, Icons.SignSettings, C.text)
+wrench.AnchorPoint = Vector2.new(0.5, 0.5)
+wrench.Position = UDim2.fromScale(0.5, 0.5)
+wrench.Size = UDim2.fromOffset(32, 32)
 
 ---------------------------------------------------------------- the panel
 

@@ -47,7 +47,6 @@ banner.Position = UDim2.new(0.5, 0, 0, Card.Gap)
 banner.Size = UDim2.fromOffset(Card.QuietWidth, Card.Height)
 banner.Visible = false
 Style.sign(banner, "orange", true)
-local signEdge = banner:FindFirstChild("SignEdge") :: UIStroke
 local pill = Style.pill(banner, "", C.ink)
 pill.AnchorPoint = Vector2.new(0, 0.5)
 pill.Position = UDim2.fromOffset(14, Card.Height / 2)
@@ -345,7 +344,7 @@ local function update()
 		title.TextColor3 = C.ink
 		title.Position = UDim2.fromOffset(14 + pill.AbsoluteSize.X / k + 8, Card.Height / 2)
 		timer.Text = fmt(left + Config.WarnSeconds)
-		signEdge.Color = Style.signs.orange.edge
+		Style.ring(banner, nil)
 	else
 		-- warn or live: the sign is painted the event's colour
 		local ink = C.ink
@@ -366,7 +365,7 @@ local function update()
 		Loc.set(timer, if phase == "live" then "EventEnds" else "EventIn", { time = fmt(left) })
 		-- the warning blinks the sign's edge yellow
 		local blink = phase == "warn" and math.floor(os.clock() * 4) % 2 == 0
-		signEdge.Color = if blink then C.yellow else Style.signs.orange.edge
+		Style.ring(banner, if blink then C.yellow else nil)
 	end
 	-- the title stops short of the timer
 	title.Size = UDim2.new(

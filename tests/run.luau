@@ -3415,6 +3415,13 @@ local function checkPopups()
 		not Rules.mayOpen(100, 0, 100 - Cfg.GapSeconds / 2, Cfg)
 	)
 	check("popups: after the gap", Rules.mayOpen(100, 0, 100 - Cfg.GapSeconds, Cfg))
+	local streak = { open = false, group = Cfg.Collect, since = 50 }
+	local starter = { open = false, group = Cfg.Nudge, since = 10 }
+	local chests = { open = false, group = Cfg.Collect, since = 20 }
+	local up = { open = true, group = Cfg.Nudge, since = 90 }
+	check("popups: collect before nudges", Rules.before(streak, starter))
+	check("popups: soonest first in a group", Rules.before(chests, streak))
+	check("popups: the open card stays first", Rules.before(up, chests))
 end
 checkPopups()
 

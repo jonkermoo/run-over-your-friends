@@ -153,14 +153,11 @@ end
 
 local function build(gui: ScreenGui, preview: Preview)
 	card = Style.panel(gui)
-	Style.posts(card)
 	card.Name = "StarterCard"
-	card.AnchorPoint = Vector2.new(0.5, 0.5)
-	card.Position = UDim2.fromScale(0.5, 0.5)
+	Style.slot(card)
 	card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 	card.ZIndex = 10
 	card.Visible = false
-	Style.stroke(card, C.yellow, 4, 0)
 	Style.hazard(card, CARD_W, 14)
 
 	local title = Style.label(card, "STARTER PACK", 52, F.display, C.yellow)
@@ -179,7 +176,6 @@ local function build(gui: ScreenGui, preview: Preview)
 	offPill.Rotation = 10
 	offPill.ZIndex = 3
 	Style.stroke(offPill, C.ink, 3, 0)
-	Style.shadow(offPill, C.ink, 4)
 	local once = Style.pill(card, "ONE TIME ONLY  ·  ONCE PER ACCOUNT", C.pink)
 	once.TextColor3 = C.text
 	once.TextSize = 15

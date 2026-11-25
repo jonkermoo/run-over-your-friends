@@ -455,8 +455,7 @@ function UpgradePanel.attach(p: Parts): Panel
 		tabs.Visible = mine
 		tabs:SetAttribute("Tab", tab) -- the open tab, for client/Guide's garage tour
 		for name, b in tabButtons do
-			b.BackgroundColor3 = if name == tab then C.yellow else C.card
-			b.TextColor3 = if name == tab then C.ink else C.dim
+			Style.setKind(b, if name == tab then "gold" else "ink")
 		end
 		p.info.Visible = not mine or tab == "Stats"
 		p.info.Position = if mine then PAGE else UDim2.new()

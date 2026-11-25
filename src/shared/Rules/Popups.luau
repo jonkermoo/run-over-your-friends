@@ -26,4 +26,18 @@ function Popups.mayOpen(now: number, stillSince: number?, closedAt: number?, cfg
 	return closedAt == nil or now - closedAt >= cfg.GapSeconds
 end
 
+export type Card = { open: boolean, group: number, since: number }
+
+-- the queue's order: the card on screen stays first, then things to collect (a lower group) before progress
+-- nudges, and in each group the one that has waited longest
+function Popups.before(a: Card, b: Card): boolean
+	if a.open ~= b.open then
+		return a.open
+	end
+	if a.group ~= b.group then
+		return a.group < b.group
+	end
+	return a.since < b.since
+end
+
 return Popups

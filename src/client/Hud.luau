@@ -178,14 +178,9 @@ local function plate(
 	end
 	l:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 	fit()
-	-- a small sign: green ones get the white inner line, the rest a dark edge and lip
-	if fill == C.panel then
-		Style.sign(l, "green", true)
-	else
-		Style.corner(l, 7)
-		Style.stroke(l, C.ink, 2, 0)
-		Style.shadow(l, C.ink, 3)
-	end
+	-- a small sign from the kit, its face in the feed line's colour
+	Style.sign(l, "green", true)
+	l.BackgroundColor3 = fill
 	return l
 end
 
@@ -472,7 +467,6 @@ keysChip.Position = controls.Position
 keysChip.Size = UDim2.fromOffset(104, 42)
 keysChip.Visible = false
 keysChip.Parent = gui
-Style.shadow(keysChip)
 local chipCap = keyCap(keysChip, DriveHudConfig.ToggleKey)
 chipCap.AnchorPoint = Vector2.new(0, 0.5)
 chipCap.Position = UDim2.new(0, 14, 0.5, 0)
@@ -550,13 +544,13 @@ end
 
 ---------------------------------------------------------------- side buttons and panels
 
--- top left: a steel gantry with a pictogram sign hanging from it for each menu (client/SignMenu); the left
+-- top left: a pictogram sign plate for each menu (client/SignMenu); the left
 -- middle of the screen is the phone thumbstick's, so no buttons there
 local strip = require(script.Parent.SignMenu).strip(gui)
 strip.Name = "Menu"
-strip.Position = UDim2.fromOffset(14, 4)
+strip.Position = UDim2.fromOffset(14, 2)
 strip.Size = UDim2.fromOffset(0, require(script.Parent.SignMenu).HEIGHT)
-local tabRow = Instance.new("Frame") -- the layout lives in here so it doesn't move the gantry
+local tabRow = Instance.new("Frame") -- the layout lives in here so the strip can size to it
 tabRow.BackgroundTransparency = 1
 tabRow.Size = UDim2.fromScale(0, 1)
 tabRow.AutomaticSize = Enum.AutomaticSize.X
@@ -570,7 +564,7 @@ end)
 local stripList = Instance.new("UIListLayout")
 stripList.FillDirection = Enum.FillDirection.Horizontal
 stripList.SortOrder = Enum.SortOrder.LayoutOrder
-stripList.Padding = UDim.new(0, 2)
+stripList.Padding = UDim.new(0, 4)
 stripList.Parent = tabRow
 
 local tabs: { TextButton } = {}
@@ -654,7 +648,7 @@ local function closeButton(p: Frame, y: number): TextButton
 	local close = Style.button(p, "X", "dark", 22)
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -14, 0, y)
+	close.Position = UDim2.new(1, -16, 0, y)
 	close.Size = UDim2.fromOffset(44, 44)
 	close.Activated:Connect(function()
 		p.Visible = false
@@ -735,17 +729,18 @@ do
 		b.Name = name
 		b.Size = UDim2.fromOffset(size, size)
 		b.AnchorPoint = Vector2.new(1, 0)
-		b.Position = UDim2.new(1, -right, 0, 4)
+		b.Position = UDim2.new(1, -right, 0, 11)
 		b.ZIndex = 3
 		return b
 	end
 	garageNav.back = headButton("< BACK", "Back", 0)
 	garageNav.back.TextSize = 26
 	garageNav.back.AnchorPoint = Vector2.new(0, 0)
-	garageNav.back.Position = UDim2.fromOffset(14, 4)
+	garageNav.back.Position = UDim2.fromOffset(16, 11)
 	garageNav.back.Size = UDim2.fromOffset(130, size)
-	garageNav.next = headButton(">", "Next", 14 + size + 14)
-	garageNav.prev = headButton("<", "Prev", 14 + 2 * (size + 12) + 2)
+	-- clear of the sign's edge and of each other
+	garageNav.next = headButton(">", "Next", 16 + size + 10)
+	garageNav.prev = headButton("<", "Prev", 16 + 2 * (size + 10))
 	-- on a gamepad: LB / RB step through the cars (B goes back to the list, client/Pad)
 	local carsChip = Pad.chip(details, { Enum.KeyCode.ButtonL1, Enum.KeyCode.ButtonR1 }, "cars")
 	carsChip.AnchorPoint = Vector2.new(1, 0.5)
@@ -753,7 +748,7 @@ do
 end
 local garageLine = Style.dashes(garage, C.yellow, false, 4)
 garageLine.Position = UDim2.fromOffset(0, LayoutConfig.GarageHeader)
-local garageClose = closeButton(garage, 4)
+local garageClose = closeButton(garage, 11)
 garageClose.Size =
 	UDim2.fromOffset(LayoutConfig.GarageHeaderButton, LayoutConfig.GarageHeaderButton)
 garageClose.ZIndex = 3
@@ -944,10 +939,9 @@ for _, stats in Vehicles.List do
 	row.BorderSizePixel = 0
 	row.Text = ""
 	row.LayoutOrder = stats.order
-	row.BackgroundTransparency = 0.72 -- a recessed box in the sign (Style.card)
 	row.Parent = rows
-	Style.corner(row, 8)
-	Style.stroke(row, C.text, 1.5, 0.78)
+	Style.sign(row, "blue", true) -- a small plate on the sign; the chosen car's is yellow
+	row.BackgroundColor3 = C.ink
 	local rowNext = Instance.new("Frame") -- the car to save for: a yellow edge
 	rowNext.BackgroundColor3 = C.yellow
 	rowNext.BorderSizePixel = 0
@@ -1292,8 +1286,7 @@ function refreshCards()
 			end
 		end
 		-- the chosen row is painted yellow, its words in ink
-		c.row.BackgroundColor3 = if chosen then C.yellow else C.ink
-		c.row.BackgroundTransparency = if chosen then 0 else 0.72
+		c.row.BackgroundColor3 = if chosen then C.yellow else Color3.fromRGB(22, 52, 118)
 		c.rowBay.TextColor3 = if chosen then C.ink else C.yellow
 		if chosen then
 			c.rowName.TextColor3 = C.ink
@@ -1937,12 +1930,10 @@ end
 local OFFER_W, OFFER_H = 500, 410
 local offer = Style.panel(gui)
 offer.Name = "Upsell"
-offer.AnchorPoint = Vector2.new(0.5, 0.5)
-offer.Position = UDim2.fromScale(0.5, 0.5)
+Style.slot(offer)
 offer.Size = UDim2.fromOffset(OFFER_W, OFFER_H)
 offer.ZIndex = 10
 offer.Visible = false
-Style.stroke(offer, C.yellow, 4, 0)
 Style.hazard(offer, OFFER_W, 14)
 local offerTitle = Style.label(offer, "", 40, F.display, C.yellow)
 offerTitle.Position = UDim2.fromOffset(0, 26)
@@ -2093,7 +2084,7 @@ local function maybeOfferStarter()
 		return
 	end
 	starterOffered = true
-	Popups.want("Starter", 2, function()
+	Popups.want("Starter", require(ReplicatedStorage.Shared.Config.Popups).Nudge, function()
 		if StarterCard.eligible() then
 			offer.Visible = false
 			StarterCard.show()
@@ -2286,7 +2277,7 @@ local function holdButton(
 	b.Size = UDim2.fromOffset(LayoutConfig.TouchKey, LayoutConfig.TouchKey)
 	Instance.new("UIScale").Parent = b -- placeTouch keeps it at least TouchMinScale
 	slotOf[b] = slot
-	for _, name in { "Edge", "Shadow", "Line", "Bolts", "ExitArrow" } do
+	for _, name in { "Face", "Trim", "Words", "Bolts", "ExitArrow" } do
 		local extra = b:FindFirstChild(name)
 		if extra then
 			extra:Destroy()

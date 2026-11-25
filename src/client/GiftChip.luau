@@ -51,7 +51,6 @@ function GiftChip.start()
 	chip.Visible = false
 	chip.Parent = hud
 	Style.sign(chip, "blue", true)
-	local edge = chip:FindFirstChild("SignEdge") :: UIStroke
 	local box = giftBox(chip)
 	local title = Style.label(chip, "", 16, F.display, C.text)
 	title.AutoLocalize = false
@@ -103,8 +102,7 @@ function GiftChip.start()
 			box.Visible = false
 		end
 		chip.Visible = true
-		edge.Color = if ready then C.yellow else Style.signs.blue.edge
-		edge.Thickness = if ready then 3 else 2
+		Style.ring(chip, if ready then C.yellow else nil)
 		title.TextColor3 = if ready then C.yellow else C.text
 		if ready ~= wasReady then
 			if ready then

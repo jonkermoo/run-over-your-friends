@@ -239,7 +239,6 @@ local function makeRow(list: Frame, y: number, h: number, place: number?): Row
 	value.TextXAlignment = Enum.TextXAlignment.Right
 	value.ZIndex = 2
 	if metal then
-		Style.shadow(row, C.ink, 5)
 		if place == 1 then
 			crown(row, -12, -22, 42)
 			shine(row)
@@ -299,7 +298,6 @@ local function build(part: BasePart, board: Config.Board): View
 	badge.Position = UDim2.fromOffset(PAD, 34)
 	badge.Size = UDim2.fromOffset(84, 84)
 	badge.Parent = bg
-	Style.shadow(badge, C.ink, 5)
 	local icon = Style.image(badge, (Icons :: any)[board.icon] or 0, C.ink)
 	icon.AnchorPoint = Vector2.new(0.5, 0.5)
 	icon.Position = UDim2.fromScale(0.5, 0.5)

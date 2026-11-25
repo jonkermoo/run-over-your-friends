@@ -19,7 +19,7 @@ return table.freeze({
 	GarageColumns = 2,
 	GarageRowHeight = 70,
 	GarageHeader = 70, -- the title row: BACK, the name, < >, X (GarageHeaderButton square)
-	GarageHeaderButton = 60,
+	GarageHeaderButton = 48, -- sits 11 px down, clear of the sign's edge and the header line
 	GaragePictureShare = 0.45,
 	GarageActionHeight = 70,
 	GarageTabsHeight = 60,

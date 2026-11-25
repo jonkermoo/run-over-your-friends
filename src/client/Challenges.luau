@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Challenges)
+local PopupsConfig = require(ReplicatedStorage.Shared.Config.Popups)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Net = require(ReplicatedStorage.Shared.Net)
@@ -311,7 +312,6 @@ card.AnchorPoint = Vector2.new(0.5, 0.5)
 card.Position = UDim2.fromScale(0.5, 0.5)
 card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
-Style.stroke(card, C.yellow, 4, 0)
 local cardScale = Instance.new("UIScale")
 cardScale.Parent = card
 Style.hazard(card, W, 14)
@@ -531,11 +531,9 @@ ngui.Parent = playerGui
 Style.fit(ngui)
 local nudge = Style.panel(ngui)
 nudge.Name = "NudgeCard"
-nudge.AnchorPoint = Vector2.new(0.5, 0.5)
-nudge.Position = UDim2.fromScale(0.5, 0.5)
+Style.slot(nudge)
 nudge.Size = UDim2.fromOffset(NUDGE_W, NUDGE_H)
 nudge.Visible = false
-Style.stroke(nudge, C.yellow, 4, 0)
 Style.hazard(nudge, NUDGE_W, 12)
 local nTitle = Style.label(nudge, "DAILY CHALLENGES", 34, F.display, C.yellow)
 nTitle.Position = UDim2.fromOffset(0, 26)
@@ -601,7 +599,9 @@ local function maybeNudge()
 		return
 	end
 	seen.nudged = true
-	Popups.want("Challenges", 3, function()
+	-- chests waiting to open count as something to collect; just today's new challenges are a nudge
+	local group = if chests > 0 then PopupsConfig.Collect else PopupsConfig.Nudge
+	Popups.want("Challenges", group, function()
 		-- the words as things stand when it opens: chests first, else today's challenges
 		local now = state or s
 		local count = waiting(now)

@@ -145,7 +145,6 @@ local function buildSign(car: Model, chassis: BasePart)
 	plate.Position = UDim2.fromOffset(2, 2)
 	plate.Parent = gui
 	Style.stroke(plate, C.yellow, 3, 0)
-	Style.shadow(plate, C.ink, 4)
 	local band = Instance.new("Frame")
 	band.BackgroundColor3 = C.pink
 	band.BorderSizePixel = 0

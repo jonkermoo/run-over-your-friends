@@ -1,8 +1,10 @@
 --!strict
--- One queue for the centre-screen cards nobody asked for (daily streak, Starter Pack): the front one opens
--- once the player has stopped and no menu is open, the next waits a while after it is answered, and a card
--- still up when the car gets going goes away and comes back at the next stop (Config/Popups). Cards the
--- player opens themselves, and the tutorial's, don't come through here.
+-- One queue for the cards nobody asked for (daily streak, chests, Starter Pack): one at a time, in one slot
+-- in the middle of the screen (Style.slot). Things to collect go before progress nudges, the soonest first
+-- (Rules/Popups.before). The front one opens once the player has stopped and no menu is open, the next waits
+-- a while after it is answered, a card closed with its X comes back later, and a card still up when the car
+-- gets going goes away and comes back at the next stop (Config/Popups). Cards the player opens themselves,
+-- and the tutorial's, don't come through here.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -15,7 +17,8 @@ local Popups = {}
 
 type Entry = {
 	id: string,
-	order: number,
+	group: number,
+	since: number,
 	show: () -> (),
 	hide: () -> (),
 	isOpen: () -> boolean,
@@ -30,10 +33,10 @@ local stillSince: number? = nil
 local closedAt: number? = nil
 local snoozed: { [string]: boolean } = {} -- closed with X, waiting to come back
 
--- ask for a card; a lower order goes first. Asking again for one already waiting does nothing.
+-- ask for a card in a group (Config/Popups Collect or Nudge). Asking again for one already waiting does nothing.
 function Popups.want(
 	id: string,
-	order: number,
+	group: number,
 	show: () -> (),
 	hide: () -> (),
 	isOpen: () -> boolean
@@ -46,17 +49,16 @@ function Popups.want(
 			return
 		end
 	end
-	table.insert(
-		queue,
-		{ id = id, order = order, show = show, hide = hide, isOpen = isOpen, open = false }
-	)
-	-- a card already on screen stays at the front
-	table.sort(queue, function(a, b)
-		if a.open ~= b.open then
-			return a.open
-		end
-		return a.order < b.order
-	end)
+	table.insert(queue, {
+		id = id,
+		group = group,
+		since = os.clock(),
+		show = show,
+		hide = hide,
+		isOpen = isOpen,
+		open = false,
+	})
+	table.sort(queue, Rules.before)
 end
 
 -- the card isn't needed any more (collected elsewhere): takes it off the screen if it's up
@@ -87,7 +89,7 @@ function Popups.snooze(id: string)
 			task.delay(Cfg.ReturnSeconds, function()
 				if snoozed[id] then
 					snoozed[id] = nil
-					Popups.want(e.id, e.order, e.show, e.hide, e.isOpen)
+					Popups.want(e.id, e.group, e.show, e.hide, e.isOpen)
 				end
 			end)
 			return

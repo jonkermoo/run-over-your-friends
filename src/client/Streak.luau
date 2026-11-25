@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config.Daily)
+local PopupsConfig = require(ReplicatedStorage.Shared.Config.Popups)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Daily = require(ReplicatedStorage.Shared.Rules.Daily)
 local Loc = require(ReplicatedStorage.Shared.Loc)
@@ -39,13 +40,10 @@ gui.Parent = playerGui
 Style.fit(gui)
 
 local card = Style.panel(gui)
-Style.posts(card)
 card.Name = "StreakCard"
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-card.Position = UDim2.fromScale(0.5, 0.5)
+Style.slot(card)
 card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
-Style.stroke(card, C.yellow, 4, 0)
 local scale = Instance.new("UIScale")
 scale.Parent = card
 Style.hazard(card, W, 14)
@@ -73,7 +71,6 @@ type Tile = {
 	pay: TextLabel,
 	stamp: TextLabel,
 	prize: boolean,
-	edge: UIStroke,
 }
 local tiles: { Tile } = {}
 for i = 1, TILES do
@@ -92,7 +89,6 @@ for i = 1, TILES do
 	post.Size = UDim2.fromOffset(7, 10)
 	post.Parent = f
 	Style.sign(f, "green", true)
-	local edge = f:FindFirstChild("SignEdge") :: UIStroke
 	local day = Style.label(f, "", 14, F.heavy, C.dim)
 	day.Position = UDim2.fromOffset(0, 6)
 	day.Size = UDim2.new(1, 0, 0, 18)
@@ -119,7 +115,6 @@ for i = 1, TILES do
 		pay = pay,
 		stamp = stamp,
 		prize = prize,
-		edge = edge,
 	})
 end
 
@@ -170,14 +165,9 @@ local function draw()
 		t.stamp.Visible = got
 		t.frame.Size =
 			UDim2.fromOffset(if t.prize then PRIZE_W else TILE_W, if big then TODAY_H else TILE_H)
-		t.edge.Color = if t.prize and not now then C.yellow else Style.signs.green.edge
-		t.edge.Thickness = if t.prize and not now then 3 else 2
-		local line = t.frame:FindFirstChild("Line")
-		if line then
-			((line :: Frame):FindFirstChildOfClass("UIStroke") :: UIStroke).Color = if now
-				then C.ink
-				else C.edge
-		end
+		-- today's marker is yellow with a black line; the week prize carries a yellow ring
+		Style.sign(t.frame, if now then "yellow" else "green", true)
+		Style.ring(t.frame, if t.prize and not now then C.yellow else nil)
 		local ink = if now then C.ink elseif got then C.dim elseif t.prize then C.yellow else C.text
 		t.frame.BackgroundColor3 = if now
 			then C.yellow
@@ -219,7 +209,7 @@ end)
 local function update()
 	local step = (player:GetAttribute("Tutorial") or 0) :: number
 	if state.ready and step >= Onboarding.Steps.Done then
-		Popups.want("Streak", 1, showCard, hideCard, isOpen)
+		Popups.want("Streak", PopupsConfig.Collect, showCard, hideCard, isOpen)
 	else
 		Popups.drop("Streak")
 	end

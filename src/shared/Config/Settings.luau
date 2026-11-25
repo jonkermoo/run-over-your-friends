@@ -3,7 +3,7 @@
 -- my car (Config/Riders). GUI pixels at desktop size (Style.fit scales them).
 
 return table.freeze({
-	TileWidth = 104,
+	TileWidth = 54, -- a square grey plate with a wrench
 	TileHeight = 54,
 	TileGap = 10, -- between the tile and the 196-wide cash box, 14 in from the right edge (client/Hud)
 	PanelWidth = 460,

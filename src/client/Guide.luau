@@ -106,7 +106,6 @@ claimBox.Position = UDim2.fromScale(0.5, 0.42)
 claimBox.Size = UDim2.fromOffset(440, 196)
 claimBox.ZIndex = 20
 claimBox.Visible = false
-Style.stroke(claimBox, GOLD, 4, 0)
 local claimScale = Instance.new("UIScale")
 claimScale.Parent = claimBox
 local claimTitle = label(claimBox, "FIRST GOAL DONE!", 30, BOLD, GOLD)
@@ -142,22 +141,17 @@ local claimState = { shownAt = 0, sent = false }
 
 -- over the bottom left of the garage sheet (the car page's picture), one page at a time: a title, a line, the
 -- next car's money bar on the last page, and NEXT / DONE (gamepad Y)
-local TOUR_W, TOUR_H = 400, 168
-local tourBox = Style.panel(gui)
+-- a callout bubble from the UI kit: the title in its yellow band, the words in its white body, the tail
+-- (its bottom Style.BUBBLE_TAIL px) pointing at the car
+local TOUR_W, TOUR_H = 400, 180
+local tourBox = Style.bubble(gui)
 tourBox.Name = "TourBox"
 tourBox.AnchorPoint = Vector2.new(0, 1)
 tourBox.Size = UDim2.fromOffset(TOUR_W, TOUR_H)
 tourBox.ZIndex = 20
 tourBox.Visible = false
-Style.stroke(tourBox, GOLD, 3, 0)
-local tourStripe = Instance.new("Frame")
-tourStripe.BorderSizePixel = 0
-tourStripe.BackgroundColor3 = GOLD
-tourStripe.Size = UDim2.new(0, 7, 1, 0)
-tourStripe.ZIndex = 21
-tourStripe.Parent = tourBox
 local tourTitle = label(tourBox, "", 26, BOLD, GOLD)
-tourTitle.Position = UDim2.fromOffset(20, 10)
+tourTitle.Position = UDim2.fromOffset(18, 7)
 tourTitle.Size = UDim2.new(1, -36, 0, 30)
 tourTitle.TextXAlignment = Enum.TextXAlignment.Left
 tourTitle.TextScaled = true
@@ -166,24 +160,22 @@ local tourTitleFit = Instance.new("UITextSizeConstraint")
 tourTitleFit.MaxTextSize = 26
 tourTitleFit.Parent = tourTitle
 local tourText = label(tourBox, "", 16, F.bold, WHITE)
-tourText.Position = UDim2.fromOffset(20, 44)
+tourText.Position = UDim2.fromOffset(18, Style.BUBBLE_HEAD + 8)
 tourText.Size = UDim2.new(1, -36, 0, 58)
 tourText.TextXAlignment = Enum.TextXAlignment.Left
 tourText.TextYAlignment = Enum.TextYAlignment.Top
 tourText.TextWrapped = true
 tourText.ZIndex = 21
 local tourBack, tourFill = Style.bar(tourBox, MONEY)
-tourBack.BackgroundColor3 = C.card
-tourBack.BackgroundTransparency = 0
-tourBack.Position = UDim2.fromOffset(20, 124)
+tourBack.Position = UDim2.fromOffset(18, TOUR_H - Style.BUBBLE_TAIL - 38)
 tourBack.Size = UDim2.new(1, -180, 0, 8)
 tourBack.ZIndex = 21
 tourFill.ZIndex = 22
 local tourNext = Style.button(tourBox, "NEXT", "green", 22)
 tourNext.Name = "TourNext"
 tourNext.AnchorPoint = Vector2.new(1, 1)
-tourNext.Position = UDim2.new(1, -14, 1, -14)
-tourNext.Size = UDim2.fromOffset(130, 48)
+tourNext.Position = UDim2.new(1, -14, 1, -Style.BUBBLE_TAIL - 12)
+tourNext.Size = UDim2.fromOffset(130, 46)
 tourNext.ZIndex = 21
 -- which page (Config/Onboarding TourPages), whose car page it shows, and which pages were reported
 local TOUR = Onboarding.TourPages
@@ -1070,8 +1062,8 @@ local function update()
 	end
 	-- a card over the screen (the Starter Pack, the "need more money" card) has the player's attention: no
 	-- arrow on top of it
-	local upsell = hud and hud:FindFirstChild("Upsell") :: GuiObject?
-	local starter = hud and hud:FindFirstChild("StarterCard") :: GuiObject?
+	local upsell = hud and hud:FindFirstChild("Upsell", true) :: GuiObject?
+	local starter = hud and hud:FindFirstChild("StarterCard", true) :: GuiObject?
 	if (upsell and upsell.Visible) or (starter and starter.Visible) then
 		pressTarget = nil
 	end

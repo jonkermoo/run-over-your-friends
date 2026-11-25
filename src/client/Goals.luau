@@ -55,7 +55,7 @@ panel.Name = "GoalsSheet"
 panel.Position = UDim2.fromOffset(14, TOP)
 panel.Size = UDim2.fromOffset(SHEET_W, HEAD_H)
 panel.Visible = false
-Style.sign(panel, "brown")
+Style.sign(panel, "red")
 local headLine = Style.dashes(panel, C.yellow, false, 4)
 headLine.Position = UDim2.fromOffset(0, HEAD_H - 6)
 

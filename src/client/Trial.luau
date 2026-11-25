@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Cfg = require(ReplicatedStorage.Shared.Config.Trial)
+local PopupsConfig = require(ReplicatedStorage.Shared.Config.Popups)
 local EventConfig = require(ReplicatedStorage.Shared.Config.Events)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Loc = require(ReplicatedStorage.Shared.Loc)
@@ -176,13 +177,10 @@ end
 -- shadow, the car and a lane-line bar of cash toward it, then the pass (gold) and KEEP DRIVING (dark)
 local CARD_W, CARD_H = 500, 360
 local card = Style.panel(gui)
-Style.posts(card)
 card.Name = "TrialOver"
-card.AnchorPoint = Vector2.new(0.5, 0.5)
-card.Position = UDim2.fromScale(0.5, 0.5)
+Style.slot(card)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.Visible = false
-Style.stroke(card, C.yellow, 4, 0)
 Style.hazard(card, CARD_W, 14)
 local title = Style.label(card, "TRIAL OVER!", 40, F.display, C.yellow)
 title.Position = UDim2.fromOffset(0, 26)
@@ -272,7 +270,7 @@ function Trial.start()
 	Net.waitFor("TrialOver").OnClientEvent:Connect(function()
 		-- through the queue of unasked-for cards (client/Popups): first in line, once the car has stopped
 		shownLogged = false
-		Popups.want("TrialOver", 0, endCard, function()
+		Popups.want("TrialOver", PopupsConfig.Nudge, endCard, function()
 			card.Visible = false
 		end, function()
 			return card.Visible

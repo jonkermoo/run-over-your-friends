@@ -60,7 +60,6 @@ function NextCar.start()
 	bar.Visible = false
 	bar.Parent = hud
 	Style.sign(bar, "green", true)
-	local edge = bar:FindFirstChild("SignEdge") :: UIStroke
 	local tag = Style.label(bar, "NEXT CAR", 10, F.heavy, C.yellow)
 	tag.Position = UDim2.fromOffset(10, 5)
 	tag.Size = UDim2.fromOffset(90, 11)
@@ -119,8 +118,7 @@ function NextCar.start()
 		progress.Visible = not ready
 		buy.Visible = ready
 		fill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
-		edge.Color = if ready then C.yellow else Style.signs.green.edge
-		edge.Thickness = if ready then 3 else 2
+		Style.ring(bar, if ready then C.yellow else nil)
 	end
 
 	Style.onTap(bar, function()

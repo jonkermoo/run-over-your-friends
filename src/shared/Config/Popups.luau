@@ -8,4 +8,12 @@ return table.freeze({
 	MovingMph = 15, -- a card still open when the car gets up to this goes away and comes back at the next stop
 	GapSeconds = 90, -- after one card is answered, the next waits this long
 	ReturnSeconds = 300, -- a card closed with its X comes back after this long (unless it was answered meanwhile)
+	-- the order: things to collect (daily streak, chests) before progress nudges (trial over, Starter Pack, today's
+	-- challenges); soonest first in each
+	Collect = 1,
+	Nudge = 2,
+	-- every card opens in one slot over the car: the screen between these layout px from the top (under the event
+	-- sign) and from the bottom (over the speedometer); a card taller than that shrinks to fit
+	SlotTop = 96,
+	SlotBottom = 124,
 })

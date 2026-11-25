@@ -77,7 +77,6 @@ local function plate(step: BasePart, face: Enum.NormalId, board: Leaderboards.Bo
 	card.BackgroundColor3 = C.panel
 	card.BorderSizePixel = 0
 	card.Parent = gui
-	Style.shadow(card, C.ink, 6)
 	local title = Style.label(card, if board then board.title else "", 34, F.display, accent)
 	title.Position = UDim2.fromOffset(0, 10)
 	title.Size = UDim2.new(1, 0, 0, 38)
