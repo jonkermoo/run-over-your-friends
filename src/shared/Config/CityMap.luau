@@ -14,8 +14,8 @@ return table.freeze({
 	Pin = 123493636137749, -- (Decal 105196457864314) the player marker (tools/map/pin.py): a white map pin, tinted; its tip is the spot
 	-- world x, z under the picture's middle, and the studs it covers edge to edge both ways (it is square): the
 	-- beaches in the west to the island's east edge (tools/map/scan.luau uses the same numbers)
-	Centre = table.freeze({ 850, 100 }),
-	Span = 7000,
+	Centre = table.freeze({ 250, 0 }),
+	Span = 5600,
 	Pixels = 2048, -- the whole picture's size, both ways (tools/map)
 
 	-- the server sends every player's spot to each client that has the map open, this often
@@ -63,7 +63,7 @@ return table.freeze({
 
 	-- key places, marked on the map (measured from the built map in Studio)
 	Places = table.freeze({
-		table.freeze({ key = "StuntPark", name = "STUNT PARK", x = 1811, z = 0 }),
+		table.freeze({ key = "StuntPark", name = "STUNT PARK", x = 1700, z = 0 }),
 		-- the Stadium Row district (Rules/Districts: the north middle of the grid)
 		table.freeze({ key = "Stadium", name = "STADIUM ROW", x = 142, z = -710 }),
 	}) :: { Place },

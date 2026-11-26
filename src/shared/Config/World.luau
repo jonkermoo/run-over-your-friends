@@ -120,6 +120,25 @@ return table.freeze({
 		RoadWidth = 64, -- wide enough for the semi and the fire truck
 		BlocksX = 7, -- odd, so the spawn block sits right in the middle (was 8 x 8: compacted)
 		BlocksZ = 7,
+		-- which blocks stand (rows north to south, blocks west to east, "X" a block): a ragged town, not a
+		-- square; the spawn block (the middle) stands, and the middle row runs out to the harbour side (west)
+		Mask = table.freeze({
+			"..XX...",
+			".XXXX..",
+			"XXXXXX.",
+			"XXXXXX.",
+			".XXXXXX",
+			"..XXXX.",
+			"...X...",
+		}),
+		-- neighbouring blocks { i, j, i2, j2 } joined into one bigger block: the road between them is left out
+		-- and paved for people (RoadLayout plazas), so the blocks read as different sizes
+		Merges = table.freeze({
+			table.freeze({ 2, 1, 3, 1 }),
+			table.freeze({ 4, 2, 4, 3 }),
+			table.freeze({ 1, 4, 2, 4 }),
+			table.freeze({ 3, 5, 4, 5 }),
+		}),
 		FloorHeight = 14,
 		PanelWidth = 12,
 		WallThickness = 1.5,

@@ -14,6 +14,7 @@ export type Grid = {
 	sidewalk: number,
 	x0: number, -- west edge of the city grid (outer road edge)
 	z0: number,
+	has: { [number]: { [number]: boolean } }?, -- which blocks stand (Rules/RoadLayout)
 }
 export type Node = { i: number, j: number, x: number, z: number, lit: boolean, out: { number } }
 export type Link = {
@@ -58,8 +59,14 @@ function Roads.crossing(grid: Grid, i: number, j: number): (number, number)
 	return grid.x0 + grid.road / 2 + i * pitch, grid.z0 + grid.road / 2 + j * pitch
 end
 
--- isLit(i, j): whether the crossing has traffic lights (StreetKit puts them only in some districts)
-function Roads.graph(grid: Grid, isLit: (number, number) -> boolean): Graph
+-- isLit(i, j): whether the crossing has traffic lights (StreetKit puts them only in some districts);
+-- keep(i, j, i2, j2): whether the road between two neighbouring crossings is there (the ragged town leaves
+-- some out: Rules/RoadLayout.segment); no `keep`, every one is
+function Roads.graph(
+	grid: Grid,
+	isLit: (number, number) -> boolean,
+	keep: ((number, number, number, number) -> boolean)?
+): Graph
 	local g: Graph = { grid = grid, nodes = {}, links = {}, between = {} }
 	for j = 0, grid.blocksZ do
 		for i = 0, grid.blocksX do
@@ -93,11 +100,11 @@ function Roads.graph(grid: Grid, isLit: (number, number) -> boolean): Graph
 	for j = 0, grid.blocksZ do
 		for i = 0, grid.blocksX do
 			local here = nodeId(grid, i, j)
-			if i < grid.blocksX then
+			if i < grid.blocksX and (keep == nil or keep(i, j, i + 1, j)) then
 				link(here, nodeId(grid, i + 1, j))
 				link(nodeId(grid, i + 1, j), here)
 			end
-			if j < grid.blocksZ then
+			if j < grid.blocksZ and (keep == nil or keep(i, j, i, j + 1)) then
 				link(here, nodeId(grid, i, j + 1))
 				link(nodeId(grid, i, j + 1), here)
 			end

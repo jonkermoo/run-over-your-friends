@@ -8,18 +8,26 @@ export type RGB = { number }
 
 return table.freeze({
 	Ring = table.freeze({
-		Gap = 220, -- from the city's outer road to the ring's centre line
+		Gap = 110, -- from the town's outer roads to the loop's centre line (the loop follows the ragged edge)
 		Width = 90,
+		Points = 96, -- the loop's centre line, this many points round
+		Window = 0.2, -- radians: each point clears the town this far either side of its direction...
+		Smooth = 4, -- ...then this many passes of smoothing over its radius
+		StubOut = 0.8, -- a grid road's end runs on to the loop when it points this straight out of town
 		CentreLine = 0.6, -- the ring's double yellow
 		Connector = 80, -- the roads out to the stunt park and the port
 	}),
 
-	-- every other cell between the city and the ring gets a billboard (what else stands there: Config/Country)
+	-- the empty lattice cells inside the loop: every other one gets a billboard (what else stands there:
+	-- Config/Country); a cell is used when all of it is inside the loop and this far clear of its edge
 	RingCells = table.freeze({
 		BillboardEvery = 2,
+		LoopClear = 10,
 	}),
 
+	-- each zone's centre (At), round the loop road: the island is small, so every area sits close to it
 	Stunt = table.freeze({
+		At = { 1700, 0 },
 		Gap = 70,
 		Width = 900,
 		Depth = 1100,
@@ -64,6 +72,7 @@ return table.freeze({
 	}),
 
 	Port = table.freeze({
+		At = { -1725, 0 },
 		Gap = 70,
 		Width = 700,
 		Depth = 1000,
@@ -135,9 +144,10 @@ return table.freeze({
 	}),
 
 	Desert = table.freeze({
+		At = { 0, 1500 },
 		Gap = 120,
-		Width = 1800,
-		Depth = 800,
+		Width = 1000,
+		Depth = 500,
 		Dunes = 48,
 		DuneRadius = table.freeze({ 30, 80 }),
 		DuneSlope = table.freeze({ 20, 35 }), -- height as a percent of the dune's radius
@@ -167,6 +177,7 @@ return table.freeze({
 	}),
 
 	Site = table.freeze({
+		At = { -350, -1550 },
 		Gap = 70,
 		Width = 760,
 		Depth = 600,

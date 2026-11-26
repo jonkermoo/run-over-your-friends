@@ -584,7 +584,7 @@ end
 function StreetLife.build(map: { props: Folder, buildings: Folder, grid: Routes.Grid }): number
 	local M = World.Map
 	local grid = map.grid
-	local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
+	local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed, M.Mask)
 	local params = OverlapParams.new()
 	params.FilterType = Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances = { map.props, map.buildings }
@@ -602,9 +602,12 @@ function StreetLife.build(map: { props: Folder, buildings: Folder, grid: Routes.
 	local siteAt = Vector3.new(Cfg.Site.Block[1], 0, Cfg.Site.Block[2])
 	for i = 0, grid.blocksX - 1 do
 		for j = 0, grid.blocksZ - 1 do
+			local kind = plan[i][j]
+			if kind == nil then
+				continue -- no block here (World Map.Mask)
+			end
 			local cx, cz = Routes.blockCentre(grid, i, j)
 			local centre = Vector3.new(cx, 0, cz)
-			local kind = plan[i][j]
 			if kind == "parking" then
 				local keepOut = table.clone(Cfg.Lot.KeepOut)
 				if (centre - siteAt).Magnitude < 1 then

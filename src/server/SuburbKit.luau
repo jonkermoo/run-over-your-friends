@@ -332,7 +332,8 @@ function SuburbKit.garden(
 	end
 end
 
--- one neighbourhood; `ringOuter` is the ring road's outer edge from the middle
+-- one neighbourhood; `ringOuter` is the loop road's outer edge from the middle (worked out again where the
+-- hood's axis crosses the loop)
 local function hood(
 	h: Cfg.Hood,
 	ringOuter: number,
@@ -350,6 +351,10 @@ local function hood(
 	folder.Parent = static
 	local roadHalf = Cfg.Road / 2
 	local setback = roadHalf + Cfg.Verge + Cfg.Sidewalk + Cfg.Lawn
+	-- where the hood's axis leaves the loop road (its outer edge), as the road meshes have it
+	local layout = RoadLayout.fromConfig()
+	local cross = RoadLayout.hitLoop(layout.loop, { origin.X, origin.Z }, { dir.X, dir.Z })
+	ringOuter = if cross then cross + (layout.ringOuter - layout.ring) else ringOuter
 
 	-- the ground: flat over the feeder and the whole neighbourhood
 	local F = Cfg.Feeder

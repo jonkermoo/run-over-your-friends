@@ -10,8 +10,8 @@
 #   Concrete  downtown kerbs and the suburb sidewalks, one tiling concrete texture
 #   Trim      everything laid on top, from one atlas (Textures: trim.png): lane paint, zebras, stop lines,
 #             gutters, tyre wear, the soft verge where roads meet grass, manholes, drains, patches
-# Heights: the city, the ring, its stubs and connectors stand on their (invisible) collision parts at 0.10,
-# the suburbs on the terrain (-0.19); the feeders ramp between the two just past the ring.
+# Heights: the city, the loop road, its stubs and connectors stand on their (invisible) collision parts at 0.10,
+# the suburbs on the terrain (-0.19); the feeders ramp between the two just past the loop.
 import json, math, random, sys
 import numpy as np
 import shapely
@@ -42,8 +42,15 @@ SUB_VERGE, SUB_WALK, SUB_WALK_H = 3, 6, 0.17
 g = L["grid"]
 span_x = g["nx"] * g["pitch"] + g["road"]
 span_z = g["nz"] * g["pitch"] + g["road"]
-KERB_ZONE = box(-span_x / 2 - 8, -span_z / 2 - 8, span_x / 2 + 8, span_z / 2 + 8)
+# the town's kerbed roads: every standing block (layout mask) grown by its roads, plus a little
+_x0, _z0, _B, _R, _P = g["x0"], g["z0"], g["block"], g["road"], g["pitch"]
+KERB_ZONE = unary_union([
+    box(_x0 + _R + i * _P - _R - 8, _z0 + _R + j * _P - _R - 8, _x0 + _R + i * _P + _B + _R + 8, _z0 + _R + j * _P + _B + _R + 8)
+    for j, row in enumerate(L["mask"]) for i, c in enumerate(row) if c == "X"
+])
 RO = L["ringOuter"]
+RING_W = next(r["width"] for r in L["roads"] if r["kind"] == "ring")
+LOOP = Polygon(L["loop"]).buffer(RING_W / 2)  # the loop road and all inside it
 
 # ---------------------------------------------------------------- outline
 roads = L["roads"]
@@ -59,10 +66,10 @@ raw = unary_union(road_polys + bulbs)
 outline = raw.buffer(FILLET, join_style="round", quad_segs=6).buffer(-FILLET, join_style="round", quad_segs=6)
 outline = outline.simplify(0.03)
 streets_raw = unary_union([p for p, r in zip(road_polys, roads) if r["kind"] == "street"] + bulbs)
-connectors = unary_union([box(c["x"] - c["w"] / 2, c["z"] - c["d"] / 2, c["x"] + c["w"] / 2, c["z"] + c["d"] / 2)
-                          for c in L["connectors"]])
-INSIDE = unary_union([box(-RO, -RO, RO, RO), connectors.buffer(FILLET + 4, join_style="mitre")])
-MID = box(-RO - RAMP, -RO - RAMP, RO + RAMP, RO + RAMP).difference(INSIDE)
+connectors = unary_union([LineString(r["pts"]).buffer(r["width"] / 2, cap_style="flat")
+                          for r in roads if r["kind"] == "connector"])
+INSIDE = unary_union([LOOP, connectors.buffer(FILLET + 4, join_style="mitre")])
+MID = LOOP.buffer(RAMP).difference(INSIDE)
 INSIDE_P = shapely.prepared.prep(INSIDE)
 KERB_P = shapely.prepared.prep(KERB_ZONE)
 
@@ -70,8 +77,8 @@ KERB_P = shapely.prepared.prep(KERB_ZONE)
 def height(x, z):
     if INSIDE_P.covers(Point(x, z)):
         return TOWN_Y
-    d = max(abs(x), abs(z))
-    t = min(max((d - RO) / RAMP, 0.0), 1.0)
+    d = LOOP.exterior.distance(Point(x, z))
+    t = min(max(d / RAMP, 0.0), 1.0)
     return TOWN_Y + t * (SUB_Y - TOWN_Y)
 
 
@@ -378,6 +385,8 @@ for idx, r in enumerate(roads):
     clear = others.buffer(6)
     w = r["width"]
     pts = r["pts"]
+    if r["kind"] == "ring":
+        pts = pts[:-1]  # the loop runs one step past its start (so the surface closes); the paint closes on it
     if r["kind"] == "street":
         pts = [tuple(p) for p in pts]
         # streets: smooth the 20-stud polyline a little for the wear lines

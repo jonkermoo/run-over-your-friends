@@ -159,7 +159,7 @@ return table.freeze({
 
 	-- north-east: fields of crop rows, wind breaks of trees, a red barn, a silo and hay bales
 	Farm = table.freeze({
-		Rect = table.freeze({ x = 1950, z = -1950, w = 1000, d = 1000 }),
+		Rect = table.freeze({ x = 1280, z = -1360, w = 560, d = 560 }),
 		Fields = table.freeze({ 2, 2 }), -- columns, rows
 		FieldGap = 70, -- between fields (grass tracks)
 		-- the fields are drawn into the terrain, so they follow the roll of the land: a patchwork of whole fields
@@ -202,8 +202,8 @@ return table.freeze({
 
 	-- south-east: a dirt track loop with jumps (terrain) and berms, a start gate, tyre stacks
 	Moto = table.freeze({
-		Rect = table.freeze({ x = 1900, z = 1900, w = 900, d = 900 }),
-		Loop = table.freeze({ 640, 560 }), -- the track's centre line, east-west and north-south
+		Rect = table.freeze({ x = 1150, z = 1250, w = 700, d = 650 }),
+		Loop = table.freeze({ 520, 460 }), -- the track's centre line, east-west and north-south
 		Width = 40,
 		Jumps = 8,
 		JumpRadius = 28,
@@ -264,7 +264,7 @@ return table.freeze({
 
 	-- north-west: a pine forest round a lake with a jetty and a log cabin
 	Forest = table.freeze({
-		Rect = table.freeze({ x = -1300, z = -2000, w = 1100, d = 1100 }),
+		Rect = table.freeze({ x = -1350, z = -1250, w = 700, d = 700 }),
 		Pines = 110,
 		PineHeight = table.freeze({ 28, 50 }),
 		Lake = 130, -- radius
@@ -303,15 +303,15 @@ return table.freeze({
 	-- the wind turbines stand out in the countryside, a row along a rise north of Sunny Vale (they used to stand in
 	-- the cells by the ring, inside town); the land rolls under them
 	WindFarm = table.freeze({
-		Rect = table.freeze({ x = 3000, z = -1650, w = 900, d = 220 }),
+		Rect = table.freeze({ x = 600, z = -1950, w = 900, d = 220 }),
 		Turbines = 6,
 		Seed = 4410,
 	}),
 
 	-- lakes on the new land (terrain water in a sandy bowl), trees round the shore
 	Lakes = table.freeze({
-		table.freeze({ x = 2600, z = 2200, r = 220 }),
-		table.freeze({ x = 1950, z = -2750, r = 200 }),
+		table.freeze({ x = -950, z = 1700, r = 140 }),
+		table.freeze({ x = 1900, z = -850, r = 130 }),
 	}),
 	LakeDepth = 10,
 	LakeBeach = 0.12, -- the sandy shore, as a share of the radius either side of the edge
