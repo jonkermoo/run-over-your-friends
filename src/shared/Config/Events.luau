@@ -230,30 +230,56 @@ return table.freeze({
 	HitGap = 1, -- seconds between counted hits from one player
 	Bounce = 0.45, -- the hitter's car bounces back with this share of its speed
 	BounceUp = 18, -- studs/s up
-	-- the health bar over an event vehicle (layout px; studs over its roof)
-	HpBar = table.freeze({ Width = 220, Height = 22, Above = 6, Text = 16 }),
+	-- the health bar over an event vehicle, as wide as its name needs (layout px; studs over its roof)
+	HpBar = table.freeze({ Pad = 16, MinWidth = 90, Height = 14, Above = 6, Text = 15, Count = 11 }),
 
-	-- Money Truck (tier 3): an armoured van drives a route; every hit spills cash, the last hit cracks it
+	-- both trucks (server/EventProps): steered on the server, sent to every screen Tick seconds apart and drawn
+	-- Delay seconds behind (client/EventProps). Off the road (chasing, knocked, heading back) they turn at most
+	-- TurnRate rad/s and speed up or slow at Accel studs/s each second; heading back to the road at BackSpeed.
+	-- Anything within SmashReach studs of the truck's box while it moves at SmashSpeed or more is smashed:
+	-- props, traffic, people (thrown at NpcThrow times its speed, NpcUp up) and, off the road, walls.
+	Truck = table.freeze({
+		Tick = 0.1,
+		Delay = 0.2,
+		TurnRate = 1.6,
+		Accel = 40,
+		BackSpeed = 40,
+		SkidDecel = 70, -- studs/s each second it slows after a knock lands
+		SmashSpeed = 6,
+		SmashReach = 2,
+		NpcThrow = 1.4,
+		NpcUp = 50,
+		-- a player run over: thrown at least Push studs/s along its way (Carry times its speed if more) and Up,
+		-- for Seconds without control; not within AfterHit seconds of hitting it, nor more than once every Gap
+		RunOver = table.freeze({
+			Push = 90,
+			Up = 60,
+			Carry = 1.5,
+			Seconds = 1.6,
+			AfterHit = 1.5,
+			Gap = 2,
+		}),
+	}),
+
+	-- Money Truck (tier 3): an armoured van about a lane wide drives a route; every hit pays, the last cracks it
 	MoneyTruck = table.freeze({
 		-- the armoured bank van (ReplicatedStorage.VehicleModels; tools/blender/export_bank_van.py), its armour
 		-- (Paint) and gold band and vault doors (Trim) coloured here
 		Vehicle = "BankVan",
-		Scale = 1, -- times Game.VehicleScale
+		Scale = 1.6, -- times Game.VehicleScale: about as wide as a lane
 		Paint = table.freeze({ 52, 78, 60 }), -- armour green
 		Trim = table.freeze({ 255, 196, 40 }), -- gold
 		Speed = 40,
 		Hits = 6, -- to crack it with one player in the server...
 		HitsPerPlayer = 2, -- ...plus this many for each other player...
 		HitsMax = 16, -- ...up to this
-		SpillCount = 3, -- cash bundles each hit throws out
-		SpillValue = 300,
+		HitPay = 900, -- to the hitter, each hit but the last
 		Jackpot = 8000, -- to whoever cracks it
-		JackpotSpill = 8, -- and this many bundles burst out for anyone
 		-- every hit but the last knocks it flying like a hit car (Rules/Events.knockSpeed, Config/PlayerHits caps):
 		-- Weight kg against the hitter's (that ratio clamped RatioMin-RatioMax, as a car hitting a car), Lift up per
-		-- 1 along the ground, never faster than MaxSpeed studs/s (a starter car throws it ~15 studs up, the cap
-		-- ~40), Flips turns in the air (at least one), then it drives back into its lane over PlayerHits'
-		-- parkedRecover seconds; no hits count while it flies
+		-- 1 along the ground, never faster than MaxSpeed studs/s. Each screen throws its copy as a real body
+		-- spinning about Flips turns in the air; it skids to a stop (Truck.SkidDecel) and drives back to the road,
+		-- smashing what's in its way. No hits count until it's stopped.
 		Knock = table.freeze({
 			Weight = 1500,
 			RatioMin = 0.25,
@@ -265,15 +291,6 @@ return table.freeze({
 		}),
 		Mark = "TRUCK", -- the screen-edge pointer's word
 	}),
-	-- the cash bundles a hit spills (pooled parts): grabbed by driving or walking through them
-	Cash = table.freeze({
-		Max = 40,
-		Life = 25, -- seconds before an untouched bundle goes
-		Radius = 10, -- studs from a player to grab it
-		Spread = table.freeze({ 12, 28 }), -- studs from the hit, min and max
-		Size = table.freeze({ 3.2, 1.4, 1.8 }),
-		Color = table.freeze({ 60, 200, 90 }),
-	}),
 	-- Cash Drop (tier 1): a crate parachutes onto a street; the first car to touch it after it lands wins
 	CashDrop = table.freeze({
 		Value = 2500,
@@ -281,18 +298,36 @@ return table.freeze({
 		FallHeight = 320, -- studs above the street it starts at
 		Radius = 16, -- studs from the crate's middle to a player to claim it
 		From = table.freeze({ 350, 1100 }), -- studs from a player picked at random
-		CrateSize = 10,
-		ChuteSize = table.freeze({ 36, 12 }), -- canopy width and height
+		CrateSize = 10, -- studs: the airdrop crate (ServerStorage.EventModels.Airdrop, tools/blender/export_airdrop.py)
 		RingSize = 46, -- the landing ring on the street
 		Mark = "CASH",
 	}),
-	-- Boss Truck (tier 3): a huge monster truck chases players; hit it to wear it down, the pot is split by damage
+	-- Boss Truck (tier 3): a huge monster truck roams the roads and runs players over; hit it to wear it down, the
+	-- pot is split by damage
 	BossTruck = table.freeze({
 		Vehicle = "Monster",
 		Scale = 2.4, -- times Game.VehicleScale
 		Paint = table.freeze({ 200, 30, 30 }),
 		Speed = 44,
-		ChaseRange = 1600, -- studs: it heads for the nearest player this close, else roams
+		ChaseRange = 1600, -- studs: on the road it turns toward the nearest player this close, else roams
+		-- a player within Sight studs (out of the safe zone) and it leaves the road for them at ChaseSpeed,
+		-- smashing through anything; it gives up past LoseRange or after ChaseMax seconds, drives back to the
+		-- road and won't chase again for ChaseRest seconds
+		Sight = 220,
+		LoseRange = 420,
+		ChaseSpeed = 62,
+		ChaseMax = 14,
+		ChaseRest = 5,
+		-- a hit knocks it a little (as MoneyTruck.Knock; it's far heavier)
+		Knock = table.freeze({
+			Weight = 6000,
+			RatioMin = 0.25,
+			RatioMax = 4,
+			Scale = 0.6,
+			MaxSpeed = 55,
+			Lift = 0.7,
+			Flips = 0,
+		}),
 		Hp = 240, -- with one player in the server...
 		HpPerPlayer = 140, -- ...plus this for each other player
 		-- one hit's damage: Damage at DamageSpeed m/s closing speed in a WeightRef kg car, in step with speed
@@ -305,14 +340,6 @@ return table.freeze({
 		Pot = 20000, -- split by damage done when it's beaten...
 		FailShare = 0.4, -- ...or this share of it when time runs out first
 		MinShare = 500, -- anyone who hit it gets at least this
-		-- every SlamEvery seconds it slams the ground (a ring warns SlamWarn seconds ahead): every player within
-		-- SlamRadius is thrown away from it
-		SlamEvery = 5,
-		SlamWarn = 1.2,
-		SlamRadius = 85, -- the truck is about 80 studs long: this reaches ~45 past its nose
-		SlamPush = 85, -- studs/s out
-		SlamUp = 70, -- studs/s up
-		SlamDown = 1.6, -- seconds without control
 		Mark = "BOSS",
 	}),
 })

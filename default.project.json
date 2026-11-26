@@ -9,7 +9,8 @@
     },
     "ServerStorage": {
       "SceneryModels": { "$path": "assets/Scenery.rbxm" },
-      "RoadModels": { "$path": "assets/Roads.rbxm" }
+      "RoadModels": { "$path": "assets/Roads.rbxm" },
+      "EventModels": { "$path": "assets/EventModels.rbxm" }
     },
     "ReplicatedFirst": {
       "Loading": { "$path": "src/first/Loading.client.luau" }
