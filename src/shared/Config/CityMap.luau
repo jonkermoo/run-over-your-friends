@@ -8,8 +8,8 @@ export type Place = { key: string, name: string, x: number, z: number }
 return table.freeze({
 	-- the picture in TileGrid x TileGrid square tiles (row by row from the top left, image ids; 0 draws a plain dark
 	-- square), so it stays sharp zoomed in (Roblox images are at most 1024 px)
-	-- (Decals 126830927606578, 103021315203907, 89133872365004, 139739612073418)
-	Tiles = table.freeze({ 95819431331767, 123428804733195, 128784584278736, 110697980419299 }),
+	-- (Decals 71465546536715, 124376541789803, 96638352576837, 115603774010850)
+	Tiles = table.freeze({ 131860736317099, 83934468585430, 74994243145972, 130259334223745 }),
 	TileGrid = 2,
 	Pin = 123493636137749, -- (Decal 105196457864314) the player marker (tools/map/pin.py): a white map pin, tinted; its tip is the spot
 	-- world x, z under the picture's middle, and the studs it covers edge to edge both ways (it is square): the
