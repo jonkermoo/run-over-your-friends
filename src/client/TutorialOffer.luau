@@ -65,7 +65,6 @@ tag.Position = UDim2.new(0.5, 0, 0, 30)
 local title = Style.label(card, "LEARN TO WRECK THE CITY", 46, F.display, C.yellow)
 title.Position = UDim2.fromOffset(20, 62)
 title.Size = UDim2.new(1, -40, 0, 54)
-title.Rotation = -3
 title.TextScaled = true
 Style.outline(title, 3)
 local titleFit = Instance.new("UITextSizeConstraint")
@@ -94,7 +93,6 @@ local bill = Style.image(reward, Icons.Bill)
 bill.AnchorPoint = Vector2.new(0.5, 0.5)
 bill.Position = UDim2.fromOffset(70, 46)
 bill.Size = UDim2.fromOffset(78, 78)
-bill.Rotation = -8
 local coin = Style.image(reward, Icons.Coin)
 coin.AnchorPoint = Vector2.new(0.5, 0.5)
 coin.Position = UDim2.fromOffset(104, 64)
@@ -225,15 +223,6 @@ function TutorialOffer.start()
 	Popups.addBusy(TutorialOffer.isOpen)
 	player:GetAttributeChangedSignal("TutorialOffer"):Connect(refresh)
 	refresh()
-	-- the big button breathes a little so the eye lands on it
-	task.spawn(function()
-		while true do
-			task.wait()
-			if gui.Enabled then
-				start.Rotation = 1.5 * math.sin(os.clock() * 5)
-			end
-		end
-	end)
 	task.spawn(bindTab)
 end
 

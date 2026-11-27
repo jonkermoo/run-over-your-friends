@@ -27,21 +27,4 @@ return table.freeze({
 	SignUnstuck = 107881160438518, -- a tipped car with a turn arrow
 	SignGift = 136681305731590, -- a wrapped gift
 	Stop = 104168263192523, -- the stop-sign octagon alert badge, full colour (red with a white rim and black edge)
-	-- the Street Sign UI kit (tools/ui/ui_kit.py), 9-sliced by client/Style: *Face is white and tinted in game,
-	-- *Trim keeps its colours (edge, inner line, rivets, gloss) and lies over the face
-	KitPanelFace = 96135237979934, -- 128 px sign, corner slices 40
-	KitPanelTrimLight = 75884939817559, -- white inner line, rivets
-	KitPanelTrimDark = 76456125175393, -- black inner line, rivets
-	KitPlateFace = 106907384360801, -- 96 px small sign, corner slices 28
-	KitPlateTrimLight = 105443343499504,
-	KitPlateTrimDark = 101947108372634,
-	KitButtonFace = 132471931576741, -- 96 px button plate with its depth drawn in along the bottom
-	KitButtonTrimLight = 97555120886725,
-	KitButtonTrimDark = 71140049860871,
-	KitBolt = 115372287340851, -- a steel bolt head, full colour
-	KitExitArrow = 131426796094223, -- the exit-sign arrow, white
-	KitInset = 136038691301510, -- a recessed box inside a sign, see-through black
-	KitBarFill = 102920446765066, -- a progress bar's fill, white
-	KitHazard = 81284558201141, -- one tile of yellow and black stripes (56x28)
-	KitBubble = 124682213648428, -- the garage tour's callout, full colour (yellow title band, tail bottom left)
 })

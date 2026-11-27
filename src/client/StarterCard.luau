@@ -163,7 +163,6 @@ local function build(gui: ScreenGui, preview: Preview)
 	local title = Style.label(card, "STARTER PACK", 52, F.display, C.yellow)
 	title.Position = UDim2.fromOffset(0, 28)
 	title.Size = UDim2.new(1, -70, 0, 54) -- a little left of centre: the deal sticker takes the corner
-	title.Rotation = -3
 	Style.outline(title, 3)
 	-- the deal's sticker, slapped on the top-right corner while it runs
 	offPill = Style.label(card, "", 24, F.display, C.text)
@@ -173,7 +172,6 @@ local function build(gui: ScreenGui, preview: Preview)
 	offPill.AnchorPoint = Vector2.new(1, 0)
 	offPill.Position = UDim2.new(1, -8, 0, 22)
 	offPill.Size = UDim2.fromOffset(100, 40)
-	offPill.Rotation = 10
 	offPill.ZIndex = 3
 	Style.stroke(offPill, C.ink, 3, 0)
 	local once = Style.pill(card, "ONE TIME ONLY  ·  ONCE PER ACCOUNT", C.pink)

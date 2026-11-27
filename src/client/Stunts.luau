@@ -29,7 +29,6 @@ ticker.Name = "AirTicker"
 ticker.AnchorPoint = Vector2.new(0.5, 1)
 ticker.Position = UDim2.new(0.5, 0, 1, -140)
 ticker.Size = UDim2.fromOffset(320, Callouts.AirTickerSize + 10)
-ticker.Rotation = -4
 ticker.Visible = false
 Style.outline(ticker, 2)
 local scale = Instance.new("UIScale")

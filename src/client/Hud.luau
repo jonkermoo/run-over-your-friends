@@ -222,7 +222,6 @@ local function sparkle()
 	for i = 1, Callouts.CashSparks do
 		local coin = Style.image(moneyBox, if i % 2 == 0 then Icons.Coin else Icons.Bill)
 		coin.AnchorPoint = Vector2.new(0.5, 0.5)
-		coin.Rotation = math.random(-20, 20)
 		coin.Size = UDim2.fromOffset(Callouts.CashSparkSize, Callouts.CashSparkSize)
 		coin.Position = UDim2.fromScale(0.3 + math.random() * 0.6, 0.6)
 		coin.ZIndex = 5
@@ -237,7 +236,6 @@ local function sparkle()
 					-0.6 - math.random() * 0.6,
 					0
 				),
-				Rotation = math.random(-180, 180),
 				ImageTransparency = 1,
 			}
 		)

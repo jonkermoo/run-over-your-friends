@@ -347,7 +347,6 @@ local function showCelebrate(title: string | Loc.Msg, subtitle: string | Loc.Msg
 	t.AnchorPoint = Vector2.new(0.5, 0.5)
 	t.Position = UDim2.new(0.5, 0, 0, Callouts.CheerTop)
 	t.Size = UDim2.fromOffset(760, Callouts.CheerSize + 10)
-	t.Rotation = -4
 	Style.outline(t, 3)
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
@@ -1005,7 +1004,6 @@ local function update()
 	if claimBox.Visible then
 		local left = 1 - (os.clock() - claimState.shownAt) / Onboarding.ClaimAutoAfter
 		claimFill.Size = UDim2.fromScale(math.clamp(left, 0, 1), 1)
-		claimButton.Rotation = 2 * math.sin(os.clock() * 8)
 		target = nil
 		pressTarget = claimButton
 		pressFromSide = true -- from above it would sit on the pop-up's title

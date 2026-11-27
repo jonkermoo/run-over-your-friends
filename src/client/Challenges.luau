@@ -361,7 +361,6 @@ flash.AnchorPoint = Vector2.new(0.5, 0.5)
 flash.Position = UDim2.fromScale(0.5, 0.5)
 flash.BackgroundColor3 = C.yellow
 flash.BorderSizePixel = 0
-flash.Rotation = 45
 flash.Visible = false
 flash.Parent = chest
 
@@ -412,9 +411,7 @@ end
 
 local function resetChest()
 	chest.Visible = true
-	chest.Rotation = 0
 	lid.Position = UDim2.fromOffset(0, 14)
-	lid.Rotation = 0
 	lid.BackgroundTransparency = 0
 	lid.Visible = true
 	lock.Visible = true
@@ -455,11 +452,12 @@ function Challenges.open(set: "Daily" | "Weekly")
 	-- shake while waiting
 	task.spawn(function()
 		local t = 0
+		local home = chest.Position
 		while opening.token == token and not prize.Visible and t < 6 do
 			t += task.wait()
-			chest.Rotation = math.sin(t * 40) * math.min(t * 8, 7)
+			chest.Position = home + UDim2.fromOffset(math.sin(t * 40) * math.min(t * 8, 4), 0)
 		end
-		chest.Rotation = 0
+		chest.Position = home
 		if opening.token == token and not prize.Visible then
 			closeCard() -- no answer: nothing was opened
 		end
@@ -479,11 +477,7 @@ local function reveal(set: string, cash: number, paintId: string)
 	if opening.token ~= token then
 		return
 	end
-	tween(
-		lid,
-		0.35,
-		{ Position = UDim2.fromOffset(-30, -70), Rotation = -35, BackgroundTransparency = 1 }
-	)
+	tween(lid, 0.35, { Position = UDim2.fromOffset(-30, -70), BackgroundTransparency = 1 })
 	lock.Visible = false
 	flash.Visible = true
 	flash.Size = UDim2.fromOffset(20, 20)
@@ -633,7 +627,6 @@ local function updateMark()
 		m.AnchorPoint = Vector2.new(0.5, 0.5)
 		m.Position = UDim2.new(1, -2, 0, 2)
 		m.Size = UDim2.fromOffset(14, 14)
-		m.Rotation = 45
 		m.BackgroundColor3 = C.pink
 		m.BorderSizePixel = 0
 		m.ZIndex = 5

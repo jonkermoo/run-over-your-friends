@@ -105,7 +105,6 @@ for i = 1, TILES do
 	stamp.AnchorPoint = Vector2.new(0.5, 0.5)
 	stamp.Position = UDim2.new(0.5, 0, 0, 48)
 	stamp.Size = UDim2.fromOffset(50, 26)
-	stamp.Rotation = -12
 	stamp.ZIndex = 2
 	Style.stroke(stamp, C.money, 3, 0)
 	table.insert(tiles, {

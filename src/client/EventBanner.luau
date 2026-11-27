@@ -160,7 +160,6 @@ local function showTitle(event: Config.Event)
 	holder.AnchorPoint = Vector2.new(0.5, 0.5)
 	holder.Position = UDim2.fromScale(0.5, 0.3)
 	holder.Size = UDim2.fromOffset(900, 130)
-	holder.Rotation = -4
 	holder.Parent = gui
 	local back = Style.label(holder, event.title, 84, F.display, C.ink)
 	back.Position = UDim2.fromOffset(7, 7)

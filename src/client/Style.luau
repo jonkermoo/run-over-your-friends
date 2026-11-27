@@ -1,9 +1,9 @@
 --!strict
--- One look for every screen, "Street Sign": every panel is a road sign (highway green with a white inner
--- line, a dark edge and corner rivets; each menu in its own sign colour), buttons are sign plates (yellow
--- for go, white for no) with a black inner line, and type is heavy Builder Sans. Panels, buttons, cards,
--- bars and the tour bubble are images drawn outside the game (tools/ui/ui_kit.py, Config/Icons Kit*),
--- 9-sliced, with live text on top. Everything visual goes through here so the UI stays consistent.
+-- One look for every screen, "Road": straight shapes with 6 px (buttons) and 8 px (sheets, cards) corners, a
+-- thick black outline on everything, traffic colours, Titillium Web Black type with a black text stroke on
+-- colour, and a few road touches (asphalt sheets, dashed yellow lane lines, hazard stripes, checkered strips).
+-- Every shape here is coded from Frames, UICorner, UIStroke and UIGradient, so nothing waits on an image;
+-- only icons are images (Config/Icons). Everything visual goes through here so the UI stays consistent.
 
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -132,131 +132,103 @@ function Style.fit(gui: ScreenGui)
 	table.insert(fitted, s)
 end
 
+local function rgb(r: number, g: number, b: number): Color3
+	return Color3.fromRGB(r, g, b)
+end
+
+local INK = rgb(20, 20, 20)
+local WHITE = rgb(255, 255, 255)
+
+-- traffic colours; the menu colours are GARAGE blue, STORE green, GOALS red, MAP amber, INVITE purple and
+-- settings grey. Old names (panel, card, gold, money...) are kept so every screen keeps working.
 Style.colors = table.freeze({
-	ink = Color3.fromRGB(21, 21, 21),
-	panel = Color3.fromRGB(0, 107, 63), -- highway sign green
-	panelTop = Color3.fromRGB(0, 107, 63),
-	card = Color3.fromRGB(36, 38, 42), -- dark charcoal for tracks, caps and plates inside a sign
-	edge = Color3.fromRGB(247, 247, 242), -- a sign's white inner line
-	text = Color3.fromRGB(255, 255, 255),
-	dim = Color3.fromRGB(213, 233, 222),
-	yellow = Color3.fromRGB(255, 201, 21), -- warning-sign yellow
-	red = Color3.fromRGB(215, 38, 43), -- stop-sign red
-	pink = Color3.fromRGB(255, 46, 154),
-	orange = Color3.fromRGB(255, 122, 0), -- construction orange
-	gold = Color3.fromRGB(255, 201, 21),
-	money = Color3.fromRGB(255, 214, 51),
-	blue = Color3.fromRGB(31, 79, 168), -- services blue
-	purple = Color3.fromRGB(150, 70, 255),
-	green = Color3.fromRGB(43, 200, 90),
-	grey = Color3.fromRGB(70, 70, 78),
-	brown = Color3.fromRGB(110, 59, 30), -- recreation brown
-	white = Color3.fromRGB(246, 246, 241), -- regulatory white
-	steel = Color3.fromRGB(150, 158, 166), -- gantries and posts
-	billEdge = Color3.fromRGB(26, 160, 67), -- the store's drawn banknotes
-	billInk = Color3.fromRGB(11, 93, 34),
-	prize = Color3.fromRGB(58, 42, 85), -- the daily streak's week prize tile
+	ink = INK,
+	asphalt = rgb(52, 54, 59), -- sheets and HUD bars
+	panel = rgb(52, 54, 59),
+	panelTop = rgb(52, 54, 59),
+	card = rgb(38, 40, 44), -- a darker box inside a sheet
+	edge = WHITE,
+	text = WHITE,
+	dim = rgb(184, 188, 196),
+	yellow = rgb(255, 204, 0),
+	amber = rgb(255, 184, 0),
+	red = rgb(255, 59, 48),
+	pink = rgb(255, 79, 163),
+	orange = rgb(255, 106, 19),
+	gold = rgb(255, 204, 0),
+	money = rgb(255, 204, 0),
+	blue = rgb(31, 123, 255),
+	purple = rgb(163, 71, 255),
+	green = rgb(25, 194, 74),
+	grey = rgb(138, 146, 156),
+	brown = rgb(150, 96, 52),
+	white = WHITE,
+	steel = rgb(150, 158, 166),
+	billEdge = rgb(26, 160, 67), -- the store's drawn banknotes
+	billInk = rgb(11, 93, 34),
+	prize = rgb(58, 42, 85), -- the daily streak's week prize tile
 })
 local C = Style.colors
 
--- Builder Sans (Roblox's own) in its heaviest weights stands in for highway-sign type; Highway Gothic
--- (also built in) is for numbers on real-sign pieces (the speed limit, mile markers)
-local BUILDER = "rbxasset://fonts/families/BuilderSans.json"
+-- Titillium Web (built into Roblox) in its Black weight for everything big, Bold for sentences
+local TITILLIUM = "rbxasset://fonts/families/TitilliumWeb.json"
 Style.fonts = table.freeze({
-	display = Font.new(BUILDER, Enum.FontWeight.ExtraBold),
-	heavy = Font.new(BUILDER, Enum.FontWeight.ExtraBold),
-	bold = Font.new(BUILDER, Enum.FontWeight.Bold),
-	medium = Font.new(BUILDER, Enum.FontWeight.Bold),
-	sign = Font.new("rbxasset://fonts/families/HighwayGothic.json"),
+	display = Font.new(TITILLIUM, Enum.FontWeight.Heavy),
+	heavy = Font.new(TITILLIUM, Enum.FontWeight.Heavy),
+	bold = Font.new(TITILLIUM, Enum.FontWeight.Bold),
+	medium = Font.new(TITILLIUM, Enum.FontWeight.SemiBold),
+	sign = Font.new(TITILLIUM, Enum.FontWeight.Heavy),
 })
 local F = Style.fonts
 
--- sign kinds: face, dark edge and lip, inner line, text, small text, money
+-- the shapes' numbers, layout px
+local R_SMALL = 6 -- buttons, plates
+local R_BIG = 8 -- sheets, cards
+local R_TINY = 4 -- tags, chips, bars
+local INK_W = 4 -- the black outline round everything
+local SHEET_W = 5 -- and round sheets
+local SHINE = 5 -- the inner top highlight (white 28%)
+local BAND = 6 -- the inner bottom band (black 22%)
+
+-- what sits on each colour: words, small words, money; `stroke` = white words get a black text stroke
 type Sign = {
 	face: Color3,
-	edge: Color3,
-	line: Color3,
 	text: Color3,
 	dim: Color3,
 	money: Color3,
+	stroke: boolean,
 }
+local function onColour(face: Color3): Sign
+	return {
+		face = face,
+		text = WHITE,
+		dim = WHITE:Lerp(face, 0.18),
+		money = C.yellow,
+		stroke = true,
+	}
+end
+local function onLight(face: Color3, dim: Color3): Sign
+	return { face = face, text = INK, dim = dim, money = INK, stroke = false }
+end
 Style.signs = table.freeze({
-	green = {
-		face = C.panel,
-		edge = Color3.fromRGB(0, 51, 29),
-		line = C.edge,
-		text = C.text,
-		dim = C.dim,
-		money = C.money,
-	},
-	blue = {
-		face = C.blue,
-		edge = Color3.fromRGB(15, 44, 99),
-		line = C.edge,
-		text = C.text,
-		dim = Color3.fromRGB(211, 224, 251),
-		money = C.money,
-	},
-	brown = {
-		face = C.brown,
-		edge = Color3.fromRGB(51, 23, 7),
-		line = C.edge,
-		text = C.text,
-		dim = Color3.fromRGB(240, 220, 203),
-		money = C.money,
-	},
-	orange = {
-		face = C.orange,
-		edge = Color3.fromRGB(90, 40, 0),
-		line = C.ink,
-		text = C.ink,
-		dim = Color3.fromRGB(74, 36, 0),
-		money = C.ink,
-	},
-	red = {
-		face = C.red,
-		edge = Color3.fromRGB(110, 15, 18),
-		line = C.edge,
-		text = C.text,
-		dim = Color3.fromRGB(255, 214, 214),
-		money = C.money,
-	},
-	purple = {
-		face = Color3.fromRGB(122, 62, 196),
-		edge = Color3.fromRGB(60, 24, 104),
-		line = C.edge,
-		text = C.text,
-		dim = Color3.fromRGB(226, 211, 250),
-		money = C.money,
-	},
-	grey = {
-		face = Color3.fromRGB(128, 134, 140),
-		edge = Color3.fromRGB(52, 56, 60),
-		line = C.edge,
-		text = C.text,
-		dim = Color3.fromRGB(226, 230, 233),
-		money = C.money,
-	},
-	yellow = {
-		face = C.yellow,
-		edge = Color3.fromRGB(143, 106, 0),
-		line = C.ink,
-		text = C.ink,
-		dim = Color3.fromRGB(90, 66, 0),
-		money = C.ink,
-	},
-	white = {
-		face = C.white,
-		edge = Color3.fromRGB(58, 58, 58),
-		line = C.ink,
-		text = C.ink,
-		dim = Color3.fromRGB(85, 88, 90),
-		money = C.red,
-	},
+	asphalt = { face = C.asphalt, text = WHITE, dim = C.dim, money = C.yellow, stroke = false },
+	card = { face = C.card, text = WHITE, dim = C.dim, money = C.yellow, stroke = false },
+	green = onColour(C.green),
+	blue = onColour(C.blue),
+	red = onColour(C.red),
+	purple = onColour(C.purple),
+	orange = onColour(C.orange),
+	pink = onColour(C.pink),
+	grey = onColour(C.grey),
+	brown = onColour(C.brown),
+	ink = { face = INK, text = WHITE, dim = C.dim, money = C.yellow, stroke = false },
+	yellow = onLight(C.yellow, rgb(92, 70, 0)),
+	amber = onLight(C.amber, rgb(92, 62, 0)),
+	white = onLight(WHITE, rgb(75, 85, 99)),
 } :: { [string]: Sign })
 local SIGNS = Style.signs
 
--- the sign kind a piece sits on (the nearest ancestor painted by Style.sign), green by default
+-- the colour a piece sits on (the nearest ancestor painted by Style.sign / card / bubble), asphalt by default
 local function signOf(obj: Instance?): Sign
 	local o = obj
 	while o and not o:IsA("LayerCollector") do
@@ -266,13 +238,13 @@ local function signOf(obj: Instance?): Sign
 		end
 		o = o.Parent
 	end
-	return SIGNS.green
+	return SIGNS.asphalt
 end
 
--- white text on a green sign becomes black on an orange or white one, and so on
+-- white words on a colour stay white; on yellow or white they turn black, and so on
 local function tone(parent: Instance?, color: Color3): Color3
 	local sign = signOf(parent)
-	if sign == SIGNS.green then
+	if sign.text == WHITE then
 		return color
 	end
 	if color == C.text then
@@ -281,63 +253,55 @@ local function tone(parent: Instance?, color: Color3): Color3
 		return sign.dim
 	elseif color == C.money then
 		return sign.money
-	elseif color == C.yellow and sign.text == C.ink then
-		return C.ink
 	end
 	return color
 end
 Style.tone = tone
 
--- button looks: face colour, and whether the words and inner line are black (else white)
+-- button looks: face colour, and whether the words are black (else white with a black stroke)
 local KINDS: { [string]: { any } } = {
 	red = { C.red, false },
-	orange = { C.orange, true },
-	gold = { C.yellow, true }, -- go
-	green = { C.yellow, true }, -- go (buttons are never green in this style)
+	orange = { C.orange, false },
+	gold = { C.green, false }, -- go
+	green = { C.green, false }, -- go
 	blue = { C.blue, false },
-	purple = { C.pink, false },
-	grey = { Color3.fromRGB(128, 134, 140), false },
-	ink = { C.card, false }, -- a tab that isn't open
-	dark = { C.white, true }, -- no / back / close
+	purple = { C.purple, false },
+	pink = { C.pink, false },
+	grey = { C.grey, false },
+	ink = { C.asphalt, false }, -- a tab that isn't open
+	dark = { WHITE, true }, -- no / back
+	white = { WHITE, true },
+	yellow = { C.yellow, true },
+	amber = { C.amber, true },
 }
 
--- signs have softly rounded corners; radius is in layout px
+-- 6 px for buttons, 8 for sheets and cards; never rounder (999 and up stays a circle)
 function Style.corner(obj: Instance, radius: number)
 	local c = obj:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, math.min(radius, 12))
+	if radius >= 100 then
+		c.CornerRadius = UDim.new(0.5, 0)
+	else
+		c.CornerRadius = UDim.new(0, math.min(radius, R_BIG))
+	end
 	c.Parent = obj
 end
 
-function Style.stroke(
-	obj: Instance,
-	color: Color3?,
-	thickness: number?,
-	transparency: number?
-): UIStroke
-	local s = Instance.new("UIStroke")
-	s.Color = color or C.edge
-	s.Thickness = thickness or 2
-	s.Transparency = transparency or 0
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	s.LineJoinMode = Enum.LineJoinMode.Round
-	s.Parent = obj
-	return s
+local function radiusOf(obj: Instance): number
+	local c = obj:FindFirstChildOfClass("UICorner")
+	return if c then c.CornerRadius.Offset else 0
 end
 
--- flat colour (the shading is in the kit images); the bottom colour is ignored
-function Style.gradient(obj: Instance, top: Color3, _bottom: Color3): UIGradient
-	if obj:IsA("GuiObject") then
-		obj.BackgroundColor3 = top
-	end
-	local g = Instance.new("UIGradient")
-	g.Parent = obj
-	return g
+-- inside the shape, so a sheet's size is its outer size (as in the drafts)
+local function inner(s: UIStroke)
+	pcall(function()
+		(s :: any).BorderStrokePosition = Enum.BorderStrokePosition.Inner
+	end)
 end
 
--- keep a piece's own images and words drawn in the right order in either ZIndex mode. `layer` (0 face,
--- 1 trim, 2 bolts...) puts a backing image under everything else in the piece: in a ScreenGui that sorts
--- siblings, below every sibling (any ZIndex the caller gave its labels); in one that sorts globally, on the
--- piece's own ZIndex, drawn before the labels made after it. Without a layer it takes the piece's ZIndex.
+-- keep a piece's own parts drawn in the right order in either ZIndex mode. `layer` (0 shade, 1 trim...)
+-- puts a part under everything else in the piece: in a ScreenGui that sorts siblings, below every sibling
+-- (any ZIndex the caller gave its labels); in one that sorts globally, on the piece's own ZIndex, drawn
+-- before the labels made after it. Without a layer it takes the piece's ZIndex.
 local BACK = -50
 local function follow(obj: GuiObject, part: GuiObject, layer: number?)
 	local function sync()
@@ -356,78 +320,17 @@ local function follow(obj: GuiObject, part: GuiObject, layer: number?)
 	sync()
 end
 
----------------------------------------------------------------- the UI kit's images
-
--- 9-slice sets drawn outside the game (tools/ui/ui_kit.py) at 2x: a white face the game tints, trims that keep
--- their colours (light = white inner line, dark = black), the slice insets in image px (left, top, right,
--- bottom) and the image's size
-type Kit = { face: number, light: number, dark: number, slice: { number }, w: number, h: number }
-local KIT: { [string]: Kit } = {
-	panel = {
-		face = Icons.KitPanelFace,
-		light = Icons.KitPanelTrimLight,
-		dark = Icons.KitPanelTrimDark,
-		slice = { 40, 40, 40, 40 },
-		w = 128,
-		h = 128,
-	},
-	plate = {
-		face = Icons.KitPlateFace,
-		light = Icons.KitPlateTrimLight,
-		dark = Icons.KitPlateTrimDark,
-		slice = { 28, 28, 28, 28 },
-		w = 96,
-		h = 96,
-	},
-	button = {
-		face = Icons.KitButtonFace,
-		light = Icons.KitButtonTrimLight,
-		dark = Icons.KitButtonTrimDark,
-		slice = { 30, 30, 30, 38 },
-		w = 96,
-		h = 96,
-	},
-	inset = {
-		face = Icons.KitInset,
-		light = 0,
-		dark = 0,
-		slice = { 20, 20, 20, 20 },
-		w = 64,
-		h = 64,
-	},
-	fill = {
-		face = Icons.KitBarFill,
-		light = 0,
-		dark = 0,
-		slice = { 10, 10, 10, 10 },
-		w = 32,
-		h = 32,
-	},
-	bubble = {
-		face = Icons.KitBubble,
-		light = 0,
-		dark = 0,
-		slice = { 64, 96, 64, 52 },
-		w = 200,
-		h = 180,
-	},
-}
-local HALF = 0.5 -- the images are drawn at twice layout size
-local BUTTON_LIFT = 2 -- a button's words sit this far up, over its face rather than its drawn-in depth
-
--- an image filling the whole object even when the object has a UIPadding (for its words)
-local function unpad(obj: GuiObject, img: GuiObject)
+-- a part filling the whole object even when the object has a UIPadding (for its words), `inset` px in
+local function unpad(obj: GuiObject, part: GuiObject, inset: number)
 	local function fit()
 		local pad = obj:FindFirstChildOfClass("UIPadding")
-		if not pad then
-			img.Position = UDim2.new()
-			img.Size = UDim2.fromScale(1, 1)
-			return
+		local l, r, t, b = 0, 0, 0, 0
+		if pad then
+			l, r = pad.PaddingLeft.Offset, pad.PaddingRight.Offset
+			t, b = pad.PaddingTop.Offset, pad.PaddingBottom.Offset
 		end
-		local l, r = pad.PaddingLeft.Offset, pad.PaddingRight.Offset
-		local t, b = pad.PaddingTop.Offset, pad.PaddingBottom.Offset
-		img.Position = UDim2.fromOffset(-l, -t)
-		img.Size = UDim2.new(1, l + r, 1, t + b)
+		part.Position = UDim2.fromOffset(inset - l, inset - t)
+		part.Size = UDim2.new(1, l + r - inset * 2, 1, t + b - inset * 2)
 	end
 	obj.ChildAdded:Connect(function(c)
 		if c:IsA("UIPadding") then
@@ -437,96 +340,144 @@ local function unpad(obj: GuiObject, img: GuiObject)
 	fit()
 end
 
-local function sliced(obj: GuiObject, name: string, id: number, kit: Kit): ImageLabel
-	local img = obj:FindFirstChild(name) :: ImageLabel?
-	if not img then
-		local new = Instance.new("ImageLabel")
-		new.Name = name
-		new.BackgroundTransparency = 1
-		new.ScaleType = Enum.ScaleType.Slice
-		new.SliceScale = HALF
+-- the black outline (one per piece, named Ink); calling again changes its width
+local function ink(obj: GuiObject, width: number): UIStroke
+	local s = obj:FindFirstChild("Ink") :: UIStroke?
+	if not s then
+		local new = Instance.new("UIStroke")
+		new.Name = "Ink"
+		new.Color = INK
+		new.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		new.LineJoinMode = Enum.LineJoinMode.Round
+		inner(new)
 		new.Parent = obj
-		unpad(obj, new)
-		follow(obj, new, if name == "Face" then 0 else 1)
-		img = new
+		s = new
 	end
-	local i = img :: ImageLabel
-	local s = kit.slice
-	i.Image = if id ~= 0 then `rbxassetid://{id}` else ""
-	i.SliceCenter = Rect.new(s[1], s[2], kit.w - s[3], kit.h - s[4])
-	return i
+	local stroke = s :: UIStroke
+	stroke.Thickness = width
+	obj:SetAttribute("InkWidth", width)
+	return stroke
 end
 
--- small pieces draw their corners smaller, so the slices never overlap
-local function fitSlices(obj: GuiObject)
-	local function fit()
-		local k = currentScale
-		local w, h = obj.AbsoluteSize.X / k, obj.AbsoluteSize.Y / k
-		for _, c in obj:GetChildren() do
-			local kit = if c:IsA("ImageLabel") then KIT[c:GetAttribute("Kit") :: string] else nil
-			if kit then
-				local s = kit.slice
-				local scale = math.max(0.05, math.min(HALF, w / (s[1] + s[3]), h / (s[2] + s[4])));
-				(c :: ImageLabel).SliceScale = scale
-			end
-		end
-	end
-	obj:GetPropertyChangedSignal("AbsoluteSize"):Connect(fit)
-	obj.ChildAdded:Connect(fit)
-	task.defer(fit)
-end
-
--- the object's own background gives way to the images: BackgroundColor3 tints the face and
--- BackgroundTransparency fades it, so code that recolours a sign or button keeps working
-local function adopt(obj: GuiObject, face: ImageLabel, tinted: boolean)
-	if obj:GetAttribute("Skinned") then
+-- the inner top highlight and bottom band: one frame inside the outline whose gradient is white at the
+-- top, clear in the middle and black at the bottom, hard-edged, measured in px from the piece's height
+local function shadeKeys(s: Frame, obj: GuiObject, shine: number, band: number)
+	local g = s:FindFirstChildOfClass("UIGradient") :: UIGradient
+	local w = (obj:GetAttribute("InkWidth") :: number?) or 0
+	local h = obj.AbsoluteSize.Y / currentScale - w * 2
+	if h <= 2 then
 		return
 	end
-	obj:SetAttribute("Skinned", true)
-	local busy = false
-	local function color()
-		if tinted then
-			face.ImageColor3 = obj.BackgroundColor3
-		end
+	local room = math.max(1, math.min(1, (h - 2) / (shine + band)))
+	local a = math.clamp(shine * room / h, 0.002, 0.45)
+	local b = math.clamp(1 - band * room / h, 0.55, 0.998)
+	local e = 0.001
+	local top, bottom = 0.72, 0.78
+	if shine <= 0 then
+		top = 1
 	end
-	local function fade()
-		if busy then
-			return
-		end
-		busy = true
-		face.ImageTransparency = obj.BackgroundTransparency
-		obj.BackgroundTransparency = 1
-		busy = false
+	if band <= 0 then
+		bottom = 1
 	end
-	obj:GetPropertyChangedSignal("BackgroundColor3"):Connect(color)
-	obj:GetPropertyChangedSignal("BackgroundTransparency"):Connect(fade)
-	color()
-	fade()
+	g.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, top),
+		NumberSequenceKeypoint.new(a, top),
+		NumberSequenceKeypoint.new(a + e, 1),
+		NumberSequenceKeypoint.new(b - e, 1),
+		NumberSequenceKeypoint.new(b, bottom),
+		NumberSequenceKeypoint.new(1, bottom),
+	})
 end
 
--- put a kit set on any frame or button: the tinted face and the trim (light or dark inner line)
-local function skin(obj: GuiObject, kitName: string, tint: Color3?, dark: boolean?)
-	local kit = KIT[kitName]
-	obj.BorderSizePixel = 0
-	local face = sliced(obj, "Face", kit.face, kit)
-	face:SetAttribute("Kit", kitName)
-	if kit.light ~= 0 then
-		local trim = sliced(obj, "Trim", if dark then kit.dark else kit.light, kit)
-		trim:SetAttribute("Kit", kitName)
+local function shade(obj: GuiObject, shine: number, band: number)
+	local s = obj:FindFirstChild("Shade") :: Frame?
+	if not s then
+		local new = Instance.new("Frame")
+		new.Name = "Shade"
+		new.BackgroundColor3 = WHITE
+		new.BorderSizePixel = 0
+		new.Active = false
+		new.Parent = obj
+		local g = Instance.new("UIGradient")
+		g.Rotation = 90
+		g.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, WHITE),
+			ColorSequenceKeypoint.new(0.5, WHITE),
+			ColorSequenceKeypoint.new(0.501, INK),
+			ColorSequenceKeypoint.new(1, INK),
+		})
+		g.Parent = new
+		Instance.new("UICorner").Parent = new
+		follow(obj, new, 0)
+		s = new
+		obj:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			shadeKeys(
+				new,
+				obj,
+				obj:GetAttribute("Shine") :: number,
+				obj:GetAttribute("Band") :: number
+			)
+		end)
 	end
-	if not obj:GetAttribute("Skinned") then
-		fitSlices(obj)
+	local f = s :: Frame
+	obj:SetAttribute("Shine", shine)
+	obj:SetAttribute("Band", band)
+	local w = (obj:GetAttribute("InkWidth") :: number?) or 0
+	if not f:GetAttribute("Fitted") then
+		f:SetAttribute("Fitted", true)
+		unpad(obj, f, w)
 	end
-	if tint then
-		obj.BackgroundColor3 = tint
-	end
-	adopt(obj, face, kit.light ~= 0 or kitName == "fill")
-	if tint then
-		face.ImageColor3 = tint
-	end
+	local corner = f:FindFirstChildOfClass("UICorner") :: UICorner
+	corner.CornerRadius = UDim.new(0, math.max(0, radiusOf(obj) - w))
+	f.BackgroundTransparency = obj.BackgroundTransparency
+	shadeKeys(f, obj, shine, band)
 end
 
--- a text label or button's words drawn by a child over its kit images (an object's own text draws under its
+-- the piece's outline and shade fade with its background (fades tween BackgroundTransparency)
+local function fades(obj: GuiObject)
+	if obj:GetAttribute("Fades") then
+		return
+	end
+	obj:SetAttribute("Fades", true)
+	obj:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
+		local t = obj.BackgroundTransparency
+		local s = obj:FindFirstChild("Ink")
+		if s and s:IsA("UIStroke") and not obj:GetAttribute("Ringed") then
+			s.Transparency = t
+		end
+		local f = obj:FindFirstChild("Shade")
+		if f and f:IsA("Frame") then
+			f.BackgroundTransparency = t
+		end
+	end)
+end
+
+-- a text stroke in ink on a label's words (one per label, named TextInk); width 0 takes it off
+local function textInk(l: TextLabel | TextButton, width: number)
+	local s = l:FindFirstChild("TextInk") :: UIStroke?
+	if width <= 0 then
+		if s then
+			s:Destroy()
+		end
+		return
+	end
+	if not s then
+		local new = Instance.new("UIStroke")
+		new.Name = "TextInk"
+		new.Color = INK
+		new.LineJoinMode = Enum.LineJoinMode.Round
+		new.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+		new.Parent = l
+		s = new
+	end
+	(s :: UIStroke).Thickness = width
+end
+
+local function inkFor(size: number): number
+	return if size >= 26 then 3 else 2
+end
+
+-- a text label or button's words drawn by a child over its shade (an object's own text draws under its
 -- children): the object keeps its Text, size and colours, which the words copy, and its own text is hidden
 local MIRROR = {
 	"Text",
@@ -560,10 +511,17 @@ local function words(obj: TextLabel | TextButton, lift: number): TextLabel
 		obj:GetPropertyChangedSignal(p):Connect(copy)
 	end
 	obj.MaxVisibleGraphemes = 0
-	-- a size cap or outline put on the object applies to the words
+	-- a size cap or text outline put on the object applies to the words
 	local function take(c: Instance)
 		local stroke = c:IsA("UIStroke") and c.ApplyStrokeMode == Enum.ApplyStrokeMode.Contextual
 		if c:IsA("UITextSizeConstraint") or stroke then
+			if stroke then
+				local old = w:FindFirstChild("TextInk")
+				if old then
+					old:Destroy()
+				end
+				c.Name = "TextInk"
+			end
 			c:Clone().Parent = w
 		end
 	end
@@ -575,12 +533,24 @@ local function words(obj: TextLabel | TextButton, lift: number): TextLabel
 	return w
 end
 
--- a highlight ring round a sign (an event about to end, a car you can buy): pass nil to take it off
+-- a highlight ring round a piece (an event about to end, a car you can buy): its outline turns that colour;
+-- pass nil to put the black back
 function Style.ring(obj: GuiObject, color: Color3?)
+	local s = obj:FindFirstChild("Ink") :: UIStroke?
+	if s then
+		obj:SetAttribute("Ringed", color ~= nil)
+		s.Color = color or INK
+		s.Transparency = if color then 0 else obj.BackgroundTransparency
+		return
+	end
 	local ring = obj:FindFirstChild("SignEdge") :: UIStroke?
 	if not ring then
-		local r = Style.stroke(obj, C.yellow, 3, 1)
+		local r = Instance.new("UIStroke")
 		r.Name = "SignEdge"
+		r.Thickness = 3
+		r.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		r.LineJoinMode = Enum.LineJoinMode.Round
+		r.Parent = obj
 		ring = r
 	end
 	local r = ring :: UIStroke
@@ -588,9 +558,48 @@ function Style.ring(obj: GuiObject, color: Color3?)
 	r.Transparency = if color then 0 else 1
 end
 
----------------------------------------------------------------- signs, cards and buttons
+-- an outline. On a piece that already has its black outline, the new one is drawn by a ring frame laid
+-- over it, so both show (and the caller's changes to the returned stroke still work).
+function Style.stroke(
+	obj: Instance,
+	color: Color3?,
+	thickness: number?,
+	transparency: number?
+): UIStroke
+	local s = Instance.new("UIStroke")
+	s.Color = color or INK
+	s.Thickness = thickness or 2
+	s.Transparency = transparency or 0
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	s.LineJoinMode = Enum.LineJoinMode.Round
+	local holder: Instance = obj
+	if obj:IsA("GuiObject") and obj:FindFirstChild("Ink") then
+		local over = Instance.new("Frame")
+		over.Name = "Ring"
+		over.BackgroundTransparency = 1
+		over.Size = UDim2.fromScale(1, 1)
+		over.Parent = obj
+		Style.corner(over, radiusOf(obj))
+		follow(obj, over)
+		holder = over
+	end
+	s.Parent = holder
+	return s
+end
 
--- text: white, heavy, on the sign's colours (see tone)
+-- the colour as a flat face with a plain gradient (kept for older callers)
+function Style.gradient(obj: Instance, top: Color3, _bottom: Color3): UIGradient
+	if obj:IsA("GuiObject") then
+		obj.BackgroundColor3 = top
+	end
+	local g = Instance.new("UIGradient")
+	g.Parent = obj
+	return g
+end
+
+---------------------------------------------------------------- labels, sheets, cards and buttons
+
+-- words: white, Titillium; black on yellow or white pieces, and with a black stroke on colours
 function Style.label(
 	parent: Instance,
 	text: string,
@@ -605,25 +614,82 @@ function Style.label(
 	l.FontFace = font or F.medium
 	l.TextColor3 = tone(parent, color or C.text)
 	l.Parent = parent
+	local sign = signOf(parent)
+	if sign.stroke and l.TextColor3 == WHITE then
+		textInk(l, inkFor(size))
+	end
 	return l
 end
 
--- a thin line in the sign's line colour along the top or bottom edge (or a vertical one with vertical =
--- true); the colour argument is kept for older callers and ignored
+-- a road marking: a dashed yellow lane line on asphalt (horizontal, or vertical with vertical = true), a
+-- thin black rule on a colour; the colour argument is kept for older callers and ignored
+local DASH, GAP = 26, 18
+local function dashes(holder: Frame, vertical: boolean)
+	local function build()
+		local s = currentScale
+		local long = (if vertical then holder.AbsoluteSize.Y else holder.AbsoluteSize.X) / s * 2
+		local need = math.ceil(long / (DASH + GAP)) + 1
+		local have = holder:GetAttribute("Dashes") :: number? or 0
+		for i = have, need - 1 do
+			local d = Instance.new("Frame")
+			d.Name = "Dash"
+			d.BorderSizePixel = 0
+			d.BackgroundColor3 = C.yellow
+			if vertical then
+				d.Position = UDim2.fromOffset(0, i * (DASH + GAP))
+				d.Size = UDim2.new(1, 0, 0, DASH)
+			else
+				d.Position = UDim2.fromOffset(i * (DASH + GAP), 0)
+				d.Size = UDim2.new(0, DASH, 1, 0)
+			end
+			d.ZIndex = holder.ZIndex
+			d.Parent = holder
+		end
+		holder:SetAttribute("Dashes", math.max(have, need))
+	end
+	holder:GetPropertyChangedSignal("AbsoluteSize"):Connect(build)
+	holder:GetPropertyChangedSignal("ZIndex"):Connect(function()
+		for _, d in holder:GetChildren() do
+			if d:IsA("GuiObject") then
+				d.ZIndex = holder.ZIndex
+			end
+		end
+	end)
+	task.defer(build)
+end
+
+-- a dashed yellow lane line (6 px), across or (vertical) down its box; give it a Size and Position
+function Style.lane(parent: Instance, vertical: boolean?): Frame
+	local f = Instance.new("Frame")
+	f.Name = "Lane"
+	f.BackgroundTransparency = 1
+	f.ClipsDescendants = true
+	f.Size = if vertical then UDim2.new(0, 6, 1, 0) else UDim2.new(1, 0, 0, 6)
+	f.Parent = parent
+	dashes(f, vertical == true)
+	return f
+end
+
 function Style.dashes(
 	parent: Instance,
 	_color: Color3?,
 	vertical: boolean?,
 	thickness: number?
 ): Frame
-	local t = math.min(thickness or 3, 3)
+	local t = math.min(thickness or 4, 6)
+	local sign = signOf(parent)
+	if sign == SIGNS.asphalt or sign == SIGNS.card or sign == SIGNS.ink then
+		local lane = Style.lane(parent, vertical)
+		lane.Name = "Dashes"
+		lane.Size = if vertical then UDim2.new(0, t, 1, 0) else UDim2.new(1, 0, 0, t)
+		return lane
+	end
 	local line = Instance.new("Frame")
 	line.Name = "Dashes"
-	line.BackgroundColor3 = signOf(parent).line
+	line.BackgroundColor3 = INK
 	line.BorderSizePixel = 0
 	line.Size = if vertical then UDim2.new(0, t, 1, 0) else UDim2.new(1, 0, 0, t)
 	line.Parent = parent
-	Style.corner(line, 2)
 	return line
 end
 
@@ -637,88 +703,110 @@ function Style.fitText(l: TextLabel | TextButton, padX: number, padY: number)
 	fit()
 end
 
--- a solid ink outline so text reads over the world
+-- a solid black text stroke so words read over the world or on a colour
 function Style.outline(l: TextLabel | TextButton, thickness: number?)
-	local s = Instance.new("UIStroke")
-	s.Color = C.ink
-	s.Thickness = thickness or 2
-	s.Transparency = 0
-	s.LineJoinMode = Enum.LineJoinMode.Round
-	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-	s.Parent = l
+	local w = l:FindFirstChild("Words")
+	textInk(if w and w:IsA("TextLabel") then w else l, thickness or 2)
 end
 
--- Turn any frame or button into a sign drawn from the kit: a face in the kind's colour (green, blue, red,
--- brown, orange, white, yellow, purple, grey) with its dark edge, white (or black) inner line and, on big
--- ones, a rivet in each corner. Calling it again repaints it in another kind. Labels made with Style.label
--- inside it afterwards take the kind's text colours.
+-- Paint any frame or button as a piece of the kit. Big ones (sheets) are asphalt with a 5 px black outline
+-- and remember `kind` as their accent (Accent attribute, for a title plate); small ones (plates, tags, tiles)
+-- take the kind's colour (green, blue, red, purple, orange, pink, grey, yellow, amber, white, asphalt) with a
+-- 4 px outline, the inner highlight and the bottom band. Calling it again repaints it. Labels made with
+-- Style.label inside it afterwards take the kind's text colours.
 function Style.sign(obj: GuiObject, kind: string?, small: boolean?)
-	local k = kind or "green"
-	local sign = SIGNS[k] or SIGNS.green
-	obj:SetAttribute("Sign", k)
-	Style.corner(obj, if small then 8 else 11)
-	local dark = sign.line == C.ink
+	local k = if kind and SIGNS[kind] then kind else "asphalt"
+	local face = if small then k else "asphalt"
+	local sign = SIGNS[face]
+	obj:SetAttribute("Sign", face)
+	if not small then
+		obj:SetAttribute("Accent", k)
+	end
+	obj.BorderSizePixel = 0
+	obj.BackgroundColor3 = sign.face
+	Style.corner(obj, if small then R_SMALL else R_BIG)
+	ink(obj, if small then INK_W else SHEET_W)
 	if small then
-		skin(obj, "plate", sign.face, dark)
-	else
-		skin(obj, "panel", sign.face, dark)
+		shade(obj, SHINE, BAND)
 	end
-	if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and not obj:FindFirstChild("Words") then
-		words(obj :: any, 0)
-	end
-	if small then
-		return
-	end
-	-- the riveted trim only on signs big enough to carry it
-	if not obj:GetAttribute("Sized") then
-		obj:SetAttribute("Sized", true)
-		local function check()
-			local s = currentScale
-			local big = obj.AbsoluteSize.X / s >= 150 and obj.AbsoluteSize.Y / s >= 90
-			local kit = if big then KIT.panel else KIT.plate
-			local name = if big then "panel" else "plate"
-			local isDark = (SIGNS[obj:GetAttribute("Sign") :: string] or SIGNS.green).line == C.ink
-			local face = obj:FindFirstChild("Face") :: ImageLabel
-			if face and face:GetAttribute("Kit") ~= name then
-				sliced(obj, "Face", kit.face, kit):SetAttribute("Kit", name)
-				sliced(obj, "Trim", if isDark then kit.dark else kit.light, kit):SetAttribute(
-					"Kit",
-					name
-				)
-			end
+	fades(obj)
+	if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+		local w = obj:FindFirstChild("Words") :: TextLabel?
+		if not w then
+			w = words(obj :: any, 0)
 		end
-		obj:GetPropertyChangedSignal("AbsoluteSize"):Connect(check)
-		task.defer(check)
+		local t = obj :: TextLabel
+		if t.TextColor3 == WHITE or t.TextColor3 == INK then
+			t.TextColor3 = sign.text
+		end
+		textInk(w :: TextLabel, if sign.stroke then inkFor(t.TextSize) else 0)
 	end
 end
 
--- a highway-green sign (see Style.sign); radius is ignored (kept for older callers)
+-- an asphalt sheet (see Style.sign); radius is ignored (kept for older callers)
 function Style.panel(parent: Instance, _radius: number?, transparency: number?): Frame
 	local f = Instance.new("Frame")
 	f.BackgroundTransparency = transparency or 0
 	f.Parent = parent
-	Style.sign(f, "green")
+	Style.sign(f, "asphalt")
 	return f
 end
 
--- the garage tour's callout: a white body under a yellow title band, its tail at the bottom left (the
--- bottom 13 layout px are the tail). Labels inside it take black words.
+-- the garage tour's callout: a white body under a yellow title band (Style.BUBBLE_HEAD px), held up by a
+-- short black post at the bottom left (the bottom Style.BUBBLE_TAIL px). Labels inside it take black words.
+Style.BUBBLE_HEAD = 44
+Style.BUBBLE_TAIL = 13
 function Style.bubble(parent: Instance): Frame
 	local f = Instance.new("Frame")
+	f.Name = "Bubble"
+	f.BackgroundTransparency = 1
 	f.Parent = parent
 	f:SetAttribute("Sign", "white")
-	skin(f, "bubble")
+	local body = Instance.new("Frame")
+	body.Name = "Body"
+	body.BackgroundColor3 = WHITE
+	body.Size = UDim2.new(1, 0, 1, -Style.BUBBLE_TAIL)
+	body.Parent = f
+	Style.corner(body, R_BIG)
+	ink(body, INK_W)
+	follow(f, body, 0)
+	local head = Instance.new("Frame")
+	head.Name = "Head"
+	head.BackgroundColor3 = C.yellow
+	head.BorderSizePixel = 0
+	head.Position = UDim2.fromOffset(INK_W, INK_W)
+	head.Size = UDim2.new(1, -INK_W * 2, 0, Style.BUBBLE_HEAD - INK_W)
+	head.Parent = body
+	Style.corner(head, R_BIG - INK_W)
+	local rule = Instance.new("Frame")
+	rule.Name = "Rule"
+	rule.BackgroundColor3 = INK
+	rule.BorderSizePixel = 0
+	rule.Position = UDim2.new(0, 0, 1, -3)
+	rule.Size = UDim2.new(1, 0, 0, 3)
+	rule.Parent = head
+	follow(f, head, 1)
+	local post = Instance.new("Frame")
+	post.Name = "Post"
+	post.BackgroundColor3 = INK
+	post.BorderSizePixel = 0
+	post.Position = UDim2.new(0, 28, 1, -Style.BUBBLE_TAIL - 2)
+	post.Size = UDim2.fromOffset(10, Style.BUBBLE_TAIL + 2)
+	post.Parent = f
+	follow(f, post, 0)
 	return f
 end
-Style.BUBBLE_HEAD = 44 -- the bubble's title band, layout px
-Style.BUBBLE_TAIL = 13
 
--- a recessed box inside a sign: the sign's colour darkened, with a faint light rim
+-- a box inside a sheet: darker asphalt with a black outline
 function Style.card(parent: Instance, _radius: number?): Frame
 	local f = Instance.new("Frame")
+	f.BorderSizePixel = 0
+	f.BackgroundColor3 = C.card
 	f.Parent = parent
-	Style.corner(f, 8)
-	skin(f, "inset")
+	f:SetAttribute("Sign", "card")
+	Style.corner(f, R_BIG)
+	ink(f, INK_W)
+	fades(f)
 	return f
 end
 
@@ -741,22 +829,18 @@ end
 
 local function paintButton(b: TextButton, look: { any })
 	local dark = look[2] == true
-	local ink = if dark then C.ink else C.text
 	b.BackgroundColor3 = look[1]
-	b.TextColor3 = ink
-	skin(b, "button", look[1], dark)
-	if not b:FindFirstChild("Words") then
-		words(b, BUTTON_LIFT)
+	b.TextColor3 = if dark then INK else WHITE
+	local w = b:FindFirstChild("Words") :: TextLabel?
+	if not w then
+		w = words(b, 1)
 	end
-	local arrow = b:FindFirstChild("ExitArrow") :: ImageLabel?
-	if arrow then
-		arrow.ImageColor3 = ink
-	end
+	textInk(w :: TextLabel, if dark then 0 else inkFor(b.TextSize))
 end
 
--- a sign-plate button drawn from the kit: yellow for go, white for no (and blue, red, orange, grey), a black
--- or white inner line, its depth drawn in; it sinks when pressed. Big ones carry two mounting bolts and an
--- exit-sign arrow after their words.
+-- a button: a flat traffic-colour face (green for go, white for no; also red, blue, orange, purple, pink,
+-- grey, yellow, amber), 6 px corners, a 4 px black outline, the inner highlight and bottom band, and white
+-- words with a black stroke (black words on white and yellow). It sinks when pressed.
 function Style.button(parent: Instance, text: string, kind: string?, size: number?): TextButton
 	local look = KINDS[kind or "red"] or KINDS.red
 	local b = Instance.new("TextButton")
@@ -766,39 +850,11 @@ function Style.button(parent: Instance, text: string, kind: string?, size: numbe
 	b.TextSize = size or 17
 	b.FontFace = F.display
 	b.Parent = parent
+	Style.corner(b, R_SMALL)
+	ink(b, INK_W)
+	shade(b, SHINE, BAND)
+	fades(b)
 	paintButton(b, look)
-	-- bolts and the arrow show only on big plates with room beside the words
-	local bolts = Instance.new("Frame")
-	bolts.Name = "Bolts"
-	bolts.BackgroundTransparency = 1
-	bolts.Size = UDim2.fromScale(1, 1)
-	bolts.Visible = false
-	bolts.Parent = b
-	for _, at in { { 0, 13 }, { 1, -13 } } do
-		local bolt = Style.image(bolts, Icons.KitBolt, Color3.new(1, 1, 1))
-		bolt.AnchorPoint = Vector2.new(0.5, 0.5)
-		bolt.Position = UDim2.new(at[1], at[2], 0.5, -BUTTON_LIFT)
-		bolt.Size = UDim2.fromOffset(12, 12)
-	end
-	local arrow = Style.image(b, Icons.KitExitArrow, b.TextColor3)
-	arrow.Name = "ExitArrow"
-	arrow.AnchorPoint = Vector2.new(0, 0.5)
-	arrow.Size = UDim2.fromOffset(16, 16)
-	arrow.Visible = false
-	follow(b, bolts, 2)
-	follow(b, arrow, 2)
-	local function decorate()
-		local s = currentScale
-		local w, h = b.AbsoluteSize.X / s, b.AbsoluteSize.Y / s
-		local tw = b.TextBounds.X / s
-		local big = w >= 150 and h >= 44
-		bolts.Visible = big
-		arrow.Visible = big and w - tw >= 96
-		arrow.Position = UDim2.new(0.5, tw / 2 + 9, 0.5, -BUTTON_LIFT)
-	end
-	b:GetPropertyChangedSignal("AbsoluteSize"):Connect(decorate)
-	b:GetPropertyChangedSignal("TextBounds"):Connect(decorate)
-	decorate()
 	press(b)
 	return b
 end
@@ -826,39 +882,148 @@ function Style.setKind(b: TextButton, kind: string)
 	paintButton(b, KINDS[kind] or KINDS.red)
 end
 
--- a progress bar: a recessed track and a shaded fill (yellow unless told); returns the back and the fill
+-- a progress bar: an asphalt track with a 3 px black outline and a flat fill (yellow unless told) with a
+-- thin highlight; returns the track and the fill. The outline is drawn over the fill.
 function Style.bar(parent: Instance, color: Color3?): (Frame, Frame)
 	local back = Instance.new("Frame")
+	back.BorderSizePixel = 0
+	back.BackgroundColor3 = C.asphalt
 	back.ClipsDescendants = true
 	back.Parent = parent
-	skin(back, "inset")
+	Style.corner(back, R_TINY)
 	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.BorderSizePixel = 0
+	fill.BackgroundColor3 = color or C.yellow
 	fill.Size = UDim2.fromScale(0, 1)
 	fill.Parent = back
-	skin(fill, "fill", color or C.yellow)
+	shade(fill, 3, 0)
+	fades(fill)
+	local edge = Instance.new("Frame")
+	edge.Name = "Edge"
+	edge.BackgroundTransparency = 1
+	edge.Size = UDim2.fromScale(1, 1)
+	edge.Parent = back
+	Style.corner(edge, R_TINY)
+	local s = Instance.new("UIStroke")
+	s.Name = "Ink"
+	s.Color = INK
+	s.Thickness = 3
+	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	inner(s)
+	s.Parent = edge
+	local function z()
+		fill.ZIndex = back.ZIndex
+		edge.ZIndex = back.ZIndex + 1
+	end
+	back:GetPropertyChangedSignal("ZIndex"):Connect(z)
+	z()
 	return back, fill
 end
 
 -- kept for older callers: bars are solid in this style
 function Style.laneGaps(_back: Frame, _behind: Color3) end
 
--- a yellow-and-black construction band along the top of a card, just inside its edge (`width` is kept for
--- older callers)
-function Style.hazard(parent: Instance, _width: number, height: number): ImageLabel
-	local band = Instance.new("ImageLabel")
-	band.Name = "Hazard"
-	band.BackgroundTransparency = 1
-	band.Image = `rbxassetid://{Icons.KitHazard}`
-	band.ScaleType = Enum.ScaleType.Tile
-	band.TileSize = UDim2.fromOffset(height * 2, height)
-	band.Position = UDim2.fromOffset(4, 4)
-	band.Size = UDim2.new(1, -8, 0, height)
+-- yellow-and-black hazard stripes filling a box (thin black frames at 45 degrees on yellow, clipped by the
+-- box): the frame round events and offers. Give it a Size and Position.
+local STRIPE, PITCH = 10, 22 -- black stripe width across and stripe spacing, layout px
+function Style.stripes(parent: Instance): Frame
+	local band = Instance.new("Frame")
+	band.Name = "Stripes"
+	band.BackgroundColor3 = C.yellow
+	band.BorderSizePixel = 0
+	band.ClipsDescendants = true
 	band.Parent = parent
-	Style.corner(band, 8)
+	local function build()
+		local s = currentScale
+		local w = band.AbsoluteSize.X / s * 2
+		local h = band.AbsoluteSize.Y / s * 2
+		local need = math.ceil((w + h) / PITCH) + 1
+		local have = band:GetAttribute("Stripes") :: number? or 0
+		for i = have, need - 1 do
+			local d = Instance.new("Frame")
+			d.Name = "Stripe"
+			d.BorderSizePixel = 0
+			d.BackgroundColor3 = INK
+			d.AnchorPoint = Vector2.new(0.5, 0.5)
+			d.Rotation = 45 -- the one turned piece: a stripe inside its clipping band
+			d.Position = UDim2.new(0, i * PITCH - h / 2, 0.5, 0)
+			d.Size = UDim2.fromOffset(STRIPE / math.sqrt(2), h * 2 + 40)
+			d.ZIndex = band.ZIndex
+			d.Parent = band
+		end
+		band:SetAttribute("Stripes", math.max(have, need))
+	end
+	band:GetPropertyChangedSignal("AbsoluteSize"):Connect(build)
+	band:GetPropertyChangedSignal("ZIndex"):Connect(function()
+		for _, d in band:GetChildren() do
+			if d:IsA("GuiObject") then
+				d.ZIndex = band.ZIndex
+			end
+		end
+	end)
+	task.defer(build)
 	return band
 end
 
--- one of the HUD's shape images (Config/Icons), fitted into its box; color tints the white ones
+-- a hazard band along the top of a card, just inside its outline (`width` is kept for older callers)
+function Style.hazard(parent: Instance, _width: number, height: number): Frame
+	local band = Style.stripes(parent)
+	band.Name = "Hazard"
+	band.Position = UDim2.fromOffset(INK_W, INK_W)
+	band.Size = UDim2.new(1, -INK_W * 2, 0, height)
+	local rule = Instance.new("Frame")
+	rule.Name = "Rule"
+	rule.BackgroundColor3 = INK
+	rule.BorderSizePixel = 0
+	rule.Position = UDim2.fromOffset(INK_W, INK_W + height)
+	rule.Size = UDim2.new(1, -INK_W * 2, 0, 3)
+	rule.Parent = parent
+	return band
+end
+
+-- a checkered strip (finish-line squares, `cell` px) filling a box: the top of reward cards
+function Style.checker(parent: Instance, cell: number?): Frame
+	local size = cell or 12
+	local strip = Instance.new("Frame")
+	strip.Name = "Checker"
+	strip.BackgroundColor3 = WHITE
+	strip.BorderSizePixel = 0
+	strip.ClipsDescendants = true
+	strip.Parent = parent
+	local function build()
+		local s = currentScale
+		local cols = math.ceil(strip.AbsoluteSize.X / s * 2 / size)
+		local rows = math.ceil(strip.AbsoluteSize.Y / s * 2 / size)
+		local key = cols * 1000 + rows
+		if (strip:GetAttribute("Built") :: number? or 0) >= key then
+			return
+		end
+		strip:SetAttribute("Built", key)
+		for _, c in strip:GetChildren() do
+			if c.Name == "Cell" then
+				c:Destroy()
+			end
+		end
+		for r = 0, rows - 1 do
+			for c = r % 2, cols - 1, 2 do
+				local d = Instance.new("Frame")
+				d.Name = "Cell"
+				d.BorderSizePixel = 0
+				d.BackgroundColor3 = INK
+				d.Position = UDim2.fromOffset(c * size, r * size)
+				d.Size = UDim2.fromOffset(size, size)
+				d.ZIndex = strip.ZIndex
+				d.Parent = strip
+			end
+		end
+	end
+	strip:GetPropertyChangedSignal("AbsoluteSize"):Connect(build)
+	task.defer(build)
+	return strip
+end
+
+-- one of the icon images (Config/Icons), fitted into its box; color tints it (white = as drawn)
 function Style.image(parent: Instance, id: number, color: Color3?): ImageLabel
 	local img = Instance.new("ImageLabel")
 	img.BackgroundTransparency = 1
@@ -869,50 +1034,68 @@ function Style.image(parent: Instance, id: number, color: Color3?): ImageLabel
 	return img
 end
 
--- a small sign tag ("TUTORIAL", "HOURLY"): a little plate with a thin inner line; black words on light
--- colours, white on dark ones
+-- a small tag ("TUTORIAL", "HOURLY"): a colour plate, 4 px corners, a 3 px black outline; black words on
+-- light colours, white with a stroke on the rest
 function Style.pill(parent: Instance, text: string, color: Color3): TextLabel
-	local light = color.R * 0.3 + color.G * 0.59 + color.B * 0.11 > 0.55
-	local ink = if light then C.ink else C.text
+	local light = color.R * 0.3 + color.G * 0.59 + color.B * 0.11 > 0.62
 	local p = Instance.new("TextLabel")
 	p.Text = text
 	p.TextSize = 12
 	p.FontFace = F.heavy
-	p.TextColor3 = ink
+	p.TextColor3 = if light then INK else WHITE
+	p.BackgroundColor3 = color
+	p.BorderSizePixel = 0
 	p.Size = UDim2.fromOffset(0, 20)
 	p.Parent = parent
-	skin(p, "button", color, light)
-	-- as wide as its words plus a margin (a UIPadding would pull the plate's images in too)
+	Style.corner(p, R_TINY)
+	ink(p, 3)
+	fades(p)
+	-- as wide as its words plus a margin
 	local function fit()
 		p.Size = UDim2.new(0, p.TextBounds.X / currentScale + 16, p.Size.Y.Scale, p.Size.Y.Offset)
 	end
 	p:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 	fit()
-	words(p, 1)
+	local w = words(p, 0)
+	textInk(w, if light then 0 else 2)
 	return p
 end
 
--- the red stop-sign octagon with a white rim that marks something new ("!" or a count); `size` layout px
-function Style.stop(parent: Instance, text: string, size: number?): ImageLabel
+-- a black chip with yellow words: timers and prices on a colour ("2:45", "$1,000")
+function Style.chip(parent: Instance, text: string, size: number?): TextLabel
+	local p = Instance.new("TextLabel")
+	p.Text = text
+	p.TextSize = size or 18
+	p.FontFace = F.heavy
+	p.TextColor3 = C.yellow
+	p.BackgroundColor3 = INK
+	p.BorderSizePixel = 0
+	p.Parent = parent
+	Style.corner(p, R_TINY)
+	return p
+end
+
+-- the yellow square badge with a black number that marks something new ("!" or a count); `size` layout px
+function Style.stop(parent: Instance, text: string, size: number?): Frame
 	local s = size or 24
-	local img = Instance.new("ImageLabel")
-	img.Name = "Stop"
-	img.BackgroundTransparency = 1
-	img.Image = if Icons.Stop ~= 0 then `rbxassetid://{Icons.Stop}` else ""
-	img.ScaleType = Enum.ScaleType.Fit
-	img.Size = UDim2.fromOffset(s, s)
-	img.Parent = parent
+	local f = Instance.new("Frame")
+	f.Name = "Stop"
+	f.BackgroundColor3 = C.yellow
+	f.BorderSizePixel = 0
+	f.Size = UDim2.fromOffset(s, s)
+	f.Parent = parent
+	Style.corner(f, R_TINY)
+	ink(f, 3)
 	local l = Instance.new("TextLabel")
 	l.Name = "Count"
 	l.BackgroundTransparency = 1
 	l.Size = UDim2.fromScale(1, 1)
-	l.Position = UDim2.fromOffset(0, 1)
 	l.Text = text
-	l.TextSize = math.floor(s * 0.55)
+	l.TextSize = math.floor(s * 0.6)
 	l.FontFace = F.display
-	l.TextColor3 = C.text
-	l.Parent = img
-	return img
+	l.TextColor3 = INK
+	l.Parent = f
+	return f
 end
 
 -- the one slot every pop-up card opens in: over the car, between the event sign and the speedometer
@@ -948,15 +1131,38 @@ function Style.slot(card: GuiObject)
 	size()
 end
 
--- the X in a card's top right corner: every pop-up has one (a white sign plate), clear of the card's edge
+-- the X on a card's top right corner, poking out over it: a stop sign (an icon) with a white X
 function Style.closeX(card: GuiObject, onClose: () -> ()): TextButton
-	local x = Style.button(card, "X", "dark", 22)
+	local x = Instance.new("TextButton")
 	x.Name = "CloseX"
-	x.AnchorPoint = Vector2.new(1, 0)
-	-- under the hazard band when the card has one
-	x.Position = UDim2.new(1, -12, 0, if card:FindFirstChild("Hazard") then 24 else 12)
-	x.Size = UDim2.fromOffset(42, 42)
+	x.AutoButtonColor = false
+	x.BackgroundTransparency = 1
+	x.Text = ""
+	x.AnchorPoint = Vector2.new(0.5, 0.5)
+	x.Position = UDim2.new(1, -8, 0, 8)
+	x.Size = UDim2.fromOffset(56, 56)
 	x.ZIndex = card.ZIndex + 10
+	x.Parent = card
+	local sign = Style.image(x, Icons.Stop, WHITE)
+	sign.Name = "StopSign"
+	sign.Size = UDim2.fromScale(1, 1)
+	sign.ZIndex = x.ZIndex
+	local l = Instance.new("TextLabel")
+	l.Name = "X"
+	l.BackgroundTransparency = 1
+	l.Size = UDim2.fromScale(1, 1)
+	l.Text = "X"
+	l.TextSize = 28
+	l.FontFace = F.display
+	l.TextColor3 = WHITE
+	l.ZIndex = x.ZIndex
+	l.Parent = x
+	textInk(l, 2)
+	x:GetPropertyChangedSignal("ZIndex"):Connect(function()
+		sign.ZIndex = x.ZIndex
+		l.ZIndex = x.ZIndex
+	end)
+	press(x)
 	Style.onTap(x, onClose)
 	return x
 end
