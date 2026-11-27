@@ -8,14 +8,14 @@ export type Place = { key: string, name: string, x: number, z: number }
 return table.freeze({
 	-- the picture in TileGrid x TileGrid square tiles (row by row from the top left, image ids; 0 draws a plain dark
 	-- square), so it stays sharp zoomed in (Roblox images are at most 1024 px)
-	-- (Decals 71465546536715, 124376541789803, 96638352576837, 115603774010850)
-	Tiles = table.freeze({ 131860736317099, 83934468585430, 74994243145972, 130259334223745 }),
+	-- (Decals 116932431344137, 95038765693554, 77617853975728, 107490445678922)
+	Tiles = table.freeze({ 137949881515841, 73030245992735, 106717559782513, 107588905821113 }),
 	TileGrid = 2,
 	Pin = 123493636137749, -- (Decal 105196457864314) the player marker (tools/map/pin.py): a white map pin, tinted; its tip is the spot
 	-- world x, z under the picture's middle, and the studs it covers edge to edge both ways (it is square): the
-	-- beaches in the west to the island's east edge (tools/map/scan.luau uses the same numbers)
-	Centre = table.freeze({ 250, 0 }),
-	Span = 5600,
+	-- whole island inside a ring of mountains, the sea in the west (tools/map/scan.luau uses the same numbers)
+	Centre = table.freeze({ 400, 0 }),
+	Span = 7000,
 	Pixels = 2048, -- the whole picture's size, both ways (tools/map)
 
 	-- the server sends every player's spot to each client that has the map open, this often

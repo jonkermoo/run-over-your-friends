@@ -2,27 +2,73 @@
 
 Each scan pixel is r, g, b and a height byte ((y + 50) / 2). The picture keeps the real colours, mutes them a
 little so they read under the dots, shades slopes from the north-west, and draws a dark edge wherever the
-height jumps (building outlines), so the city reads as a map rather than a photo.
+height jumps (building outlines), so the city reads as a map rather than a photo. Pixels whose rays hit
+nothing (past the end of the terrain, out beyond the mountains, where nobody can go) are filled outward from
+the land next to them, so the picture has no empty corners.
 
     python tools/map/render.py <rows.hex> <out.png>
 """
 import sys
 
+import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter
+
+# what tools/map/scan.luau writes for a ray that hit nothing: colour 0.08, 0.09, 0.1 and height byte 0
+MISS = "14171a00"
+FILL_BLUR = 24  # px
+
+
+def fill_misses(rgb: np.ndarray, hts: np.ndarray, miss: np.ndarray) -> None:
+    """Grows the land into the missed pixels one ring at a time, each taking the mean of its filled neighbours."""
+    miss = miss.copy()
+    while miss.any():
+        have = ~miss
+        acc = np.zeros(rgb.shape, dtype=np.float64)
+        acc_h = np.zeros(hts.shape, dtype=np.float64)
+        count = np.zeros(hts.shape, dtype=np.float64)
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)):
+            src = np.roll(have, (dy, dx), axis=(0, 1))
+            # np.roll wraps round: drop what came in over the picture's edge
+            if dy == 1:
+                src[0, :] = False
+            elif dy == -1:
+                src[-1, :] = False
+            if dx == 1:
+                src[:, 0] = False
+            elif dx == -1:
+                src[:, -1] = False
+            acc += np.roll(rgb, (dy, dx), axis=(0, 1)) * src[..., None]
+            acc_h += np.roll(hts, (dy, dx), axis=(0, 1)) * src
+            count += src
+        grow = miss & (count > 0)
+        if not grow.any():
+            break
+        rgb[grow] = acc[grow] / count[grow][:, None]
+        hts[grow] = acc_h[grow] / count[grow]
+        miss &= ~grow
 
 
 def main(src: str, out: str) -> None:
     with open(src, encoding="ascii") as f:
         rows = f.read().split("\n")
     n = len(rows)
-    col = Image.new("RGB", (n, n))
-    hts = [[0.0] * n for _ in range(n)]
-    px = col.load()
+    rgb = np.zeros((n, n, 3), dtype=np.float64)
+    h_arr = np.zeros((n, n), dtype=np.float64)
+    miss = np.zeros((n, n), dtype=bool)
     for y, row in enumerate(rows):
         for x in range(n):
             s = row[x * 8 : x * 8 + 8]
-            px[x, y] = (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
-            hts[y][x] = int(s[6:8], 16) * 2 - 50
+            rgb[y, x] = (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+            h_arr[y, x] = int(s[6:8], 16) * 2 - 50
+            miss[y, x] = s == MISS
+    fill_misses(rgb, h_arr, miss)
+    col = Image.fromarray(np.clip(rgb + 0.5, 0, 255).astype(np.uint8), "RGB")
+    if miss.any():
+        # growing the land outward leaves streaks: soften the filled part, and leave it unshaded (below)
+        soft = col.filter(ImageFilter.GaussianBlur(FILL_BLUR))
+        col = Image.composite(soft, col, Image.fromarray(miss.astype(np.uint8) * 255, "L"))
+    hts = h_arr.tolist()
+    filled = miss.tolist()
     col = ImageEnhance.Color(col).enhance(0.85)
     col = ImageEnhance.Brightness(col).enhance(0.9)
     px = col.load()
@@ -30,6 +76,9 @@ def main(src: str, out: str) -> None:
     sp = shaded.load()
     for y in range(n):
         for x in range(n):
+            if filled[y][x]:
+                sp[x, y] = px[x, y]
+                continue
             h = hts[y][x]
             hn = hts[max(0, y - 1)][x]
             hw = hts[y][max(0, x - 1)]
