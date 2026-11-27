@@ -125,6 +125,9 @@ local function layer(name: string, z: number): Frame
 	return f
 end
 local placesLayer = layer("Places", 2)
+-- the GUI draws by global ZIndex, and every mark here is ZIndex 1, so they stack in the order made: the teleport
+-- rings go in before the players' marks, so a ring never hides a player (your own arrow at the spawn plaza)
+local teleportLayer = layer("Teleports", 5)
 local othersLayer = layer("Others", 3)
 local friendsLayer = layer("Friends", 4)
 local selfLayer = layer("You", 6)
@@ -308,7 +311,8 @@ local function tpRing(parent: Instance, size: number): Frame
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0.5, 0)
 	corner.Parent = r
-	Style.stroke(r, C.text, 3, 0)
+	-- round joins: the style's mitred edge draws a square round a round frame
+	Style.stroke(r, C.text, 3, 0).LineJoinMode = Enum.LineJoinMode.Round
 	return r
 end
 legendRow(6, "TELEPORT", function(f)
@@ -342,7 +346,6 @@ end
 -- the teleport areas (Config/Teleport) and their rings; a place label on the same spot gives way to the ring
 local areas = TeleportRules.areas(TeleportCfg.Places, World.Map, Suburbs.Hoods, Country.Moto.Rect)
 local rings: { [string]: { holder: Frame, ring: Frame, name: Frame } } = {}
-local teleportLayer = layer("Teleports", 5)
 
 for _, p in Cfg.Places do
 	if not TeleportRules.find(areas, p.key) then
