@@ -8,7 +8,8 @@
 -- from: "Plaza" = the spawn plaza (Config/World Map), "Suburb" = the Config/Suburbs hood called `hood`,
 -- "Moto" = the motocross track (Config/Country Moto), "Spot" = the fixed x, z given here.
 -- roads = true lands on the built road points (MapBuilder spawnPoints) within `radius` of the middle; false
--- lands on `count` points in a circle `radius` round it.
+-- lands on `count` points in a circle `radius` round it, or, when `spots` is given, on those points (x, z
+-- offsets from the middle, so they move with it).
 export type Place = {
 	key: string,
 	name: string,
@@ -19,6 +20,7 @@ export type Place = {
 	roads: boolean,
 	radius: number,
 	count: number?,
+	spots: { { number } }?,
 }
 
 return table.freeze({
@@ -56,16 +58,29 @@ return table.freeze({
 			roads = true,
 			radius = 450,
 		}),
-		-- the stunt park (the city map's STUNT PARK label, Config/CityMap Places)
+		-- the stunt park (the city map's STUNT PARK label, Config/CityMap Places; a test keeps them the same). Its
+		-- floor is a field of ramps and mounds, so it lands on two lanes that run clear across it (measured in
+		-- Studio, clear of the tyre row at z -55): a circle of spots put cars nose-first into the mounds
 		table.freeze({
 			key = "StuntPark",
 			name = "STUNT PARK",
 			from = "Spot",
-			x = 1953,
-			z = -2,
+			x = 1700,
+			z = 0,
 			roads = false,
-			radius = 90,
-			count = 8,
+			radius = 330,
+			spots = table.freeze({
+				table.freeze({ -320, -180 }),
+				table.freeze({ -160, -180 }),
+				table.freeze({ 0, -180 }),
+				table.freeze({ 160, -180 }),
+				table.freeze({ 320, -180 }),
+				table.freeze({ -320, -280 }),
+				table.freeze({ -160, -280 }),
+				table.freeze({ 0, -280 }),
+				table.freeze({ 160, -280 }),
+				table.freeze({ 320, -280 }),
+			}),
 		}),
 		table.freeze({
 			key = "Motocross",

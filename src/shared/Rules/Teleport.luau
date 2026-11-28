@@ -12,6 +12,7 @@ export type Area = {
 	roads: boolean,
 	radius: number,
 	count: number,
+	offsets: { Spot }?, -- fixed landing spots, as offsets from the middle (Config/Teleport `spots`)
 }
 export type Spot = { x: number, z: number }
 
@@ -55,6 +56,14 @@ function Teleport.areas(places: { any }, m: MapCfg, hoods: { Hood }, moto: Rect)
 			x, z = p.x, p.z
 		end
 		if x and z then
+			local offsets: { Spot }? = nil
+			if p.spots then
+				local list = {}
+				for _, o in p.spots do
+					table.insert(list, { x = o[1], z = o[2] })
+				end
+				offsets = list
+			end
 			table.insert(out, {
 				key = p.key,
 				name = p.name,
@@ -63,6 +72,7 @@ function Teleport.areas(places: { any }, m: MapCfg, hoods: { Hood }, moto: Rect)
 				roads = p.roads,
 				radius = p.radius,
 				count = p.count or 0,
+				offsets = offsets,
 			})
 		end
 	end
@@ -83,9 +93,15 @@ local function d2(ax: number, az: number, bx: number, bz: number): number
 end
 
 -- an area's landing spots: the road points within its radius, nearest first, kept minGap apart (at most
--- maxSpots), or `count` points evenly round a circle of its radius
+-- maxSpots), or its fixed spots if it has them, or else `count` points evenly round a circle of its radius
 function Teleport.spots(area: Area, roads: { Spot }, minGap: number, maxSpots: number): { Spot }
 	local out: { Spot } = {}
+	if not area.roads and area.offsets then
+		for _, o in area.offsets do
+			table.insert(out, { x = area.x + o.x, z = area.z + o.z })
+		end
+		return out
+	end
 	if not area.roads then
 		for i = 1, area.count do
 			local a = (i - 1) / area.count * 2 * math.pi

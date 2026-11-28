@@ -2,6 +2,7 @@
 -- Teleport checks (Config/Teleport, Rules/Teleport), called from tests/run.
 
 local Cfg = require("../src/shared/Config/Teleport")
+local CityMap = require("../src/shared/Config/CityMap")
 local Country = require("../src/shared/Config/Country")
 local Net = require("../src/shared/Net")
 local Rules = require("../src/shared/Rules/Teleport")
@@ -17,10 +18,29 @@ return function(check: (string, boolean) -> ())
 	do
 		local keys, ok = {}, true
 		for _, a in areas do
-			ok = ok and not keys[a.key] and a.radius > 0 and (a.roads or a.count >= 2)
+			local fixed = if a.offsets then #a.offsets else 0
+			ok = ok and not keys[a.key] and a.radius > 0 and (a.roads or a.count >= 2 or fixed >= 2)
 			keys[a.key] = true
 		end
 		check("teleport: area keys unique, each with room for several spots", ok)
+	end
+
+	-- a fixed-spot area sits on the city map's label of the same key, so the ring and the landing agree (the
+	-- stunt park moved with the level-B map and its old spot was left behind)
+	do
+		local ok = true
+		for _, p in Cfg.Places do
+			if p.from == "Spot" then
+				local found = false
+				for _, label in CityMap.Places do
+					if label.key == p.key then
+						found = label.x == p.x and label.z == p.z
+					end
+				end
+				ok = ok and found
+			end
+		end
+		check("teleport: fixed areas match the city map's labels", ok)
 	end
 
 	-- the plaza is the city grid's middle block (MapBuilder): with 8 x 8 blocks of 220 and roads of 64 that's 142
@@ -77,6 +97,26 @@ return function(check: (string, boolean) -> ())
 		check(
 			"teleport: circle spots",
 			#ring == 4 and math.abs(ring[1].x - 60) < 1e-6 and math.abs(ring[1].z - 10) < 1e-6
+		)
+		local fixed = Rules.areas({
+			{
+				key = "F",
+				name = "F",
+				from = "Spot",
+				x = 100,
+				z = -50,
+				roads = false,
+				radius = 50,
+				spots = {
+					{ 10, 0 },
+					{ -10, 5 },
+				},
+			},
+		}, World.Map, {}, Country.Moto.Rect)
+		local fs = Rules.spots(fixed[1], {}, 60, 5)
+		check(
+			"teleport: fixed spots are offsets from the middle",
+			#fs == 2 and fs[1].x == 110 and fs[1].z == -50 and fs[2].x == 90 and fs[2].z == -45
 		)
 	end
 
