@@ -5,9 +5,11 @@
 -- guide sign whose exit tab shows the percent and whose lines carry the status and a rotating tip, and a road
 -- along the bottom where a line-painting cart lays fresh double yellow over the faded old line as loading
 -- goes on. It covers the HUD and the bare terrain while the map streams in around the spawn plaza, and goes
--- when the character stands on a real floor (or after Config/Loading Timeout, whatever happens first).
+-- when the character stands on a real floor and the UI's icons and type have loaded (or after Config/Loading
+-- Timeout, whatever happens first).
 -- client/Style can't be required here (it isn't replicated yet), so its colours and fonts are copied.
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -491,12 +493,37 @@ local function waitForSpawn()
 	reach("ground")
 end
 
+-- the UI's icons (every id in Config/Icons) and its Titillium Web Black type load behind the cover, so no
+-- picture or word pops in late once it lifts
+local preloaded = false
+task.spawn(function()
+	local list: { Instance } = {}
+	local iconsModule = (configFolder :: Instance):FindFirstChild("Icons")
+	if iconsModule and iconsModule:IsA("ModuleScript") then
+		for _, id in require(iconsModule) :: any do
+			if type(id) == "number" and id ~= 0 then
+				local img = Instance.new("ImageLabel")
+				img.Image = `rbxassetid://{id}`
+				table.insert(list, img)
+			end
+		end
+	end
+	local face = Instance.new("TextLabel")
+	face.Text = "ROAD"
+	face.FontFace = Font.new("rbxasset://fonts/families/TitilliumWeb.json", Enum.FontWeight.Heavy)
+	table.insert(list, face)
+	pcall(function()
+		ContentProvider:PreloadAsync(list)
+	end)
+	preloaded = true
+end)
+
 local ready = false
 task.spawn(function()
 	waitForSpawn()
 	ready = true
 end)
-while not ready and os.clock() - shownAt < Config.Timeout do
+while not (ready and preloaded) and os.clock() - shownAt < Config.Timeout do
 	task.wait(0.1)
 end
 -- for analytics (client/Track): seconds from client start to spawn-ready, and whether it got there in time

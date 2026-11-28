@@ -27,4 +27,44 @@ return table.freeze({
 	SignUnstuck = 107881160438518, -- a tipped car with a turn arrow
 	SignGift = 136681305731590, -- a wrapped gift
 	Stop = 104168263192523, -- the stop-sign octagon alert badge, full colour (red with a white rim and black edge)
+	-- the road UI icons (tools/ui/road_icons.py): black outline, flat traffic colours, full colour (not tinted),
+	-- 256 px; preloaded behind the loading cover (first/Loading)
+	RoadBag = 100751902892147, -- bag
+	RoadBolt = 112754394326221, -- bolt
+	RoadCarBlack = 75663587557493, -- car-black
+	RoadCarBlue = 76716020793903, -- car-blue
+	RoadCarGreen = 119125093667730, -- car-green
+	RoadCarPink = 102807577873440, -- car-pink
+	RoadCarRed = 135712065091242, -- car-red
+	RoadCarTaxi = 77978477574044, -- car-taxi
+	RoadCarWhite = 135451717694544, -- car-white
+	RoadCarYellow = 81725698112790, -- car-yellow
+	RoadCash = 99798213093541, -- cash
+	RoadCheck = 140280752279603, -- check
+	RoadChest = 92014782543309, -- chest
+	RoadClock = 83732446002304, -- clock
+	RoadCoin = 132378840780683, -- coin
+	RoadCone = 126119340902395, -- cone
+	RoadCrown = 100413443450861, -- crown
+	RoadEye = 114597095659754, -- eye
+	RoadFlag = 90668949254628, -- flag
+	RoadGift = 92034103021215, -- gift
+	RoadLock = 83464061487660, -- lock
+	RoadMap = 112404987737502, -- map
+	RoadMinus = 83441291470924, -- minus
+	RoadMusic = 124453689833301, -- music
+	RoadPaint = 117097778078080, -- paint
+	RoadPeople = 139510269319697, -- people
+	RoadPin = 106730221309948, -- pin
+	RoadPlus = 95210446217118, -- plus
+	RoadRocket = 119280263069795, -- rocket
+	RoadSeat = 85488063662378, -- seat
+	RoadSkull = 97143186365407, -- skull
+	RoadStar = 134681462774653, -- star
+	RoadStop = 83826547029328, -- stop
+	RoadTarget = 75370453566679, -- target
+	RoadTicket = 88119798064505, -- ticket
+	RoadTrophy = 103430761692038, -- trophy
+	RoadVip = 130431096140448, -- vip
+	RoadWrench = 93475247083487, -- wrench
 })
