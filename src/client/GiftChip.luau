@@ -1,6 +1,6 @@
 --!strict
--- The play-time gift chip in the right column, under the next-car bar (the left middle is the phone
--- thumbstick's): a countdown to the next gift, OPEN! once it can be claimed (a tap opens the goals sheet,
+-- The play-time gift in the right column, under the next-car road (the left middle is the phone thumbstick's):
+-- a purple plate with the gift icon poking out of it and a countdown chip, OPEN YOUR GIFT! once it can be claimed (a tap opens the goals sheet,
 -- where client/GiftRows claims it), and after the last gift the first-day "come back tomorrow" line, else nothing. GiftService publishes
 -- GiftStart and GiftsClaimed; DailyService publishes TomorrowDay and TomorrowPays.
 
@@ -11,6 +11,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config.Gifts)
 local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Gifts = require(ReplicatedStorage.Shared.Rules.Gifts)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Goals = require(script.Parent.Goals)
 local Hud = require(script.Parent.Hud)
@@ -19,15 +20,18 @@ local Style = require(script.Parent.Style)
 local C, F = Style.colors, Style.fonts
 local player = Players.LocalPlayer
 
-local TOP, WIDTH, HEIGHT = 120, 196, 40 -- layout px: under the next-car bar (client/NextCar: 68 + 46 + 6)
+local COLUMN = LayoutConfig.Column
+local TOP = COLUMN.Top + COLUMN.Row + COLUMN.NextCar + COLUMN.Gap * 2 -- under the next-car road (client/NextCar)
 
 local GiftChip = {}
 
--- the gift pictogram, white on the blue sign
+-- the gift icon, poking out of the plate's left end
 local function giftBox(parent: Instance): ImageLabel
-	local box = Style.image(parent, Icons.SignGift, C.text)
-	box.Size = UDim2.fromOffset(26, 26)
-	box.Position = UDim2.fromOffset(9, 7)
+	local box = Style.image(parent, Icons.RoadGift)
+	box.AnchorPoint = Vector2.new(0.5, 0.5)
+	box.Size = UDim2.fromOffset(58, 58)
+	box.Position = UDim2.new(0, 8, 0.5, -6)
+	box.ZIndex = 4
 	return box
 end
 
@@ -43,23 +47,39 @@ function GiftChip.start()
 	chip.Name = "GiftChip"
 	chip.AutoButtonColor = false
 	chip.Text = ""
-	chip.BackgroundColor3 = C.panel
 	chip.BorderSizePixel = 0
 	chip.AnchorPoint = Vector2.new(1, 0)
-	chip.Position = UDim2.new(1, -14, 0, TOP)
-	chip.Size = UDim2.fromOffset(WIDTH, HEIGHT)
+	chip.Position = UDim2.new(1, -COLUMN.Right, 0, TOP)
+	chip.Size = UDim2.fromOffset(COLUMN.Width, COLUMN.Gift)
 	chip.Visible = false
 	chip.Parent = hud
-	Style.sign(chip, "blue", true)
+	Style.sign(chip, "purple", true)
 	local box = giftBox(chip)
-	local title = Style.label(chip, "", 16, F.display, C.text)
+	-- one line: the title and a black timer chip; after the last gift, two lines (title over the tomorrow line)
+	local title = Style.label(chip, "", 20, F.display, C.text)
 	title.AutoLocalize = false
-	title.Position = UDim2.fromOffset(42, 4)
-	title.Size = UDim2.new(1, -50, 0, 17)
-	local sub = Style.label(chip, "", 11, F.heavy, C.dim)
+	title.AnchorPoint = Vector2.new(0, 0.5)
+	title.Position = UDim2.new(0, 46, 0.5, -1)
+	title.Size = UDim2.new(1, -140, 0, 22)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.TextScaled = true
+	do
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = 20
+		fit.Parent = title
+	end
+	local sub = Style.chip(chip, "", 18)
 	sub.AutoLocalize = false
-	sub.Position = UDim2.fromOffset(42, 22)
-	sub.Size = UDim2.new(1, -50, 0, 13)
+	sub.AnchorPoint = Vector2.new(1, 0.5)
+	sub.Position = UDim2.new(1, -8, 0.5, -1)
+	sub.Size = UDim2.fromOffset(82, 32)
+	local line = Style.label(chip, "", 12, F.bold, C.text)
+	line.AutoLocalize = false
+	line.Position = UDim2.fromOffset(46, 26)
+	line.Size = UDim2.new(1, -56, 0, 16)
+	line.TextXAlignment = Enum.TextXAlignment.Left
+	line.TextTruncate = Enum.TextTruncate.AtEnd
+	line.Visible = false
 	local bounce = Instance.new("UIScale")
 	bounce.Parent = box
 	local pulse = TweenService:Create(
@@ -84,9 +104,11 @@ function GiftChip.start()
 			ready = Gifts.open(index, played, Config.Minutes, 0)
 			title.Text =
 				Loc.text(if ready then "GiftOpen" else "GiftNext", { m = Config.Minutes[index] })
-			sub.Text = if ready
-				then Loc.text("GiftTap")
-				else clock(Gifts.wait(index, played, Config.Minutes))
+			sub.Text = clock(Gifts.wait(index, played, Config.Minutes))
+			sub.Visible = not ready
+			title.Size = UDim2.new(1, if ready then -56 else -140, 0, 22)
+			title.Position = UDim2.new(0, 46, 0.5, -1)
+			line.Visible = false
 			box.Visible = true
 		else
 			local pay = player:GetAttribute("TomorrowPays")
@@ -95,15 +117,18 @@ function GiftChip.start()
 				return
 			end
 			title.Text = Loc.text("GiftTomorrow")
-			sub.Text = Loc.text(
+			line.Text = Loc.text(
 				"TomorrowPays",
 				{ n = player:GetAttribute("TomorrowDay") or 2, pay = Style.money(pay) }
 			)
-			box.Visible = false
+			line.Visible = true
+			sub.Visible = false
+			title.Size = UDim2.new(1, -56, 0, 20)
+			title.Position = UDim2.fromOffset(46, 15)
+			box.Visible = true
 		end
 		chip.Visible = true
 		Style.ring(chip, if ready then C.yellow else nil)
-		title.TextColor3 = if ready then C.yellow else C.text
 		if ready ~= wasReady then
 			if ready then
 				pulse:Play()

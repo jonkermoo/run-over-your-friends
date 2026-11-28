@@ -1,6 +1,6 @@
 --!strict
 -- Pinned goals: up to three goals stacked top left under the menu strip, each a small asphalt card with
--- its set's paint stripe, the goal, a lane-line bar, the reward and an X to unpin. Pins are picked in the
+-- its set's colour stripe, the goal, a bar, the reward chip and an X to unpin. Pins are picked in the
 -- goals sheet (Goals calls toggle); the server goal and one hourly goal are pinned for you until you change
 -- them. A finished hourly/daily pin shows DONE for a moment, then moves to its set's next goal; the server
 -- goal's card counts down to its end, then shows DONE (or a wait) and the time to the next server goal
@@ -35,8 +35,9 @@ type SetView = { goals: { GoalView }, endsAt: number }
 
 PinnedGoals.colors = table.freeze({ Hourly = C.blue, Daily = C.pink, Server = C.yellow })
 
-local TOP, LEFT, GAP = 68, 14, 10
-local CARD_W, CARD_W_NARROW, CARD_H = 300, 250, 58
+local TOP = LayoutConfig.Menu.Top + LayoutConfig.Menu.Height + 12 -- under the menu bar
+local LEFT, GAP = 14, 10
+local CARD_W, CARD_W_NARROW, CARD_H = 300, 250, 66
 local NARROW = 1000 -- real px (not layout px, so phones count): narrower screens get slimmer cards
 
 local gui = Instance.new("ScreenGui")
@@ -156,7 +157,8 @@ local function fillCard(card: Card, g: GoalView)
 	card.reward.Text = if g.done
 		then Loc.text("PinnedDone", { n = shortNumber(g.reward) })
 		else "$" .. shortNumber(g.reward)
-	card.reward.BackgroundColor3 = if g.done then C.green else C.gold
+	card.reward.BackgroundColor3 = if g.done then C.green else C.ink
+	card.reward.TextColor3 = if g.done then C.text else C.yellow
 	card.text.TextColor3 = if g.done or g == WAITING then C.dim else C.text
 	-- the server goal's tag carries its clock: time left, then (done or between goals) time to the next
 	local s = sets[card.pin.set]
@@ -183,38 +185,40 @@ local function build(width: number)
 			continue
 		end
 		local color = PinnedGoals.colors[p.set] or C.yellow
-		local frame = Style.panel(stack)
+		-- an asphalt card with its set's colour stripe down the left, inside the outline
+		local frame = Style.card(stack)
+		frame.BackgroundColor3 = C.asphalt
 		frame.Name = "Pinned" .. i
 		frame.Position = UDim2.fromOffset(0, (i - 1) * (CARD_H + GAP))
 		frame.Size = UDim2.fromOffset(width, CARD_H)
 		local stripe = Instance.new("Frame")
 		stripe.BorderSizePixel = 0
 		stripe.BackgroundColor3 = color
-		stripe.Size = UDim2.new(0, 6, 1, 0)
+		stripe.Position = UDim2.fromOffset(4, 4)
+		stripe.Size = UDim2.new(0, 8, 1, -8)
 		stripe.Parent = frame
-		local tag = Style.pill(frame, string.upper(p.set), color)
-		tag.TextColor3 = if p.set == "Hourly" then C.text else C.ink
+		local tag = Style.label(frame, string.upper(p.set), 12, F.display, color:Lerp(C.text, 0.45))
 		tag.Name = "Tag"
-		tag.Position = UDim2.fromOffset(16, 7)
-		local reward = Style.pill(frame, "", C.gold)
+		tag.Position = UDim2.fromOffset(20, 7)
+		tag.Size = UDim2.new(1, -110, 0, 14)
+		tag.TextXAlignment = Enum.TextXAlignment.Left
+		local reward = Style.chip(frame, "", 14)
 		reward.AnchorPoint = Vector2.new(1, 0)
-		reward.Position = UDim2.new(1, -40, 0, 7)
-		local text = Style.label(frame, Loc.goal(g, p.set == "Server"), 15, F.heavy, C.text)
+		reward.Position = UDim2.new(1, -38, 0, 6)
+		Style.fitText(reward, 6, 2)
+		local text = Style.label(frame, Loc.goal(g, p.set == "Server"), 16, F.bold, C.text)
 		text.AutoLocalize = false
-		text.Position = UDim2.fromOffset(16, 28)
-		text.Size = UDim2.new(1, -30, 0, 16)
+		text.Position = UDim2.fromOffset(20, 25)
+		text.Size = UDim2.new(1, -30, 0, 18)
 		text.TextXAlignment = Enum.TextXAlignment.Left
 		text.TextTruncate = Enum.TextTruncate.AtEnd
 		local back, fill = Style.bar(frame, color)
-		back.BackgroundColor3 = C.card
-		back.BackgroundTransparency = 0
-		back.Position = UDim2.fromOffset(16, 48)
-		back.Size = UDim2.new(1, -86, 0, 5)
-		Style.laneGaps(back, C.panel)
-		local amount = Style.label(frame, "", 12, F.bold, C.dim)
+		back.Position = UDim2.fromOffset(20, 46)
+		back.Size = UDim2.new(1, -94, 0, 12)
+		local amount = Style.label(frame, "", 13, F.display, C.dim)
 		amount.AnchorPoint = Vector2.new(1, 0)
-		amount.Position = UDim2.new(1, -12, 0, 43)
-		amount.Size = UDim2.fromOffset(62, 14)
+		amount.Position = UDim2.new(1, -12, 0, 44)
+		amount.Size = UDim2.fromOffset(62, 16)
 		amount.TextXAlignment = Enum.TextXAlignment.Right
 		local close = Style.button(frame, "X", "dark", 14)
 		close.Name = "Unpin"

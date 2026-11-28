@@ -1,11 +1,8 @@
 --!strict
--- The SETTINGS tile left of the cash box and its panel (client/Settings): music, show UI and who can ride in
--- my car (Config/Riders). GUI pixels at desktop size (Style.fit scales them).
+-- The SETTINGS panel (client/Settings; its tile sits left of the cash box, sized by Config/Layout Column):
+-- music, show UI and who can ride in my car (Config/Riders). GUI pixels at desktop size (Style.fit scales them).
 
 return table.freeze({
-	TileWidth = 54, -- a square grey plate with a wrench
-	TileHeight = 54,
-	TileGap = 10, -- between the tile and the 196-wide cash box, 14 in from the right edge (client/Hud)
 	PanelWidth = 460,
 	Pad = 16, -- inside the panel's edges
 	Header = 62, -- the title strip

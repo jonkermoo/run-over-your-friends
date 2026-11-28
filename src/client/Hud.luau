@@ -60,31 +60,43 @@ Style.fit(gui)
 
 ---------------------------------------------------------------- money and pop-ups
 
--- top right: the money on a green sign with a yellow CASH tab on its top edge
-local moneyBox = Style.panel(gui)
+-- top right: the money on a green plate, a coin poking out of its left end (Config/Layout Column)
+local COLUMN = LayoutConfig.Column
+local moneyBox = Instance.new("Frame")
+moneyBox.Name = "Cash"
 moneyBox.AnchorPoint = Vector2.new(1, 0)
-moneyBox.Position = UDim2.new(1, -14, 0, 14)
-moneyBox.Size = UDim2.fromOffset(196, 50)
+moneyBox.Position = UDim2.new(1, -COLUMN.Right, 0, COLUMN.Top)
+moneyBox.Size = UDim2.fromOffset(COLUMN.CashWidth, COLUMN.Row)
+moneyBox.Parent = gui
+Style.sign(moneyBox, "green", true)
 local moneyScale = Instance.new("UIScale")
 moneyScale.Parent = moneyBox
-local cashTag = Style.pill(moneyBox, "CASH", C.yellow)
-cashTag.TextSize = 11
-cashTag.Position = UDim2.fromOffset(12, -11)
-local moneyLabel = Style.label(moneyBox, "$0", 30, F.display, C.text)
-moneyLabel.AnchorPoint = Vector2.new(1, 0)
-moneyLabel.Position = UDim2.new(1, -14, 0, 10)
-moneyLabel.Size = UDim2.new(1, -20, 0, 32)
+do
+	local coin = Style.image(moneyBox, Icons.RoadCoin)
+	coin.Name = "Coin"
+	coin.AnchorPoint = Vector2.new(0.5, 0.5)
+	coin.Position = UDim2.new(0, 6, 0.5, -4)
+	coin.Size = UDim2.fromOffset(58, 58)
+	coin.ZIndex = 3
+end
+local moneyLabel = Style.label(moneyBox, "$0", 32, F.display, C.text)
+moneyLabel.AnchorPoint = Vector2.new(1, 0.5)
+moneyLabel.Position = UDim2.new(1, -14, 0.5, -1)
+moneyLabel.Size = UDim2.new(1, -60, 0, 36)
 moneyLabel.TextXAlignment = Enum.TextXAlignment.Right
 moneyLabel.TextScaled = true
-local moneyFit = Instance.new("UITextSizeConstraint")
-moneyFit.MaxTextSize = 30
-moneyFit.Parent = moneyLabel
+moneyLabel.ZIndex = 3
+do
+	local fit = Instance.new("UITextSizeConstraint")
+	fit.MaxTextSize = 32
+	fit.Parent = moneyLabel
+end
 
 -- the feed under the money: gains and messages stack downwards and fade, the newest on top
 local feed = Instance.new("Frame")
 feed.BackgroundTransparency = 1
 feed.AnchorPoint = Vector2.new(1, 0)
-feed.Position = UDim2.new(1, -14, 0, 172)
+feed.Position = UDim2.new(1, -COLUMN.Right, 0, COLUMN.FeedTop)
 feed.Size = UDim2.fromOffset(320, 260)
 feed.Parent = gui
 local feedItems: { GuiObject } = {}
@@ -94,7 +106,7 @@ local friendChip = Style.pill(gui, "", C.pink)
 friendChip.Name = "FriendChip"
 friendChip.TextColor3 = C.text
 friendChip.AnchorPoint = Vector2.new(1, 0)
-friendChip.Position = UDim2.new(1, -14, 0, 166) -- under the next-car bar and gift chip (client/NextCar, GiftChip)
+friendChip.Position = UDim2.new(1, -COLUMN.Right, 0, COLUMN.FeedTop) -- under the column (client/NextCar, GiftChip)
 friendChip.Visible = false
 local function refreshFriends()
 	local n = (player:GetAttribute("Friends") or 0) :: number
@@ -102,7 +114,8 @@ local function refreshFriends()
 		SocialRules.friendPercent(n, SocialConfig.FriendBonusPer, SocialConfig.FriendBonusMax)
 	Loc.set(friendChip, if n == 1 then "FriendsHere1" else "FriendsHere", { n = n, pct = pct })
 	friendChip.Visible = n > 0
-	feed.Position = UDim2.new(1, -14, 0, if n > 0 then 194 else 172)
+	feed.Position =
+		UDim2.new(1, -COLUMN.Right, 0, if n > 0 then COLUMN.FeedTop + 28 else COLUMN.FeedTop)
 end
 
 local function fadeOut(obj: GuiObject, seconds: number)
@@ -262,7 +275,7 @@ local function refreshMoney()
 		):Play()
 		if big then
 			moneyBox.BackgroundColor3 = C.money
-			TweenService:Create(moneyBox, TweenInfo.new(0.5), { BackgroundColor3 = C.panel }):Play()
+			TweenService:Create(moneyBox, TweenInfo.new(0.5), { BackgroundColor3 = C.green }):Play()
 			sparkle()
 		end
 	end
@@ -285,40 +298,39 @@ end
 
 ---------------------------------------------------------------- speedometer
 
--- bottom centre: a white speed-limit sign (SPEED, the big number, MPH) with the gear on a small blue plate
--- beside it; flight and thruster meters run under the number
-local DASH_W, DASH_H, METER_H = 104, 96, 12
-local dash = Style.panel(gui)
+-- bottom centre: the speed as a big white number with a black stroke over MPH, the gear on a small
+-- chip beside it (blue in drive, red in reverse); flight and thruster meters run under the number
+local DASH_W, DASH_H, METER_H = 112, 84, 14
+local dash = Instance.new("Frame")
 dash.Name = "Speedometer"
+dash.BackgroundTransparency = 1
 dash.AnchorPoint = Vector2.new(0.5, 1)
-dash.Position = UDim2.new(0.5, 0, 1, -18)
+dash.Position = UDim2.new(0.5, 0, 1, -14)
 dash.Size = UDim2.fromOffset(DASH_W, DASH_H)
 dash.Visible = false
-Style.sign(dash, "white", true)
-local dashTop = Style.label(dash, "SPEED", 14, F.heavy, C.ink)
-dashTop.Position = UDim2.fromOffset(0, 8)
-dashTop.Size = UDim2.new(1, 0, 0, 14)
-local gearLabel = Style.label(dash, "D", 20, F.display, C.text)
+dash.Parent = gui
+local gearLabel = Style.label(dash, "D", 22, F.display, C.text)
 gearLabel.BackgroundColor3 = C.blue
 gearLabel.BackgroundTransparency = 0
-gearLabel.TextColor3 = C.text
 gearLabel.AnchorPoint = Vector2.new(1, 1)
-gearLabel.Position = UDim2.fromOffset(-8, DASH_H)
-gearLabel.Size = UDim2.fromOffset(34, 34)
+gearLabel.Position = UDim2.fromOffset(-6, DASH_H - 8)
+gearLabel.Size = UDim2.fromOffset(38, 38)
 Style.corner(gearLabel, 6)
-Style.stroke(gearLabel, C.ink, 2, 0)
-local speedLabel = Style.label(dash, "0", 50, F.sign, C.ink)
-speedLabel.Position = UDim2.fromOffset(4, 22)
-speedLabel.Size = UDim2.new(1, -8, 0, 50)
-local unitLabel = Style.label(dash, "MPH", 14, F.heavy, C.ink)
-unitLabel.Position = UDim2.fromOffset(0, DASH_H - 24)
-unitLabel.Size = UDim2.new(1, 0, 0, 14)
+Style.stroke(gearLabel, C.ink, 3, 0)
+Style.outline(gearLabel, 2)
+local speedLabel = Style.label(dash, "0", 64, F.display, C.text)
+speedLabel.Position = UDim2.fromOffset(0, 0)
+speedLabel.Size = UDim2.new(1, 0, 0, 60)
+Style.outline(speedLabel, 4)
+local unitLabel = Style.label(dash, "MPH", 20, F.display, C.text)
+unitLabel.Position = UDim2.fromOffset(0, DASH_H - 26)
+unitLabel.Size = UDim2.new(1, 0, 0, 20)
+Style.outline(unitLabel, 3)
 
 local function meter(color: Color3): (Frame, Frame)
 	local back, fill = Style.bar(dash, color)
-	back.BackgroundColor3 = C.card
 	back.BackgroundTransparency = 0
-	back.Size = UDim2.new(1, -16, 0, 6)
+	back.Size = UDim2.new(1, -16, 0, 10)
 	back.Visible = false
 	back.ClipsDescendants = true
 	return back, fill
@@ -542,27 +554,26 @@ end
 
 ---------------------------------------------------------------- side buttons and panels
 
--- top left: a pictogram sign plate for each menu (client/SignMenu); the left
--- middle of the screen is the phone thumbstick's, so no buttons there
+-- top left: the menu, a colour tile per menu on an asphalt bar (client/SignMenu); the left middle of the
+-- screen is the phone thumbstick's, so no buttons there
 local strip = require(script.Parent.SignMenu).strip(gui)
 strip.Name = "Menu"
-strip.Position = UDim2.fromOffset(14, 2)
-strip.Size = UDim2.fromOffset(0, require(script.Parent.SignMenu).HEIGHT)
+strip.Position = UDim2.fromOffset(LayoutConfig.Menu.Left, LayoutConfig.Menu.Top)
+strip.Size = UDim2.fromOffset(0, LayoutConfig.Menu.Height)
 local tabRow = Instance.new("Frame") -- the layout lives in here so the strip can size to it
 tabRow.BackgroundTransparency = 1
+tabRow.Position = UDim2.fromOffset(LayoutConfig.Menu.Pad, 0)
 tabRow.Size = UDim2.fromScale(0, 1)
 tabRow.AutomaticSize = Enum.AutomaticSize.X
 tabRow.Parent = strip
 tabRow:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	strip.Size = UDim2.fromOffset(
-		tabRow.AbsoluteSize.X / Style.scale(),
-		require(script.Parent.SignMenu).HEIGHT
-	)
+	local m = LayoutConfig.Menu
+	strip.Size = UDim2.fromOffset(tabRow.AbsoluteSize.X / Style.scale() + m.Pad * 2, m.Height)
 end)
 local stripList = Instance.new("UIListLayout")
 stripList.FillDirection = Enum.FillDirection.Horizontal
 stripList.SortOrder = Enum.SortOrder.LayoutOrder
-stripList.Padding = UDim.new(0, 4)
+stripList.Padding = UDim.new(0, LayoutConfig.Menu.Gap)
 stripList.Parent = tabRow
 
 local tabs: { TextButton } = {}

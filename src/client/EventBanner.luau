@@ -37,7 +37,7 @@ gui.ResetOnSpawn = false
 gui.Parent = playerGui
 Style.fit(gui)
 
--- an orange construction sign at the top centre with an amber LED timer: one line (pill, title, timer) up
+-- an orange plate in a hazard-stripe frame at the top centre with a black timer chip: one line (pill, title, timer) up
 -- in the empty middle of Roblox's top bar, and during a contest one slim line under it
 local Card = Config.Card
 local banner = Style.panel(gui)
@@ -47,6 +47,29 @@ banner.Position = UDim2.new(0.5, 0, 0, Card.Gap)
 banner.Size = UDim2.fromOffset(Card.QuietWidth, Card.Height)
 banner.Visible = false
 Style.sign(banner, "orange", true)
+-- the hazard-stripe frame round the plate: a sibling drawn under it that follows its place and size
+local HAZARD_PAD = 6
+local hazard = Style.stripes(gui)
+hazard.Name = "SignHazard"
+hazard.ZIndex = 0
+hazard.AnchorPoint = Vector2.new(0.5, 0)
+hazard.Visible = false
+Style.corner(hazard, 6)
+do
+	local edge = Instance.new("UIStroke")
+	edge.Color = C.ink
+	edge.Thickness = 4
+	edge.Parent = hazard
+	local function follow()
+		hazard.Position = banner.Position + UDim2.fromOffset(0, -HAZARD_PAD)
+		hazard.Size = banner.Size + UDim2.fromOffset(HAZARD_PAD * 2, HAZARD_PAD * 2)
+		hazard.Visible = banner.Visible
+	end
+	for _, p in { "Position", "Size", "Visible" } do
+		banner:GetPropertyChangedSignal(p):Connect(follow)
+	end
+	follow()
+end
 local pill = Style.pill(banner, "", C.ink)
 pill.AnchorPoint = Vector2.new(0, 0.5)
 pill.Position = UDim2.fromOffset(14, Card.Height / 2)
@@ -61,10 +84,9 @@ local titleFit = Instance.new("UITextSizeConstraint")
 titleFit.MaxTextSize = Card.TitleText
 titleFit.MinTextSize = math.ceil(Card.TitleText * 0.6)
 titleFit.Parent = title
-local LED = Color3.fromRGB(255, 176, 32)
+local LED = C.yellow
 local timer = Style.label(banner, "", Card.TimerText, F.display, LED)
-timer.FontFace = Font.new("rbxasset://fonts/families/BuilderMono.json", Enum.FontWeight.Bold)
-timer.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+timer.BackgroundColor3 = C.ink
 timer.BackgroundTransparency = 0
 timer.AnchorPoint = Vector2.new(1, 0.5)
 timer.Position = UDim2.new(1, -10, 0, Card.Height / 2)
@@ -123,7 +145,7 @@ chipDot.Size = UDim2.fromOffset(30, 30)
 chipDot.ZIndex = 2
 local chipTimer = Style.label(chip, "", 18, F.display, LED)
 chipTimer.FontFace = timer.FontFace
-chipTimer.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+chipTimer.BackgroundColor3 = C.ink
 chipTimer.BackgroundTransparency = 0
 chipTimer.Position = UDim2.fromOffset(40, 8)
 chipTimer.Size = UDim2.new(1, -48, 1, -16)
@@ -135,10 +157,10 @@ chip.Activated:Connect(function()
 	shrunk = false
 end)
 
--- dark text on bright paint, white on dark paint
+-- black words on light paint (yellow, white), white on the rest
 local function inkOn(color: Color3): Color3
 	local lum = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
-	return if lum > 0.5 then C.ink else C.text
+	return if lum > 0.65 then C.ink else C.text
 end
 
 local sting = Instance.new("Sound")
@@ -340,13 +362,13 @@ local function update()
 		pill.TextColor3 = inkOn(tierColor)
 		contest.Visible, contestYou.Visible = false, false
 		title.Text = event.title
-		title.TextColor3 = C.ink
+		title.TextColor3 = C.text
 		title.Position = UDim2.fromOffset(14 + pill.AbsoluteSize.X / k + 8, Card.Height / 2)
 		timer.Text = fmt(left + Config.WarnSeconds)
 		Style.ring(banner, nil)
 	else
 		-- warn or live: the sign is painted the event's colour
-		local ink = C.ink
+		local ink = C.text
 		local extra = if phase == "live" then fillStandings(event, ink) else 0
 		if phase ~= "live" then
 			contest.Visible, contestYou.Visible = false, false
@@ -374,8 +396,12 @@ local function update()
 		Card.TitleText + 4
 	)
 	-- the X sits just right of the sign's top line
-	hide.Position =
-		UDim2.new(0.5, banner.Size.X.Offset / 2 + 8, 0, y + (Card.Height - hide.Size.Y.Offset) / 2)
+	hide.Position = UDim2.new(
+		0.5,
+		banner.Size.X.Offset / 2 + HAZARD_PAD + 8,
+		0,
+		y + (Card.Height - hide.Size.Y.Offset) / 2
+	)
 end
 
 function EventBanner.start()

@@ -42,15 +42,17 @@ tile.BackgroundColor3 = C.panel
 tile.BorderSizePixel = 0
 tile.Text = ""
 tile.AnchorPoint = Vector2.new(1, 0)
-tile.Position = UDim2.new(1, -(14 + 196 + Cfg.TileGap), 0, 8)
-tile.Size = UDim2.fromOffset(Cfg.TileWidth, Cfg.TileHeight)
+-- beside the cash, in the HUD's right column (Config/Layout Column)
+local COLUMN = LayoutConfig.Column
+tile.Position = UDim2.new(1, -(COLUMN.Right + COLUMN.CashWidth + COLUMN.Gap), 0, COLUMN.Top)
+tile.Size = UDim2.fromOffset(COLUMN.Width - COLUMN.CashWidth - COLUMN.Gap, COLUMN.Row)
 tile.Parent = gui
 Style.sign(tile, "grey", true)
--- just a white wrench on the grey plate
-local wrench = Style.image(tile, Icons.SignSettings, C.text)
+-- just the wrench on the grey tile
+local wrench = Style.image(tile, Icons.RoadWrench)
 wrench.AnchorPoint = Vector2.new(0.5, 0.5)
 wrench.Position = UDim2.fromScale(0.5, 0.5)
-wrench.Size = UDim2.fromOffset(32, 32)
+wrench.Size = UDim2.fromOffset(40, 40)
 
 ---------------------------------------------------------------- the panel
 

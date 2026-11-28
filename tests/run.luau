@@ -3228,7 +3228,7 @@ do
 	check("layout: a desktop screen is not scaled", Layout.scale(1920, 1019, cfg) == 1)
 	check("layout: a laptop screen is not scaled", Layout.scale(1280, 640, cfg) == 1)
 	local phone = Layout.scale(848, 395, cfg)
-	check("layout: a phone is scaled by its height", math.abs(phone - 395 / 560) < 1e-6)
+	check("layout: a phone is scaled by its height", math.abs(phone - 395 / cfg.RefHeight) < 1e-6)
 	check("layout: a tiny screen stops at the minimum", Layout.scale(300, 200, cfg) == cfg.MinScale)
 	check(
 		"layout: the store opens on its first section",
@@ -3255,7 +3255,7 @@ do
 	)
 	check(
 		"layout: a sheet nearly as tall as the room keeps its top under the strip",
-		Layout.sheetCentre(860, 760, top, bottom) - 380 >= top
+		Layout.sheetCentre(760 + top + bottom + 40, 760, top, bottom) - 380 >= top
 	)
 	check(
 		"layout: a too-tall sheet never pokes above the strip",

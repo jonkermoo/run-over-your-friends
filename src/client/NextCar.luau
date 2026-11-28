@@ -1,6 +1,7 @@
 --!strict
--- The next car to buy, under the cash: "SEDAN $1,240 / $3,000" with a bar, BUY NOW once the cash covers it (a
--- tap opens the garage on that car), and a red dot on the GARAGE tab while it can be bought. Same pick as the
+-- The next car to buy, under the cash: a yellow plate, "NEXT CAR: SEDAN  $1,240 / $3,000", and a little road the car
+-- drives along as the cash comes in; a BUY! sticker once the cash covers it (a tap opens the garage on that car),
+-- and a "!" badge on the GARAGE tile while it can be bought. Same pick as the
 -- garage's NEXT UP and the tutorial: the cheapest car not owned, never the Scooter or Cart (a step down) or a pass
 -- car.
 
@@ -13,6 +14,8 @@ local DailyRules = require(ReplicatedStorage.Shared.Rules.Daily)
 local Economy = require(ReplicatedStorage.Shared.Config.Economy)
 local GarageRules = require(ReplicatedStorage.Shared.Rules.Garage)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
+local LayoutConfig = require(ReplicatedStorage.Shared.Config.Layout)
 local Hud = require(script.Parent.Hud)
 local Style = require(script.Parent.Style)
 
@@ -21,7 +24,18 @@ local player = Players.LocalPlayer
 
 local NOT_FOR_CASH = { Roadster = true } -- the pass is the way to it
 local FIRST_STEP_UP = (Vehicles.ById[Economy.RookieUntil] or { price = 0 }).price
-local TOP, WIDTH, HEIGHT = 68, 196, 46 -- layout px, right under the cash box (Hud: 8 + 54 + 6)
+local COLUMN = LayoutConfig.Column
+local TOP = COLUMN.Top + COLUMN.Row + COLUMN.Gap -- under the cash
+-- the car drawn on the road: the icon nearest each car's look (a plain red car otherwise)
+local CAR_ICON: { [string]: number } = {
+	Taxi = Icons.RoadCarTaxi,
+	Sedan = Icons.RoadCarBlue,
+	Muscle = Icons.RoadCarBlack,
+	IceCream = Icons.RoadCarPink,
+	Supercar = Icons.RoadCarYellow,
+	Hatchback = Icons.RoadCarGreen,
+	FireTruck = Icons.RoadCarRed,
+}
 
 local NextCar = {}
 
@@ -52,43 +66,61 @@ function NextCar.start()
 	bar.Name = "NextCar"
 	bar.AutoButtonColor = false
 	bar.Text = ""
-	bar.BackgroundColor3 = C.panel
 	bar.BorderSizePixel = 0
 	bar.AnchorPoint = Vector2.new(1, 0)
-	bar.Position = UDim2.new(1, -14, 0, TOP)
-	bar.Size = UDim2.fromOffset(WIDTH, HEIGHT)
+	bar.Position = UDim2.new(1, -COLUMN.Right, 0, TOP)
+	bar.Size = UDim2.fromOffset(COLUMN.Width, COLUMN.NextCar)
 	bar.Visible = false
 	bar.Parent = hud
-	Style.sign(bar, "green", true)
-	local tag = Style.label(bar, "NEXT CAR", 10, F.heavy, C.yellow)
-	tag.Position = UDim2.fromOffset(10, 5)
-	tag.Size = UDim2.fromOffset(90, 11)
-	local name = Style.label(bar, "", 17, F.display, C.text)
+	Style.sign(bar, "yellow", true)
+	local name = Style.label(bar, "", 18, F.display, C.ink)
 	name.AutoLocalize = false
-	name.Position = UDim2.fromOffset(10, 15)
-	name.Size = UDim2.fromOffset(110, 18)
-	local progress = Style.label(bar, "", 12, F.heavy, C.dim)
+	name.Position = UDim2.fromOffset(14, 8)
+	name.Size = UDim2.new(1, -28, 0, 20)
+	name.TextXAlignment = Enum.TextXAlignment.Left
+	name.TextTruncate = Enum.TextTruncate.AtEnd
+	local progress = Style.label(bar, "", 13, F.display, C.ink)
 	progress.AutoLocalize = false
 	progress.AnchorPoint = Vector2.new(1, 0)
-	progress.Position = UDim2.new(1, -10, 0, 17)
-	progress.Size = UDim2.fromOffset(90, 14)
+	progress.Position = UDim2.new(1, -14, 0, 11)
+	progress.Size = UDim2.fromOffset(120, 16)
 	progress.TextXAlignment = Enum.TextXAlignment.Right
-	local buy = Style.pill(bar, "BUY NOW", C.yellow)
+	-- the road: an asphalt bar with a lane line, the paint behind the car shows how far along you are
+	local back, fill = Style.bar(bar, C.green)
+	back.Position = UDim2.new(0, 14, 1, -32)
+	back.Size = UDim2.new(1, -28, 0, 22)
+	fill.BackgroundTransparency = 0.35
+	local lane = Style.lane(back)
+	lane.Position = UDim2.new(0, 6, 0.5, -2)
+	lane.Size = UDim2.new(1, -12, 0, 4)
+	lane.ZIndex = back.ZIndex + 1
+	local car = Style.image(bar, Icons.RoadCarRed)
+	car.Name = "Car"
+	car.AnchorPoint = Vector2.new(0.5, 1)
+	car.Size = UDim2.fromOffset(46, 46)
+	car.ZIndex = 4
+	-- the BUY! sticker on the top right corner once the cash covers it
+	local buy = Style.pill(bar, "BUY!", C.red)
+	buy.Name = "Buy"
+	buy.TextSize = 18
 	buy.AnchorPoint = Vector2.new(1, 0)
-	buy.Position = UDim2.new(1, -8, 0, 8)
-	buy.Size = UDim2.fromOffset(78, 24)
-	buy.TextSize = 14
-	local back, fill = Style.bar(bar, C.money)
-	back.Position = UDim2.new(0, 10, 1, -10)
-	back.Size = UDim2.new(1, -20, 0, 5)
+	buy.Position = UDim2.new(1, 12, 0, -14)
+	buy.Size = UDim2.fromOffset(0, 28)
+	buy.ZIndex = 5
+	local buyPulse = Instance.new("UIScale")
+	buyPulse.Parent = buy
+	TweenService:Create(
+		buyPulse,
+		TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+		{ Scale = 1.12 }
+	):Play()
 
-	-- the GARAGE tab's red dot while the next car can be bought
+	-- the GARAGE tile's badge while the next car can be bought
 	local garageButton = hud:FindFirstChild("GarageButton", true) :: GuiObject?
-	-- a stop-sign "!" badge on the sign's top right corner
-	local dot = Style.stop(hud, "!", 22)
+	local dot = Style.stop(hud, "!", 24)
 	dot.Name = "AffordDot"
 	dot.AnchorPoint = Vector2.new(0.5, 0.5)
-	dot.Position = UDim2.new(1, -4, 0, 12)
+	dot.Position = UDim2.new(1, -2, 0, 20)
 	dot.ZIndex = 5
 	dot.Visible = false
 	local pulse = Instance.new("UIScale")
@@ -113,12 +145,16 @@ function NextCar.start()
 			return
 		end
 		local v = Vehicles.ById[target]
-		name.Text = string.upper(v and v.name or target)
+		name.Text = "NEXT CAR: " .. string.upper(v and v.name or target)
 		progress.Text = `{Style.money(math.min(cash, price))} / {Style.money(price)}`
 		progress.Visible = not ready
+		name.Size = UDim2.new(1, if ready then -28 else -150, 0, 20)
 		buy.Visible = ready
-		fill.Size = UDim2.fromScale(math.clamp(cash / math.max(price, 1), 0, 1), 1)
-		Style.ring(bar, if ready then C.yellow else nil)
+		local k = math.clamp(cash / math.max(price, 1), 0, 1)
+		fill.Size = UDim2.fromScale(k, 1)
+		car.Image = `rbxassetid://{CAR_ICON[target] or Icons.RoadCarRed}`
+		-- the car drives along the road (its middle stays on the road between 23 px from either end)
+		car.Position = UDim2.new(0, 14 + 23 + k * (COLUMN.Width - 28 - 46), 1, -12)
 	end
 
 	Style.onTap(bar, function()

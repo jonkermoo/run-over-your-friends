@@ -614,9 +614,15 @@ function Style.label(
 	l.FontFace = font or F.medium
 	l.TextColor3 = tone(parent, color or C.text)
 	l.Parent = parent
-	local sign = signOf(parent)
-	if sign.stroke and l.TextColor3 == WHITE then
-		textInk(l, inkFor(size))
+	-- on a colour, light words get a black stroke; it goes when the words turn dark
+	if signOf(parent).stroke then
+		local function stroke()
+			local c = l.TextColor3
+			local light = c.R * 0.3 + c.G * 0.59 + c.B * 0.11 > 0.6
+			textInk(l, if light then inkFor(l.TextSize) else 0)
+		end
+		l:GetPropertyChangedSignal("TextColor3"):Connect(stroke)
+		stroke()
 	end
 	return l
 end
@@ -1057,7 +1063,13 @@ function Style.pill(parent: Instance, text: string, color: Color3): TextLabel
 	p:GetPropertyChangedSignal("TextBounds"):Connect(fit)
 	fit()
 	local w = words(p, 0)
-	textInk(w, if light then 0 else 2)
+	-- light words get a black stroke, dark ones none (callers recolour tags)
+	local function stroke()
+		local c = p.TextColor3
+		textInk(w, if c.R * 0.3 + c.G * 0.59 + c.B * 0.11 > 0.6 then 2 else 0)
+	end
+	p:GetPropertyChangedSignal("TextColor3"):Connect(stroke)
+	stroke()
 	return p
 end
 
@@ -1131,7 +1143,7 @@ function Style.slot(card: GuiObject)
 	size()
 end
 
--- the X on a card's top right corner, poking out over it: a stop sign (an icon) with a white X
+-- the X on a card's top right corner, poking out over it: the stop-sign icon (a white X on red)
 function Style.closeX(card: GuiObject, onClose: () -> ()): TextButton
 	local x = Instance.new("TextButton")
 	x.Name = "CloseX"
@@ -1140,27 +1152,15 @@ function Style.closeX(card: GuiObject, onClose: () -> ()): TextButton
 	x.Text = ""
 	x.AnchorPoint = Vector2.new(0.5, 0.5)
 	x.Position = UDim2.new(1, -8, 0, 8)
-	x.Size = UDim2.fromOffset(56, 56)
+	x.Size = UDim2.fromOffset(60, 60)
 	x.ZIndex = card.ZIndex + 10
 	x.Parent = card
-	local sign = Style.image(x, Icons.Stop, WHITE)
+	local sign = Style.image(x, Icons.RoadStop, WHITE)
 	sign.Name = "StopSign"
 	sign.Size = UDim2.fromScale(1, 1)
 	sign.ZIndex = x.ZIndex
-	local l = Instance.new("TextLabel")
-	l.Name = "X"
-	l.BackgroundTransparency = 1
-	l.Size = UDim2.fromScale(1, 1)
-	l.Text = "X"
-	l.TextSize = 28
-	l.FontFace = F.display
-	l.TextColor3 = WHITE
-	l.ZIndex = x.ZIndex
-	l.Parent = x
-	textInk(l, 2)
 	x:GetPropertyChangedSignal("ZIndex"):Connect(function()
 		sign.ZIndex = x.ZIndex
-		l.ZIndex = x.ZIndex
 	end)
 	press(x)
 	Style.onTap(x, onClose)
