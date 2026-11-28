@@ -7,10 +7,11 @@
 --
 -- Road meshes collide as boxes, so they're switched to precise collision for the scan and coloured by their
 -- layer (Asphalt dark, Concrete pale; Trim, the paint and kerbs, is skipped). The invisible drive surfaces
--- under the city's roads count as asphalt (low) or sidewalk (raised). Other see-through parts, the far
--- skyline stand-ins and anything outside workspace.Map are skipped.
+-- under the city's roads count as asphalt (low) or sidewalk (raised); they are thin slabs, so the tall
+-- invisible walls round the island (also plain Parts in Map.Static) are skipped. Other see-through parts,
+-- the far skyline stand-ins and anything outside workspace.Map are skipped too.
 
-local CX, CZ, SPAN, OUT, SS = 1350, 50, 8400, 2048, 2
+local CX, CZ, SPAN, OUT, SS = 400, 0, 7000, 2048, 2
 local ASPH = Color3.fromRGB(58, 60, 66)
 local WALK = Color3.fromRGB(176, 174, 168)
 
@@ -26,10 +27,17 @@ local map = workspace:WaitForChild("Map")
 local roads = map:WaitForChild("Static"):WaitForChild("Roads")
 local skyline = map:FindFirstChild("Skyline")
 
+-- what the rays skip goes in an exclude list: CanQuery alone does nothing on a part that still collides
+-- (the island's invisible walls)
+local T = workspace.Terrain
+local params = RaycastParams.new()
+params.IgnoreWater = false
+params.FilterType = Enum.RaycastFilterType.Exclude
+local skip: { Instance } = {}
 local layer: { [Instance]: string } = {}
 local surf: { [Instance]: boolean } = {}
 for _, p in workspace:GetDescendants() do
-	if p:IsA("BasePart") then
+	if p:IsA("BasePart") and p ~= T then -- (Terrain is a BasePart too)
 		local q
 		if p:IsDescendantOf(roads) and p:IsA("MeshPart") then
 			local l = p.Name:match("_(%a+)$") or ""
@@ -39,7 +47,7 @@ for _, p in workspace:GetDescendants() do
 		elseif not p:IsDescendantOf(map) or (skyline and p:IsDescendantOf(skyline)) then
 			q = false
 		elseif p.Transparency >= 0.6 then
-			q = p.Name == "Part" and p.Parent == map.Static
+			q = p.Name == "Part" and p.Parent == map.Static and p.Size.Y <= 2
 			if q then
 				surf[p] = true
 			end
@@ -47,17 +55,18 @@ for _, p in workspace:GetDescendants() do
 			q = true
 		end
 		p.CanQuery = q
+		if not q then
+			table.insert(skip, p)
+		end
 	end
 end
+params.FilterDescendantsInstances = skip
 
 local folder = game:GetService("ServerStorage"):FindFirstChild("MapCap") or Instance.new("Folder")
 folder.Name = "MapCap"
 folder:ClearAllChildren()
 folder.Parent = game:GetService("ServerStorage")
 
-local T = workspace.Terrain
-local params = RaycastParams.new()
-params.IgnoreWater = false
 local N = OUT * SS
 local step = SPAN / N
 local x0, z0 = CX - SPAN / 2, CZ - SPAN / 2
@@ -94,14 +103,39 @@ local function colOf(r: RaycastResult?): (number, number, number, number)
 end
 
 local down = Vector3.new(0, -2000, 0)
+-- some of the map is still being built after the pass above, so a see-through part the pass never saw is
+-- added to the skip list when a ray first meets it, and the ray cast again
+local function cast(at: Vector3): RaycastResult?
+	for _ = 1, 16 do
+		local r = workspace:Raycast(at, down, params)
+		local inst = r and r.Instance
+		if
+			not (
+				inst
+				and inst ~= T
+				and not layer[inst]
+				and not surf[inst]
+				and (inst :: BasePart).Transparency >= 0.6
+			)
+		then
+			return r
+		end
+		params:AddToFilter(inst)
+	end
+	return nil
+end
 for oy = 0, OUT - 1 do
 	local row = table.create(OUT)
 	for ox = 0, OUT - 1 do
 		local R, G, B, H = 0, 0, 0, 0
 		for sy = 0, SS - 1 do
 			for sx = 0, SS - 1 do
-				local at = Vector3.new(x0 + (ox * SS + sx + 0.5) * step, 1500, z0 + (oy * SS + sy + 0.5) * step)
-				local a, b, c, h = colOf(workspace:Raycast(at, down, params))
+				local at = Vector3.new(
+					x0 + (ox * SS + sx + 0.5) * step,
+					1500,
+					z0 + (oy * SS + sy + 0.5) * step
+				)
+				local a, b, c, h = colOf(cast(at))
 				R += a
 				G += b
 				B += c

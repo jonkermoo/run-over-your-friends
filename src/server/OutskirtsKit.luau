@@ -1,6 +1,6 @@
 --!strict
--- The world outside the city grid, from Config/Outskirts: the ground and the sea, the highway ring and its
--- connectors, the cells between the city and the ring, the stunt park (east), the container port (west), the
+-- The world outside the city grid, from Config/Outskirts: the ground and the sea, the loop road and its
+-- connectors (Rules/RoadLayout), the empty cells inside the loop, the stunt park (east), the container port (west), the
 -- desert (south), the construction site (north), and groves and ponds on the flat grass the zones leave empty.
 -- Terrain costs no parts, so dunes, dirt jumps and the sea are terrain; what you smash is parts.
 
@@ -11,6 +11,7 @@ local Zones = require(ReplicatedStorage.Shared.Config.Zones)
 local LandCfg = require(ReplicatedStorage.Shared.Config.Land)
 local Land = require(ReplicatedStorage.Shared.Rules.Land)
 local Rules = require(ReplicatedStorage.Shared.Rules.Outskirts)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Tiles = require(ReplicatedStorage.Shared.Rules.Tiles)
 local CountryKit = require(script.Parent.CountryKit)
@@ -286,9 +287,9 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local R = ctx.road
 	local half = ctx.half
 	local RG = Cfg.Ring
-	local ring = math.max(ctx.spanX, ctx.spanZ) / 2 + RG.Gap
+	local layout = RoadLayout.fromConfig()
 	local RW = RG.Width
-	local ringOuter = ring + RW / 2
+	local ringOuter = layout.ringOuter
 	local zones = Rules.zones(ringOuter, Cfg.Stunt, Cfg.Port, Cfg.Desert, Cfg.Site)
 	local seaEdge = zones.port.x - zones.port.w / 2
 
@@ -323,7 +324,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 	local port = zones.port
 	local function beachWidth(zc: number): number
 		local off = math.abs(zc - port.z) - (port.d / 2 + BEACH.Gap)
-		local toEnd = half - math.abs(zc)
+		local toEnd = math.min(half, LandCfg.CoastReach) - math.abs(zc)
 		if off <= 0 or toEnd < 0 then
 			return 0
 		end
@@ -438,116 +439,90 @@ function OutskirtsKit.build(ctx: Ctx): Result
 		)
 	end
 
-	-- highway ring, joined to every grid road: the road you see is the road meshes (RoadKit); these invisible
-	-- parts are what cars drive on, every top at 0.10
-	for _, s in { 1, -1 } do
-		part(
-			static,
-			Vector3.new(RW, 1, ring * 2 + RW),
-			CFrame.new(s * ring, -0.4, 0),
-			COLORS.road,
-			Enum.Material.Asphalt,
-			1
-		)
-		part(
-			static,
-			Vector3.new(ring * 2 + RW, 1, RW),
-			CFrame.new(0, -0.4, s * ring),
-			COLORS.road,
-			Enum.Material.Asphalt,
-			1
-		)
-	end
-	local roadX, roadZ = {}, {}
-	for i = 0, ctx.blocksX do
-		local x = ctx.x0 + R / 2 + i * ctx.pitch
-		table.insert(roadX, x)
-		local len = ring - ctx.spanZ / 2
-		for _, s in { 1, -1 } do
-			part(
-				static,
-				Vector3.new(R, 1, len),
-				CFrame.new(x, -0.4, s * (ctx.spanZ / 2 + len / 2)),
-				COLORS.road,
-				Enum.Material.Asphalt,
-				1
-			)
-		end
-	end
-	for j = 0, ctx.blocksZ do
-		local z = ctx.z0 + R / 2 + j * ctx.pitch
-		table.insert(roadZ, z)
-		local len = ring - ctx.spanX / 2
-		for _, s in { 1, -1 } do
-			part(
-				static,
-				Vector3.new(len, 1, R),
-				CFrame.new(s * (ctx.spanX / 2 + len / 2), -0.4, z),
-				COLORS.road,
-				Enum.Material.Asphalt,
-				1
-			)
-		end
-	end
-	-- connectors from the ring out to each zone, on the middle grid roads
-	local connectors: { Rules.Rect } = {}
-	for _, z in { zones.stunt, zones.port, zones.desert, zones.site } do
-		local alongX = z.z == 0
-		local near = if alongX then math.abs(z.x) - z.w / 2 else math.abs(z.z) - z.d / 2
-		local len = near - ring + 20
-		local mid = ring + len / 2
-		local rect: Rules.Rect = if alongX
-			then { x = math.sign(z.x) * mid, z = 0, w = len, d = RG.Connector }
-			else { x = 0, z = math.sign(z.z) * mid, w = RG.Connector, d = len }
-		table.insert(connectors, rect)
-		part(
-			static,
-			Vector3.new(rect.w, 1, rect.d),
-			CFrame.new(rect.x, -0.4, rect.z),
-			COLORS.road,
-			Enum.Material.Asphalt,
-			1
-		)
-		-- split-rail fences down both sides, a pole line with wires down one (RoadsideKit)
-		local along = if alongX
-			then Vector3.new(math.sign(z.x), 0, 0)
-			else Vector3.new(0, 0, math.sign(z.z))
-		local across = Vector3.new(-along.Z, 0, along.X)
-		local halfRoad = RG.Connector / 2
-		local from = along * ring
-		local to = along * (ring + len)
-		local RF = Roadside.Fence
-		for _, s in { -1, 1 } do
-			local off = across * s * (halfRoad + RF.Out)
-			RoadsideKit.fence(
-				static,
-				from + along * RF.EndGap + off,
-				to - along * RF.EndGap + off,
-				function()
-					return false
-				end
-			)
-		end
-		local poleOff = across * (halfRoad + Roadside.Poles.RoadOut)
-		RoadsideKit.poles(
-			static,
-			{ from + along * RF.EndGap + poleOff, to - along * RF.EndGap + poleOff },
-			function()
-				return false
+	-- the loop road round the town, the stubs out to it and the connectors to the zones: the road you see is
+	-- the road meshes (RoadKit); these invisible parts, one per piece of each centre line, are what cars drive
+	-- on, every top at 0.10. Each piece runs a little past its ends so the bends close.
+	local function drive(pts: { RoadLayout.Pt }, width: number, overlap: number)
+		for n = 1, #pts - 1 do
+			local a = Vector3.new(pts[n][1], -0.4, pts[n][2])
+			local b = Vector3.new(pts[n + 1][1], -0.4, pts[n + 1][2])
+			local len = (b - a).Magnitude
+			if len > 0.5 then
+				part(
+					static,
+					Vector3.new(width, 1, len + overlap),
+					CFrame.lookAt((a + b) / 2, b),
+					COLORS.road,
+					Enum.Material.Asphalt,
+					1
+				)
 			end
-		)
+		end
+	end
+	for _, r in layout.roads do
+		if r.kind == "ring" then
+			drive(r.pts, r.width, r.width * 0.35)
+		elseif r.kind == "stub" then
+			drive(r.pts, r.width, 0)
+		end
+	end
+	-- connectors out to each zone, split-rail fences down both sides and a pole line with wires down one
+	-- (RoadsideKit), along the curve
+	local connectors: { Rules.Rect } = layout.connectors
+	local RF = Roadside.Fence
+	local halfRoad = RG.Connector / 2
+	for _, l in layout.links do
+		local pts = l.pts
+		drive(pts, RG.Connector, RG.Connector * 0.35)
+		local function offset(n: number, by: number): Vector3
+			local a = pts[math.max(n - 1, 1)]
+			local b = pts[math.min(n + 1, #pts)]
+			local dir = Vector3.new(b[1] - a[1], 0, b[2] - a[2]).Unit
+			return Vector3.new(pts[n][1], 0, pts[n][2]) + Vector3.new(-dir.Z, 0, dir.X) * by
+		end
+		-- the fence starts clear of the loop and stops short of the zone
+		local first = 1
+		while
+			first < #pts
+			and RoadLayout.distance(layout.loop, pts[first][1], pts[first][2])
+				< RW / 2 + RF.EndGap
+		do
+			first += 1
+		end
+		local last = #pts - 1
+		for _, s in { -1, 1 } do
+			for n = first, last - 1 do
+				RoadsideKit.fence(
+					static,
+					offset(n, s * (halfRoad + RF.Out)),
+					offset(n + 1, s * (halfRoad + RF.Out)),
+					function()
+						return false
+					end
+				)
+			end
+		end
+		local line = {}
+		for n = first, last do
+			table.insert(line, offset(n, halfRoad + Roadside.Poles.RoadOut))
+		end
+		if #line >= 2 then
+			RoadsideKit.poles(static, line, function()
+				return false
+			end)
+		end
 	end
 
-	-- the cells between the city and the ring: trees, and a billboard facing the ring every other cell
+	-- the empty lattice cells inside the loop (round the ragged town): trees, fields, gas stations, and a
+	-- billboard facing out every other cell
 	local RC = Cfg.RingCells
-	local inner = ring - RW / 2
 	local cellCount = 0
 	local country: CountryKit.Ctx = {
 		static = static,
 		buildings = buildings,
 		props = props,
 		random = random,
-		half = half,
+		half = math.min(half, LandCfg.CoastReach),
 		reach = reach,
 		-- open ground: inside the edge's fill band and east of the coast (by r)
 		allowed = function(x: number, z: number, r: number): boolean
@@ -581,31 +556,32 @@ function OutskirtsKit.build(ctx: Ctx): Result
 			)
 		end
 	end
-	local bandX, bandZ = inner - ctx.spanX / 2, inner - ctx.spanZ / 2
-	for i = 1, #roadX - 1 do
-		local cx = (roadX[i] + roadX[i + 1]) / 2
-		local w = roadX[i + 1] - roadX[i] - R
-		for _, s in { 1, -1 } do
-			cell(cx, s * (ctx.spanZ / 2 + bandZ / 2), w, bandZ, Vector3.new(0, 0, s))
-		end
-	end
-	for j = 1, #roadZ - 1 do
-		local cz = (roadZ[j] + roadZ[j + 1]) / 2
-		local d = roadZ[j + 1] - roadZ[j] - R
-		for _, s in { 1, -1 } do
-			cell(s * (ctx.spanX / 2 + bandX / 2), cz, bandX, d, Vector3.new(s, 0, 0))
-		end
-	end
-
-	-- the four corner cells, where the band turns
-	for _, sx in { 1, -1 } do
-		for _, sz in { 1, -1 } do
-			CountryKit.corner(
-				country,
-				sx * (ctx.spanX / 2 + bandX / 2),
-				sz * (ctx.spanZ / 2 + bandZ / 2),
-				math.min(bandX, bandZ)
-			)
+	local lg = layout.grid
+	local B = lg.block
+	local clear = RW / 2 + RC.LoopClear
+	for i = 0, lg.nx - 1 do
+		for j = 0, lg.nz - 1 do
+			if not layout.has[i][j] then
+				local cx = lg.x0 + R + i * lg.pitch + B / 2
+				local cz = lg.z0 + R + j * lg.pitch + B / 2
+				local fits = true
+				for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+					local x, z = cx + c[1] * B / 2, cz + c[2] * B / 2
+					if
+						not RoadLayout.inside(layout.loop, x, z)
+						or RoadLayout.distance(layout.loop, x, z) < clear
+					then
+						fits = false
+					end
+				end
+				if fits then
+					-- face out of town along the cell's longer way to the middle
+					local out = if math.abs(cx) > math.abs(cz)
+						then Vector3.new(math.sign(cx), 0, 0)
+						else Vector3.new(0, 0, math.sign(cz))
+					cell(cx, cz, B, B, out)
+				end
+			end
 		end
 	end
 
@@ -1724,7 +1700,7 @@ function OutskirtsKit.build(ctx: Ctx): Result
 
 	-- what the groves and ponds keep clear of: the city, the ring, its connectors, the zones and the sea
 	local exclude: { Rules.Rect } = {
-		{ x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 },
+		{ x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 }, -- the loop's furthest reach, all round
 		zones.stunt,
 		zones.port,
 		zones.desert,

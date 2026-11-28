@@ -1,6 +1,6 @@
 --!strict
 -- Builds the world from World.Map at server start (same seed, same city every time):
--- an 8x8 city grid with wide roads; blocks from the city plan (offices, homes, the burger place, the parcel
+-- a 7x7 city grid with wide roads; blocks from the city plan (offices, homes, the burger place, the parcel
 -- warehouse, shops, parks, plazas) with destructible chunked buildings and places for the crowd,
 -- parking lots with kickers; the ground, the highway ring and the zones beyond it come from OutskirtsKit.
 
@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
 local BuildingConfig = require(ReplicatedStorage.Shared.Config.Buildings)
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local Crowd = require(ReplicatedStorage.Shared.Config.Crowd)
 local HouseRules = require(ReplicatedStorage.Shared.Rules.Houses)
 local Houses = require(ReplicatedStorage.Shared.Config.Houses)
@@ -692,40 +693,57 @@ function MapBuilder.build(fresh: boolean?): Result
 	end
 
 	-- city grid: the roads you see are meshes (RoadKit); these plain parts under them are what cars drive on,
-	-- all with their top at 0.10, invisible
+	-- all with their top at 0.10, invisible. Only the roads the ragged town has (Rules/RoadLayout): one part
+	-- per run of road along a grid line, a spawn point at every crossing they reach, and paving (for people,
+	-- no road) where two blocks are merged.
 	local B, R = M.BlockSize, M.RoadWidth
 	local pitch = B + R
 	local spanX, spanZ = M.BlocksX * pitch + R, M.BlocksZ * pitch + R
 	local x0, z0 = -spanX / 2, -spanZ / 2
-	for i = 0, M.BlocksX do
-		local x = x0 + R / 2 + i * pitch
-		part(
-			static,
-			Vector3.new(R, 1, spanZ),
-			CFrame.new(x, -0.4, 0),
-			COLORS.road,
-			Enum.Material.Asphalt,
-			1
-		)
-	end
-	for j = 0, M.BlocksZ do
-		local z = z0 + R / 2 + j * pitch
-		part(
-			static,
-			Vector3.new(spanX, 1, R),
-			CFrame.new(0, -0.4, z),
-			COLORS.road,
-			Enum.Material.Asphalt,
-			1
-		)
-		for i = 0, M.BlocksX do
-			table.insert(spawnPoints, Vector3.new(x0 + R / 2 + i * pitch, 0.2, z))
+	local layout = RoadLayout.fromConfig()
+	for _, road in layout.roads do
+		if road.kind == "town" then
+			local a, b = road.pts[1], road.pts[2]
+			local alongX = a[2] == b[2]
+			local len = math.abs(if alongX then b[1] - a[1] else b[2] - a[2]) + R
+			part(
+				static,
+				if alongX then Vector3.new(len, 1, R) else Vector3.new(R, 1, len),
+				CFrame.new((a[1] + b[1]) / 2, -0.4, (a[2] + b[2]) / 2),
+				COLORS.road,
+				Enum.Material.Asphalt,
+				1
+			)
 		end
+	end
+	for k = 0, M.BlocksX do
+		for m = 0, M.BlocksZ do
+			if
+				RoadLayout.segment(layout, k, m, k + 1, m)
+				or RoadLayout.segment(layout, k - 1, m, k, m)
+				or RoadLayout.segment(layout, k, m, k, m + 1)
+				or RoadLayout.segment(layout, k, m - 1, k, m)
+			then
+				table.insert(
+					spawnPoints,
+					Vector3.new(x0 + R / 2 + k * pitch, 0.2, z0 + R / 2 + m * pitch)
+				)
+			end
+		end
+	end
+	for _, pz in layout.plazas do
+		part(
+			static,
+			Vector3.new(pz.w, 1, pz.d),
+			CFrame.new(pz.x, -0.42, pz.z),
+			COLORS.plaza,
+			Enum.Material.Pavement
+		)
 	end
 
 	-- blocks: what stands where comes from the city plan
 	local centreI, centreJ = math.floor(M.BlocksX / 2), math.floor(M.BlocksZ / 2)
-	local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed)
+	local plan = CityPlan.plan(M.BlocksX, M.BlocksZ, M.Seed, M.Mask)
 	local places: { Places.Place } = {}
 	local count, offices, shops = 0, 0, 0
 	local function addPlace(place: Places.Place, i: number, j: number)
@@ -760,6 +778,9 @@ function MapBuilder.build(fresh: boolean?): Result
 	end
 	for i = 0, M.BlocksX - 1 do
 		for j = 0, M.BlocksZ - 1 do
+			if plan[i][j] == nil then
+				continue -- no block here: the ragged town's edge (World Map.Mask)
+			end
 			local cx = x0 + R + i * pitch + B / 2
 			local cz = z0 + R + j * pitch + B / 2
 			local centre = Vector3.new(cx, 0, cz)
@@ -1398,34 +1419,43 @@ function MapBuilder.build(fresh: boolean?): Result
 		end
 	end
 
-	-- a sidewalk along the outside of the outer road, between the roads that run out to the ring
+	-- a sidewalk along the outside of every road on the town's edge (a road with a block on one side only)
 	if Country.OuterSidewalk then
 		local SW = M.SidewalkWidth
 		local style = Streets.Districts.maple
 		local colour = Color3.fromRGB(style.sidewalk[1], style.sidewalk[2], style.sidewalk[3])
 		local mat = (Enum.Material :: any)[style.sidewalkMaterial]
-		for k = 0, M.BlocksX - 1 do
-			local x = x0 + R + k * pitch + B / 2
-			for _, s in { -1, 1 } do
-				part(
-					static,
-					Vector3.new(B, 1, SW),
-					CFrame.new(x, -0.42, s * (spanZ / 2 + SW / 2)),
-					colour,
-					mat
-				)
+		local function stands(i: number, j: number): boolean
+			return i >= 0 and j >= 0 and i < M.BlocksX and j < M.BlocksZ and layout.has[i][j]
+		end
+		for k = 0, M.BlocksX do
+			for m = 0, M.BlocksZ - 1 do
+				local w, e = stands(k - 1, m), stands(k, m)
+				if w ~= e then
+					local x = x0 + R / 2 + k * pitch + (if w then 1 else -1) * (R / 2 + SW / 2)
+					part(
+						static,
+						Vector3.new(SW, 1, B),
+						CFrame.new(x, -0.42, z0 + R + m * pitch + B / 2),
+						colour,
+						mat
+					)
+				end
 			end
 		end
-		for k = 0, M.BlocksZ - 1 do
-			local z = z0 + R + k * pitch + B / 2
-			for _, s in { -1, 1 } do
-				part(
-					static,
-					Vector3.new(SW, 1, B),
-					CFrame.new(s * (spanX / 2 + SW / 2), -0.42, z),
-					colour,
-					mat
-				)
+		for m = 0, M.BlocksZ do
+			for k = 0, M.BlocksX - 1 do
+				local n, so = stands(k, m - 1), stands(k, m)
+				if n ~= so then
+					local z = z0 + R / 2 + m * pitch + (if n then 1 else -1) * (R / 2 + SW / 2)
+					part(
+						static,
+						Vector3.new(B, 1, SW),
+						CFrame.new(x0 + R + k * pitch + B / 2, -0.42, z),
+						colour,
+						mat
+					)
+				end
 			end
 		end
 	end
@@ -1520,15 +1550,32 @@ function MapBuilder.build(fresh: boolean?): Result
 	local GU = World.GrassUnder
 	local terrain = Terra.terrain
 	local edge = World.Map.SidewalkWidth + GU.CityMargin
-	terrain:ReplaceMaterial(
-		Region3.new(
-			Vector3.new(x0 - edge, -16, z0 - edge),
-			Vector3.new(x0 + spanX + edge, 4, z0 + spanZ + edge)
-		):ExpandToGrid(4),
-		4,
-		Enum.Material.Grass,
-		Enum.Material.Asphalt
-	)
+	-- the town: every standing block grown by its roads and the sidewalk past them
+	local cityRects: { { number } } = {}
+	for i = 0, M.BlocksX - 1 do
+		for j = 0, M.BlocksZ - 1 do
+			if layout.has[i][j] then
+				local bx, bz = x0 + R + i * pitch, z0 + R + j * pitch
+				local r = { bx - R - edge, bz - R - edge, bx + B + R + edge, bz + B + R + edge }
+				table.insert(cityRects, r)
+				terrain:ReplaceMaterial(
+					Region3.new(Vector3.new(r[1], -16, r[2]), Vector3.new(r[3], 4, r[4]))
+						:ExpandToGrid(4),
+					4,
+					Enum.Material.Grass,
+					Enum.Material.Asphalt
+				)
+			end
+		end
+	end
+	local function inCity(lo: Vector3, hi: Vector3): boolean
+		for _, r in cityRects do
+			if lo.X >= r[1] and hi.X <= r[3] and lo.Z >= r[2] and hi.Z <= r[4] then
+				return true
+			end
+		end
+		return false
+	end
 	for _, p in map:GetDescendants() do
 		if
 			not p:IsA("BasePart")
@@ -1555,12 +1602,7 @@ function MapBuilder.build(fresh: boolean?): Result
 		if lo.Y > GU.MaxBottom or hi.Y > GU.MaxTop then
 			continue
 		end
-		if
-			lo.X >= x0 - edge
-			and hi.X <= x0 + spanX + edge
-			and lo.Z >= z0 - edge
-			and hi.Z <= z0 + spanZ + edge
-		then
+		if inCity(lo, hi) then
 			continue -- the city grid is done above
 		end
 		Terra.run("grass", clearGrassUnder, size, cf, lo, hi)
@@ -1589,6 +1631,7 @@ function MapBuilder.build(fresh: boolean?): Result
 			sidewalk = M.SidewalkWidth,
 			x0 = x0,
 			z0 = z0,
+			has = layout.has,
 		},
 	}
 end
