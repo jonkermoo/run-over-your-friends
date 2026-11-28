@@ -105,7 +105,7 @@ local valueText: TextLabel
 local buy: TextButton
 local onClose: (() -> ())? = nil
 
-local CARD_W, CARD_H = 580, 560
+local CARD_W, CARD_H = 580, 594
 local TILE_W, TILE_H, PLUS_W = 156, 160, 36
 local PIC_H = 104 -- the picture at the top of each tile
 
@@ -124,16 +124,17 @@ local function tile(
 	t.LayoutOrder = order
 	local pic = Instance.new("Frame")
 	pic.Name = "Picture"
-	pic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+	pic.BackgroundColor3 = C.asphalt
 	pic.BorderSizePixel = 0
 	pic.ClipsDescendants = true
-	pic.Size = UDim2.new(1, 0, 0, PIC_H)
+	pic.Position = UDim2.fromOffset(4, 4)
+	pic.Size = UDim2.new(1, -8, 0, PIC_H - 4)
 	pic.Parent = t
 	local edge = Instance.new("Frame")
 	edge.BackgroundColor3 = C.yellow
 	edge.BorderSizePixel = 0
-	edge.Position = UDim2.fromOffset(0, PIC_H)
-	edge.Size = UDim2.new(1, 0, 0, 3)
+	edge.Position = UDim2.fromOffset(4, PIC_H)
+	edge.Size = UDim2.new(1, -8, 0, 3)
 	edge.Parent = t
 	local n = Style.label(t, name, 17, F.display, nameColor)
 	n.Position = UDim2.fromOffset(6, PIC_H + 10)
@@ -158,10 +159,11 @@ local function build(gui: ScreenGui, preview: Preview)
 	card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 	card.ZIndex = 10
 	card.Visible = false
-	Style.hazard(card, CARD_W, 14)
+	Style.hazard(card, CARD_W, 20)
+	Style.topIcon(card, Icons.RoadCarRed, 120)
 
-	local title = Style.label(card, "STARTER PACK", 52, F.display, C.yellow)
-	title.Position = UDim2.fromOffset(0, 28)
+	local title = Style.label(card, "STARTER PACK", 48, F.display, C.text)
+	title.Position = UDim2.fromOffset(0, 62)
 	title.Size = UDim2.new(1, -70, 0, 54) -- a little left of centre: the deal sticker takes the corner
 	Style.outline(title, 3)
 	-- the deal's sticker, slapped on the top-right corner while it runs
@@ -170,22 +172,24 @@ local function build(gui: ScreenGui, preview: Preview)
 	offPill.BackgroundColor3 = C.red
 	offPill.BackgroundTransparency = 0
 	offPill.AnchorPoint = Vector2.new(1, 0)
-	offPill.Position = UDim2.new(1, -8, 0, 22)
+	offPill.Position = UDim2.new(1, 14, 0, 40)
 	offPill.Size = UDim2.fromOffset(100, 40)
 	offPill.ZIndex = 3
-	Style.stroke(offPill, C.ink, 3, 0)
+	Style.corner(offPill, 6)
+	Style.stroke(offPill, C.ink, 4, 0)
+	Style.outline(offPill, 2)
 	local once = Style.pill(card, "ONE TIME ONLY  ·  ONCE PER ACCOUNT", C.pink)
 	once.TextColor3 = C.text
 	once.TextSize = 15
 	once.Size = UDim2.fromOffset(0, 24)
 	once.AnchorPoint = Vector2.new(0.5, 0)
-	once.Position = UDim2.new(0.5, 0, 0, 92)
+	once.Position = UDim2.new(0.5, 0, 0, 120)
 
 	-- what's inside: a picture of each car, then the cash, with a + between them
 	local row = Instance.new("Frame")
 	row.Name = "Contents"
 	row.BackgroundTransparency = 1
-	row.Position = UDim2.fromOffset(0, 130)
+	row.Position = UDim2.fromOffset(0, 158)
 	row.Size = UDim2.new(1, 0, 0, TILE_H)
 	row.Parent = card
 	local list = Instance.new("UIListLayout")
@@ -206,29 +210,28 @@ local function build(gui: ScreenGui, preview: Preview)
 	end
 	local cash = tile(row, order + 1, Style.money(FULL.money), "CASH", C.money)
 	local pic = cash:FindFirstChild("Picture") :: Frame
-	local bill = Style.image(pic, Icons.Bill)
+	local bill = Style.image(pic, Icons.RoadCash)
 	bill.AnchorPoint = Vector2.new(0.5, 0.5)
 	bill.Position = UDim2.fromScale(0.4, 0.45)
 	bill.Size = UDim2.fromOffset(70, 70)
-	local coin = Style.image(pic, Icons.Coin)
+	local coin = Style.image(pic, Icons.RoadCoin)
 	coin.AnchorPoint = Vector2.new(0.5, 0.5)
 	coin.Position = UDim2.fromScale(0.66, 0.6)
 	coin.Size = UDim2.fromOffset(46, 46)
 
 	-- the value bar: honest numbers from Rules/Offer
 	local value = Instance.new("Frame")
-	value.BackgroundColor3 = C.money
-	value.BorderSizePixel = 0
-	value.Position = UDim2.fromOffset(24, 304)
-	value.Size = UDim2.new(1, -48, 0, 40)
+	value.Position = UDim2.fromOffset(24, 334)
+	value.Size = UDim2.new(1, -48, 0, 44)
 	value.Parent = card
+	Style.sign(value, "yellow", true)
 	valueText = Style.label(value, "", 24, F.display, C.ink)
 	valueText.Size = UDim2.fromScale(1, 1)
 
 	-- the price: the full one struck through and the deal while it runs, and its countdown on the right
 	local priceRow = Instance.new("Frame")
 	priceRow.BackgroundTransparency = 1
-	priceRow.Position = UDim2.fromOffset(24, 354)
+	priceRow.Position = UDim2.fromOffset(24, 388)
 	priceRow.Size = UDim2.new(1, -48, 0, 46)
 	priceRow.Parent = card
 	local left = Instance.new("Frame")
@@ -257,9 +260,10 @@ local function build(gui: ScreenGui, preview: Preview)
 	priceNow.Size = UDim2.fromOffset(0, 46)
 	priceNow.LayoutOrder = 2
 	Style.outline(priceNow, 2)
-	timer = Style.label(priceRow, "", 19, F.display, C.text)
-	timer.BackgroundColor3 = C.red
+	timer = Style.label(priceRow, "", 19, F.display, C.yellow)
+	timer.BackgroundColor3 = C.ink
 	timer.BackgroundTransparency = 0
+	Style.corner(timer, 4)
 	timer.AnchorPoint = Vector2.new(1, 0.5)
 	timer.Position = UDim2.fromScale(1, 0.5)
 	timer.AutomaticSize = Enum.AutomaticSize.X
@@ -280,7 +284,7 @@ local function build(gui: ScreenGui, preview: Preview)
 		StarterCard.hide()
 		Popups.snooze("Starter")
 	end)
-	local no = Style.button(card, "NO THANKS", "dark", 16)
+	local no = Style.quiet(card, "NO THANKS", 17)
 	no.Name = "StarterNo"
 	no.AnchorPoint = Vector2.new(0.5, 1)
 	no.Position = UDim2.new(0.5, 0, 1, -14)

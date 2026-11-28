@@ -139,8 +139,8 @@ function Trial.button(vehicleId: string, action: TextButton)
 	end)
 end
 
--- the countdown under the event sign while the trial car is out, a small sign like it (client/EventBanner):
--- yellow dashes above and below, the name on the left, the time on the right (pink near the end)
+-- the countdown under the event sign while the trial car is out, a small asphalt plate: the name on the
+-- left, the time on the right (pink near the end)
 local SIGN = EventConfig.Card
 local chip = Style.panel(gui)
 chip.Name = "TrialChip"
@@ -148,10 +148,6 @@ chip.AnchorPoint = Vector2.new(0.5, 0)
 chip.Position = UDim2.new(0.5, 0, 0, SIGN.Gap + SIGN.Height + 10)
 chip.Size = UDim2.fromOffset(250, SIGN.Height)
 chip.Visible = false
-Style.dashes(chip, C.yellow).Position = UDim2.fromOffset(0, 3)
-local chipBottom = Style.dashes(chip, C.yellow)
-chipBottom.AnchorPoint = Vector2.new(0, 1)
-chipBottom.Position = UDim2.new(0, 0, 1, -3)
 local chipName = Style.label(chip, "ROADSTER TRIAL", SIGN.TitleText, F.display, C.text)
 chipName.AnchorPoint = Vector2.new(0, 0.5)
 chipName.Position = UDim2.fromOffset(14, SIGN.Height / 2)
@@ -173,50 +169,48 @@ local function refreshChip()
 	end
 end
 
--- the end card, a poster like the garage's "can't afford it" card (client/Hud Upsell): hazard band, yellow edge, pink
--- shadow, the car and a lane-line bar of cash toward it, then the pass (gold) and KEEP DRIVING (dark)
-local CARD_W, CARD_H = 500, 360
+-- the end card: the Roadster poking out of the top, TRIAL OVER!, come back tomorrow, and how far your cash is
+-- toward the car (a road bar), then the pass (yellow) and a quiet KEEP DRIVING
+local CARD_W, CARD_H = 480, 350
 local card = Style.panel(gui)
 card.Name = "TrialOver"
 Style.slot(card)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.Visible = false
-Style.hazard(card, CARD_W, 14)
-local title = Style.label(card, "TRIAL OVER!", 40, F.display, C.yellow)
-title.Position = UDim2.fromOffset(0, 26)
-title.Size = UDim2.new(1, 0, 0, 44)
-Style.outline(title, 2)
-local pic = Instance.new("Frame")
-pic.Name = "Picture"
-pic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
-pic.BorderSizePixel = 0
-pic.Position = UDim2.fromOffset(24, 84)
-pic.Size = UDim2.fromOffset(120, 70)
-pic.Parent = card
-Style.image(pic, Icons.PassRoadster).Size = UDim2.fromScale(1, 1)
-local carName = Style.label(card, string.upper(Vehicles.ById[Cfg.Car].name), 20, F.display, C.text)
-carName.Position = UDim2.fromOffset(158, 84)
-carName.Size = UDim2.new(1, -182, 0, 24)
-carName.TextXAlignment = Enum.TextXAlignment.Left
-local barBack, barFill = Style.bar(card, C.money)
-barBack.BackgroundTransparency = 0
-barBack.Position = UDim2.fromOffset(158, 112)
-barBack.Size = UDim2.new(1, -182, 0, 16)
-Style.laneGaps(barBack, C.ink)
-local amount = Style.label(card, "", 14, F.bold, C.dim)
-amount.Position = UDim2.fromOffset(158, 132)
-amount.Size = UDim2.new(1, -182, 0, 18)
-amount.TextXAlignment = Enum.TextXAlignment.Left
+Style.topIcon(card, Icons.PassRoadster, 150)
+local title = Style.label(card, "TRIAL OVER!", 38, F.display, C.text)
+title.Position = UDim2.fromOffset(0, 74)
+title.Size = UDim2.new(1, 0, 0, 40)
+Style.outline(title, 3)
 local sub = Style.label(card, "Come back tomorrow for another drive", 18, F.bold, C.text)
-sub.Position = UDim2.fromOffset(24, 172)
+sub.Position = UDim2.fromOffset(24, 116)
 sub.Size = UDim2.new(1, -48, 0, 24)
 sub.TextWrapped = true
-local passBtn = Style.button(card, "GET ROADSTER PASS", "gold", 26)
+local carName =
+	Style.label(card, string.upper(Vehicles.ById[Cfg.Car].name), 15, F.display, C.yellow)
+carName.Position = UDim2.fromOffset(24, 152)
+carName.Size = UDim2.new(0.5, -24, 0, 18)
+carName.TextXAlignment = Enum.TextXAlignment.Left
+local amount = Style.label(card, "", 15, F.display, C.yellow)
+amount.AnchorPoint = Vector2.new(1, 0)
+amount.Position = UDim2.new(1, -24, 0, 152)
+amount.Size = UDim2.new(0.5, -24, 0, 18)
+amount.TextXAlignment = Enum.TextXAlignment.Right
+local barBack, barFill = Style.bar(card, C.green)
+barBack.Position = UDim2.fromOffset(24, 174)
+barBack.Size = UDim2.new(1, -48, 0, 24)
+do
+	local lane = Style.lane(barBack)
+	lane.Position = UDim2.new(0, 8, 0.5, -2)
+	lane.Size = UDim2.new(1, -16, 0, 4)
+	lane.ZIndex = barBack.ZIndex + 1
+end
+local passBtn = Style.button(card, "GET ROADSTER PASS", "yellow", 26)
 passBtn.Name = "TrialPass"
 passBtn.AnchorPoint = Vector2.new(0.5, 1)
-passBtn.Position = UDim2.new(0.5, 0, 1, -62)
-passBtn.Size = UDim2.fromOffset(320, 58)
-local noBtn = Style.button(card, "KEEP DRIVING", "dark", 16)
+passBtn.Position = UDim2.new(0.5, 0, 1, -64)
+passBtn.Size = UDim2.new(1, -48, 0, 60)
+local noBtn = Style.quiet(card, "KEEP DRIVING", 17)
 noBtn.Name = "TrialNo"
 noBtn.AnchorPoint = Vector2.new(0.5, 1)
 noBtn.Position = UDim2.new(0.5, 0, 1, -14)

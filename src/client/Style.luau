@@ -1029,6 +1029,54 @@ function Style.checker(parent: Instance, cell: number?): Frame
 	return strip
 end
 
+-- a checkered strip along the top of a card, just inside its outline, with a black rule under it: the top of
+-- reward pop-ups (the hazard band's partner)
+function Style.checkerTop(parent: Instance, height: number): Frame
+	local strip = Style.checker(parent, height / 2)
+	strip.Name = "CheckerTop"
+	strip.Position = UDim2.fromOffset(INK_W, INK_W)
+	strip.Size = UDim2.new(1, -INK_W * 2, 0, height)
+	local rule = Instance.new("Frame")
+	rule.Name = "Rule"
+	rule.BackgroundColor3 = INK
+	rule.BorderSizePixel = 0
+	rule.Position = UDim2.fromOffset(INK_W, INK_W + height)
+	rule.Size = UDim2.new(1, -INK_W * 2, 0, 3)
+	rule.Parent = parent
+	return strip
+end
+
+-- a pop-up's big icon, centred on the card's top edge and poking out over it (upright, full colour)
+function Style.topIcon(card: GuiObject, id: number, size: number): ImageLabel
+	local icon = Style.image(card, id)
+	icon.Name = "TopIcon"
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0)
+	icon.Size = UDim2.fromOffset(size, size)
+	icon.ZIndex = card.ZIndex + 5
+	return icon
+end
+
+-- a quiet "no thanks": grey words with no plate, so the one real choice stands out
+function Style.quiet(parent: Instance, text: string, size: number?): TextButton
+	local b = Instance.new("TextButton")
+	b.Name = "Quiet"
+	b.AutoButtonColor = false
+	b.BackgroundTransparency = 1
+	b.Text = text
+	b.TextSize = size or 16
+	b.FontFace = F.display
+	b.TextColor3 = C.dim
+	b.Parent = parent
+	b.MouseEnter:Connect(function()
+		b.TextColor3 = WHITE
+	end)
+	b.MouseLeave:Connect(function()
+		b.TextColor3 = C.dim
+	end)
+	return b
+end
+
 -- one of the icon images (Config/Icons), fitted into its box; color tints it (white = as drawn)
 function Style.image(parent: Instance, id: number, color: Color3?): ImageLabel
 	local img = Instance.new("ImageLabel")

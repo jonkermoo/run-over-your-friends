@@ -314,12 +314,12 @@ card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
 local cardScale = Instance.new("UIScale")
 cardScale.Parent = card
-Style.hazard(card, W, 14)
+Style.checkerTop(card, 22)
 
-local cardTitle = Style.label(card, "DAILY CHEST", 40, F.display, C.yellow)
-cardTitle.Position = UDim2.fromOffset(0, 24)
-cardTitle.Size = UDim2.new(1, 0, 0, 44)
-Style.outline(cardTitle, 2)
+local cardTitle = Style.label(card, "DAILY CHEST", 38, F.display, C.yellow)
+cardTitle.Position = UDim2.fromOffset(0, 34)
+cardTitle.Size = UDim2.new(1, 0, 0, 42)
+Style.outline(cardTitle, 3)
 
 -- the chest, drawn: a box with bands and a lid that flies off
 local chest = Instance.new("Frame")
@@ -343,6 +343,7 @@ local function block(
 	f.Position = UDim2.fromOffset(x, y)
 	f.Size = UDim2.fromOffset(w, h)
 	f.Parent = parent
+	Style.corner(f, 4)
 	Style.stroke(f, C.ink, 3, 0)
 	return f
 end
@@ -374,7 +375,7 @@ prize.Visible = false
 prize.Parent = card
 local prizeScale = Instance.new("UIScale")
 prizeScale.Parent = prize
-local cashIcon = Style.image(prize, Icons.Bill)
+local cashIcon = Style.image(prize, Icons.RoadCash)
 cashIcon.AnchorPoint = Vector2.new(0.5, 0)
 cashIcon.Position = UDim2.new(0.5, 0, 0, 6)
 cashIcon.Size = UDim2.fromOffset(96, 96)
@@ -385,6 +386,7 @@ swatch.Position = UDim2.new(0.5, 0, 0, 14)
 swatch.Size = UDim2.fromOffset(120, 80)
 swatch.BorderSizePixel = 0
 swatch.Parent = prize
+Style.corner(swatch, 6)
 local swatchEdge = Style.stroke(swatch, C.ink, 4, 0)
 local prizeBig = Style.label(prize, "", 40, F.display, C.money)
 prizeBig.AutoLocalize = false
@@ -396,7 +398,7 @@ prizeSmall.Position = UDim2.fromOffset(20, 154)
 prizeSmall.Size = UDim2.new(1, -40, 0, 40)
 prizeSmall.TextWrapped = true
 
-local nice = Style.button(card, "NICE!", "gold", 28)
+local nice = Style.button(card, "NICE!", "green", 28)
 nice.Name = "Nice"
 nice.AnchorPoint = Vector2.new(0.5, 1)
 nice.Position = UDim2.new(0.5, 0, 1, -20)
@@ -516,7 +518,7 @@ end
 
 ---------------- the join card and the GOALS tab mark
 
-local NUDGE_W, NUDGE_H = 440, 210
+local NUDGE_W, NUDGE_H = 440, 240
 local ngui = Instance.new("ScreenGui")
 ngui.Name = "ChallengeNudge"
 ngui.ResetOnSpawn = false
@@ -528,21 +530,21 @@ nudge.Name = "NudgeCard"
 Style.slot(nudge)
 nudge.Size = UDim2.fromOffset(NUDGE_W, NUDGE_H)
 nudge.Visible = false
-Style.hazard(nudge, NUDGE_W, 12)
-local nTitle = Style.label(nudge, "DAILY CHALLENGES", 34, F.display, C.yellow)
-nTitle.Position = UDim2.fromOffset(0, 26)
+Style.topIcon(nudge, Icons.RoadTarget, 104)
+local nTitle = Style.label(nudge, "DAILY CHALLENGES", 34, F.display, C.text)
+nTitle.Position = UDim2.fromOffset(0, 60)
 nTitle.Size = UDim2.new(1, 0, 0, 40)
-Style.outline(nTitle, 2)
+Style.outline(nTitle, 3)
 local nSub = Style.label(nudge, "", 17, F.bold, C.text)
-nSub.Position = UDim2.fromOffset(20, 72)
+nSub.Position = UDim2.fromOffset(20, 102)
 nSub.Size = UDim2.new(1, -40, 0, 48)
 nSub.TextWrapped = true
-local nGo = Style.button(nudge, "GOALS", "gold", 24)
+local nGo = Style.button(nudge, "GOALS", "red", 24)
 nGo.Name = "NudgeGoals"
 nGo.AnchorPoint = Vector2.new(1, 1)
 nGo.Position = UDim2.new(0.5, -8, 1, -20)
 nGo.Size = UDim2.fromOffset(170, 50)
-local nLater = Style.button(nudge, "LATER", "dark", 22)
+local nLater = Style.button(nudge, "LATER", "white", 22)
 Style.closeX(nudge, function()
 	Popups.snooze("Challenges")
 end)

@@ -26,7 +26,7 @@ local money = Style.money
 
 local Streak = {}
 
-local W, H = 620, 360
+local W, H = 620, 380
 local TILE_W, TILE_H, TILE_GAP = 72, 104, 8
 local TODAY_H = 124 -- today's tile stands taller
 local PRIZE_W = 88 -- the last tile, the week's big prize, is wider
@@ -46,21 +46,23 @@ card.Size = UDim2.fromOffset(W, H)
 card.Visible = false
 local scale = Instance.new("UIScale")
 scale.Parent = card
-Style.hazard(card, W, 14)
+Style.checkerTop(card, 22)
+Style.topIcon(card, Icons.RoadStar, 110)
 
-local title = Style.label(card, "DAILY STREAK", 44, F.display, C.yellow)
-title.Position = UDim2.fromOffset(0, 26)
-title.Size = UDim2.new(1, 0, 0, 46)
-Style.outline(title, 2)
-local sub = Style.label(card, "", 16, F.bold, C.text)
-sub.Position = UDim2.fromOffset(20, 76)
+local title = Style.label(card, "DAILY STREAK", 38, F.display, C.yellow)
+title.Position = UDim2.fromOffset(0, 58)
+title.Size = UDim2.new(1, 0, 0, 40)
+Style.outline(title, 3)
+local sub = Style.label(card, "", 17, F.bold, C.text)
+sub.Position = UDim2.fromOffset(20, 100)
 sub.Size = UDim2.new(1, -40, 0, 22)
 
--- the week: a row of mile markers (small green signs on posts), today's yellow and raised
+-- the week: a row of day tiles (done green with a check, today yellow and raised, the rest asphalt, the
+-- week's prize white with a chest)
 local row = Instance.new("Frame")
 row.BackgroundTransparency = 1
 row.AnchorPoint = Vector2.new(0.5, 0)
-row.Position = UDim2.new(0.5, 0, 0, 110)
+row.Position = UDim2.new(0.5, 0, 0, 126)
 row.Size = UDim2.fromOffset((TILES - 1) * (TILE_W + TILE_GAP) + PRIZE_W, TODAY_H + 10)
 row.Parent = card
 
@@ -80,19 +82,11 @@ for i = 1, TILES do
 	f.Position = UDim2.new(0, (i - 1) * (TILE_W + TILE_GAP), 1, -10)
 	f.Size = UDim2.fromOffset(if prize then PRIZE_W else TILE_W, TILE_H)
 	f.Parent = row
-	local post = Instance.new("Frame")
-	post.Name = "Post"
-	post.BackgroundColor3 = C.steel
-	post.BorderSizePixel = 0
-	post.AnchorPoint = Vector2.new(0.5, 0)
-	post.Position = UDim2.new(0.5, 0, 1, 2)
-	post.Size = UDim2.fromOffset(7, 10)
-	post.Parent = f
-	Style.sign(f, "green", true)
+	Style.sign(f, "card", true)
 	local day = Style.label(f, "", 14, F.heavy, C.dim)
 	day.Position = UDim2.fromOffset(0, 6)
 	day.Size = UDim2.new(1, 0, 0, 18)
-	local icon = Style.image(f, Icons.Bill)
+	local icon = Style.image(f, Icons.RoadCash)
 	icon.AnchorPoint = Vector2.new(0.5, 0)
 	icon.Position = UDim2.new(0.5, 0, 0, 26)
 	icon.Size = UDim2.fromOffset(42, 42)
@@ -100,13 +94,9 @@ for i = 1, TILES do
 	pay.AnchorPoint = Vector2.new(0, 1)
 	pay.Position = UDim2.new(0, 0, 1, -8)
 	pay.Size = UDim2.new(1, 0, 0, 22)
-	-- collected days get a rubber stamp over the picture
-	local stamp = Style.label(f, "GOT", 16, F.display, C.money)
-	stamp.AnchorPoint = Vector2.new(0.5, 0.5)
-	stamp.Position = UDim2.new(0.5, 0, 0, 48)
-	stamp.Size = UDim2.fromOffset(50, 26)
-	stamp.ZIndex = 2
-	Style.stroke(stamp, C.money, 3, 0)
+	-- collected days show a check instead of their money (the stamp is kept hidden for older code)
+	local stamp = Style.label(f, "", 1, F.display, C.text)
+	stamp.Visible = false
 	table.insert(tiles, {
 		frame = f,
 		day = day,
@@ -155,25 +145,25 @@ local function draw()
 		t.day.Text = if now then Loc.source("TODAY") else Loc.text("StreakDay", { n = d })
 		t.pay.Text = short(pay)
 		t.pay.TextSize = if now then 22 else 17
-		-- small pay is a coin, bigger is a banknote
-		t.icon.Image = `rbxassetid://{if pay < Config.CoinBelow then Icons.Coin else Icons.Bill}`
+		-- done days show a check; the prize a chest; small pay is a coin, bigger is cash
+		local id = if got
+			then Icons.RoadCheck
+			elseif t.prize then Icons.RoadChest
+			elseif pay < Config.CoinBelow then Icons.RoadCoin
+			else Icons.RoadCash
+		t.icon.Image = `rbxassetid://{id}`
 		local big = now or t.prize
 		local iconSize = if big then 54 else 42
 		t.icon.Size = UDim2.fromOffset(iconSize, iconSize)
-		t.icon.ImageTransparency = if got then 0.6 else 0
-		t.stamp.Visible = got
 		t.frame.Size =
 			UDim2.fromOffset(if t.prize then PRIZE_W else TILE_W, if big then TODAY_H else TILE_H)
-		-- today's marker is yellow with a black line; the week prize carries a yellow ring
-		Style.sign(t.frame, if now then "yellow" else "green", true)
-		Style.ring(t.frame, if t.prize and not now then C.yellow else nil)
-		local ink = if now then C.ink elseif got then C.dim elseif t.prize then C.yellow else C.text
-		t.frame.BackgroundColor3 = if now
-			then C.yellow
-			elseif t.prize then C.prize
-			else Color3.fromRGB(11, 125, 75)
-		t.frame.BackgroundTransparency = if got then 0.4 else 0
-		t.day.TextColor3 = if now or t.prize then ink else C.dim
+		Style.sign(
+			t.frame,
+			if now then "yellow" elseif got then "green" elseif t.prize then "white" else "card",
+			true
+		)
+		local ink = if now or (t.prize and not got) then C.ink else C.text
+		t.day.TextColor3 = if now or got or t.prize then ink else C.dim
 		t.pay.TextColor3 = ink
 	end
 end

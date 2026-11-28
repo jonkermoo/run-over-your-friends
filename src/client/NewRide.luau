@@ -39,31 +39,37 @@ local function turntable(stats: Vehicles.Vehicle)
 	end
 	local card = Style.panel(gui)
 	Style.slot(card)
-	card.Size = UDim2.fromOffset(420, 270)
+	card.Size = UDim2.fromOffset(420, 320)
+	Style.hazard(card, 420, 20)
+	local head = Style.label(card, "NEW RIDE!", 32, F.display, C.yellow)
+	head.Position = UDim2.fromOffset(0, 32)
+	head.Size = UDim2.new(1, 0, 0, 36)
+	Style.outline(head, 3)
 	local vf = Instance.new("ViewportFrame")
-	vf.Position = UDim2.fromOffset(8, 8)
-	vf.Size = UDim2.new(1, -16, 0, 210)
-	vf.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+	vf.Position = UDim2.fromOffset(14, 74)
+	vf.Size = UDim2.new(1, -28, 0, 186)
+	vf.BackgroundColor3 = C.card
 	vf.Ambient = Color3.fromRGB(150, 150, 170)
 	vf.LightColor = Color3.fromRGB(255, 236, 200)
 	vf.LightDirection = Vector3.new(-1, -1.5, -0.6)
 	vf.ClipsDescendants = true -- the light sweep stays inside the picture
 	vf.Parent = card
-	local name = Style.label(card, string.upper(stats.name), 30, F.display, C.yellow)
-	name.Position = UDim2.fromOffset(0, 222)
+	Style.corner(vf, 6)
+	local name = Style.label(card, string.upper(stats.name), 30, F.display, C.text)
+	name.Position = UDim2.fromOffset(0, 266)
 	name.Size = UDim2.new(1, 0, 0, 36)
-	Style.outline(name, 2)
+	Style.outline(name, 3)
 	-- first day: what coming back tomorrow pays (DailyService publishes it once today's reward is in)
 	local tomorrowPay = player:GetAttribute("TomorrowPays")
 	if typeof(tomorrowPay) == "number" then
-		card.Size = UDim2.fromOffset(420, 296)
+		card.Size = UDim2.fromOffset(420, 344)
 		local line = Style.label(card, "", 15, F.heavy, C.money)
 		Loc.set(
 			line,
 			"TomorrowPays",
 			{ n = player:GetAttribute("TomorrowDay") or 2, pay = Style.money(tomorrowPay) }
 		)
-		line.Position = UDim2.fromOffset(0, 262)
+		line.Position = UDim2.fromOffset(0, 306)
 		line.Size = UDim2.new(1, 0, 0, 20)
 	end
 	-- a light sweep across the picture

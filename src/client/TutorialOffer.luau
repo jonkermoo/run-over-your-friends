@@ -22,7 +22,7 @@ local TutorialOffer = {}
 local C, F = Style.colors, Style.fonts
 local player = Players.LocalPlayer
 
-local CARD_W, CARD_H = 560, 440
+local CARD_W, CARD_H = 500, 380
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "TutorialOffer"
@@ -51,74 +51,57 @@ card.Name = "OfferCard"
 Style.slot(card)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.ZIndex = 2
-Style.hazard(card, CARD_W, 14)
+Style.hazard(card, CARD_W, 20)
 local scale = Instance.new("UIScale")
 scale.Parent = card
+Style.topIcon(card, Icons.RoadCone, 116)
 
-local tag = Style.pill(card, "NEW HERE?", C.pink)
-tag.TextColor3 = C.text
-tag.TextSize = 15
-tag.Size = UDim2.fromOffset(0, 24)
-tag.AnchorPoint = Vector2.new(0.5, 0)
-tag.Position = UDim2.new(0.5, 0, 0, 30)
-
-local title = Style.label(card, "LEARN TO WRECK THE CITY", 46, F.display, C.yellow)
-title.Position = UDim2.fromOffset(20, 62)
-title.Size = UDim2.new(1, -40, 0, 54)
+local title = Style.label(card, "LEARN TO WRECK THE CITY", 38, F.display, C.text)
+title.Position = UDim2.fromOffset(20, 72)
+title.Size = UDim2.new(1, -40, 0, 42)
 title.TextScaled = true
 Style.outline(title, 3)
 local titleFit = Instance.new("UITextSizeConstraint")
-titleFit.MaxTextSize = 46
+titleFit.MaxTextSize = 38
 titleFit.Parent = title
 
-local sub = Style.label(card, "Hit people, smash buildings, tune your car", 17, F.heavy, C.dim)
-sub.Position = UDim2.fromOffset(20, 122)
-sub.Size = UDim2.new(1, -40, 0, 22)
+local sub = Style.label(card, "Hit people, smash buildings, tune your car", 18, F.bold, C.text)
+sub.Position = UDim2.fromOffset(30, 118)
+sub.Size = UDim2.new(1, -60, 0, 24)
 sub.TextScaled = true
 local subFit = Instance.new("UITextSizeConstraint")
-subFit.MaxTextSize = 17
+subFit.MaxTextSize = 18
 subFit.Parent = sub
 
--- the reward: the money pictures on the left, what you get on the right
-local reward = Style.card(card)
+-- the reward: a yellow plate, a coin and what finishing pays
+local reward = Instance.new("Frame")
 reward.Name = "Reward"
-reward.Position = UDim2.fromOffset(40, 158)
-reward.Size = UDim2.new(1, -80, 0, 100)
-local edge = Instance.new("Frame")
-edge.BackgroundColor3 = C.money
-edge.BorderSizePixel = 0
-edge.Size = UDim2.new(0, 6, 1, 0)
-edge.Parent = reward
-local bill = Style.image(reward, Icons.Bill)
-bill.AnchorPoint = Vector2.new(0.5, 0.5)
-bill.Position = UDim2.fromOffset(70, 46)
-bill.Size = UDim2.fromOffset(78, 78)
-local coin = Style.image(reward, Icons.Coin)
+reward.AnchorPoint = Vector2.new(0.5, 0)
+reward.Position = UDim2.new(0.5, 0, 0, 158)
+reward.Size = UDim2.fromOffset(320, 50)
+reward.Parent = card
+Style.sign(reward, "yellow", true)
+local coin = Style.image(reward, Icons.RoadCoin)
 coin.AnchorPoint = Vector2.new(0.5, 0.5)
-coin.Position = UDim2.fromOffset(104, 64)
-coin.Size = UDim2.fromOffset(46, 46)
-local finish = Style.label(reward, "FINISH IT AND GET", 16, F.heavy, C.yellow)
-finish.Position = UDim2.fromOffset(150, 14)
-finish.Size = UDim2.new(1, -164, 0, 20)
-finish.TextXAlignment = Enum.TextXAlignment.Left
-local amount = Style.label(reward, "", 52, F.display, C.money)
+coin.Position = UDim2.new(0, 30, 0.5, -1)
+coin.Size = UDim2.fromOffset(40, 40)
+local amount = Style.label(reward, "", 22, F.display, C.ink)
 amount.AutoLocalize = false
-amount.Text = "+" .. Style.money(Onboarding.FinishBonus)
-amount.Position = UDim2.fromOffset(150, 36)
-amount.Size = UDim2.new(1, -164, 0, 56)
+amount.Text = "FINISH IT: +" .. Style.money(Onboarding.FinishBonus)
+amount.Position = UDim2.fromOffset(56, 0)
+amount.Size = UDim2.new(1, -66, 1, -2)
 amount.TextXAlignment = Enum.TextXAlignment.Left
-Style.outline(amount, 3)
 
-local start = Style.button(card, "START TUTORIAL", "green", 38)
+local start = Style.button(card, "START TUTORIAL", "green", 32)
 start.Name = "StartTutorial"
 start.AnchorPoint = Vector2.new(0.5, 0)
-start.Position = UDim2.new(0.5, 0, 0, 280)
-start.Size = UDim2.fromOffset(440, 84)
+start.Position = UDim2.new(0.5, 0, 0, 230)
+start.Size = UDim2.new(1, -48, 0, 68)
 start.ZIndex = 3
-local no = Style.button(card, "NO THANKS", "dark", 16)
+local no = Style.quiet(card, "NO THANKS", 17)
 no.Name = "NoThanks"
 no.AnchorPoint = Vector2.new(0.5, 1)
-no.Position = UDim2.new(0.5, 0, 1, -16)
+no.Position = UDim2.new(0.5, 0, 1, -18)
 no.Size = UDim2.fromOffset(160, 36)
 no.ZIndex = 3
 

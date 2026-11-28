@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Callouts = require(ReplicatedStorage.Shared.Config.Callouts)
 local Net = require(ReplicatedStorage.Shared.Net)
+local Icons = require(ReplicatedStorage.Shared.Config.Icons)
 local Loc = require(ReplicatedStorage.Shared.Loc)
 local Sfx = require(script.Parent.Sfx)
 local Style = require(script.Parent.Style)
@@ -61,15 +62,16 @@ local function show(r: Result)
 	local card = Style.panel(gui)
 	card.AnchorPoint = Vector2.new(0.5, 0.5)
 	card.Position = UDim2.fromScale(0.5, 0.45)
-	card.Size = UDim2.fromOffset(COLUMN * 3 + 40, 340)
-	Style.stroke(card, C.yellow, 3, 0)
+	card.Size = UDim2.fromOffset(COLUMN * 3 + 40, 400)
+	Style.checkerTop(card, 22)
+	Style.topIcon(card, Icons.RoadTrophy, 100)
 	local title = Style.label(card, "", 28, F.display, C.yellow)
 	Loc.set(title, "PodiumTitle", { event = Loc.src(r.title) })
-	title.Position = UDim2.fromOffset(0, 10)
+	title.Position = UDim2.fromOffset(0, 50)
 	title.Size = UDim2.new(1, 0, 0, 34)
-	Style.outline(title, 2)
+	Style.outline(title, 3)
 
-	local floor = 286 -- where the steps stand
+	local floor = 346 -- where the steps stand
 	for _, slot in SLOTS do
 		local e = r.top[slot.place]
 		local left = 20 + slot.x * COLUMN
@@ -79,6 +81,8 @@ local function show(r: Result)
 		step.Position = UDim2.fromOffset(left + 8, floor - slot.height)
 		step.Size = UDim2.fromOffset(COLUMN - 16, slot.height)
 		step.Parent = card
+		Style.corner(step, 6)
+		Style.stroke(step, C.ink, 4, 0)
 		local num = Style.label(step, "", 26, F.display, C.ink)
 		num.AutoLocalize = false
 		num.Text = Loc.resolve(Loc.ordinal(slot.place))
@@ -92,7 +96,8 @@ local function show(r: Result)
 			head.Position = UDim2.fromOffset(left + (COLUMN - HEAD) / 2, top - HEAD - 50)
 			head.Size = UDim2.fromOffset(HEAD, HEAD)
 			head.Parent = card
-			Style.stroke(head, slot.color, 3, 0)
+			Style.corner(head, 6)
+			Style.stroke(head, C.ink, 4, 0)
 			task.spawn(function()
 				head.Image = headshot(e.id)
 			end)

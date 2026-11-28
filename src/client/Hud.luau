@@ -1943,20 +1943,21 @@ Style.slot(offer)
 offer.Size = UDim2.fromOffset(OFFER_W, OFFER_H)
 offer.ZIndex = 10
 offer.Visible = false
-Style.hazard(offer, OFFER_W, 14)
-local offerTitle = Style.label(offer, "", 40, F.display, C.yellow)
-offerTitle.Position = UDim2.fromOffset(0, 26)
-offerTitle.Size = UDim2.new(1, 0, 0, 44)
-Style.outline(offerTitle, 2)
+Style.hazard(offer, OFFER_W, 20)
+local offerTitle = Style.label(offer, "", 38, F.display, C.text)
+offerTitle.Position = UDim2.fromOffset(0, 32)
+offerTitle.Size = UDim2.new(1, 0, 0, 42)
+Style.outline(offerTitle, 3)
 -- the car you're saving for, and how far along you are
 local offerPic = Instance.new("Frame")
 offerPic.Name = "Picture"
-offerPic.BackgroundColor3 = Color3.fromRGB(46, 46, 54)
+offerPic.BackgroundColor3 = C.card
 offerPic.BorderSizePixel = 0
 offerPic.ClipsDescendants = true
 offerPic.Position = UDim2.fromOffset(24, 84)
 offerPic.Size = UDim2.fromOffset(120, 70)
 offerPic.Parent = offer
+Style.corner(offerPic, 6)
 local offerCar = Style.label(offer, "", 20, F.display, C.text)
 offerCar.Position = UDim2.fromOffset(158, 84)
 offerCar.Size = UDim2.new(1, -182, 0, 24)
@@ -1978,9 +1979,10 @@ do
 	local edge = Instance.new("Frame")
 	edge.BackgroundColor3 = C.money
 	edge.BorderSizePixel = 0
-	edge.Size = UDim2.new(0, 8, 1, 0)
+	edge.Position = UDim2.fromOffset(4, 4)
+	edge.Size = UDim2.new(0, 8, 1, -8)
 	edge.Parent = offerPack
-	local packBill = Style.image(offerPack, Icons.Bill)
+	local packBill = Style.image(offerPack, Icons.RoadCash)
 	packBill.AnchorPoint = Vector2.new(0, 0.5)
 	packBill.Position = UDim2.new(0, 20, 0.5, 0)
 	packBill.Size = UDim2.fromOffset(58, 58)
@@ -1999,12 +2001,12 @@ local offerText = Style.label(offerPack, "", 14, F.bold, C.dim)
 offerText.Position = UDim2.fromOffset(90, 42)
 offerText.Size = UDim2.new(1, -102, 0, 20)
 offerText.TextXAlignment = Enum.TextXAlignment.Left
-local offerBuy = Style.button(offer, "", "gold", 26)
+local offerBuy = Style.button(offer, "", "green", 26)
 offerBuy.Name = "UpsellBuy"
 offerBuy.AnchorPoint = Vector2.new(0.5, 1)
 offerBuy.Position = UDim2.new(0.5, 0, 1, -62)
 offerBuy.Size = UDim2.fromOffset(320, 58)
-local offerNo = Style.button(offer, "KEEP DRIVING", "dark", 16)
+local offerNo = Style.quiet(offer, "KEEP DRIVING", 17)
 offerNo.Name = "UpsellNo"
 offerNo.AnchorPoint = Vector2.new(0.5, 1)
 offerNo.Position = UDim2.new(0.5, 0, 1, -14)
