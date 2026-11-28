@@ -1,7 +1,8 @@
 --!strict
 -- The new events' things on this screen (server/EventProps): the Money Truck and the Boss Truck are drawn here
--- from the route in workspace attributes (Rules/Route), with a health bar over them, the boss's slam ring, and
--- a crash report when this player's car runs into one at speed (Net HitEventProp; the car bounces off). The
+-- where the server says they are (the EventPose attribute, drawn Truck.Delay behind and eased between poses),
+-- with a health bar over them, thrown as a real body when a hit knocks them, and a crash report when this
+-- player's car runs into one at speed (Net HitEventProp; the car bounces off). The
 -- Cash Drop's crate is a real part on the street; here it's lifted while it falls. target() tells the finder
 -- (client/GiantFinder) what to point at. Numbers: Config/Events.
 
@@ -14,7 +15,7 @@ local Game = require(ReplicatedStorage.Shared.Config.Game)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
-local Route = require(ReplicatedStorage.Shared.Rules.Route)
+local EventRules = require(ReplicatedStorage.Shared.Rules.Events)
 local VehicleParts = require(ReplicatedStorage.Shared.VehicleParts)
 local Drive = require(script.Parent.Drive)
 local Style = require(script.Parent.Style)
@@ -44,12 +45,15 @@ local folder = Instance.new("Folder")
 folder.Name = "EventVehicles"
 local pool: { [string]: Copy } = {}
 local copy: Copy? = nil -- the one on the road now
-local routeText = ""
-local path: Route.Path? = nil
-local y, groundAt, spin = 0, 0, 0
+local samples: { { t: number, x: number, z: number, yaw: number } } = {} -- the server's latest poses
+local y: number? = nil -- the ground under it
+local groundAt, spin = 0, 0
 local brokenAt: number? = nil -- the server time it was cracked or beaten, once this screen has thrown it
+local knockAt: number? = nil -- the last knock this screen has seen
+local flying: { at: number, untilAt: number }? = nil -- thrown: physics has it until untilAt (server time)
+local settling: { from: CFrame, at: number }? = nil -- easing back to its pose after a throw
+local SETTLE = 0.6 -- seconds
 local hitAt = 0
-local ring: BasePart? = nil
 
 local groundParams = RaycastParams.new()
 groundParams.FilterType = Enum.RaycastFilterType.Include
@@ -147,12 +151,13 @@ local function build(which: string): Copy?
 			end
 		end
 	end
-	-- the health bar: the name over a bar with what's left
+	-- the health bar: the name over a bar with what's left, as wide as the name needs
 	local H = Config.HpBar
 	local color = if which == "BossTruck" then C.red else C.gold
 	local bar = c.bar
 	bar.Name = "HpBar"
-	bar.Size = UDim2.fromOffset(H.Width, H.Height + H.Text + 4)
+	local tall = H.Height + H.Text + 4
+	bar.Size = UDim2.fromOffset(H.MinWidth, tall)
 	bar.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + H.Above, 0)
 	bar.LightInfluence = 0
 	bar.AlwaysOnTop = false -- buildings in front hide it, like the finder's column
@@ -166,63 +171,18 @@ local function build(which: string): Copy?
 	back.Size = UDim2.new(1, 0, 0, H.Height)
 	fill.Size = UDim2.fromScale(1, 1)
 	c.fill = fill
-	local count = Style.label(back, "", H.Height - 6, F.heavy, C.text)
+	local count = Style.label(back, "", H.Count, F.heavy, C.text)
 	count.Size = UDim2.fromScale(1, 1)
 	count.ZIndex = 2
-	Style.outline(count, 2)
+	Style.outline(count, 1)
 	c.count = count
+	name:GetPropertyChangedSignal("TextBounds"):Connect(function()
+		bar.Size =
+			UDim2.fromOffset(math.max(H.MinWidth, math.ceil(name.TextBounds.X) + H.Pad), tall)
+	end)
 	bar.Parent = body
 	model.Parent = folder
 	return c
-end
-
-local function reset(c: Copy)
-	c.body.Anchored = true
-	c.body.AssemblyLinearVelocity = Vector3.zero
-	c.body.AssemblyAngularVelocity = Vector3.zero
-	for _, e in c.parts do
-		e.part.Transparency = e.transparency
-		e.part.CanCollide = false
-	end
-	c.bar.Enabled = true
-	c.body.CFrame = CFrame.new(0, -500, 0)
-end
-
--- the cracked or beaten truck tumbles over and fades on this screen
-local function wreck(c: Copy)
-	c.bar.Enabled = false
-	c.body.Anchored = false
-	c.body.CanCollide = true
-	c.body.AssemblyLinearVelocity = Vector3.new(0, 60, 0) + c.body.CFrame.LookVector * 20
-	c.body.AssemblyAngularVelocity = Vector3.new(math.random() * 4 - 2, 0, math.random() * 4 - 2)
-	task.delay(4, function()
-		if copy ~= c then
-			return
-		end
-		for _, e in c.parts do
-			TweenService:Create(e.part, TweenInfo.new(1.5), { Transparency = 1 }):Play()
-		end
-	end)
-end
-
-local function slamRing(): BasePart
-	local r = ring
-	if r then
-		return r
-	end
-	local part = Instance.new("Part")
-	part.Name = "SlamRing"
-	part.Shape = Enum.PartType.Cylinder
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.Material = Enum.Material.Neon
-	part.Color = C.red
-	part.Transparency = 1
-	part.Parent = folder
-	ring = part
-	return part
 end
 
 -- this player's car ran into the truck: report it and bounce off
@@ -277,28 +237,115 @@ local function checkHit(c: Copy, x: number, z: number, hx: number, hz: number, s
 		+ Vector3.new(0, Config.BounceUp, 0)
 end
 
+local function reset(c: Copy)
+	c.body.Anchored = true
+	c.body.AssemblyLinearVelocity = Vector3.zero
+	c.body.AssemblyAngularVelocity = Vector3.zero
+	for _, e in c.parts do
+		e.part.Transparency = e.transparency
+		e.part.CanCollide = false
+	end
+	c.bar.Enabled = true
+	c.body.CFrame = CFrame.new(0, -500, 0)
+end
+
+-- the cracked or beaten truck tumbles over and fades on this screen
+local function wreck(c: Copy)
+	c.bar.Enabled = false
+	c.body.Anchored = false
+	c.body.CanCollide = true
+	c.body.AssemblyLinearVelocity = Vector3.new(0, 60, 0) + c.body.CFrame.LookVector * 20
+	c.body.AssemblyAngularVelocity = Vector3.new(math.random() * 4 - 2, 0, math.random() * 4 - 2)
+	task.delay(4, function()
+		if copy ~= c then
+			return
+		end
+		for _, e in c.parts do
+			TweenService:Create(e.part, TweenInfo.new(1.5), { Transparency = 1 }):Play()
+		end
+	end)
+end
+
+-- where the server says the truck is, Truck.Delay seconds back (between the two poses either side of then):
+-- x, z, unit heading hx, hz, speed studs/s. nil before the first pose.
+local function poseAt(rt: number): (number?, number, number, number, number)
+	local n = #samples
+	if n == 0 then
+		return nil, 0, 0, 0, 0
+	end
+	local a, b = samples[1], samples[1]
+	for i = 2, n do
+		b = samples[i]
+		if b.t >= rt then
+			a = samples[i - 1]
+			break
+		end
+		a = b
+	end
+	local dt = b.t - a.t
+	local k = if dt > 1e-3 then math.clamp((rt - a.t) / dt, 0, 1.5) else 1
+	local turn = (b.yaw - a.yaw + math.pi) % (math.pi * 2) - math.pi
+	local yaw = a.yaw + turn * math.min(k, 1)
+	local speed = if dt > 1e-3 then math.sqrt((b.x - a.x) ^ 2 + (b.z - a.z) ^ 2) / dt else 0
+	return a.x + (b.x - a.x) * k, a.z + (b.z - a.z) * k, -math.sin(yaw), -math.cos(yaw), speed
+end
+
+-- a new pose from the server (EventPose: x, seconds since it set off, z, turned to its heading)
+local function takePose(cf: CFrame)
+	local t = cf.Position.Y
+	local last = samples[#samples]
+	if last and t <= last.t then
+		if t < last.t - 1 then
+			table.clear(samples) -- a new truck
+		else
+			return
+		end
+	end
+	local look = cf.LookVector
+	table.insert(
+		samples,
+		{ t = t, x = cf.Position.X, z = cf.Position.Z, yaw = math.atan2(-look.X, -look.Z) }
+	)
+	if #samples > 20 then
+		table.remove(samples, 1)
+	end
+end
+
+-- a hit throws this screen's copy as a real body: off it flies and tumbles, and once the server has it stopped
+-- it eases back to where the server says it is
+local function throw(c: Copy, kv: Vector3, kat: number, which: string)
+	local K = cfgOf(which).Knock
+	local g = workspace.Gravity
+	local air = EventRules.airTime(kv.Y, g)
+	local flat = kv * Vector3.new(1, 0, 1)
+	local skid = flat.Magnitude / Config.Truck.SkidDecel
+	local axis = if flat.Magnitude > 0.1
+		then Vector3.new(0, 1, 0):Cross(flat.Unit)
+		else Vector3.new(1, 0, 0)
+	local turns = math.max(K.Flips, 0)
+	local rate = if air > 0 and turns > 0 then math.pi * 2 * turns / air else 0.8
+	c.body.Anchored = false
+	c.body.CanCollide = true
+	c.body.AssemblyLinearVelocity = kv
+	c.body.AssemblyAngularVelocity = axis * rate + Vector3.new(0, (math.random() - 0.5) * 1.5, 0)
+	flying = { at = kat, untilAt = kat + air + skid + 0.3 }
+end
+
 local function stepTruck(dt: number)
 	local which = workspace:GetAttribute("EventProp")
-	local text = workspace:GetAttribute("EventRoute")
-	local at = workspace:GetAttribute("EventRouteAt")
-	if
-		(which ~= "MoneyTruck" and which ~= "BossTruck")
-		or typeof(text) ~= "string"
-		or typeof(at) ~= "number"
-	then
+	local epoch = workspace:GetAttribute("EventEpoch")
+	if (which ~= "MoneyTruck" and which ~= "BossTruck") or typeof(epoch) ~= "number" then
 		if copy then
 			reset(copy)
 			copy = nil
 		end
-		if ring then
-			ring.Transparency = 1
-		end
-		routeText, path, brokenAt = "", nil, nil
+		table.clear(samples)
+		brokenAt, flying, settling, knockAt = nil, nil, nil, nil
 		return
 	end
-	if text ~= routeText then
-		routeText = text
-		path = Route.build(Route.decode(text), Config.RouteLane, Config.RouteCorner)
+	local pose = workspace:GetAttribute("EventPose")
+	if typeof(pose) == "CFrame" then
+		takePose(pose)
 	end
 	if not copy or copy.which ~= which then
 		if copy then
@@ -311,13 +358,15 @@ local function stepTruck(dt: number)
 		pool[which] = c
 		reset(c)
 		copy = c
-		groundAt, brokenAt = 0, nil
+		groundAt, brokenAt, flying, settling, knockAt = 0, nil, nil, nil, nil
+		y = nil
 	end
 	local c = copy :: Copy
-	local p = path :: Route.Path
 	local now = workspace:GetServerTimeNow()
-	local speed = cfgOf(which).Speed
-	local x, z, hx, hz = Route.at(p, speed * (now - at))
+	local x, z, hx, hz, speed = poseAt(now - epoch - Config.Truck.Delay)
+	if not x then
+		return
+	end
 	-- health
 	local hp, hpMax = workspace:GetAttribute("EventHp"), workspace:GetAttribute("EventHpMax")
 	if typeof(hp) == "number" and typeof(hpMax) == "number" and hpMax > 0 then
@@ -330,68 +379,96 @@ local function stepTruck(dt: number)
 			brokenAt = broken
 			wreck(c)
 		end
-		if ring then
-			ring.Transparency = 1
-		end
 		return
 	end
-	if os.clock() >= groundAt then
+	-- a new knock: throw it
+	local kv, kat = workspace:GetAttribute("EventKnock"), workspace:GetAttribute("EventKnockAt")
+	if typeof(kv) == "Vector3" and typeof(kat) == "number" and kat ~= knockAt then
+		knockAt = kat
+		if now - kat < 1 then
+			throw(c, kv, kat, which)
+		end
+	end
+	if os.clock() >= groundAt or y == nil then
 		groundAt = os.clock() + 0.25
 		local map = workspace:FindFirstChild("Map")
 		if map then
 			groundParams.FilterDescendantsInstances = { map }
-			local hit =
-				workspace:Raycast(Vector3.new(x, 120, z), Vector3.new(0, -240, 0), groundParams)
-			y = if hit then hit.Position.Y else y
+			-- from just over the last ground, so a roof or floor above isn't taken for it
+			local from = if y then y + 8 else 200
+			local hit = workspace:Raycast(
+				Vector3.new(x, from, z),
+				Vector3.new(0, -(from + 60), 0),
+				groundParams
+			)
+			y = if hit then hit.Position.Y else (y or 0)
 		end
 	end
 	local yaw = math.atan2(-hx, -hz)
-	c.body.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0) * c.rel
+	local place = CFrame.new(x, y :: number, z) * CFrame.Angles(0, yaw, 0) * c.rel
+	local f = flying
+	if f then
+		if now < f.untilAt then
+			return -- physics has it
+		end
+		flying = nil
+		settling = { from = c.body.CFrame, at = os.clock() }
+		c.body.Anchored = true
+		c.body.CanCollide = false
+	end
+	local s = settling
+	if s then
+		local k = math.clamp((os.clock() - s.at) / SETTLE, 0, 1)
+		k = k * k * (3 - 2 * k)
+		c.body.CFrame = s.from:Lerp(place, k)
+		if k >= 1 then
+			settling = nil
+		end
+		return
+	end
+	c.body.CFrame = place
 	spin -= speed * dt / (1.6 * cfgOf(which).Scale)
 	for _, m in c.wheels do
 		m.Transform = CFrame.Angles(spin, 0, 0)
 	end
-	-- the boss's slam: a red ring grows on the ground before it lands
-	if which == "BossTruck" then
-		local r = slamRing()
-		local slamAt = workspace:GetAttribute("BossSlamAt")
-		local left = if typeof(slamAt) == "number" then slamAt - now else math.huge
-		local B = Config.BossTruck
-		if left <= B.SlamWarn and left > -0.15 then
-			local k = math.clamp(1 - left / B.SlamWarn, 0.05, 1)
-			local d = B.SlamRadius * 2 * k
-			r.Size = Vector3.new(0.4, d, d)
-			r.CFrame = CFrame.new(x, y + 0.3, z) * CFrame.Angles(0, 0, math.pi / 2)
-			r.Transparency = 0.35 + 0.4 * (1 - k)
-		else
-			r.Transparency = 1
-		end
-	end
 	checkHit(c, x, z, hx, hz, speed)
 end
 
--- the crate: lifted on this screen while it falls (the server keeps it where it lands)
-type Fall = { landAt: number, height: number, crate: CFrame, chute: CFrame }
+-- the airdrop: lifted on this screen while it falls (the server keeps it where it lands), swaying under its
+-- canopy about the crate's top
+type Fall = {
+	landAt: number,
+	height: number,
+	pivot: CFrame,
+	parts: { { part: BasePart, rel: CFrame } },
+}
 local fall: Fall? = nil
 
 local function stepCrate()
 	local props = workspace:FindFirstChild("EventProps")
-	local model = props and props:FindFirstChild("CashDrop")
-	local crate = model and model:FindFirstChild("Crate") :: BasePart?
-	local chute = model and model:FindFirstChild("Chute") :: BasePart?
+	local model = props and props:FindFirstChild("CashDrop") :: Model?
+	local crate = model and model.PrimaryPart
 	local landAt = model and model:GetAttribute("LandAt")
-	if not (model and crate and chute and typeof(landAt) == "number") then
+	if not (model and crate and typeof(landAt) == "number") then
 		fall = nil
 		return
 	end
 	local f = fall
 	if not f or f.landAt ~= landAt then
 		local h = model:GetAttribute("FallHeight")
+		-- sway about the middle of the crate's lid
+		local pivot = crate.CFrame + Vector3.new(0, crate.Size.Y / 2, 0)
+		local parts = {}
+		for _, p in model:GetChildren() do
+			if p:IsA("BasePart") and p.Name ~= "Ring" then
+				table.insert(parts, { part = p, rel = pivot:ToObjectSpace(p.CFrame) })
+			end
+		end
 		f = {
 			landAt = landAt,
 			height = if typeof(h) == "number" then h else 0,
-			crate = crate.CFrame,
-			chute = chute.CFrame,
+			pivot = pivot,
+			parts = parts,
 		}
 		fall = f
 	end
@@ -399,9 +476,10 @@ local function stepCrate()
 	local left = ff.landAt - workspace:GetServerTimeNow()
 	local lift = math.max(left, 0) / Config.CashDrop.FallSeconds * ff.height
 	local sway = if left > 0 then math.sin(os.clock() * 1.3) * 0.12 else 0
-	local tilt = CFrame.Angles(sway, 0, sway * 0.6)
-	crate.CFrame = (ff.crate + Vector3.new(0, lift, 0)) * tilt
-	chute.CFrame = (ff.chute + Vector3.new(0, lift, 0)) * tilt
+	local at = (ff.pivot + Vector3.new(0, lift, 0)) * CFrame.Angles(sway, 0, sway * 0.6)
+	for _, e in ff.parts do
+		e.part.CFrame = at * e.rel
+	end
 end
 
 -- what the finder points at now: a part, the word on its plate and its colour
@@ -415,7 +493,7 @@ function EventProps.target(): (BasePart?, string, Color3)
 	if which == "CashDrop" then
 		local props = workspace:FindFirstChild("EventProps")
 		local model = props and props:FindFirstChild("CashDrop")
-		local crate = model and model:FindFirstChild("Crate") :: BasePart?
+		local crate = model and (model :: Model).PrimaryPart
 		if crate then
 			return crate, Config.CashDrop.Mark, C.money
 		end

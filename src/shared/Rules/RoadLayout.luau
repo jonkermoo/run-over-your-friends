@@ -1,5 +1,5 @@
 --!strict
--- Where every road goes, as plain numbers: the city grid, the highway ring and its stubs, the connectors to
+-- Where every road goes, as plain numbers: the city grid (ragged: Config/World Map.Mask), the loop road round it and its stubs, the connectors to
 -- the zones, the suburbs' feeders and curving streets, and the downtown lane paint. The game builds its
 -- road collision and terrain from this, and the road meshes (Config/RoadMeshes, tools/roads) were made from
 -- the same numbers: `RoadLayout.hash` of the layout is stored with the meshes, so a test fails if the layout
@@ -22,13 +22,20 @@ export type Layout = {
 		x0: number,
 		z0: number,
 	},
-	ring: number,
+	has: { [number]: { [number]: boolean } }, -- has[i][j]: the block stands (Config/World Map.Mask)
+	mask: { string }, -- the same as rows of "X" and "." north to south (1-based, for the JSON tools)
+	merged: { [string]: boolean }, -- road segments left out between merged blocks (RoadLayout.mergeKeys)
+	plazas: { Rect }, -- where those segments would be: paved for people, no cars
+	ring: number, -- the loop's furthest centre-line point from the middle
+	ringInner: number, -- and its nearest
 	ringOuter: number,
+	loop: { Pt }, -- the loop road's centre line, closed (the last point is the first)
 	roads: { Road },
 	bulbs: { { number } },
 	strokes: { Stroke },
 	manholes: { Pt },
-	connectors: { Rect },
+	connectors: { Rect }, -- each connector's bounding box (for keeping things clear of it)
+	links: { { pts: { Pt }, zone: string } }, -- the connectors' centre lines
 	suburbs: { { name: string, streets: { Street } } },
 }
 
@@ -191,14 +198,111 @@ function RoadLayout.segmentStrokes(B: number, R: number, S: PaintCfg, alongX: bo
 end
 
 export type Inputs = {
-	map: { BlockSize: number, RoadWidth: number, BlocksX: number, BlocksZ: number },
-	ring: { Gap: number, Width: number, Connector: number },
+	map: {
+		BlockSize: number,
+		RoadWidth: number,
+		BlocksX: number,
+		BlocksZ: number,
+		Mask: { string }?,
+		Merges: { { number } }?,
+	},
+	ring: {
+		Gap: number,
+		Width: number,
+		Connector: number,
+		Points: number?,
+		Smooth: number?,
+		Window: number?,
+		StubOut: number?,
+	},
 	zones: { [string]: Rect }?, -- filled in by `build` from `zonesOf`
 	zonesOf: (ringOuter: number) -> { [string]: Rect },
 	paint: PaintCfg,
 	suburbs: SuburbCfg & { Hoods: { Hood & { name: string } }, Feeder: { width: number } },
 	seed: number,
 }
+
+-- which blocks stand: `mask[j]` is row j (north to south), one character per block west to east, "X" for a
+-- block; no mask means every block
+function RoadLayout.blockSet(
+	map: { BlocksX: number, BlocksZ: number, Mask: { string }? }
+): { [number]: { [number]: boolean } }
+	local has = {}
+	for i = 0, map.BlocksX - 1 do
+		has[i] = {}
+		for j = 0, map.BlocksZ - 1 do
+			local row = map.Mask and map.Mask[j + 1]
+			has[i][j] = row == nil or string.sub(row, i + 1, i + 1) == "X"
+		end
+	end
+	return has
+end
+
+-- a merge joins two neighbouring blocks across the road between them (that road is left out); the key
+-- names the road segment: "v,k,m" is the north-south segment on line k between crossings m and m + 1,
+-- "h,k,m" the east-west one on line m between crossings k and k + 1
+function RoadLayout.mergeKeys(merges: { { number } }?): { [string]: boolean }
+	local out = {}
+	for _, m in merges or {} do
+		local i, j, i2, j2 = m[1], m[2], m[3], m[4]
+		if j == j2 then
+			out[`v,{math.max(i, i2)},{j}`] = true
+		else
+			out[`h,{i},{math.max(j, j2)}`] = true
+		end
+	end
+	return out
+end
+
+-- where a ray from `from` along unit `dir` first meets the closed polyline `loop` (distance along the ray)
+function RoadLayout.hitLoop(loop: { Pt }, from: Pt, dir: Pt): number?
+	local best: number? = nil
+	for n = 1, #loop - 1 do
+		local a, b = loop[n], loop[n + 1]
+		local ex, ez = b[1] - a[1], b[2] - a[2]
+		local den = dir[1] * ez - dir[2] * ex
+		if math.abs(den) > 1e-9 then
+			local wx, wz = a[1] - from[1], a[2] - from[2]
+			local t = (wx * ez - wz * ex) / den
+			local s = (wx * dir[2] - wz * dir[1]) / den
+			if t > 0 and s >= 0 and s <= 1 and (best == nil or t < best) then
+				best = t
+			end
+		end
+	end
+	return best
+end
+
+-- is the point inside the closed polyline?
+function RoadLayout.inside(loop: { Pt }, x: number, z: number): boolean
+	local c = false
+	local n = #loop
+	local j = n
+	for i = 1, n do
+		local a, b = loop[i], loop[j]
+		if (a[2] > z) ~= (b[2] > z) and x < (b[1] - a[1]) * (z - a[2]) / (b[2] - a[2]) + a[1] then
+			c = not c
+		end
+		j = i
+	end
+	return c
+end
+
+-- how far the point is from the polyline (open or closed)
+function RoadLayout.distance(pts: { Pt }, x: number, z: number): number
+	local best = math.huge
+	for n = 1, #pts - 1 do
+		local a, b = pts[n], pts[n + 1]
+		local ex, ez = b[1] - a[1], b[2] - a[2]
+		local len2 = ex * ex + ez * ez
+		local t = if len2 > 0
+			then math.clamp(((x - a[1]) * ex + (z - a[2]) * ez) / len2, 0, 1)
+			else 0
+		local dx, dz = x - (a[1] + ex * t), z - (a[2] + ez * t)
+		best = math.min(best, math.sqrt(dx * dx + dz * dz))
+	end
+	return best
+end
 
 -- the whole road layout
 function RoadLayout.build(I: Inputs): Layout
@@ -207,38 +311,77 @@ function RoadLayout.build(I: Inputs): Layout
 	local nx, nz = I.map.BlocksX, I.map.BlocksZ
 	local spanX, spanZ = nx * pitch + R, nz * pitch + R
 	local x0, z0 = -spanX / 2, -spanZ / 2
-	local ring = math.max(spanX, spanZ) / 2 + I.ring.Gap
 	local RW = I.ring.Width
-	local ringOuter = ring + RW / 2
 	local roads: { Road } = {}
 	local strokes: { Stroke } = {}
 	local manholes: { Pt } = {}
+	local has = RoadLayout.blockSet(I.map)
+	local mask: { string } = {}
+	for j = 0, nz - 1 do
+		local row = ""
+		for i = 0, nx - 1 do
+			row ..= if has[i][j] then "X" else "."
+		end
+		table.insert(mask, row)
+	end
+	local merged = RoadLayout.mergeKeys(I.map.Merges)
+	local function block(i: number, j: number): boolean
+		return i >= 0 and j >= 0 and i < nx and j < nz and has[i][j]
+	end
 	local function rx(k: number): number
 		return x0 + R / 2 + k * pitch
 	end
 	local function rz(k: number): number
 		return z0 + R / 2 + k * pitch
 	end
-	-- city grid, then the stubs out to the ring
-	for i = 0, nx do
-		table.insert(roads, { kind = "town", pts = { { rx(i), z0 }, { rx(i), -z0 } }, width = R })
-		for _, s in { 1, -1 } do
-			table.insert(roads, {
-				kind = "stub",
-				pts = { { rx(i), s * spanZ / 2 }, { rx(i), s * ring } },
-				width = R,
-			})
+	-- the city's road segments: one wherever a block stands on either side, unless the two sides are merged
+	local function vSeg(k: number, m: number): boolean
+		return (block(k - 1, m) or block(k, m)) and not merged[`v,{k},{m}`]
+	end
+	local function hSeg(k: number, m: number): boolean
+		return (block(k, m - 1) or block(k, m)) and not merged[`h,{k},{m}`]
+	end
+	local plazas: { Rect } = {}
+	for key in merged do
+		local parts = string.split(key, ",")
+		local k, m = tonumber(parts[2]) :: number, tonumber(parts[3]) :: number
+		if parts[1] == "v" then
+			table.insert(plazas, { x = rx(k), z = rz(m) + pitch / 2, w = R, d = B })
+		else
+			table.insert(plazas, { x = rx(k) + pitch / 2, z = rz(m), w = B, d = R })
 		end
 	end
-	for j = 0, nz do
-		table.insert(roads, { kind = "town", pts = { { x0, rz(j) }, { -x0, rz(j) } }, width = R })
-		for _, s in { 1, -1 } do
-			table.insert(roads, {
-				kind = "stub",
-				pts = { { s * spanX / 2, rz(j) }, { s * ring, rz(j) } },
-				width = R,
-			})
+	-- runs of segments along each grid line become one road each
+	local ends: { { pt: Pt, dir: Pt } } = {} -- the open ends of the grid, where a stub runs out to the loop
+	local function runs(count: number, seg: (n: number) -> boolean, at: (n: number) -> Pt, out: Pt)
+		local n = 0
+		while n < count do
+			if seg(n) then
+				local first = n
+				while n < count and seg(n) do
+					n += 1
+				end
+				table.insert(roads, { kind = "town", pts = { at(first), at(n) }, width = R })
+				table.insert(ends, { pt = at(first), dir = { -out[1], -out[2] } })
+				table.insert(ends, { pt = at(n), dir = out })
+			else
+				n += 1
+			end
 		end
+	end
+	for k = 0, nx do
+		runs(nz, function(m)
+			return vSeg(k, m)
+		end, function(m)
+			return { rx(k), rz(m) }
+		end, { 0, 1 })
+	end
+	for m = 0, nz do
+		runs(nx, function(k)
+			return hSeg(k, m)
+		end, function(k)
+			return { rx(k), rz(m) }
+		end, { 1, 0 })
 	end
 	-- downtown paint and manholes (as StreetKit used to draw them)
 	local function addStrokes(cx: number, cz: number, alongX: boolean)
@@ -249,59 +392,164 @@ function RoadLayout.build(I: Inputs): Layout
 			)
 		end
 	end
+	local crossing: { [string]: boolean } = {}
 	for k = 0, nx do
 		for m = 0, nz - 1 do
-			addStrokes(rx(k), rz(m) + R / 2 + B / 2, false)
+			if vSeg(k, m) then
+				addStrokes(rx(k), rz(m) + R / 2 + B / 2, false)
+				crossing[`{k},{m}`] = true
+				crossing[`{k},{m + 1}`] = true
+			end
 		end
 	end
 	for m = 0, nz do
 		for k = 0, nx - 1 do
-			addStrokes(rx(k) + R / 2 + B / 2, rz(m), true)
+			if hSeg(k, m) then
+				addStrokes(rx(k) + R / 2 + B / 2, rz(m), true)
+				crossing[`{k},{m}`] = true
+				crossing[`{k + 1},{m}`] = true
+			end
 		end
 	end
 	for k = 0, nx do
 		for m = 0, nz do
-			table.insert(manholes, { rx(k) + 9, rz(m) + 9 })
+			if crossing[`{k},{m}`] then
+				table.insert(manholes, { rx(k) + 9, rz(m) + 9 })
+			end
 		end
 	end
-	-- the ring: four sides, each running past the corners by half its width so the square closes
-	for _, s in { 1, -1 } do
-		table.insert(roads, {
-			kind = "ring",
-			pts = { { s * ring, -ring - RW / 2 }, { s * ring, ring + RW / 2 } },
-			width = RW,
-		})
-		table.insert(roads, {
-			kind = "ring",
-			pts = { { -ring - RW / 2, s * ring }, { ring + RW / 2, s * ring } },
-			width = RW,
-		})
+	-- the loop: round the town at `Gap` past its outer roads, following its ragged edge. For each direction,
+	-- the furthest point of the town (blocks grown by their roads) within a window either side, smoothed.
+	local outline: { Pt } = {}
+	for i = 0, nx - 1 do
+		for j = 0, nz - 1 do
+			if has[i][j] then
+				local ax, bx = rx(i) - R / 2, rx(i + 1) + R / 2
+				local az, bz = rz(j) - R / 2, rz(j + 1) + R / 2
+				for _, p in
+					{
+						{ ax, az },
+						{ bx, az },
+						{ ax, bz },
+						{ bx, bz },
+						{ (ax + bx) / 2, az },
+						{ (ax + bx) / 2, bz },
+						{ ax, (az + bz) / 2 },
+						{ bx, (az + bz) / 2 },
+					}
+				do
+					table.insert(outline, p)
+				end
+			end
+		end
 	end
-	-- connectors from the ring to the zones
+	local N = I.ring.Points or 96
+	local window = I.ring.Window or math.pi / 9
+	local radius: { number } = {}
+	for n = 1, N do
+		local a = (n - 1) / N * 2 * math.pi
+		local far = 0
+		for _, p in outline do
+			local d = math.abs((math.atan2(p[2], p[1]) - a + math.pi) % (2 * math.pi) - math.pi)
+			if d < window then
+				far = math.max(far, math.sqrt(p[1] * p[1] + p[2] * p[2]) * math.cos(d))
+			end
+		end
+		radius[n] = far
+	end
+	for _ = 1, I.ring.Smooth or 3 do
+		local was = table.clone(radius)
+		for n = 1, N do
+			local l, r = was[(n - 2) % N + 1], was[n % N + 1]
+			radius[n] = math.max(was[n], (l + 2 * was[n] + r) / 4)
+		end
+	end
+	local loop: { Pt } = {}
+	for n = 1, N do
+		local a = (n - 1) / N * 2 * math.pi
+		local r = radius[n] + I.ring.Gap
+		table.insert(loop, { math.cos(a) * r, math.sin(a) * r })
+	end
+	table.insert(loop, loop[1])
+	local ring, ringInner = 0, math.huge
+	for n = 1, N do
+		local d = math.sqrt(loop[n][1] ^ 2 + loop[n][2] ^ 2)
+		ring = math.max(ring, d)
+		ringInner = math.min(ringInner, d)
+	end
+	local ringOuter = ring + RW / 2
+	-- the loop road runs one step past its start, so the mesh closes without a seam
+	local loopRoad = table.clone(loop)
+	table.insert(loopRoad, loop[2])
+	table.insert(roads, { kind = "ring", pts = loopRoad, width = RW })
+	-- stubs: the open ends of the grid that point out of town run straight on to the loop (an end running
+	-- along the town's edge stays a corner)
+	for _, e in ends do
+		local t = RoadLayout.hitLoop(loop, e.pt, e.dir)
+		local d = math.sqrt(e.pt[1] ^ 2 + e.pt[2] ^ 2)
+		local out = if d > 0 then (e.pt[1] * e.dir[1] + e.pt[2] * e.dir[2]) / d else 0
+		if t and t > R / 2 and out >= (I.ring.StubOut or 0.8) then
+			table.insert(roads, {
+				kind = "stub",
+				pts = { e.pt, { e.pt[1] + e.dir[1] * t, e.pt[2] + e.dir[2] * t } },
+				width = R,
+			})
+		end
+	end
+	-- connectors from the loop to the zones: from the loop's nearest point to the zone's near side, bowed
 	local zones = I.zonesOf(ringOuter)
 	local connectors: { Rect } = {}
+	local links: { { pts: { Pt }, zone: string } } = {}
+	local bow = RoadLayout.stream(I.seed + 77)
 	for _, key in { "stunt", "port", "desert", "site" } do
 		local z = zones[key]
-		local alongX = z.z == 0
-		local near = if alongX then math.abs(z.x) - z.w / 2 else math.abs(z.z) - z.d / 2
-		local len = near - ring + 20
-		local mid = ring + len / 2
-		local rect: Rect = if alongX
-			then { x = math.sign(z.x) * mid, z = 0, w = len, d = I.ring.Connector }
-			else { x = 0, z = math.sign(z.z) * mid, w = I.ring.Connector, d = len }
-		table.insert(connectors, rect)
-		local pts = if alongX
-			then { { math.sign(z.x) * ring, 0 }, { math.sign(z.x) * (ring + len), 0 } }
-			else { { 0, math.sign(z.z) * ring }, { 0, math.sign(z.z) * (ring + len) } }
+		local d = math.sqrt(z.x * z.x + z.z * z.z)
+		local u = { z.x / d, z.z / d }
+		-- the zone's side facing the middle
+		local q: Pt = if math.abs(u[1]) * z.d > math.abs(u[2]) * z.w
+			then { z.x - math.sign(u[1]) * z.w / 2, z.z }
+			else { z.x, z.z - math.sign(u[2]) * z.d / 2 }
+		local t = RoadLayout.hitLoop(loop, { 0, 0 }, u) :: number
+		local p: Pt = { u[1] * (t - RW / 4), u[2] * (t - RW / 4) }
+		local dx, dz = q[1] - p[1], q[2] - p[2]
+		local len = math.sqrt(dx * dx + dz * dz)
+		local side = bow(-0.18, 0.18) * len
+		local c: Pt = { (p[1] + q[1]) / 2 - dz / len * side, (p[2] + q[2]) / 2 + dx / len * side }
+		local pts: { Pt } = {}
+		local steps = math.max(2, math.ceil(len / 40))
+		for s = 0, steps do
+			local k = s / steps
+			local a, b2, c2 = (1 - k) ^ 2, 2 * (1 - k) * k, k * k
+			table.insert(
+				pts,
+				{ a * p[1] + b2 * c[1] + c2 * q[1], a * p[2] + b2 * c[2] + c2 * q[2] }
+			)
+		end
+		-- run on into the zone a little so the road meets its ground
+		table.insert(pts, { q[1] + u[1] * 20, q[2] + u[2] * 20 })
 		table.insert(roads, { kind = "connector", pts = pts, width = I.ring.Connector })
+		table.insert(links, { pts = pts, zone = key })
+		local lx, hx, lz, hz = math.huge, -math.huge, math.huge, -math.huge
+		for _, pt in pts do
+			lx, hx = math.min(lx, pt[1]), math.max(hx, pt[1])
+			lz, hz = math.min(lz, pt[2]), math.max(hz, pt[2])
+		end
+		local half = I.ring.Connector / 2
+		table.insert(connectors, {
+			x = (lx + hx) / 2,
+			z = (lz + hz) / 2,
+			w = hx - lx + 2 * half,
+			d = hz - lz + 2 * half,
+		})
 	end
-	-- the suburbs: a feeder out from the ring, then the streets (cul-de-sac bulbs at their ends)
+	-- the suburbs: a feeder from the loop out along the hood's axis, then the streets (bulbs at their ends)
 	local suburbs = {}
 	local bulbs: { { number } } = {}
 	local Sub = I.suburbs
 	for n, h in Sub.Hoods do
 		local origin, dir = RoadLayout.hoodFrame(h)
-		local a = { origin[1] + dir[1] * (ringOuter - 5), origin[2] + dir[2] * (ringOuter - 5) }
+		local t = RoadLayout.hitLoop(loop, origin, dir) or h.start
+		local a = { origin[1] + dir[1] * (t - RW / 4), origin[2] + dir[2] * (t - RW / 4) }
 		local b = { origin[1] + dir[1] * (h.start + 2), origin[2] + dir[2] * (h.start + 2) }
 		table.insert(roads, { kind = "feeder", pts = { a, b }, width = Sub.Feeder.width })
 		local streets = RoadLayout.streets(h, Sub, I.seed + n)
@@ -316,15 +564,44 @@ function RoadLayout.build(I: Inputs): Layout
 	end
 	return {
 		grid = { block = B, road = R, pitch = pitch, nx = nx, nz = nz, x0 = x0, z0 = z0 },
+		has = has,
+		mask = mask,
+		merged = merged,
+		plazas = plazas,
 		ring = ring,
+		ringInner = ringInner,
 		ringOuter = ringOuter,
+		loop = loop,
 		roads = roads,
 		bulbs = bulbs,
 		strokes = strokes,
 		manholes = manholes,
 		connectors = connectors,
+		links = links,
 		suburbs = suburbs,
 	}
+end
+
+-- do all four roads meet at crossing (k, m)?
+function RoadLayout.fourWay(L: Layout, k: number, m: number): boolean
+	return RoadLayout.segment(L, k, m, k + 1, m)
+		and RoadLayout.segment(L, k - 1, m, k, m)
+		and RoadLayout.segment(L, k, m, k, m + 1)
+		and RoadLayout.segment(L, k, m - 1, k, m)
+end
+
+-- does the road segment between two neighbouring crossings exist? (k, m) to (k2, m2), one step apart
+function RoadLayout.segment(L: Layout, k: number, m: number, k2: number, m2: number): boolean
+	local nx, nz = L.grid.nx, L.grid.nz
+	local function block(i: number, j: number): boolean
+		return i >= 0 and j >= 0 and i < nx and j < nz and L.has[i][j]
+	end
+	if k == k2 then
+		local lo = math.min(m, m2)
+		return (block(k - 1, lo) or block(k, lo)) and not L.merged[`v,{k},{lo}`]
+	end
+	local lo = math.min(k, k2)
+	return (block(lo, m - 1) or block(lo, m)) and not L.merged[`h,{lo},{m}`]
 end
 
 -- the layout from the game's own Config (what the map builder and the mesh tools both use)
@@ -376,6 +653,10 @@ function RoadLayout.hash(L: Layout): string
 	end
 	num(L.ring)
 	num(L.ringOuter)
+	for _, p in L.plazas do
+		num(p.x)
+		num(p.z)
+	end
 	for _, r in L.roads do
 		feed(r.kind)
 		num(r.width)

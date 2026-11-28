@@ -645,6 +645,28 @@ local function spray(at: Vector3)
 	Debris:AddItem(a, Streets.HydrantSpraySeconds)
 end
 
+-- a street prop knocked down: it breaks into a few pieces that fly on every screen (thrown with `push`) and
+-- stands back up after Streets.PropRebuildSeconds
+local function knockProp(prop: Model, push: Vector3, userId: number)
+	propDownUntil[prop] = os.clock() + Streets.PropRebuildSeconds
+	local pivot = prop:GetPivot().Position
+	-- it breaks into a few pieces that fly on every screen; the real one waits, hidden, to be stood back up
+	local thrown: { Burst } = {}
+	for _, p in prop:GetDescendants() do
+		if p:IsA("BasePart") and chunks[p] and not p:GetAttribute("Broken") then
+			p:SetAttribute("Broken", true)
+			table.insert(thrown, crumble(p, nil, 0, CRUMBLE.PropFly))
+			hide(p)
+			task.delay(Streets.PropRebuildSeconds, restore, p)
+		end
+	end
+	sendBricks(pivot, thrown, push)
+	if prop:GetAttribute("Prop") == "Hydrant" then
+		spray(pivot + Vector3.new(0, 1, 0))
+	end
+	Net.remote("Fx"):FireAllClients("Break", pivot, 3, 4, userId)
+end
+
 local lastProp: { [Player]: number } = {}
 
 local function onKnockProp(player: Player, prop: unknown, velocity: unknown)
@@ -677,24 +699,48 @@ local function onKnockProp(player: Player, prop: unknown, velocity: unknown)
 	if (pivot - body.Position).Magnitude > body.Size.Magnitude / 2 + 18 + speed * 0.3 then
 		return
 	end
-	propDownUntil[prop] = now + Streets.PropRebuildSeconds
 	local push = (if speed > 0.1 then velocity.Unit * speed else Vector3.zero) * CRUMBLE.PropPush
 		+ Vector3.new(0, CRUMBLE.PropLift, 0)
-	-- it breaks into a few pieces that fly on every screen; the real one waits, hidden, to be stood back up
-	local thrown: { Burst } = {}
-	for _, p in prop:GetDescendants() do
-		if p:IsA("BasePart") and chunks[p] and not p:GetAttribute("Broken") then
-			p:SetAttribute("Broken", true)
-			table.insert(thrown, crumble(p, nil, 0, CRUMBLE.PropFly))
-			hide(p)
-			task.delay(Streets.PropRebuildSeconds, restore, p)
+	knockProp(prop, push, player.UserId)
+end
+
+-- knock down every street prop standing in a box on the ground (centre x, z, unit heading hx, hz, half width
+-- and length, studs), thrown along `velocity` (studs/s): an event truck driving through (server/EventProps).
+-- Returns how many went down.
+function BuildingService.knockPropsWithin(
+	x: number,
+	z: number,
+	hx: number,
+	hz: number,
+	halfW: number,
+	halfL: number,
+	velocity: Vector3
+): number
+	local folder = propsFolder
+	if not folder then
+		return 0
+	end
+	local now = os.clock()
+	local speed = velocity.Magnitude
+	local push = (if speed > 0.1 then velocity.Unit * speed else Vector3.zero) * CRUMBLE.PropPush
+		+ Vector3.new(0, CRUMBLE.PropLift, 0)
+	local reach = halfW + halfL
+	local n = 0
+	for _, prop in folder:GetChildren() do
+		if prop:IsA("Model") and (propDownUntil[prop] or 0) <= now then
+			local at = prop:GetPivot().Position
+			local dx, dz = at.X - x, at.Z - z
+			if math.abs(dx) <= reach and math.abs(dz) <= reach then
+				local along = dx * hx + dz * hz
+				local side = dx * hz - dz * hx
+				if math.abs(along) <= halfL and math.abs(side) <= halfW then
+					knockProp(prop, push, 0)
+					n += 1
+				end
+			end
 		end
 	end
-	sendBricks(pivot, thrown, push)
-	if prop:GetAttribute("Prop") == "Hydrant" then
-		spray(pivot + Vector3.new(0, 1, 0))
-	end
-	Net.remote("Fx"):FireAllClients("Break", pivot, 3, 4, player.UserId)
+	return n
 end
 
 function BuildingService.start()

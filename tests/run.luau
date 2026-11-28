@@ -626,6 +626,31 @@ do
 	-- a solo player beats the boss in a sensible number of solid hits
 	local hits = BT.Hp / base
 	check("boss: about 8-20 solid hits alone", hits >= 8 and hits <= 20)
+	-- a hit knocks the Money Truck flying: harder with heavier cars, never past the hitter's cap
+	local K = MT.Knock
+	local light = EventRules.knockSpeed(120, 1100, 999, K)
+	local heavy = EventRules.knockSpeed(120, 6000, 999, K)
+	check(
+		"money truck: heavier cars knock it further, within the cap",
+		heavy > light
+			and light > 0
+			and EventRules.knockSpeed(250, 9000, 100, K) <= 100
+			and EventRules.knockSpeed(250, 9000, 999, K) <= K.MaxSpeed
+	)
+	local air = EventRules.airTime(60, 196.2)
+	local _, upMid, _, kMid = EventRules.knockOffset(air / 2, 50, 60, 0, 196.2, 1.5)
+	local xLand, yLand, _, kLand = EventRules.knockOffset(air + 0.01, 50, 60, 0, 196.2, 1.5)
+	local xBack, yBack = EventRules.knockOffset(air + 2, 50, 60, 0, 196.2, 1.5)
+	check(
+		"money truck: a knock flies up, lands, and comes back to its lane",
+		upMid > 5
+			and near(kMid, 0.5, 1e-6)
+			and kLand == 1
+			and yLand == 0
+			and xLand > 25
+			and xBack == 0
+			and yBack == 0
+	)
 end
 
 -- event vehicles' route (Rules/Route)
@@ -1322,7 +1347,9 @@ end
 -- the countryside stays clear of the zones, the ring and the map's edge
 do
 	local Country = require("../src/shared/Config/Country")
-	local ringOuter = 8 * 284 / 2 + 32 + OutskirtsConfig.Ring.Gap + OutskirtsConfig.Ring.Width / 2
+	local RoadLayout = require("../src/shared/Rules/RoadLayout")
+	local layout = RoadLayout.fromConfig()
+	local ringOuter = layout.ringOuter
 	local zones = OutskirtsRules.zones(
 		ringOuter,
 		OutskirtsConfig.Stunt,
@@ -1333,15 +1360,39 @@ do
 	local function overlaps(p, q)
 		return math.abs(p.x - q.x) < (p.w + q.w) / 2 and math.abs(p.z - q.z) < (p.d + q.d) / 2
 	end
+	-- clear of the loop road: every corner outside it, past its outer edge
+	local function pastLoop(r): boolean
+		for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+			local x, z = r.x + c[1] * r.w / 2, r.z + c[2] * r.d / 2
+			if
+				RoadLayout.inside(layout.loop, x, z)
+				or RoadLayout.distance(layout.loop, x, z) < ringOuter - layout.ring + 10
+			then
+				return false
+			end
+		end
+		return true
+	end
 	local ok = true
-	for _, r in { Country.Farm.Rect, Country.Moto.Rect, Country.Forest.Rect } do
+	local areas =
+		{ Country.Farm.Rect, Country.Moto.Rect, Country.Forest.Rect, Country.WindFarm.Rect }
+	for n, r in areas do
 		for _, z in zones do
 			ok = ok and not overlaps(r, z)
 		end
-		ok = ok and not overlaps(r, { x = 0, z = 0, w = ringOuter * 2, d = ringOuter * 2 })
+		for m = n + 1, #areas do
+			ok = ok and not overlaps(r, areas[m])
+		end
+		ok = ok and pastLoop(r)
 		ok = ok and math.abs(r.x) + r.w / 2 < 3000 and math.abs(r.z) + r.d / 2 < 3000
 	end
-	check("farm, motocross and forest miss the zones and the ring, inside the map", ok)
+	for _, z in zones do
+		ok = ok and pastLoop(z)
+	end
+	check(
+		"farm, motocross, forest and wind farm miss the zones, each other and the loop, inside the map",
+		ok
+	)
 	local odd = true
 	for k, use in Country.Cells.Uses do
 		if use == "gas" then
@@ -3668,23 +3719,26 @@ local function checkLand()
 	local LandCfg = require("../src/shared/Config/Land")
 	local Land = require("../src/shared/Rules/Land")
 	local Suburbs = require("../src/shared/Config/Suburbs")
-	local seaEdge = -2203 -- the port's quay (Outskirts zones at the default ring), as measured in Studio
+	local seaEdge = -2075 -- the port's quay (Config/Outskirts Port At and Width)
 	check("the coast is straight along the beaches", Land.coast(LandCfg, seaEdge, 2999) == seaEdge)
 	check("the coast curves inland past them", Land.coast(LandCfg, seaEdge, 4000) > seaEdge + 200)
 	local inside = true
 	for _, p in
 		{
-			{ 2650, 2650 },
-			{ 2650, -2650 },
-			{ -1950, -2800 },
-			{ 2400, 0 },
-			{ 0, -2700 },
-			{ 0, 2700 },
+			{ 1500, 1575 }, -- the motocross's far corner
+			{ 1560, -1640 }, -- the farm's
+			{ -1700, -1600 }, -- the forest's
+			{ 2150, 550 }, -- the stunt park's far corners
+			{ 2150, -550 },
+			{ 1050, -2060 }, -- the wind farm's
+			{ -730, -1850 }, -- past the building site
+			{ 500, 1750 }, -- past the desert
+			{ -500, 1750 },
 		}
 	do
 		inside = inside and Land.isLand(LandCfg, seaEdge, p[1], p[2], 200)
 	end
-	check("the old map's far corners are well inside the island", inside)
+	check("the zones' far corners are well inside the island", inside)
 	local outline = Land.outline(LandCfg, seaEdge, 120)
 	local ok = #outline == 120
 	for _, p in outline do

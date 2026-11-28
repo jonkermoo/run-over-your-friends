@@ -106,6 +106,49 @@ function Events.damage(closing: number, weightKg: number, c: DamageConfig): numb
 	return math.floor(math.clamp(d, c.DamageMin, c.DamageMax) + 0.5)
 end
 
+-- the Money Truck knocked into the air by a hit, as a car hitting a car is (server/PlayerHitService): the hit's
+-- launch speed (Impact.launchSpeed) times the square root of the hitter's weight over the truck's (that ratio
+-- clamped RatioMin-RatioMax, as a car hit), times Scale, capped by the hitter's car launch cap and MaxSpeed.
+-- studs/s.
+export type KnockConfig = {
+	Weight: number,
+	Scale: number,
+	RatioMin: number,
+	RatioMax: number,
+	MaxSpeed: number,
+}
+function Events.knockSpeed(launch: number, weightKg: number, cap: number, c: KnockConfig): number
+	local ratio = math.clamp(math.max(weightKg, 1) / c.Weight, c.RatioMin, c.RatioMax) ^ 0.5
+	return math.min(launch * ratio * c.Scale, cap, c.MaxSpeed)
+end
+
+-- seconds a knock with `up` studs/s upward stays in the air under gravity `g`
+function Events.airTime(up: number, g: number): number
+	return if up > 0 and g > 0 then 2 * up / g else 0
+end
+
+-- where a knocked truck is `t` seconds after the hit, from its spot on the route (studs): it flies on (vx, vy, vz)
+-- until it lands, then drives back into its lane over `back` seconds. Also its tumble, 0-1 through the flight.
+function Events.knockOffset(
+	t: number,
+	vx: number,
+	vy: number,
+	vz: number,
+	g: number,
+	back: number
+): (number, number, number, number)
+	local air = Events.airTime(vy, g)
+	if t <= 0 or air <= 0 then
+		return 0, 0, 0, 0
+	end
+	if t < air then
+		return vx * t, vy * t - g * t * t / 2, vz * t, t / air
+	end
+	local k = if back > 0 then math.clamp((t - air) / back, 0, 1) else 1
+	local keep = 1 - k * k * (3 - 2 * k)
+	return vx * air * keep, 0, vz * air * keep, 1
+end
+
 -- where the event sign goes, kept clear of the menu strip (the tab strip, top left). All in layout px from the
 -- top left of the screen area both sit in: y, h, w are the sign's top, height and width (it's centred on a
 -- screen screenW wide), menu the strip's edges (nil while it's hidden). With no top bar to sit in (a Studio

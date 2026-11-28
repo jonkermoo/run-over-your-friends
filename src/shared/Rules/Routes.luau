@@ -14,6 +14,7 @@ export type Grid = {
 	sidewalk: number,
 	x0: number, -- west edge of the city grid (outer road edge)
 	z0: number,
+	has: { [number]: { [number]: boolean } }?, -- which blocks stand (Rules/RoadLayout); none, all of them
 }
 export type Graph = {
 	grid: Grid,
@@ -56,11 +57,22 @@ function Routes.corner(g: Graph, i: number, j: number, sx: number, sz: number): 
 	return g.corners[`{i},{j},{sx},{sz}`]
 end
 
+-- does block (i, j) stand? (`grid.has`: the ragged town; none, every block does)
+function Routes.stands(grid: Grid, i: number, j: number): boolean
+	if i < 0 or j < 0 or i >= grid.blocksX or j >= grid.blocksZ then
+		return false
+	end
+	return grid.has == nil or grid.has[i][j]
+end
+
 function Routes.new(grid: Grid): Graph
 	local g: Graph = { grid = grid, nodes = {}, links = {}, corners = {}, sides = {} }
 	local inset = grid.block / 2 - grid.sidewalk / 2
 	for i = 0, grid.blocksX - 1 do
 		for j = 0, grid.blocksZ - 1 do
+			if not Routes.stands(grid, i, j) then
+				continue
+			end
 			local cx, cz = Routes.blockCentre(grid, i, j)
 			for _, sx in { -1, 1 } do
 				for _, sz in { -1, 1 } do
@@ -114,6 +126,9 @@ function Routes.finish(g: Graph)
 	local grid = g.grid
 	for i = 0, grid.blocksX - 1 do
 		for j = 0, grid.blocksZ - 1 do
+			if not Routes.stands(grid, i, j) then
+				continue
+			end
 			for side, s in SIDES do
 				local a, b
 				if s[1] ~= 0 then
@@ -136,7 +151,7 @@ function Routes.finish(g: Graph)
 				end
 				Routes.link(g, prev, b)
 			end
-			if i + 1 < grid.blocksX then
+			if Routes.stands(grid, i + 1, j) then
 				for _, sz in { -1, 1 } do
 					Routes.link(
 						g,
@@ -145,7 +160,7 @@ function Routes.finish(g: Graph)
 					)
 				end
 			end
-			if j + 1 < grid.blocksZ then
+			if Routes.stands(grid, i, j + 1) then
 				for _, sx in { -1, 1 } do
 					Routes.link(
 						g,

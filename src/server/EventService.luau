@@ -207,6 +207,14 @@ local function finishContest()
 	end
 end
 
+-- the live event was beaten: it ends EndLinger seconds from now (the schedule plans the next from then)
+local function beaten()
+	if not won then
+		won = true
+		liveEnds = math.min(liveEnds, os.clock() + Config.EndLinger)
+	end
+end
+
 local function begin(key: string)
 	local event = eventOf(key)
 	if event and event.contest then
@@ -234,8 +242,7 @@ local function begin(key: string)
 				score(player, "Damage", amount)
 			end,
 			won = function()
-				won = true
-				liveEnds = math.min(liveEnds, os.clock() + Config.EndLinger)
+				beaten()
 			end,
 			paid = function(player, what, amount)
 				Analytics.eventPaid(player, key, what, amount)
@@ -319,6 +326,11 @@ local function tick()
 		forced = nil
 		endLive()
 		nextIndex, startAt = f, t
+	end
+	-- a toppled giant ends its event (the topple bonus is paid as it falls, NpcService)
+	local g = giant
+	if liveIndex and Config.List[liveIndex].key == "Giant" and g and g:GetAttribute("Down") then
+		beaten()
 	end
 	if liveIndex and t >= liveEnds then
 		endLive()

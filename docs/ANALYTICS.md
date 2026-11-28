@@ -50,7 +50,7 @@ Item names in the purchase events: `Product:<key>` (Robux products in `Config/Pr
 | `ChestOpened` | cash it paid | `Daily` / `Weekly` | `Paint:<id>` (a chest-only paint, `Config/Paints`) or `Cash` | What challenge chests give out. |
 | `EventSeen` | 1 | event key (`Config/Events`) | tier (`Quick`, `Contest`, `Big`) | Players in the server when a live event started. |
 | `EventEnded` | players who took part | event key | `Won` (crate claimed, truck cracked, boss beaten, giant toppled) / `Time` (ran out) | Logged once per event run, on one player in the server. How often each event is won and how many join in. |
-| `EventPaid` | amount | event key | `Prize` (contest place), `Share` (Boss Truck pot split by damage), `Jackpot` (Money Truck cracked), `Cash` (a spilled bundle grabbed), `Crate` (Cash Drop) | Event money per player, per event and kind. Compare with hit pay to size `Config/Events` `PayScale`. |
+| `EventPaid` | amount | event key | `Prize` (contest place), `Share` (Boss Truck pot split by damage), `Jackpot` (Money Truck cracked), `Hit` (a Money Truck hit), `Crate` (Cash Drop) | Event money per player, per event and kind. Compare with hit pay to size `Config/Events` `PayScale`. |
 | `EventJoined` | 1 | event key | | Players who took part (a hit, smash or stunt while it was live), once per event run. With `EventSeen`: the join rate per event. |
 
 Older custom events (kept): `VehicleSpawned` (field 01: vehicle id), `Demolished`, `GiantToppled`.

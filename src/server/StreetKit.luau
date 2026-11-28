@@ -13,6 +13,7 @@ local Ambient = require(ReplicatedStorage.Shared.Config.Ambient)
 local CityPlan = require(ReplicatedStorage.Shared.Rules.CityPlan)
 local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Routes = require(ReplicatedStorage.Shared.Rules.Routes)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local S = require(ReplicatedStorage.Shared.Config.Streets)
 local Places = require(script.Parent.Places)
 local G = require(ReplicatedStorage.Shared.Config.StreetGreen)
@@ -378,10 +379,15 @@ function StreetKit.build(
 	local function district(i: number, j: number): Districts.Key
 		return Districts.of(math.clamp(i, 0, N - 1), math.clamp(j, 0, M - 1), N, M)
 	end
-	-- traffic lights at crossings that touch a district with signals (not on the city's outer edge)
+	-- traffic lights at crossings that touch a district with signals (not on the city's outer edge, and only
+	-- where all four roads meet: the ragged town leaves some out)
+	local layout = RoadLayout.fromConfig()
 	for k = 1, N - 1 do
 		for m = 1, M - 1 do
 			local lit = false
+			if not RoadLayout.fourWay(layout, k, m) then
+				continue
+			end
 			for _, d in
 				{ district(k - 1, m - 1), district(k, m - 1), district(k - 1, m), district(k, m) }
 			do
@@ -407,6 +413,9 @@ function StreetKit.build(
 		{ Vector3.new(0, 0, -1), Vector3.new(0, 0, 1), Vector3.new(-1, 0, 0), Vector3.new(1, 0, 0) }
 	for i = 0, N - 1 do
 		for j = 0, M - 1 do
+			if kinds[i][j] == nil then
+				continue -- no block here (World Map.Mask)
+			end
 			local d = (S.Districts :: any)[district(i, j)] :: S.District
 			local cx, cz = Routes.blockCentre(grid, i, j)
 			local centre = Vector3.new(cx, Y0, cz)

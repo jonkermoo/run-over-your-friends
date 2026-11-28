@@ -14,6 +14,7 @@ local Districts = require(ReplicatedStorage.Shared.Rules.Districts)
 local Net = require(ReplicatedStorage.Shared.Net)
 local Paints = require(ReplicatedStorage.Shared.Config.Paints)
 local Roads = require(ReplicatedStorage.Shared.Rules.Roads)
+local RoadLayout = require(ReplicatedStorage.Shared.Rules.RoadLayout)
 local Streets = require(ReplicatedStorage.Shared.Config.Streets)
 local Vehicles = require(ReplicatedStorage.Shared.Config.Vehicles)
 local CrowdService = require(script.Parent.CrowdService)
@@ -446,10 +447,61 @@ local function onHit(player: Player, id: unknown, velocity: unknown)
 	Net.remote("Fx"):FireAllClients("Break", pos, 14, 9, player.UserId)
 end
 
+-- an event truck drives through (server/EventProps): every live car whose box overlaps the truck's (centre x, z,
+-- unit heading hx, hz, half width and length, studs) is wrecked and thrown along `velocity` (studs/s). No one is
+-- paid. Traffic cars are taken as CAR_HALF studs across and long.
+local CAR_HALF = { 4, 9 }
+function TrafficService.wreckWithin(
+	x: number,
+	z: number,
+	hx: number,
+	hz: number,
+	halfW: number,
+	halfL: number,
+	velocity: Vector3
+): number
+	local n = 0
+	for _, car in cars do
+		if
+			car.placed
+			and car.crashedUntil == 0
+			and Roads.overlap(
+				car.x,
+				car.z,
+				car.hx,
+				car.hz,
+				CAR_HALF[1],
+				CAR_HALF[2],
+				x,
+				z,
+				hx,
+				hz,
+				halfW,
+				halfL
+			)
+		then
+			car.crashedUntil = os.clock() + Cfg.RespawnSeconds
+			local carVel = Vector3.new(car.hx, 0, car.hz) * car.speed
+			local closing = (velocity - carVel).Magnitude / Vehicles.StudsPerMetre
+			local push = (velocity - carVel) * Cfg.FlingAlong
+				+ Vector3.new(0, Cfg.FlingUp + closing * Cfg.FlingUpPerMs, 0)
+			Net.remote("TrafficCrash"):FireAllClients(car.id, car.gen, push, 0)
+			Net.remote("Fx"):FireAllClients("Break", Vector3.new(car.x, 2, car.z), 14, 9, 0)
+			n += 1
+		end
+	end
+	return n
+end
+
 function TrafficService.setup(grid: Roads.Grid)
+	local layout = RoadLayout.fromConfig()
 	local function lit(i: number, j: number): boolean
-		-- the same crossings StreetKit puts traffic lights on: inside the grid, touching a district with signals
+		-- the same crossings StreetKit puts traffic lights on: inside the grid, all four roads there
+		-- (RoadLayout.fourWay), touching a district with signals
 		if i < 1 or j < 1 or i > grid.blocksX - 1 or j > grid.blocksZ - 1 then
+			return false
+		end
+		if not RoadLayout.fourWay(layout, i, j) then
 			return false
 		end
 		for _, b in { { i - 1, j - 1 }, { i, j - 1 }, { i - 1, j }, { i, j } } do
@@ -460,7 +512,9 @@ function TrafficService.setup(grid: Roads.Grid)
 		end
 		return false
 	end
-	graph = Roads.graph(grid, lit)
+	graph = Roads.graph(grid, lit, function(i, j, i2, j2)
+		return RoadLayout.segment(layout, i, j, i2, j2)
+	end)
 	edge = grid.road / 2
 	for n, p in Paints.List do
 		if p.rgb and not p.vip then -- the VIP colour stays the VIP pass's

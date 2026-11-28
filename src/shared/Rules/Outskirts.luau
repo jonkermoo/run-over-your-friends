@@ -5,9 +5,9 @@
 local Outskirts = {}
 
 export type Rect = { x: number, z: number, w: number, d: number } -- centre and size (w east-west, d north-south)
-export type Zone = { Gap: number, Width: number, Depth: number }
+export type Zone = { Gap: number, Width: number, Depth: number, At: { number }? } -- At: its centre, if set
 
--- the four zones, `ringOuter` studs from the middle to the ring's outer edge
+-- the four zones: at their own `At` centres, else `ringOuter` studs from the middle to the ring's outer edge
 function Outskirts.zones(
 	ringOuter: number,
 	stunt: Zone,
@@ -15,31 +15,34 @@ function Outskirts.zones(
 	desert: Zone,
 	site: Zone
 ): { stunt: Rect, port: Rect, desert: Rect, site: Rect }
+	local function placed(z: Zone, r: Rect): Rect
+		return if z.At then { x = z.At[1], z = z.At[2], w = r.w, d = r.d } else r
+	end
 	return {
-		stunt = {
+		stunt = placed(stunt, {
 			x = ringOuter + stunt.Gap + stunt.Width / 2,
 			z = 0,
 			w = stunt.Width,
 			d = stunt.Depth,
-		},
-		port = {
+		}),
+		port = placed(port, {
 			x = -(ringOuter + port.Gap + port.Width / 2),
 			z = 0,
 			w = port.Width,
 			d = port.Depth,
-		},
-		desert = {
+		}),
+		desert = placed(desert, {
 			x = 0,
 			z = ringOuter + desert.Gap + desert.Depth / 2,
 			w = desert.Width,
 			d = desert.Depth,
-		},
-		site = {
+		}),
+		site = placed(site, {
 			x = 0,
 			z = -(ringOuter + site.Gap + site.Depth / 2),
 			w = site.Width,
 			d = site.Depth,
-		},
+		}),
 	}
 end
 

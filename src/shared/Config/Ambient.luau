@@ -38,9 +38,9 @@ return table.freeze({
 
 	-- bird flocks: each circles a point over downtown, `Birds` small dark birds in a loose V, flapping
 	Flocks = table.freeze({
-		{ x = 142, z = 142, height = 70, radius = 120 },
-		{ x = -426, z = 142, height = 60, radius = 90 },
-		{ x = 426, z = -142, height = 64, radius = 100 },
+		{ x = 0, z = 0, height = 70, radius = 120 },
+		{ x = -568, z = 0, height = 60, radius = 90 },
+		{ x = 284, z = -284, height = 64, radius = 100 },
 	}) :: { Flock },
 	Birds = 7,
 	BirdSize = table.freeze({ 2.4, 0.15, 0.8 }), -- wing span, thickness, body length
