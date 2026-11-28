@@ -177,7 +177,7 @@ card.Name = "TrialOver"
 Style.slot(card)
 card.Size = UDim2.fromOffset(CARD_W, CARD_H)
 card.Visible = false
-Style.topIcon(card, Icons.PassRoadster, 150)
+Style.topIcon(card, Icons.RoadRoadster, 150)
 local title = Style.label(card, "TRIAL OVER!", 38, F.display, C.text)
 title.Position = UDim2.fromOffset(0, 74)
 title.Size = UDim2.new(1, 0, 0, 40)
